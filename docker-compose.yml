@@ -1,8 +1,6 @@
 services:
   nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
+    image: kirillwynn/kw-nginx:latest
     ports:
       - "80:80"
       - "443:443"
