@@ -2,9 +2,7 @@
 .DS_Store
 Thumbs.db
 
-# Игнорировать все файлы, связанные с Docker
-**/Dockerfile
-**/docker-compose.yml
+# Игнорировать логи
 **/*.log
 *.swp
 
