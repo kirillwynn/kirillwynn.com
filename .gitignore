@@ -1,0 +1,19 @@
+# Игнорировать файлы, создаваемые системой
+.DS_Store
+Thumbs.db
+
+# Игнорировать все файлы, связанные с Docker
+**/Dockerfile
+**/docker-compose.yml
+**/*.log
+*.swp
+
+# Игнорировать виртуальные окружения Python
+venv/
+__pycache__
+
+# Игнорировать каталог Let's Encrypt
+/etc/letsencrypt
+
+# Игнорировать файл с переменными окружения
+.env
