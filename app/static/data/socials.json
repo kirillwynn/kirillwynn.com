@@ -1,0 +1,52 @@
+{
+    "socials": [
+      {
+        "name": "X",
+        "url": "https://x.com/kirillwynn",
+        "icon": "images/socials/x.svg",
+        "order": 1
+      },
+      {
+        "name": "LeetCode",
+        "url": "https://leetcode.com/u/kirillwynn/",
+        "icon": "images/socials/leetcode.svg",
+        "order": 2
+      },
+      {
+        "name": "Telegram",
+        "url": "https://t.me/kirillwynn",
+        "icon": "images/socials/telegram.svg",
+        "order": 3
+      },
+      {
+        "name": "Instagram",
+        "url": "https://instagram.com/kirillwynn",
+        "icon": "images/socials/instagram.svg",
+        "order": 4
+      },
+      {
+        "name": "Reddit",
+        "url": "https://reddit.com/user/kirillwynn",
+        "icon": "images/socials/reddit.svg",
+        "order": 5
+      },
+      {
+        "name": "Twitch",
+        "url": "https://www.twitch.tv/kirillwynn",
+        "icon": "images/socials/twitch.svg",
+        "order": 6
+      },
+      {
+        "name": "Steam",
+        "url": "https://steamcommunity.com/id/kirillwynn",
+        "icon": "images/socials/steam.svg",
+        "order": 7
+      },
+      {
+        "name": "Pulse",
+        "url": "https://www.tbank.ru/invest/social/profile/kirillwynn/",
+        "icon": "images/socials/pulse.svg",
+        "order": 8
+      }
+    ]
+  }

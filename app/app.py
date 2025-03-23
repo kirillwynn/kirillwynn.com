@@ -1,4 +1,5 @@
 import os
+import json
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from flask_sqlalchemy import SQLAlchemy
@@ -50,7 +51,12 @@ def gambling():
 
 @app.route('/catch-me')
 def catch_me():
-    return render_template('catch_me.html')
+    json_path = os.path.join(app.static_folder, 'data', 'socials.json')
+    with open(json_path, 'r', encoding='utf-8') as f:
+        socials = json.load(f)['socials']
+        
+    socials_sorted = sorted(socials, key=lambda x: x['order'])
+    return render_template('catch_me.html', socials=socials_sorted)
 
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
