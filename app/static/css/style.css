@@ -1,12 +1,12 @@
 /* Gruvbox Color Scheme */
 :root {
-    --gruvbox-bg: #1d2021;
-    --gruvbox-bg0-h: #282828;
-    --gruvbox-bg1: #3c3836;
-    --gruvbox-fg: #ebdbb2;
-    --gruvbox-fg1: #d5c4a1;
-    --gruvbox-yellow: #d79921;
-    --gruvbox-orange: #fe8019;
+    --gruvbox-bg: #1d2021;      /* Background */
+    --gruvbox-bg0-h: #282828;   /* Hard Background */
+    --gruvbox-bg1: #3c3836;     /* Slightly lighter background */
+    --gruvbox-fg: #ebdbb2;      /* Foreground (text) */
+    --gruvbox-fg1: #d5c4a1;     /* Slightly darker text */
+    --gruvbox-yellow: #d79921;  /* Yellow (accents) */
+    --gruvbox-orange: #fe8019;  /* Orange (hover) */
 }
 
 body {
@@ -20,35 +20,29 @@ body {
 .text-gruvbox-fg1 { color: var(--gruvbox-fg1); }
 .text-gruvbox-yellow { color: var(--gruvbox-yellow); }
 .border-gruvbox-bg1 { border-color: var(--gruvbox-bg1); }
-
 .shadow-md {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
-
 .shadow-lg {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
-
 .rounded-xl {
     border-radius: 16px;
 }
-
 .transition-all {
-    transition: all 0.2s ease-out;
+    transition-property: all;
+    transition-timing-function: ease-out;
+    transition-duration: 0.2s;
 }
-
 .transform:hover {
     transform: translateY(-2px) scale(1.05);
 }
-
 .animate-fade-in {
     animation: fadeIn 0.3s ease-in forwards;
 }
-
 .animate-fade-in-slow {
     animation: fadeIn 0.5s ease-in forwards;
 }
-
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
