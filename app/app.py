@@ -37,8 +37,20 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 @app.route('/')
-def hello():
-    return "Hello, world! Flask app is running."
+def index():
+    return redirect('feed')
+
+@app.route('/feed')
+def feed():
+    return render_template('feed.html')
+
+@app.route('/gambling')
+def gambling():
+    return render_template('gambling.html')
+
+@app.route('/catch-me')
+def catch_me():
+    return render_template('catch_me.html')
 
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():

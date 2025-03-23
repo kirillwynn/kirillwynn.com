@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="240mm"
+   height="239.99973mm"
+   viewBox="0 0 240 239.99973"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4 (e7c3feb1, 2024-10-09)"
+   sodipodi:docname="tbank.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="1.1015124"
+     inkscape:cx="497.95173"
+     inkscape:cy="609.61639"
+     inkscape:window-width="1728"
+     inkscape:window-height="1052"
+     inkscape:window-x="0"
+     inkscape:window-y="65"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="layer1">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="240"
+       height="239.99973"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Слой 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-94.71057,-376.5963)">
+    <g
+       id="g6"
+       transform="matrix(1.8197657,0,0,1.8197657,623.74214,-625.73177)">
+      <path
+         class="cls-2"
+         d="M -290.71411,550.80062 H -158.829 v 66.32859 c 0,17.00374 -9.07101,32.71631 -23.79583,41.21907 l -42.14669,24.33729 -42.14663,-24.33729 c -14.72513,-8.50276 -23.79596,-24.21533 -23.79596,-41.21907 z"
+         id="path1"
+         style="fill:#ffdd2d;stroke-width:0px" />
+      <path
+         class="cls-3"
+         d="m -254.51895,585.711 v 20.6296 c 2.82102,-3.18559 7.9501,-5.3416 13.81456,-5.3416 h 6.37302 v 23.98169 c 0,6.38024 -1.73353,11.96479 -4.30564,15.03655 h 27.72129 c -2.56674,-3.07487 -4.2963,-8.65234 -4.2963,-15.02437 V 600.999 h 6.3733 c 5.86446,0 10.9934,2.15601 13.81456,5.3416 V 585.711 Z"
+         id="path2"
+         style="fill:#333333;fill-rule:evenodd;stroke-width:0px" />
+    </g>
+  </g>
+</svg>
