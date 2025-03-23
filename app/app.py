@@ -1,9 +1,9 @@
 import os
-from flask import Flask
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask import Flask, redirect, render_template
 
 app = Flask(__name__)
 
