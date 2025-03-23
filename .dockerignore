@@ -1,3 +1,22 @@
+# Ignore Git-related files
 .git
+.gitignore
+
+# Ignore logs
 *.log
+
+# Ignore Markdown files
 *.md
+
+# Ignore Python virtual environments and caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# Ignore Poetry virtual environments
+.poetry/

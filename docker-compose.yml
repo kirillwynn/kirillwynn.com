@@ -1,9 +1,20 @@
 services:
+  app:
+    image: ${DOCKER_USERNAME}/kw-app:latest
+    container_name: app
+    expose:
+      - "5000"
+    restart: always
+
   nginx:
-    image: kirillwynn/kw-nginx:latest
+    image: ${DOCKER_USERNAME}/kw-nginx:latest
+    container_name: nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf  # Override default nginx config
+      - /etc/letsencrypt:/etc/letsencrypt:ro       # Mount certificates directory
+    depends_on:
+      - app
+    restart: always

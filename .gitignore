@@ -1,17 +1,20 @@
-# Игнорировать файлы, создаваемые системой
+# Ignore system-generated files
 .DS_Store
 Thumbs.db
 
-# Игнорировать логи
+# Ignore logs
 **/*.log
 *.swp
 
-# Игнорировать виртуальные окружения Python
+# Ignore Python virtual environments and caches
 venv/
 __pycache__
+*.pyc
+*.pyo
+*.pyd
 
-# Игнорировать каталог Let's Encrypt
+# Ignore Let's Encrypt certificates
 /etc/letsencrypt
 
-# Игнорировать файл с переменными окружения
+# Ignore environment variable files
 .env
