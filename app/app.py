@@ -49,14 +49,14 @@ def feed():
 def gambling():
     return render_template('gambling.html')
 
-@app.route('/catch-me')
-def catch_me():
+@app.route('/stalker-kit')
+def stalker_kit():
     json_path = os.path.join(app.static_folder, 'data', 'socials.json')
     with open(json_path, 'r', encoding='utf-8') as f:
         socials = json.load(f)['socials']
         
     socials_sorted = sorted(socials, key=lambda x: x['order'])
-    return render_template('catch_me.html', socials=socials_sorted)
+    return render_template('stalker_kit.html', socials=socials_sorted)
 
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
