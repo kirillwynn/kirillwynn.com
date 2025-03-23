@@ -1,5 +1,5 @@
 # Stage 1: Build the Flask application using Poetry
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Set environment variables for better Python performance
 ENV PYTHONUNBUFFERED=1 \
@@ -9,15 +9,15 @@ ENV PYTHONUNBUFFERED=1 \
 # Set the working directory
 WORKDIR /app
 
-# Install Poetry
+# Install Poetry at the specified version
 RUN pip install "poetry==$POETRY_VERSION"
 
-# Copy only the dependency files to leverage Docker cache
-COPY pyproject.toml poetry.lock* /app/
+# Copy dependency files (pyproject.toml and poetry.lock)
+COPY pyproject.toml poetry.lock /app/
 
-# Install dependencies without creating a virtual environment
+# Install only main dependencies without creating a virtual environment
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+    && poetry install --only main --no-interaction --no-ansi
 
 # Copy the rest of the application source code
 COPY . .
