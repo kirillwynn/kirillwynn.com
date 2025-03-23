@@ -1,8 +1,6 @@
 {% extends 'base.html' %}
 {% block title %} Stalker Kit {% endblock %}
-
-{% block content %}
-<div class="bg-gruvbox-bg1 p-8 rounded-xl shadow-md">
+{% block content %}<div class="bg-gruvbox-bg1 p-8 rounded-xl shadow-md">
     <div class="grid grid-cols-3 gap-6 max-w-3xl mx-auto">
         {% for social in socials %}
         <a href="{{ social.url }}" target="_blank"
@@ -11,11 +9,6 @@
                  class="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 lg:w-10 lg:h-10 transition-transform duration-200 ease-out hover:scale-110">
         </a>
         {% endfor %}
-    </div>
-
-    <!-- 👇 Тихая инженерная подпись -->
-    <div class="mt-4 text-center text-xs text-gruvbox-fg2 italic opacity-70 select-none">
-        @ Yandex · previously Deeplay
     </div>
 </div>
 {% endblock %}
