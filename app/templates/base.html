@@ -9,7 +9,7 @@
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body class="bg-gruvbox-bg text-gruvbox-fg font-sans min-h-screen flex flex-col transition-colors duration-200">
-    <nav class="bg-gruvbox-bg0-h p-4 shadow-md">
+    <nav class="bg-gruvbox-bg0-h px-4 py-2 shadow-md">
         <div class="max-w-4xl mx-auto flex space-x-4">
             <a href="{{ url_for('feed') }}"
                 class="px-3 py-1 rounded {% if request.endpoint == 'feed' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
