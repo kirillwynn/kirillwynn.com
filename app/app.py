@@ -26,8 +26,8 @@ if missing:
     raise RuntimeError(f"Missing required ENV vars: {', '.join(missing)}")
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
-if not app.config['SECRET_KEY']:
-    raise RuntimeError("SECRET_KEY is required")
+# if not app.config['SECRET_KEY']:
+#     raise RuntimeError("SECRET_KEY is required")
 
 db_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
