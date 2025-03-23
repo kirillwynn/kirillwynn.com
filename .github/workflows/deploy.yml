@@ -52,7 +52,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/kw-app:latest
 
-  deploy:
+    deploy:
     needs: [build-and-push-nginx, build-and-push-flask]
     runs-on: ubuntu-latest
     steps:
@@ -68,7 +68,8 @@ jobs:
           script: |
             cd ~/projects/kirillwynn.com
             git pull origin main
-            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            docker pull ${{ secrets.DOCKER_USERNAME }}/kw-nginx:latest
-            docker pull ${{ secrets.DOCKER_USERNAME }}/kw-app:latest
+            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            docker login -u $DOCKER_USERNAME -p ${{ secrets.DOCKER_PASSWORD }}
+            docker pull $DOCKER_USERNAME/kw-nginx:latest
+            docker pull $DOCKER_USERNAME/kw-app:latest
             docker compose up -d --remove-orphans
