@@ -1,11 +1,13 @@
 {% extends 'base.html' %}
 {% block title %} – Find Me {% endblock %}
 {% block content %}
-<div class="grid grid-cols-3 gap-4 justify-items-center p-6">
+<div class="grid grid-cols-4 gap-6 justify-items-center p-6">
     {% for social in socials %}
     <a href="{{ social.url }}" target="_blank">
-        <div class="bg-gruvbox-bg0-h p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
-            <img src="{{ url_for('static', filename=social.icon) }}" alt="{{ social.name }}" class="w-12 h-12">
+        <div class="bg-gruvbox-bg0-h p-4 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:-translate-y-1 hover:scale-105">
+            <img src="{{ url_for('static', filename=social.icon) }}" 
+                 alt="{{ social.name }}" 
+                 class="w-8 h-8">
         </div>
     </a>
     {% endfor %}
