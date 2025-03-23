@@ -1,41 +1,25 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kirill Wynn {% block title %}{% endblock %}</title>
+    <title> Kirill Wynn {% block title %}{% endblock %} </title>
     <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body class="bg-gruvbox-bg text-gruvbox-fg font-sans min-h-screen flex flex-col transition-colors duration-200">
-    <!-- Навигационное меню -->
-    <nav class="bg-gruvbox-bg0-h p-4 shadow-md">
-        <div class="max-w-4xl mx-auto flex space-x-4">
-            <a href="{{ url_for('feed') }}"
-               class="px-3 py-1 rounded {% if request.endpoint == 'feed' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
-                Feed
-            </a>
-            <a href="{{ url_for('gambling') }}"
-               class="px-3 py-1 rounded {% if request.endpoint == 'gambling' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
-                Gambling
-            </a>
-            <a href="{{ url_for('catch_me') }}"
-               class="px-3 py-1 rounded {% if request.endpoint == 'catch_me' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
-                Catch Me
-            </a>
+    <header class="bg-gruvbox-bg shadow-md p-2">
+        <div class="max-w-4xl mx-auto flex justify-center">
         </div>
-    </nav>
-
-    <!-- Основное содержимое -->
+    </header>
     <main class="flex-1 max-w-4xl mx-auto p-6">
         {% block content %}{% endblock %}
     </main>
-
-    <!-- Футер -->
     <footer class="text-center text-xs text-gruvbox-fg1 py-4">
-        <p> Built with love. And sarcasm. Mostly sarcasm. </p>
+        <div class="max-w-4xl mx-auto flex flex-col items-center space-y-2 animate-fade-in-slow">
+            <p> Built with love. And sarcasm. Mostly sarcasm. </p>
         </div>
     </footer>
 </body>
 </html>
+
