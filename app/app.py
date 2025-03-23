@@ -1,15 +1,15 @@
 import os
 from flask import Flask
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 app = Flask(__name__)
 
+db_host = os.getenv("DB_HOST")
+db_name = os.getenv("DB_NAME")
+db_port = os.getenv("DB_PORT")
 db_user = os.getenv("DB_USER")
 db_password = os.getenv("DB_PASSWORD")
-db_host = os.getenv("DB_HOST")
-db_port = os.getenv("DB_PORT")
-db_name = os.getenv("DB_NAME")
 
 DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 engine = create_engine(DATABASE_URL)
@@ -26,7 +26,7 @@ def webhook():
 def db_test():
     try:
         with engine.connect() as connection:
-            result = connection.execute("SELECT 1").scalar()
+            result = connection.execute(text("SELECT 1")).scalar()
             return f"DB connection successful: {result}"
     except SQLAlchemyError as e:
         return f"DB connection error: {e}"
