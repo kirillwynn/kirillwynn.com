@@ -12,15 +12,15 @@
     <nav class="bg-gruvbox-bg0-h px-4 py-2 shadow-md">
         <div class="max-w-4xl mx-auto flex space-x-4">
             <a href="{{ url_for('feed') }}"
-                class="px-3 py-1 rounded {% if request.endpoint == 'feed' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
+                class="px-3 py-1 {% if request.endpoint == 'feed' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
                 Feed
             </a>
             <a href="{{ url_for('gambling') }}"
-                class="px-3 py-1 rounded {% if request.endpoint == 'gambling' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
+                class="px-3 py-1 {% if request.endpoint == 'gambling' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
                 Gambling
             </a>
             <a href="{{ url_for('catch_me') }}"
-                class="px-3 py-1 rounded {% if request.endpoint == 'catch_me' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
+                class="px-3 py-1 {% if request.endpoint == 'catch_me' %}text-gruvbox-yellow border-b-2 border-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
                 Stalker Kit
             </a>
         </div>
