@@ -45,18 +45,18 @@ def index():
 def feed():
     return render_template('feed.html')
 
-@app.route('/gambling')
-def gambling():
-    return render_template('gambling.html')
+@app.route('/stack')
+def stack():
+    return render_template('stack.html')
 
-@app.route('/stalker-kit')
-def stalker_kit():
+@app.route('/bridge')
+def bridge():
     json_path = os.path.join(app.static_folder, 'data', 'socials.json')
     with open(json_path, 'r', encoding='utf-8') as f:
         socials = json.load(f)['socials']
         
     socials_sorted = sorted(socials, key=lambda x: x['order'])
-    return render_template('stalker_kit.html', socials=socials_sorted)
+    return render_template('bridge.html', socials=socials_sorted)
 
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
