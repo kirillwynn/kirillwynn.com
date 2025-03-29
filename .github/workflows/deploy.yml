@@ -68,14 +68,18 @@ jobs:
           script: |
             cd ~/projects/kirillwynn.com
             git pull origin main
+
             export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             docker login -u $DOCKER_USERNAME -p ${{ secrets.DOCKER_PASSWORD }}
+
             docker pull $DOCKER_USERNAME/kw-nginx:latest
             docker pull $DOCKER_USERNAME/kw-app:latest
+
             export SECRET_KEY=${{ secrets.SECRET_KEY }}
             export DB_HOST=${{ secrets.DB_HOST }}
             export DB_PORT=${{ secrets.DB_PORT }}
             export DB_NAME=${{ secrets.DB_NAME }}
             export DB_USER=${{ secrets.DB_USER }}
             export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
             docker compose up -d --remove-orphans
