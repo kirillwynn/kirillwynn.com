@@ -24,7 +24,7 @@ jobs:
       - name: Build and push Nginx image
         uses: docker/build-push-action@v5
         with:
-          context: ./nginx
+          context: .
           file: ./docker/Dockerfile.nginx
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/kw-nginx:latest
@@ -47,7 +47,7 @@ jobs:
       - name: Build and push Flask image
         uses: docker/build-push-action@v5
         with:
-          context: ./app
+          context: .
           file: ./docker/Dockerfile.app
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/kw-app:latest
