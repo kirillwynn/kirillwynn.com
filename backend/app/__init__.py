@@ -3,7 +3,7 @@ from flask import Flask
 from .config import Config
 from .extensions import db, migrate
 from .routes.main import main_bp
-from backend.app.routes.telegram import telegram_bp
+from app.routes.telegram import telegram_bp
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config.from_object(Config)

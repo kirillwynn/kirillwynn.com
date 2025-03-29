@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
-from backend.app.extensions import db
-from backend.app.models.post_raw_telegram import PostRawTelegram
+from app.extensions import db
+from app.models.post_raw_telegram import PostRawTelegram
 import datetime
 
 telegram_bp = Blueprint('telegram', __name__)
