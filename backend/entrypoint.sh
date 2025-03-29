@@ -1,7 +1,8 @@
 #!/bin/bash
 
 echo "Running Alembic migrations..."
-flask db upgrade
+alembic upgrade head
 
 echo "Starting Gunicorn..."
-exec gunicorn --bind 0.0.0.0:5000 app:app
+exec gunicorn --bind 0.0.0.0:5000 app.wsgi:app
+
