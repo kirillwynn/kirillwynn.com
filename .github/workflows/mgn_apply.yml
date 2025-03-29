@@ -1,0 +1,28 @@
+name: Apply Migrations
+
+on:
+  workflow_dispatch:
+
+jobs:
+  apply-migrations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy and run migration on server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            export SECRET_KEY=${{ secrets.SECRET_KEY }}
+            export DB_HOST=${{ secrets.DB_HOST }}
+            export DB_PORT=${{ secrets.DB_PORT }}
+            export DB_NAME=${{ secrets.DB_NAME }}
+            export DB_USER=${{ secrets.DB_USER }}
+            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            export TELEGRAM_WEBHOOK_TOKEN=${{ secrets.TELEGRAM_WEBHOOK_TOKEN }}
+
+            cd ~/projects/kirillwynn.com
+            docker compose run --rm app flask db upgrade
