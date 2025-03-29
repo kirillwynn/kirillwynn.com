@@ -15,9 +15,9 @@ class Config:
         "DB_NAME": db_name,
         "DB_USER": db_user,
         "DB_PASSWORD": db_password,
-        "TELEGRAM_WEBHOOK_TOKEN": telegram_webhook_token
+        "TELEGRAM_WEBHOOK_TOKEN": TELEGRAM_WEBHOOK_TOKEN
     }
-    
+
     missing = [k for k,v in required.items() if not v]
     if missing:
         raise RuntimeError(f"Missing required ENV vars: {', '.join(missing)}")
