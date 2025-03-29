@@ -25,7 +25,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./nginx
-          file: ./nginx/Dockerfile
+          file: ./docker/Dockerfile.nginx
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/kw-nginx:latest
 
@@ -48,7 +48,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./app
-          file: ./app/Dockerfile
+          file: ./docker/Dockerfile.app
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/kw-app:latest
 
