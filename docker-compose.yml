@@ -24,6 +24,7 @@ services:
       - "5000"
     environment:
       SECRET_KEY: ${SECRET_KEY}
+      FLASK_APP: app
       <<: *common-env
     depends_on:
       - migrate
