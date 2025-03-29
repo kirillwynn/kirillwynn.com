@@ -16,8 +16,6 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       FLASK_APP: app
       <<: *common-env
-    depends_on:
-      - migrate
     restart: always
     networks:
       - default
