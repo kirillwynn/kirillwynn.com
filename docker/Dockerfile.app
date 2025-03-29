@@ -11,6 +11,9 @@ RUN poetry config virtualenvs.create false \
 
 COPY backend/app/ ./app
 COPY backend/entrypoint.sh ./entrypoint.sh
+COPY backend/alembic.ini ./
+COPY backend/migrations ./migrations
+
 
 RUN chmod +x ./entrypoint.sh
 
