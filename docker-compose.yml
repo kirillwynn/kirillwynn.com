@@ -10,6 +10,7 @@ services:
     image: ${DOCKER_USERNAME}/kw-app:latest
     command: flask db upgrade
     environment:
+      FLASK_APP: app
       <<: *common-env
     restart: "no"
 
