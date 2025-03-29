@@ -1,4 +1,4 @@
-name: Apply Migrations
+name: Migrations – Apply 
 
 on:
   workflow_dispatch:
