@@ -10,7 +10,10 @@ RUN poetry config virtualenvs.create false \
     && poetry install --no-root --only main --no-interaction --no-ansi
 
 COPY backend/app/ ./app
+COPY backend/entrypoint.sh ./entrypoint.sh
+
+RUN chmod +x ./entrypoint.sh
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+CMD ["./entrypoint.sh"]
