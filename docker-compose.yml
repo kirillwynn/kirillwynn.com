@@ -4,6 +4,7 @@ x-common-env: &common-env
   DB_NAME: ${DB_NAME}
   DB_USER: ${DB_USER}
   DB_PASSWORD: ${DB_PASSWORD}
+  TELEGRAM_WEBHOOK_TOKEN: ${TELEGRAM_WEBHOOK_TOKEN}
 
 services:
   migrate:
