@@ -4,12 +4,12 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir "poetry==2.1.0"
 
-COPY pyproject.toml poetry.lock ./
+COPY app/pyproject.toml app/poetry.lock ./
 
 RUN poetry config virtualenvs.create false \
     && poetry install --no-root --only main --no-interaction --no-ansi
 
-COPY . .
+COPY app/ ./
 
 EXPOSE 5000
 
