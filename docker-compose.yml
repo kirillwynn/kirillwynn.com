@@ -14,6 +14,8 @@ services:
       FLASK_APP: app
       <<: *common-env
     restart: "no"
+    networks:
+      - default
 
   app:
     image: ${DOCKER_USERNAME}/kw-app:latest
@@ -26,6 +28,8 @@ services:
     depends_on:
       - migrate
     restart: always
+    networks:
+      - default
 
   nginx:
     image: ${DOCKER_USERNAME}/kw-nginx:latest
@@ -39,3 +43,9 @@ services:
     depends_on:
       - app
     restart: always
+    networks:
+      - default
+
+networks:
+  default:
+    name: kw-network
