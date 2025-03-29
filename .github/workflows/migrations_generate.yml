@@ -1,4 +1,4 @@
-name: Generate Migrations
+name: Migrations – Generate 
 
 on:
   workflow_dispatch:
