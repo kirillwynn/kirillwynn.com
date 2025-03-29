@@ -9,11 +9,11 @@ COPY backend/pyproject.toml backend/poetry.lock ./
 RUN poetry config virtualenvs.create false \
     && poetry install --no-root --only main --no-interaction --no-ansi
 
-COPY backend/app/ ./app
-COPY backend/entrypoint.sh ./entrypoint.sh
-COPY backend/migrations ./migrations
+COPY backend/ ./
 
-RUN chmod +x ./entrypoint.sh
+ENV PYTHONPATH=/app
+
+RUN chmod +x entrypoint.sh
 
 EXPOSE 5000
 
