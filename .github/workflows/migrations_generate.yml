@@ -34,6 +34,10 @@ jobs:
           cd backend
           poetry install
 
+      - name: Ensure versions/ directory exists
+        run: |
+          mkdir -p backend/migrations/versions
+
       - name: Run migration
         run: |
           cd backend
