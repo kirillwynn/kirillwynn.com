@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy and run migration on server
+      - name: Deploy and apply migration on server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -25,4 +25,11 @@ jobs:
             export TELEGRAM_WEBHOOK_TOKEN=${{ secrets.TELEGRAM_WEBHOOK_TOKEN }}
 
             cd ~/projects/kirillwynn.com
+
+            git pull origin main
+            docker login -u $DOCKER_USERNAME -p ${{ secrets.DOCKER_PASSWORD }}
+            docker pull $DOCKER_USERNAME/kw-app:latest
+            docker pull $DOCKER_USERNAME/kw-nginx:latest
+
             docker compose run --rm app flask db upgrade
+            docker compose up -d --remove-orphans
