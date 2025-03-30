@@ -49,7 +49,7 @@ def telegram_webhook(token):
     author_id = sender_chat.get('id')
     author_username = sender_chat.get('username')
 
-    # Media
+    # Defaults for media fields
     media_type = None
     file_id = None
     file_unique_id = None
@@ -59,11 +59,23 @@ def telegram_webhook(token):
     height = None
     duration = None
     media_links = []
+    photo = None
+    sticker_emoji = None
+    sticker_set_name = None
+    is_animated = None
+    is_video = None
 
-    # Photo
-    photo = channel_post.get('photo')
-    if photo:
+    # Defaults for poll
+    poll_id = poll_question = poll_options = poll_total_voter_count = None
+    poll_is_anonymous = poll_is_closed = poll_allows_multiple_answers = None
+
+    # Defaults for location
+    location_latitude = location_longitude = None
+
+    # Media parsers
+    if 'photo' in channel_post:
         media_type = 'photo'
+        photo = channel_post['photo']
         media_links = [p.get('file_id') for p in photo if 'file_id' in p]
         best_photo = photo[-1] if photo else {}
         file_id = best_photo.get('file_id')
@@ -72,20 +84,18 @@ def telegram_webhook(token):
         width = best_photo.get('width')
         height = best_photo.get('height')
 
-    # Voice
     elif 'voice' in channel_post:
-        voice = channel_post['voice']
         media_type = 'voice'
+        voice = channel_post['voice']
         file_id = voice.get('file_id')
         file_unique_id = voice.get('file_unique_id')
         file_size = voice.get('file_size')
         mime_type = voice.get('mime_type')
         duration = voice.get('duration')
 
-    # Video note
     elif 'video_note' in channel_post:
-        video = channel_post['video_note']
         media_type = 'video_note'
+        video = channel_post['video_note']
         file_id = video.get('file_id')
         file_unique_id = video.get('file_unique_id')
         file_size = video.get('file_size')
@@ -93,10 +103,9 @@ def telegram_webhook(token):
         width = video.get('length')
         height = video.get('length')
 
-    # Sticker
     elif 'sticker' in channel_post:
-        sticker = channel_post['sticker']
         media_type = 'sticker'
+        sticker = channel_post['sticker']
         file_id = sticker.get('file_id')
         file_unique_id = sticker.get('file_unique_id')
         file_size = sticker.get('file_size')
@@ -107,12 +116,10 @@ def telegram_webhook(token):
         sticker_set_name = sticker.get('set_name')
         is_animated = sticker.get('is_animated')
         is_video = sticker.get('is_video')
-    else:
-        sticker_emoji = sticker_set_name = is_animated = is_video = None
 
     # Poll
-    poll = channel_post.get('poll')
-    if poll:
+    if 'poll' in channel_post:
+        poll = channel_post['poll']
         poll_id = poll.get('id')
         poll_question = poll.get('question')
         poll_options = poll.get('options')
@@ -120,14 +127,12 @@ def telegram_webhook(token):
         poll_is_anonymous = poll.get('is_anonymous')
         poll_is_closed = poll.get('is_closed')
         poll_allows_multiple_answers = poll.get('allows_multiple_answers')
-    else:
-        poll_id = poll_question = poll_options = poll_total_voter_count = None
-        poll_is_anonymous = poll_is_closed = poll_allows_multiple_answers = None
 
     # Location
-    location = channel_post.get('location')
-    location_latitude = location.get('latitude') if location else None
-    location_longitude = location.get('longitude') if location else None
+    if 'location' in channel_post:
+        location = channel_post['location']
+        location_latitude = location.get('latitude')
+        location_longitude = location.get('longitude')
 
     post = PostRawTelegram(
         telegram_message_id=message_id,
