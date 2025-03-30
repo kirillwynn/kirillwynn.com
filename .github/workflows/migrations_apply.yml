@@ -1,4 +1,4 @@
-name: Migrations – Apply 
+name: Migrations – Apply
 
 on:
   workflow_dispatch:
@@ -8,13 +8,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy and apply migration on server
+      - name: Deploy, rebuild, and apply migrations on server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
+
+            cd ~/projects/kirillwynn.com
+            git pull origin main
+
             export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             export SECRET_KEY=${{ secrets.SECRET_KEY }}
             export DB_HOST=${{ secrets.DB_HOST }}
@@ -24,12 +29,11 @@ jobs:
             export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             export TELEGRAM_WEBHOOK_TOKEN=${{ secrets.TELEGRAM_WEBHOOK_TOKEN }}
 
-            cd ~/projects/kirillwynn.com
-
-            git pull origin main
             docker login -u $DOCKER_USERNAME -p ${{ secrets.DOCKER_PASSWORD }}
             docker pull $DOCKER_USERNAME/kw-app:latest
             docker pull $DOCKER_USERNAME/kw-nginx:latest
 
-            docker compose run --rm app flask db upgrade
+            docker compose down
             docker compose up -d --remove-orphans
+
+            docker compose run --rm app flask db upgrade
