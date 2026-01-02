@@ -11,14 +11,14 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
-    return redirect('feed')
+    return redirect('main.feed')
 
 @main_bp.route('/feed')
 def feed():
     return render_template('feed.html')
 
 @main_bp.route('/stash')
-def feed():
+def stash():
     return render_template('stash.html')
 
 @main_bp.route('/stack')
