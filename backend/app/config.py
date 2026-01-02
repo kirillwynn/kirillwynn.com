@@ -1,8 +1,6 @@
 import os
 
 class Config:
-    TELEGRAM_WEBHOOK_TOKEN = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
-
     db_host = os.getenv("DB_HOST")
     db_name = os.getenv("DB_NAME")
     db_port = os.getenv("DB_PORT")
@@ -15,7 +13,6 @@ class Config:
         "DB_NAME": db_name,
         "DB_USER": db_user,
         "DB_PASSWORD": db_password,
-        "TELEGRAM_WEBHOOK_TOKEN": TELEGRAM_WEBHOOK_TOKEN
     }
 
     missing = [k for k,v in required.items() if not v]
