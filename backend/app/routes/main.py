@@ -2,16 +2,12 @@
 
 import os
 import json
-from flask import Blueprint, redirect, render_template, current_app
+from flask import Blueprint, render_template, current_app
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from ..extensions import db
 
 main_bp = Blueprint('main', __name__)
-
-@main_bp.route('/')
-def index():
-    return redirect('main.feed')
 
 @main_bp.route('/feed')
 def feed():
