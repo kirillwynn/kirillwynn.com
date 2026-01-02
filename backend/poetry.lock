@@ -48,6 +48,40 @@ files = [
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
+name = "dnspython"
+version = "2.7.0"
+description = "DNS toolkit"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = []
+
+[package.dependencies]
+idna = ">=2.1"
+
+[[package]]
+name = "email-validator"
+version = "2.2.0"
+description = "A robust email address syntax and deliverability validation library"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = []
+
+[package.dependencies]
+dnspython = "*"
+idna = ">=2.0.0"
+
+[[package]]
+name = "idna"
+version = "3.11"
+description = "Internationalized Domain Names in Applications (IDNA)"
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = []
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -570,4 +604,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "11d910b94785775ef2128d7fc8d31fa7cbbb57a5286791ac45ffa4122f1bc58e"
+content-hash = "115cf985d932e9bf5f540555bbdd75decbb62cac81e399375fc19f6277f8c1d8"
