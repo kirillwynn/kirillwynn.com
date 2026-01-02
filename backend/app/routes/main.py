@@ -17,6 +17,10 @@ def index():
 def feed():
     return render_template('feed.html')
 
+@main_bp.route('/stash')
+def feed():
+    return render_template('stash.html')
+
 @main_bp.route('/stack')
 def stack():
     return render_template('stack.html')
