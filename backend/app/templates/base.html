@@ -17,7 +17,13 @@
                 {'label': 'Stack', 'endpoint': 'main.stack'},
                 {'label': 'Bridge', 'endpoint': 'main.bridge'}
             ] %}
-            
+
+            {% if current_user.is_authenticated and current_user.is_admin %}
+                {% set nav_items = nav_items + [
+                    {'label': 'Admin', 'endpoint': 'admin.index'}
+                ] %}
+            {% endif %}
+
             {% for item in nav_items %}
                 <a href="{{ url_for(item.endpoint) }}" class="relative px-3 py-1 {% if request.endpoint == item.endpoint %}text-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
                     {{ item.label }}
@@ -26,6 +32,10 @@
                     {% endif %}
                 </a>
             {% endfor %}
+
+            {% if current_user.is_authenticated and current_user.is_admin %}
+                <a href="{{ url_for('admin.logout') }}" class="px-3 py-1 text-gruvbox-fg hover:text-gruvbox-yellow">Logout</a>
+            {% endif %}
         </div>
     </nav>
 
