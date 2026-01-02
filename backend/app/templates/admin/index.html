@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<div class="bg-gruvbox-bg0 p-6 rounded shadow">
+    <h1 class="text-2xl font-semibold text-gruvbox-yellow mb-4">Admin Dashboard</h1>
+    <p class="text-gruvbox-fg1">Welcome, {{ current_user.name or current_user.email }}.</p>
+    <p class="text-gruvbox-fg1 mt-2">Use this area to manage the site.</p>
+</div>
+{% endblock %}

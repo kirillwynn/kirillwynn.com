@@ -48,6 +48,20 @@ files = [
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
+name = "email-validator"
+version = "2.2.0"
+description = "Lightweight email validation shim for offline installs"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = []
+develop = false
+
+[package.source]
+type = "directory"
+url = "vendor/email-validator"
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -570,4 +584,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "11d910b94785775ef2128d7fc8d31fa7cbbb57a5286791ac45ffa4122f1bc58e"
+content-hash = "e0329a5815119b7b8afc19095c8241f390cd5d2609757029220b2c9b5888b307"

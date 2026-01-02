@@ -1,0 +1,10 @@
+[project]
+name = "email-validator"
+version = "2.2.0"
+description = "Lightweight email validation shim for offline installs"
+authors = [{name = "Local"}]
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://github.com/JoshData/python-email-validator"

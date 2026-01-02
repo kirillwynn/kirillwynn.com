@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Admin Login{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-gruvbox-bg0 p-6 rounded shadow">
+    <h1 class="text-2xl font-semibold mb-4 text-gruvbox-yellow">Admin Login</h1>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4 space-y-2">
+                {% for category, message in messages %}
+                    <div class="p-3 rounded {{ 'bg-red-900 text-red-100' if category == 'error' else 'bg-gruvbox-bg1 text-gruvbox-fg' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    <form method="POST" class="space-y-4">
+        {{ form.hidden_tag() }}
+        <div>
+            {{ form.email.label(class_='block text-sm mb-1') }}
+            {{ form.email(class_='w-full p-2 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
+            {% for error in form.email.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
+        </div>
+        <div>
+            {{ form.password.label(class_='block text-sm mb-1') }}
+            {{ form.password(class_='w-full p-2 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
+            {% for error in form.password.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
+        </div>
+        <div class="text-right">
+            {{ form.submit(class_='px-4 py-2 bg-gruvbox-yellow text-gruvbox-bg font-semibold rounded hover:bg-yellow-400') }}
+        </div>
+    </form>
+</div>
+{% endblock %}
