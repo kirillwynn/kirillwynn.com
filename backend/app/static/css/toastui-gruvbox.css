@@ -112,3 +112,58 @@
 .toastui-editor-defaultUI ::-webkit-scrollbar-thumb {
   background-color: var(--gruvbox-bg1);
 }
+
+/* ==== Force Gruvbox toolbar styles (scoped to editor) ==== */
+#editor .toastui-editor-defaultUI {
+  background: var(--gruvbox-bg0);
+  color: var(--gruvbox-fg);
+}
+
+/* Toolbar container */
+#editor .toastui-editor-toolbar,
+#editor .toastui-editor-defaultUI-toolbar,
+#editor .toastui-editor-defaultUI .toastui-editor-toolbar {
+  background: var(--gruvbox-bg1) !important;
+  border-bottom: 1px solid var(--gruvbox-bg1) !important;
+}
+
+/* All toolbar buttons (different builds use different markup) */
+#editor .toastui-editor-toolbar button,
+#editor .toastui-editor-defaultUI-toolbar button,
+#editor button.toastui-editor-toolbar-icons,
+#editor .toastui-editor-toolbar .toastui-editor-toolbar-icons,
+#editor .toastui-editor-toolbar button .toastui-editor-toolbar-icons,
+#editor .toastui-editor-defaultUI-toolbar button .toastui-editor-toolbar-icons {
+  color: var(--gruvbox-fg) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  filter: none !important;
+}
+
+/* Hover / focus */
+#editor .toastui-editor-toolbar button:hover,
+#editor .toastui-editor-toolbar button:focus,
+#editor .toastui-editor-defaultUI-toolbar button:hover,
+#editor .toastui-editor-defaultUI-toolbar button:focus {
+  background: var(--gruvbox-bg2) !important;
+  color: var(--gruvbox-fg) !important;
+}
+
+/* SVG icons (some versions use <svg>) */
+#editor .toastui-editor-toolbar svg,
+#editor .toastui-editor-toolbar svg * ,
+#editor .toastui-editor-defaultUI-toolbar svg,
+#editor .toastui-editor-defaultUI-toolbar svg * {
+  fill: var(--gruvbox-fg) !important;
+  stroke: var(--gruvbox-fg) !important;
+}
+
+/* If icons are sprite/background-images, don't let them "invert" to white-on-white */
+#editor .toastui-editor-toolbar .toastui-editor-toolbar-icons {
+  background-color: transparent !important;
+}
+
+/* Divider */
+#editor .toastui-editor-toolbar-divider {
+  background: var(--gruvbox-bg1) !important;
+}
