@@ -24,6 +24,7 @@
 
     <form method="POST" class="space-y-4">
         {{ form.hidden_tag() }}
+
         <div>
             {{ form.title.label(class_='block text-sm mb-1') }}
             {{ form.title(class_='w-full p-2 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
@@ -49,15 +50,28 @@
 
         <div>
             {{ form.body_md.label(class_='block text-sm mb-1') }}
-            <div id="tiptap-debug-marker" class="text-xs text-red-400 mb-1">DEBUG: post_form template active</div>
-            <div id="tiptap-error" class="mb-2 hidden p-3 rounded border border-red-700 bg-red-900 text-red-100 text-sm whitespace-pre-wrap"></div>
+
+            <div id="tiptap-debug-marker" class="text-xs text-red-400 mb-1">
+                DEBUG: post_form template active
+            </div>
+
+            <div id="tiptap-error"
+                 class="mb-2 hidden p-3 rounded border border-red-700 bg-red-900 text-red-100 text-sm whitespace-pre-wrap"></div>
+
             <div id="tiptap-click-debug" class="text-xs text-gruvbox-fg1 mb-2"></div>
+
             <div id="tiptap-toolbar" class="flex flex-wrap gap-2 mb-2"></div>
-            <div id="tiptap-editor" class="rounded border border-gruvbox-bg2"></div>
+
+            <div id="tiptap-editor"
+                 class="min-h-[300px] p-3 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus-within:border-gruvbox-yellow focus-within:outline-none overflow-auto">
+            </div>
+
             <input type="hidden" id="body-field" name="{{ form.body_md.name }}" value="{{ form.body_md.data }}">
+
             {% for error in form.body_md.errors %}
                 <p class="text-red-400 text-sm mt-1">{{ error }}</p>
             {% endfor %}
+
             <p class="text-xs text-gruvbox-fg1 mt-1">Content will be submitted as HTML.</p>
         </div>
 
@@ -65,7 +79,9 @@
             {{ form.save_draft(class_='px-4 py-2 bg-gruvbox-bg1 text-white rounded hover:bg-gruvbox-bg') }}
             {{ form.publish(class_='px-4 py-2 bg-gruvbox-yellow text-gruvbox-bg font-semibold rounded hover:bg-yellow-400') }}
             {% if post %}
-                <a href="{{ url_for('main.post_detail', slug=post.slug) }}?preview=1" target="_blank" rel="noopener" class="px-4 py-2 bg-gruvbox-bg2 text-white rounded hover:bg-gruvbox-bg">Preview</a>
+                <a href="{{ url_for('main.post_detail', slug=post.slug) }}?preview=1"
+                   target="_blank" rel="noopener"
+                   class="px-4 py-2 bg-gruvbox-bg2 text-white rounded hover:bg-gruvbox-bg">Preview</a>
             {% endif %}
             {% if post and post.status == 'published' %}
                 {{ form.unpublish(class_='px-4 py-2 bg-red-800 text-red-100 rounded hover:bg-red-700') }}
@@ -76,198 +92,211 @@
     {% if post %}
         <form method="POST" action="{{ url_for('admin.posts_delete', post_id=post.id) }}" class="mt-4 inline-block">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="px-3 py-2 bg-red-900 text-red-100 rounded hover:bg-red-800" onclick="return confirm('Delete this post?')">Delete</button>
+            <button type="submit"
+                    class="px-3 py-2 bg-red-900 text-red-100 rounded hover:bg-red-800"
+                    onclick="return confirm('Delete this post?')">Delete</button>
         </form>
     {% endif %}
 </div>
 
 <script type="module">
-    document.addEventListener("DOMContentLoaded", async () => {
-        const editorElement = document.getElementById("tiptap-editor");
-        const toolbarElement = document.getElementById("tiptap-toolbar");
-        const bodyField = document.getElementById("body-field");
-        const form = editorElement?.closest("form");
-        const errorBox = document.getElementById("tiptap-error");
-        const clickDebug = document.getElementById("tiptap-click-debug");
+document.addEventListener("DOMContentLoaded", async () => {
+    const editorElement = document.getElementById("tiptap-editor");
+    const toolbarElement = document.getElementById("tiptap-toolbar");
+    const bodyField = document.getElementById("body-field");
+    const form = editorElement?.closest("form");
+    const errorBox = document.getElementById("tiptap-error");
+    const clickDebug = document.getElementById("tiptap-click-debug");
 
-        const toolbarButtonClass = "px-3 py-1 rounded border border-gruvbox-bg2 bg-gruvbox-bg text-white text-sm hover:bg-gruvbox-bg1 transition-colors";
-        const activeButtonClass = "bg-gruvbox-yellow text-gruvbox-bg font-semibold border-gruvbox-yellow";
+    const toolbarButtonClass =
+        "px-3 py-1 rounded border border-gruvbox-bg2 bg-gruvbox-bg text-white text-sm hover:bg-gruvbox-bg1 transition-colors";
+    const activeButtonClass =
+        "bg-gruvbox-yellow text-gruvbox-bg font-semibold border-gruvbox-yellow";
 
-        const showError = (message, detail) => {
-            if (editorElement) {
-                editorElement.textContent = "TipTap failed to initialize";
+    const showError = (message, detail) => {
+        if (editorElement) {
+            editorElement.textContent = "TipTap failed to initialize";
+        }
+        if (errorBox) {
+            errorBox.classList.remove("hidden");
+            const detailHtml = detail ? `<pre class="mt-1 whitespace-pre-wrap">${detail}</pre>` : "";
+            errorBox.innerHTML = `<div class="font-semibold">TipTap error</div><div>${message}</div>${detailHtml}`;
+        }
+    };
+
+    if (!(editorElement && bodyField && form && toolbarElement)) {
+        showError("Editor container or form fields missing");
+        return;
+    }
+
+    editorElement.textContent = "Loading editor…";
+
+    const formatElementDescriptor = (el) => {
+        if (!el) return "<none>";
+        const id = el.id ? `#${el.id}` : "";
+        const classes = el.className ? `.${String(el.className).trim().replace(/\s+/g, ".")}` : "";
+        return `${el.tagName.toLowerCase()}${id}${classes}`;
+    };
+
+    // Capture click diagnostics (helps detect overlays/pointer-events issues)
+    document.addEventListener(
+        "click",
+        (event) => {
+            const fromPoint = document.elementFromPoint(event.clientX, event.clientY);
+            const targetDescriptor = formatElementDescriptor(event.target);
+            const topDescriptor = formatElementDescriptor(fromPoint);
+
+            if (clickDebug) {
+                clickDebug.textContent = `Top element under cursor: ${topDescriptor} | Click target: ${targetDescriptor}`;
             }
-            if (errorBox) {
-                errorBox.classList.remove("hidden");
-                const detailHtml = detail ? `<pre class="mt-1 whitespace-pre-wrap">${detail}</pre>` : "";
-                errorBox.innerHTML = `<div class="font-semibold">TipTap error</div><div>${message}</div>${detailHtml}`;
-            }
-        };
 
-        if (!(editorElement && bodyField && form && toolbarElement)) {
-            showError("Editor container or form fields missing");
+            console.log("Click capture", { targetDescriptor, topDescriptor, fromPoint, target: event.target });
+        },
+        true
+    );
+
+    try {
+        // Verify vendored files exist (helps debug CSP / wrong paths / 404)
+        const [coreResponse, starterResponse] = await Promise.all([
+            fetch("/static/vendor/tiptap/core.js", { cache: "no-store" }),
+            fetch("/static/vendor/tiptap/starter-kit.js", { cache: "no-store" }),
+        ]);
+
+        if (!coreResponse.ok) {
+            showError(`Vendor file missing: core.js (HTTP ${coreResponse.status})`);
             return;
         }
 
-        editorElement.textContent = "Loading editor…";
-
-        const formatElementDescriptor = (el) => {
-            if (!el) return "<none>";
-            const id = el.id ? `#${el.id}` : "";
-            const classes = el.className
-                ? `.${String(el.className).trim().replace(/\s+/g, ".")}`
-                : "";
-            return `${el.tagName.toLowerCase()}${id}${classes}`;
-        };
-
-        document.addEventListener(
-            "click",
-            (event) => {
-                const fromPoint = document.elementFromPoint(event.clientX, event.clientY);
-                const targetDescriptor = formatElementDescriptor(event.target);
-                const topDescriptor = formatElementDescriptor(fromPoint);
-                if (clickDebug) {
-                    clickDebug.textContent = `Top element under cursor: ${topDescriptor} | Click target: ${targetDescriptor}`;
-                }
-                console.log("Click capture", { targetDescriptor, topDescriptor, fromPoint, target: event.target });
-            },
-            true
-        );
-
-        try {
-            const [coreResponse, starterResponse] = await Promise.all([
-                fetch("/static/vendor/tiptap/core.js", { cache: "no-store" }),
-                fetch("/static/vendor/tiptap/starter-kit.js", { cache: "no-store" }),
-            ]);
-
-            if (!coreResponse.ok) {
-                showError(`Vendor file missing: core.js (HTTP ${coreResponse.status})`);
-                return;
-            }
-
-            if (!starterResponse.ok) {
-                showError(`Vendor file missing: starter-kit.js (HTTP ${starterResponse.status})`);
-                return;
-            }
-
-            const [{ Editor }, { default: StarterKit }] = await Promise.all([
-                import("/static/vendor/tiptap/core.js"),
-                import("/static/vendor/tiptap/starter-kit.js"),
-            ]);
-
-            const toolbarActions = [
-                {
-                    name: "bold",
-                    label: "Bold",
-                    command: (editor) => editor.chain().focus().toggleBold().run(),
-                    isActive: (editor) => editor.isActive("bold"),
-                },
-                {
-                    name: "italic",
-                    label: "Italic",
-                    command: (editor) => editor.chain().focus().toggleItalic().run(),
-                    isActive: (editor) => editor.isActive("italic"),
-                },
-                {
-                    name: "heading1",
-                    label: "H1",
-                    command: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-                    isActive: (editor) => editor.isActive("heading", { level: 1 }),
-                },
-                {
-                    name: "heading2",
-                    label: "H2",
-                    command: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-                    isActive: (editor) => editor.isActive("heading", { level: 2 }),
-                },
-                {
-                    name: "heading3",
-                    label: "H3",
-                    command: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-                    isActive: (editor) => editor.isActive("heading", { level: 3 }),
-                },
-                {
-                    name: "bulletList",
-                    label: "Bullet List",
-                    command: (editor) => editor.chain().focus().toggleBulletList().run(),
-                    isActive: (editor) => editor.isActive("bulletList"),
-                },
-                {
-                    name: "orderedList",
-                    label: "Ordered List",
-                    command: (editor) => editor.chain().focus().toggleOrderedList().run(),
-                    isActive: (editor) => editor.isActive("orderedList"),
-                },
-                {
-                    name: "codeBlock",
-                    label: "Code Block",
-                    command: (editor) => editor.chain().focus().toggleCodeBlock().run(),
-                    isActive: (editor) => editor.isActive("codeBlock"),
-                },
-            ];
-
-            toolbarActions.forEach((action) => {
-                const button = document.createElement("button");
-                button.type = "button";
-                button.dataset.action = action.name;
-                button.textContent = action.label;
-                button.className = toolbarButtonClass;
-                toolbarElement.appendChild(button);
-            });
-
-            const editor = new Editor({
-                element: editorElement,
-                extensions: [StarterKit],
-                content: bodyField.value?.trim() || "<p>Start writing your post...</p>",
-                onCreate: ({ editor }) => {
-                    bodyField.value = editor.getHTML();
-                    updateToolbarState(editor);
-                },
-                onUpdate: ({ editor }) => {
-                    bodyField.value = editor.getHTML();
-                    updateToolbarState(editor);
-                },
-                onSelectionUpdate: ({ editor }) => updateToolbarState(editor),
-            });
-
-            editorElement.dataset.tiptapInitialized = "true";
-            editorElement.classList.add("tiptap-ready");
-            console.log("TipTap initialized");
-
-            const proseMirrorNode = editorElement.querySelector(".ProseMirror");
-            if (!proseMirrorNode) {
-                showError("TipTap mounted = false (no .ProseMirror)");
-                return;
-            }
-
-            toolbarElement.addEventListener("click", (event) => {
-                const button = event.target.closest("button[data-action]");
-                if (!button) return;
-
-                event.preventDefault();
-                const action = toolbarActions.find((item) => item.name === button.dataset.action);
-                action?.command(editor);
-                updateToolbarState(editor);
-            });
-
-            form.addEventListener("submit", () => {
-                bodyField.value = editor.getHTML();
-            });
-
-            function updateToolbarState(editorInstance) {
-                toolbarElement.querySelectorAll("button[data-action]").forEach((button) => {
-                    const action = toolbarActions.find((item) => item.name === button.dataset.action);
-                    if (!action) return;
-
-                    const isActive = action.isActive(editorInstance);
-                    button.className = `${toolbarButtonClass} ${isActive ? activeButtonClass : ""}`.trim();
-                });
-            }
-        } catch (error) {
-            console.error("Failed to initialize TipTap editor", error);
-            showError(error.message, error.stack);
+        if (!starterResponse.ok) {
+            showError(`Vendor file missing: starter-kit.js (HTTP ${starterResponse.status})`);
+            return;
         }
-    });
+
+        const [{ Editor }, { default: StarterKit }] = await Promise.all([
+            import("/static/vendor/tiptap/core.js"),
+            import("/static/vendor/tiptap/starter-kit.js"),
+        ]);
+
+        let editor; // assigned after creation
+
+        const toolbarActions = [
+            {
+                name: "bold",
+                label: "Bold",
+                command: (ed) => ed.chain().focus().toggleBold().run(),
+                isActive: (ed) => ed.isActive("bold"),
+            },
+            {
+                name: "italic",
+                label: "Italic",
+                command: (ed) => ed.chain().focus().toggleItalic().run(),
+                isActive: (ed) => ed.isActive("italic"),
+            },
+            {
+                name: "heading1",
+                label: "H1",
+                command: (ed) => ed.chain().focus().toggleHeading({ level: 1 }).run(),
+                isActive: (ed) => ed.isActive("heading", { level: 1 }),
+            },
+            {
+                name: "heading2",
+                label: "H2",
+                command: (ed) => ed.chain().focus().toggleHeading({ level: 2 }).run(),
+                isActive: (ed) => ed.isActive("heading", { level: 2 }),
+            },
+            {
+                name: "heading3",
+                label: "H3",
+                command: (ed) => ed.chain().focus().toggleHeading({ level: 3 }).run(),
+                isActive: (ed) => ed.isActive("heading", { level: 3 }),
+            },
+            {
+                name: "bulletList",
+                label: "Bullet List",
+                command: (ed) => ed.chain().focus().toggleBulletList().run(),
+                isActive: (ed) => ed.isActive("bulletList"),
+            },
+            {
+                name: "orderedList",
+                label: "Ordered List",
+                command: (ed) => ed.chain().focus().toggleOrderedList().run(),
+                isActive: (ed) => ed.isActive("orderedList"),
+            },
+            {
+                name: "codeBlock",
+                label: "Code Block",
+                command: (ed) => ed.chain().focus().toggleCodeBlock().run(),
+                isActive: (ed) => ed.isActive("codeBlock"),
+            },
+        ];
+
+        // Build toolbar buttons
+        toolbarActions.forEach((action) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.dataset.action = action.name;
+            button.textContent = action.label;
+            button.className = toolbarButtonClass;
+            toolbarElement.appendChild(button);
+        });
+
+        function updateToolbarState() {
+            toolbarElement.querySelectorAll("button[data-action]").forEach((button) => {
+                const action = toolbarActions.find((item) => item.name === button.dataset.action);
+                if (!action || !editor) return;
+
+                const isActive = action.isActive(editor);
+                button.className = `${toolbarButtonClass} ${isActive ? activeButtonClass : ""}`.trim();
+            });
+        }
+
+        editor = new Editor({
+            element: editorElement,
+            extensions: [StarterKit],
+            content: bodyField.value?.trim() || "<p>Start writing your post...</p>",
+            onCreate: ({ editor }) => {
+                bodyField.value = editor.getHTML();
+                updateToolbarState();
+            },
+            onUpdate: ({ editor }) => {
+                bodyField.value = editor.getHTML();
+                updateToolbarState();
+            },
+            onSelectionUpdate: updateToolbarState,
+        });
+
+        editorElement.textContent = "";
+
+        editorElement.dataset.tiptapInitialized = "true";
+        editorElement.classList.add("tiptap-ready");
+        console.log("TipTap initialized");
+
+        const proseMirrorNode = editorElement.querySelector(".ProseMirror");
+        if (!proseMirrorNode) {
+            showError("TipTap mounted = false (no .ProseMirror)");
+            return;
+        }
+
+        toolbarElement.addEventListener("click", (event) => {
+            const button = event.target.closest("button[data-action]");
+            if (!button || !editor) return;
+
+            event.preventDefault();
+            const action = toolbarActions.find((item) => item.name === button.dataset.action);
+            if (!action) return;
+
+            action.command(editor);
+            updateToolbarState();
+        });
+
+        form.addEventListener("submit", () => {
+            bodyField.value = editor.getHTML();
+        });
+    } catch (error) {
+        console.error("Failed to initialize TipTap editor", error);
+        showError(error.message, error.stack);
+    }
+});
 </script>
 
 {% endblock %}
