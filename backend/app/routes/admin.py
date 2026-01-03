@@ -2,11 +2,14 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf import FlaskForm
 from wtforms import PasswordField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email, Optional
+from sqlalchemy import text
+from sqlalchemy.engine.url import make_url
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..extensions import db
 from ..models import Post, User
@@ -164,3 +167,33 @@ def posts_delete(post_id: int):
     db.session.commit()
     flash("Post deleted", "success")
     return redirect(url_for("admin.posts_list"))
+
+
+@admin_bp.route("/db-info")
+@admin_required
+def db_info():
+    uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    url = make_url(uri)
+
+    db_meta = {
+        "drivername": url.drivername,
+        "username": url.username,
+        "host": url.host,
+        "port": url.port,
+        "database": url.database,
+    }
+
+    revision = None
+    error = None
+    try:
+        revision = db.session.execute(text("SELECT version_num FROM alembic_version"))\
+            .scalar()
+    except SQLAlchemyError as exc:  # pragma: no cover - debug endpoint
+        current_app.logger.warning("Could not read alembic version", exc_info=exc)
+        error = str(exc)
+
+    return jsonify({
+        "database": db_meta,
+        "alembic_version": revision,
+        "error": error,
+    })
