@@ -49,11 +49,13 @@
 
         <div>
             {{ form.body_md.label(class_='block text-sm mb-1') }}
-            {{ form.body_md(class_='w-full p-3 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none font-mono', rows='18') }}
+            <div id="tiptap-editor" class="min-h-[300px] p-3 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus-within:border-gruvbox-yellow focus-within:outline-none">
+            </div>
+            {{ form.body_md(class_='hidden', id='body-field') }}
             {% for error in form.body_md.errors %}
                 <p class="text-red-400 text-sm mt-1">{{ error }}</p>
             {% endfor %}
-            <p class="text-xs text-gruvbox-fg1 mt-1">Supports Markdown.</p>
+            <p class="text-xs text-gruvbox-fg1 mt-1">Content will be submitted as HTML.</p>
         </div>
 
         <div class="flex flex-wrap gap-3 items-center">
@@ -75,5 +77,29 @@
         </form>
     {% endif %}
 </div>
+
+<script type="module">
+    import { Editor } from "https://esm.sh/@tiptap/core@2.6.6";
+    import StarterKit from "https://esm.sh/@tiptap/starter-kit@2.6.6";
+
+    const editorElement = document.getElementById("tiptap-editor");
+    const bodyField = document.getElementById("body-field");
+    const form = editorElement?.closest("form");
+
+    if (editorElement && bodyField && form) {
+        const editor = new Editor({
+            element: editorElement,
+            extensions: [StarterKit],
+            content: bodyField.value || "<p>Start writing your post...</p>",
+            onUpdate: ({ editor }) => {
+                bodyField.value = editor.getHTML();
+            },
+        });
+
+        form.addEventListener("submit", () => {
+            bodyField.value = editor.getHTML();
+        });
+    }
+</script>
 
 {% endblock %}
