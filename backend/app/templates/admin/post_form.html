@@ -51,7 +51,7 @@
             {{ form.body_md.label(class_='block text-sm mb-1') }}
             <div id="tiptap-editor" class="min-h-[300px] p-3 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus-within:border-gruvbox-yellow focus-within:outline-none">
             </div>
-            {{ form.body_md(class_='hidden', id='body-field') }}
+            <input type="hidden" id="body-field" name="{{ form.body_md.name }}" value="{{ form.body_md.data }}">
             {% for error in form.body_md.errors %}
                 <p class="text-red-400 text-sm mt-1">{{ error }}</p>
             {% endfor %}
