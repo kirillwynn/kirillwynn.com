@@ -48,6 +48,19 @@ body {
     to { opacity: 1; }
 }
 
+.ProseMirror {
+    min-height: 300px;
+    padding: 12px;
+    background-color: var(--gruvbox-bg1);
+    color: var(--gruvbox-fg);
+    outline: none;
+}
+
+.ProseMirror:focus {
+    outline: none;
+    border-color: var(--gruvbox-yellow);
+}
+
 @media (hover: hover) {
     .hover-tile {
       transition: all 0.2s ease-out;
