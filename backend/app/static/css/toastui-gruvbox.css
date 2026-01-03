@@ -1,20 +1,15 @@
-/* Toast UI Editor – Gruvbox Dark Overrides (SAFE VERSION)
-   - НЕ использует background shorthand там, где есть иконки
-   - НЕ сбрасывает background-image у sprite-иконок
-   - Корректно отображает toolbar icons на тёмной теме
-*/
+/* Toast UI Editor – Gruvbox Dark (PNG-safe version) */
 
 :root {
   --gruvbox-bg0: #282828;
   --gruvbox-bg1: #3c3836;
   --gruvbox-bg2: #504945;
+  --gruvbox-bg3: #665c54;
   --gruvbox-fg: #ebdbb2;
   --gruvbox-yellow: #fabd2f;
 }
 
-/* =========================
-   Base editor container
-   ========================= */
+/* ================= Base editor ================= */
 
 .toastui-editor-defaultUI {
   background-color: var(--gruvbox-bg0);
@@ -23,27 +18,49 @@
   color: var(--gruvbox-fg);
 }
 
-/* =========================
-   Toolbar (generic)
-   ========================= */
+/* ================= Toolbar ================= */
 
 .toastui-editor-toolbar {
   background-color: var(--gruvbox-bg1);
   border-bottom: 1px solid var(--gruvbox-bg1);
 }
 
-.toastui-editor-toolbar-divider {
-  background-color: var(--gruvbox-bg1);
+/* ================= Toolbar buttons ================= */
+
+#editor .toastui-editor-toolbar button,
+#editor .toastui-editor-defaultUI-toolbar button {
+  background-color: var(--gruvbox-bg3) !important; /* СВЕТЛЕЕ */
+  border: 1px solid var(--gruvbox-bg2) !important;
+  border-radius: 6px;
 }
 
-/* =========================
-   Mode switch / tabs
-   ========================= */
+/* Hover */
+
+#editor .toastui-editor-toolbar button:hover,
+#editor .toastui-editor-defaultUI-toolbar button:hover {
+  background-color: var(--gruvbox-bg2) !important;
+  border-color: var(--gruvbox-yellow) !important;
+}
+
+/* Active */
+
+#editor .toastui-editor-toolbar button.active,
+#editor .toastui-editor-toolbar button[aria-pressed='true'] {
+  background-color: var(--gruvbox-bg2) !important;
+  border-color: var(--gruvbox-yellow) !important;
+}
+
+/* ================= ICONS (DO NOT TOUCH IMAGE) ================= */
+
+#editor .toastui-editor-toolbar-icons {
+  background-color: transparent !important;
+}
+
+/* ================= Mode switch ================= */
 
 .toastui-editor-mode-switch,
 .toastui-editor-tabs {
   background-color: var(--gruvbox-bg1);
-  border-bottom: 1px solid var(--gruvbox-bg1);
 }
 
 .toastui-editor-mode-switch .tab-item,
@@ -54,175 +71,24 @@
 .toastui-editor-mode-switch .tab-item.active,
 .toastui-editor-tabs .tab-item.active {
   background-color: var(--gruvbox-bg2);
-  border-color: var(--gruvbox-yellow);
   color: var(--gruvbox-yellow);
+  border-color: var(--gruvbox-yellow);
 }
 
-.toastui-editor-mode-switch .tab-item:hover,
-.toastui-editor-tabs .tab-item:hover {
-  background-color: var(--gruvbox-bg2);
-}
-
-/* =========================
-   Editor content
-   ========================= */
+/* ================= Content ================= */
 
 .toastui-editor-contents {
   background-color: var(--gruvbox-bg0);
   color: var(--gruvbox-fg);
-  font-family: inherit;
 }
-
-.toastui-editor-contents pre,
-.toastui-editor-contents code {
-  background-color: var(--gruvbox-bg1);
-  color: var(--gruvbox-yellow);
-}
-
-/* Preview pane */
 
 .toastui-editor-md-preview {
   background-color: var(--gruvbox-bg0);
-  color: var(--gruvbox-fg);
   border-left: 1px solid var(--gruvbox-bg1);
 }
 
-/* =========================
-   Tables
-   ========================= */
+/* ================= Divider ================= */
 
-.toastui-editor-contents table,
-.toastui-editor-contents th,
-.toastui-editor-contents td {
-  border-color: var(--gruvbox-bg1);
-}
-
-/* =========================
-   Popups / dropdowns
-   ========================= */
-
-.toastui-editor-popup,
-.toastui-editor-dropdown {
-  background-color: var(--gruvbox-bg0);
-  border: 1px solid var(--gruvbox-bg2);
-  color: var(--gruvbox-fg);
-}
-
-.toastui-editor-popup hr,
-.toastui-editor-dropdown hr {
-  border-color: var(--gruvbox-bg1);
-}
-
-/* =========================
-   Scrollbars
-   ========================= */
-
-.toastui-editor-defaultUI ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.toastui-editor-defaultUI ::-webkit-scrollbar-thumb {
+.toastui-editor-toolbar-divider {
   background-color: var(--gruvbox-bg1);
-}
-
-.toastui-editor-defaultUI ::-webkit-scrollbar-track {
-  background-color: var(--gruvbox-bg0);
-}
-
-/* =========================================================
-   Toolbar FIXES (scoped to #editor)
-   ========================================================= */
-
-#editor .toastui-editor-defaultUI {
-  background-color: var(--gruvbox-bg0);
-}
-
-/* Toolbar container */
-
-#editor .toastui-editor-toolbar,
-#editor .toastui-editor-defaultUI-toolbar {
-  background-color: var(--gruvbox-bg1) !important;
-  border-bottom: 1px solid var(--gruvbox-bg1) !important;
-}
-
-/* Toolbar buttons — ONLY background-color (no shorthand!) */
-
-#editor .toastui-editor-toolbar button,
-#editor .toastui-editor-defaultUI-toolbar button {
-  background-color: var(--gruvbox-bg0) !important;
-  border: 1px solid var(--gruvbox-bg2) !important;
-  border-radius: 6px;
-  color: var(--gruvbox-fg) !important;
-}
-
-/* Hover / focus */
-
-#editor .toastui-editor-toolbar button:hover,
-#editor .toastui-editor-toolbar button:focus,
-#editor .toastui-editor-defaultUI-toolbar button:hover,
-#editor .toastui-editor-defaultUI-toolbar button:focus {
-  background-color: var(--gruvbox-bg2) !important;
-  border-color: var(--gruvbox-yellow) !important;
-  outline: none !important;
-}
-
-/* Active / pressed */
-
-#editor .toastui-editor-toolbar button.active,
-#editor .toastui-editor-toolbar button[aria-pressed='true'],
-#editor .toastui-editor-defaultUI-toolbar button.active,
-#editor .toastui-editor-defaultUI-toolbar button[aria-pressed='true'] {
-  background-color: var(--gruvbox-bg2) !important;
-  border-color: var(--gruvbox-yellow) !important;
-}
-
-/* =========================
-   ICONS — CRITICAL PART
-   ========================= */
-
-/* Do NOT touch background-image, only color + filter */
-
-#editor .toastui-editor-toolbar-icons {
-  background-color: transparent !important;
-  filter: invert(1) brightness(1.15) contrast(1.05);
-  opacity: 0.95;
-}
-
-/* If icons are SVG-based */
-
-#editor .toastui-editor-toolbar svg,
-#editor .toastui-editor-toolbar svg *,
-#editor .toastui-editor-defaultUI-toolbar svg,
-#editor .toastui-editor-defaultUI-toolbar svg * {
-  fill: var(--gruvbox-fg) !important;
-  stroke: var(--gruvbox-fg) !important;
-}
-
-/* Divider */
-
-#editor .toastui-editor-toolbar-divider {
-  background-color: var(--gruvbox-bg1) !important;
-}
-
-/* =========================
-   Bottom mode switch (Markdown / WYSIWYG)
-   ========================= */
-
-#editor .toastui-editor-mode-switch,
-#editor .toastui-editor-tabs {
-  background-color: var(--gruvbox-bg1) !important;
-  border-top: 1px solid var(--gruvbox-bg1) !important;
-}
-
-#editor .toastui-editor-mode-switch .tab-item,
-#editor .toastui-editor-tabs .tab-item {
-  color: var(--gruvbox-fg) !important;
-}
-
-#editor .toastui-editor-mode-switch .tab-item.active,
-#editor .toastui-editor-tabs .tab-item.active {
-  background-color: var(--gruvbox-bg2) !important;
-  color: var(--gruvbox-yellow) !important;
-  border-color: var(--gruvbox-yellow) !important;
 }
