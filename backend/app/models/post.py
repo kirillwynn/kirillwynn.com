@@ -16,7 +16,7 @@ class Post(db.Model):
 
     # Variant A: store rendered HTML for display, keep optional markdown source
     body_html = db.Column(db.Text, nullable=False, default="")
-    body_md = db.Column(db.Text)
+    body_md = db.Column(db.Text, nullable=True)
 
     excerpt = db.Column(db.Text)
     status = db.Column(db.String(20), nullable=False, default="draft", index=True)
