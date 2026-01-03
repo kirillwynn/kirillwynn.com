@@ -49,7 +49,7 @@
 
         <div>
             {{ form.body_md.label(class_='block text-sm mb-1') }}
-            <div id="editor" class="border border-gruvbox-bg2 rounded bg-gruvbox-bg1"></div>
+            <div id="editor" class="border border-gruvbox-bg2 rounded bg-gruvbox-bg1" style="min-height: 480px;"></div>
             <input type="hidden" name="{{ form.body_md.name }}" id="{{ form.body_md.id }}" value="{{ form.body_md.data|default('')|e }}">
             {% for error in form.body_md.errors %}
                 <p class="text-red-400 text-sm mt-1">{{ error }}</p>
