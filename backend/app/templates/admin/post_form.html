@@ -129,7 +129,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
-    editorElement.textContent = "Loading editor…";
+    const loadingElement = document.createElement("div");
+    loadingElement.id = "tiptap-loading";
+    loadingElement.textContent = "Loading editor…";
+    editorElement.appendChild(loadingElement);
 
     const formatElementDescriptor = (el) => {
         if (!el) return "<none>";
@@ -156,25 +159,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
 
     try {
-        // Verify vendored files exist (helps debug CSP / wrong paths / 404)
-        const [coreResponse, starterResponse] = await Promise.all([
-            fetch("/static/vendor/tiptap/core.js", { cache: "no-store" }),
-            fetch("/static/vendor/tiptap/starter-kit.js", { cache: "no-store" }),
-        ]);
-
-        if (!coreResponse.ok) {
-            showError(`Vendor file missing: core.js (HTTP ${coreResponse.status})`);
-            return;
-        }
-
-        if (!starterResponse.ok) {
-            showError(`Vendor file missing: starter-kit.js (HTTP ${starterResponse.status})`);
-            return;
-        }
-
         const [{ Editor }, { default: StarterKit }] = await Promise.all([
-            import("/static/vendor/tiptap/core.js"),
-            import("/static/vendor/tiptap/starter-kit.js"),
+            import("https://esm.sh/@tiptap/core@2.6.6"),
+            import("https://esm.sh/@tiptap/starter-kit@2.6.6"),
         ]);
 
         let editor; // assigned after creation
@@ -265,7 +252,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             onSelectionUpdate: updateToolbarState,
         });
 
-        editorElement.textContent = "";
+        if (loadingElement.parentNode) {
+            loadingElement.remove();
+        }
 
         editorElement.dataset.tiptapInitialized = "true";
         editorElement.classList.add("tiptap-ready");
@@ -293,6 +282,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             bodyField.value = editor.getHTML();
         });
     } catch (error) {
+        if (loadingElement.parentNode) {
+            loadingElement.remove();
+        }
         console.error("Failed to initialize TipTap editor", error);
         showError(error.message, error.stack);
     }
