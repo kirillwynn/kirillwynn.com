@@ -13,7 +13,8 @@
             initialEditType: 'markdown',
             previewStyle: 'vertical',
             initialValue: hiddenInput.value || '',
-            usageStatistics: false
+            usageStatistics: false,
+            theme: 'dark'
         });
 
         if (editor && typeof editor.focus === 'function') {

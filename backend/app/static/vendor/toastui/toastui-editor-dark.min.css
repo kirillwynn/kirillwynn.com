@@ -1,0 +1,13 @@
+/* Toast UI Editor dark theme base */
+.toastui-editor-defaultUI{background:#1f2933;color:#e5e7eb;border:1px solid #3c4552}
+.toastui-editor-toolbar{background:#27313d;border-bottom:1px solid #3c4552}
+.toastui-editor-toolbar button{color:#e5e7eb}
+.toastui-editor-toolbar button:hover,.toastui-editor-toolbar button:focus{background:#32404f;color:#fff}
+.toastui-editor-toolbar-icons{color:#e5e7eb}
+.toastui-editor-toolbar-divider{background:#3c4552}
+.toastui-editor-md-container{border-right:1px solid #3c4552}
+.toastui-editor-md-preview{background:#1f2933;color:#e5e7eb}
+.toastui-editor-contents{color:#e5e7eb;background:#1f2933}
+.toastui-editor-contents pre,.toastui-editor-contents code{background:#27313d;color:#f0d399}
+.toastui-editor-contents th,.toastui-editor-contents td{border:1px solid #3c4552}
+.toastui-editor-statusbar{color:#9ca3af;border-top:1px solid #3c4552}

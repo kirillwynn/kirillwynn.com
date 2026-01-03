@@ -1,0 +1,74 @@
+/* Toast UI Editor – Gruvbox Dark Overrides */
+
+.toastui-editor-defaultUI {
+  background-color: #1d2021;
+  border: 1px solid #3c3836;
+  border-radius: 6px;
+}
+
+/* Toolbar */
+.toastui-editor-toolbar {
+  background-color: #282828;
+  border-bottom: 1px solid #3c3836;
+}
+
+.toastui-editor-toolbar-icons {
+  color: #ebdbb2;
+}
+
+.toastui-editor-toolbar-icons:hover {
+  background-color: #3c3836;
+}
+
+.toastui-editor-toolbar-divider {
+  background-color: #3c3836;
+}
+
+/* Buttons */
+.toastui-editor-toolbar button {
+  color: #ebdbb2;
+}
+
+.toastui-editor-toolbar button:hover,
+.toastui-editor-toolbar button:focus {
+  background-color: #3c3836;
+}
+
+/* Editor content area */
+.toastui-editor-contents {
+  background-color: #1d2021;
+  color: #ebdbb2;
+  font-family: inherit;
+}
+
+.toastui-editor-contents pre,
+.toastui-editor-contents code {
+  background-color: #282828;
+  color: #fabd2f;
+}
+
+/* Preview pane */
+.toastui-editor-md-preview {
+  background-color: #1d2021;
+  color: #ebdbb2;
+  border-left: 1px solid #3c3836;
+}
+
+/* Tables */
+.toastui-editor-contents table {
+  border-color: #3c3836;
+}
+
+.toastui-editor-contents th,
+.toastui-editor-contents td {
+  border-color: #3c3836;
+}
+
+/* Scrollbars (optional, subtle) */
+.toastui-editor-defaultUI ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.toastui-editor-defaultUI ::-webkit-scrollbar-thumb {
+  background-color: #3c3836;
+}
