@@ -49,8 +49,7 @@
 
         <div>
             {{ form.body_md.label(class_='block text-sm mb-1') }}
-            <div id="editor" class="border border-gruvbox-bg2 rounded bg-gruvbox-bg1" style="min-height:480px"></div>
-            <input type="hidden" name="{{ form.body_md.name }}" id="{{ form.body_md.id }}" value="{{ (form.body_md.data or '')|e }}">
+            {{ form.body_md(class_='w-full p-3 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none font-mono', rows='18') }}
             {% for error in form.body_md.errors %}
                 <p class="text-red-400 text-sm mt-1">{{ error }}</p>
             {% endfor %}
@@ -77,9 +76,4 @@
     {% endif %}
 </div>
 
-<link rel="stylesheet" href="{{ url_for('static', filename='vendor/toastui/toastui-editor.min.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='vendor/toastui/toastui-editor-dark.min.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/toastui-gruvbox.css') }}">
-<script src="{{ url_for('static', filename='vendor/toastui/toastui-editor-all.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/admin_post_editor.js') }}"></script>
 {% endblock %}
