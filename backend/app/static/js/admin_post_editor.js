@@ -1,7 +1,7 @@
 (function(){
     document.addEventListener('DOMContentLoaded', function(){
         var editorElement = document.getElementById('editor');
-        var hiddenInput = document.getElementById('body_md');
+        var hiddenInput = document.getElementById('body_md') || document.querySelector('input[name="body_md"]');
 
         if (!editorElement || !hiddenInput || typeof window.toastui === 'undefined' || typeof window.toastui.Editor !== 'function') {
             return;
