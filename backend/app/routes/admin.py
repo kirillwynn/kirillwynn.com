@@ -94,6 +94,12 @@ def posts_list():
     return render_template("admin/posts_list.html", posts=posts)
 
 
+@admin_bp.route("/tiptap-sandbox")
+@admin_required
+def tiptap_sandbox():
+    return render_template("admin/tiptap_sandbox.html")
+
+
 def _set_post_status_from_form(post: Post, form: PostForm) -> None:
     if form.publish.data:
         post.status = "published"
