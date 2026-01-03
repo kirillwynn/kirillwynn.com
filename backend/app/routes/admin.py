@@ -121,12 +121,17 @@ def _save_post_from_form(post: Post, form: PostForm) -> None:
     desired_slug = form.slug.data.strip() if form.slug.data else post.title
     # Enforce slug uniqueness every save to avoid collisions.
     post.slug = Post.unique_slug(desired_slug, post.id)
+
     raw_html = form.body_md.data or ""
-    # Sanitize HTML before persisting and keep a raw copy for auditing.
-    post.body_raw = raw_html
+    # Variant A: store HTML for rendering; keep optional source in body_md.
+    post.body_md = raw_html
+
+    # Sanitize HTML before persisting.
     post.body_html = sanitize_html(raw_html)
+
     if not post.excerpt:
         post.excerpt = generate_excerpt(post.body_html)
+
     post.tags = form.tags.data.strip() if form.tags.data else None
     _set_post_status_from_form(post, form)
     db.session.add(post)
@@ -151,7 +156,7 @@ def posts_edit(post_id: int):
     post = db.session.get(Post, post_id) or abort(404)
     form = PostForm(obj=post)
     if request.method == "GET":
-        form.body_md.data = post.body_raw or post.body_html
+        form.body_md.data = post.body_md or post.body_html
     if form.validate_on_submit():
         _save_post_from_form(post, form)
         flash("Post updated", "success")
@@ -173,27 +178,33 @@ def posts_delete(post_id: int):
 @admin_required
 def db_info():
     uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-    url = make_url(uri)
 
-    db_meta = {
-        "drivername": url.drivername,
-        "username": url.username,
-        "host": url.host,
-        "port": url.port,
-        "database": url.database,
-    }
+    masked_uri = uri
+    try:
+        masked_uri = str(make_url(uri).set(password="***"))
+    except Exception:  # pragma: no cover - defensive masking
+        masked_uri = "<unparsable URI>"
 
     revision = None
+    db_meta: dict[str, str | None] = {
+        "database_uri": masked_uri,
+        "current_database": None,
+        "current_user": None,
+    }
     error = None
+
     try:
-        revision = db.session.execute(text("SELECT version_num FROM alembic_version"))\
-            .scalar()
+        db_meta["current_database"] = db.session.execute(text("SELECT current_database()")).scalar()
+        db_meta["current_user"] = db.session.execute(text("SELECT current_user")).scalar()
+        revision = db.session.execute(text("SELECT version_num FROM alembic_version")).scalar()
     except SQLAlchemyError as exc:  # pragma: no cover - debug endpoint
-        current_app.logger.warning("Could not read alembic version", exc_info=exc)
+        current_app.logger.warning("Could not read DB diagnostics", exc_info=exc)
         error = str(exc)
 
-    return jsonify({
-        "database": db_meta,
-        "alembic_version": revision,
-        "error": error,
-    })
+    return jsonify(
+        {
+            "database": db_meta,
+            "alembic_version": revision,
+            "error": error,
+        }
+    )

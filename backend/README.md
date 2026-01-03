@@ -34,7 +34,7 @@ flask --app app:create_app db upgrade
 When working through Docker Compose, run the migration commands inside the app container to ensure the database schema is updated:
 
 ```bash
-docker compose exec app flask --app app:create_app db upgrade
-docker compose exec app flask --app app:create_app db current
-docker compose exec app flask --app app:create_app db history
+docker compose exec -T app flask --app app:create_app db upgrade
+docker compose exec -T app flask --app app:create_app db current
+docker compose exec -T app flask --app app:create_app db history
 ```
