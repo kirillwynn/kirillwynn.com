@@ -159,7 +159,6 @@
 /* CRITICAL: icons — we DO NOT touch background / background-image at all */
 #editor .toastui-editor-toolbar-icons {
   /* Only safe cosmetic props */
-  background-color: transparent !important; /* НЕ background: */
   opacity: 0.95;
 }
 
