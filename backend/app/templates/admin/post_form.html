@@ -49,6 +49,7 @@
 
         <div>
             {{ form.body_md.label(class_='block text-sm mb-1') }}
+            <div id="tiptap-toolbar" class="flex flex-wrap gap-2 mb-2"></div>
             <div id="tiptap-editor" class="min-h-[300px] p-3 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus-within:border-gruvbox-yellow focus-within:outline-none">
             </div>
             <input type="hidden" id="body-field" name="{{ form.body_md.name }}" value="{{ form.body_md.data }}">
@@ -83,18 +84,106 @@
     import StarterKit from "https://esm.sh/@tiptap/starter-kit@2.6.6";
 
     const editorElement = document.getElementById("tiptap-editor");
+    const toolbarElement = document.getElementById("tiptap-toolbar");
     const bodyField = document.getElementById("body-field");
     const form = editorElement?.closest("form");
 
-    if (editorElement && bodyField && form) {
+    const toolbarButtonClass = "px-3 py-1 rounded border border-gruvbox-bg2 bg-gruvbox-bg text-white text-sm hover:bg-gruvbox-bg1 transition-colors";
+    const activeButtonClass = "bg-gruvbox-yellow text-gruvbox-bg font-semibold border-gruvbox-yellow";
+
+    if (editorElement && bodyField && form && toolbarElement) {
         const editor = new Editor({
             element: editorElement,
             extensions: [StarterKit],
             content: bodyField.value || "<p>Start writing your post...</p>",
             onUpdate: ({ editor }) => {
                 bodyField.value = editor.getHTML();
+                updateToolbarState();
             },
+            onSelectionUpdate: updateToolbarState,
         });
+
+        const toolbarActions = [
+            {
+                name: "bold",
+                label: "Bold",
+                command: () => editor.chain().focus().toggleBold().run(),
+                isActive: () => editor.isActive("bold"),
+            },
+            {
+                name: "italic",
+                label: "Italic",
+                command: () => editor.chain().focus().toggleItalic().run(),
+                isActive: () => editor.isActive("italic"),
+            },
+            {
+                name: "heading1",
+                label: "H1",
+                command: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+                isActive: () => editor.isActive("heading", { level: 1 }),
+            },
+            {
+                name: "heading2",
+                label: "H2",
+                command: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+                isActive: () => editor.isActive("heading", { level: 2 }),
+            },
+            {
+                name: "heading3",
+                label: "H3",
+                command: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+                isActive: () => editor.isActive("heading", { level: 3 }),
+            },
+            {
+                name: "bulletList",
+                label: "Bullet List",
+                command: () => editor.chain().focus().toggleBulletList().run(),
+                isActive: () => editor.isActive("bulletList"),
+            },
+            {
+                name: "orderedList",
+                label: "Ordered List",
+                command: () => editor.chain().focus().toggleOrderedList().run(),
+                isActive: () => editor.isActive("orderedList"),
+            },
+            {
+                name: "codeBlock",
+                label: "Code Block",
+                command: () => editor.chain().focus().toggleCodeBlock().run(),
+                isActive: () => editor.isActive("codeBlock"),
+            },
+        ];
+
+        toolbarActions.forEach((action) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.dataset.action = action.name;
+            button.textContent = action.label;
+            button.className = toolbarButtonClass;
+            toolbarElement.appendChild(button);
+        });
+
+        toolbarElement.addEventListener("click", (event) => {
+            const button = event.target.closest("button[data-action]");
+            if (!button) return;
+
+            event.preventDefault();
+            const action = toolbarActions.find((item) => item.name === button.dataset.action);
+            action?.command();
+            updateToolbarState();
+        });
+
+        function updateToolbarState() {
+            toolbarElement.querySelectorAll("button[data-action]").forEach((button) => {
+                const action = toolbarActions.find((item) => item.name === button.dataset.action);
+                if (!action) return;
+
+                const isActive = action.isActive();
+                button.className = `${toolbarButtonClass} ${isActive ? activeButtonClass : ""}`.trim();
+            });
+        }
+
+        updateToolbarState();
 
         form.addEventListener("submit", () => {
             bodyField.value = editor.getHTML();
