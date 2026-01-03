@@ -1,4 +1,4 @@
-/* Toast UI Editor – Gruvbox Dark Overrides (PNG-safe) */
+/* Toast UI Editor – Gruvbox Dark Overrides (FIXED) */
 
 :root {
   --gruvbox-bg0: #282828;
@@ -9,162 +9,170 @@
   --gruvbox-yellow: #fabd2f;
 }
 
-/* =========================
-   Base editor container
-   ========================= */
+/* ================= Base editor ================= */
 
-#editor .toastui-editor-defaultUI {
-  background-color: var(--gruvbox-bg0) !important;
-  border: 1px solid var(--gruvbox-bg1) !important;
+.toastui-editor-defaultUI {
+  background-color: var(--gruvbox-bg0);
+  border: 1px solid var(--gruvbox-bg1);
   border-radius: 6px;
   color: var(--gruvbox-fg);
 }
 
-/* =========================
-   Toolbar container
-   ========================= */
+/* Toolbar container */
+.toastui-editor-toolbar {
+  background-color: var(--gruvbox-bg1);
+  border-bottom: 1px solid var(--gruvbox-bg1);
+}
 
-#editor .toastui-editor-defaultUI-toolbar,
+.toastui-editor-toolbar-divider {
+  background-color: var(--gruvbox-bg1);
+}
+
+/* Mode switch / tabs */
+.toastui-editor-mode-switch,
+.toastui-editor-tabs {
+  background-color: var(--gruvbox-bg1);
+  border-bottom: 1px solid var(--gruvbox-bg1);
+}
+
+.toastui-editor-mode-switch .tab-item,
+.toastui-editor-tabs .tab-item {
+  color: var(--gruvbox-fg);
+}
+
+.toastui-editor-mode-switch .tab-item.active,
+.toastui-editor-tabs .tab-item.active {
+  background-color: var(--gruvbox-bg2);
+  border-color: var(--gruvbox-yellow);
+  color: var(--gruvbox-yellow);
+}
+
+.toastui-editor-mode-switch .tab-item:hover,
+.toastui-editor-tabs .tab-item:hover {
+  background-color: var(--gruvbox-bg2);
+  color: var(--gruvbox-fg);
+}
+
+/* Editor content area */
+.toastui-editor-contents {
+  background-color: var(--gruvbox-bg0);
+  color: var(--gruvbox-fg);
+  font-family: inherit;
+}
+
+/* Code blocks */
+.toastui-editor-contents pre,
+.toastui-editor-contents code {
+  background-color: var(--gruvbox-bg1);
+  color: var(--gruvbox-yellow);
+}
+
+/* Preview pane */
+.toastui-editor-md-preview {
+  background-color: var(--gruvbox-bg0);
+  color: var(--gruvbox-fg);
+  border-left: 1px solid var(--gruvbox-bg1);
+}
+
+/* Tables */
+.toastui-editor-contents table {
+  border-color: var(--gruvbox-bg1);
+}
+
+.toastui-editor-contents th,
+.toastui-editor-contents td {
+  border-color: var(--gruvbox-bg1);
+}
+
+/* Popups / dropdowns */
+.toastui-editor-popup,
+.toastui-editor-dropdown {
+  background-color: var(--gruvbox-bg0);
+  border: 1px solid var(--gruvbox-bg2);
+  color: var(--gruvbox-fg);
+}
+
+.toastui-editor-popup hr,
+.toastui-editor-dropdown hr {
+  border-color: var(--gruvbox-bg1);
+}
+
+/* Scrollbars */
+.toastui-editor-defaultUI ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.toastui-editor-defaultUI ::-webkit-scrollbar-thumb {
+  background-color: var(--gruvbox-bg1);
+}
+
+.toastui-editor-defaultUI ::-webkit-scrollbar-track {
+  background-color: var(--gruvbox-bg0);
+}
+
+/* =========================================================
+   Scoped fixes for your admin editor (#editor)
+   ========================================================= */
+
+#editor .toastui-editor-defaultUI {
+  background-color: var(--gruvbox-bg0) !important;
+  color: var(--gruvbox-fg) !important;
+}
+
+/* Toolbar container (avoid "white bar") */
 #editor .toastui-editor-toolbar,
+#editor .toastui-editor-defaultUI-toolbar,
 #editor .toastui-editor-defaultUI .toastui-editor-toolbar {
-  background-color: var(--gruvbox-bg1) !important; 
+  background-color: var(--gruvbox-bg1) !important;
   border-bottom: 1px solid var(--gruvbox-bg1) !important;
 }
 
-/* Divider */
-#editor .toastui-editor-toolbar-divider {
-  background-color: var(--gruvbox-bg2) !important;
-}
-
-/* =========================
-   Toolbar buttons
-   ========================= */
-
-#editor .toastui-editor-defaultUI-toolbar button,
-#editor .toastui-editor-toolbar button {
+/* Buttons: give contrast, but DO NOT use background shorthand */
+#editor .toastui-editor-toolbar button,
+#editor .toastui-editor-defaultUI-toolbar button {
   background-color: var(--gruvbox-bg3) !important;
   border: 1px solid var(--gruvbox-bg2) !important;
   border-radius: 6px !important;
-
-  box-sizing: border-box;
+  color: var(--gruvbox-fg) !important;
 }
 
 /* Hover / focus */
-#editor .toastui-editor-defaultUI-toolbar button:not(:disabled):hover,
-#editor .toastui-editor-toolbar button:not(:disabled):hover,
-#editor .toastui-editor-defaultUI-toolbar button:focus,
-#editor .toastui-editor-toolbar button:focus {
+#editor .toastui-editor-toolbar button:hover,
+#editor .toastui-editor-toolbar button:focus,
+#editor .toastui-editor-defaultUI-toolbar button:hover,
+#editor .toastui-editor-defaultUI-toolbar button:focus {
   background-color: var(--gruvbox-bg2) !important;
   border-color: var(--gruvbox-yellow) !important;
   outline: none !important;
 }
 
 /* Active / pressed */
-#editor .toastui-editor-defaultUI-toolbar button.active,
 #editor .toastui-editor-toolbar button.active,
-#editor .toastui-editor-defaultUI-toolbar button[aria-pressed="true"],
-#editor .toastui-editor-toolbar button[aria-pressed="true"] {
+#editor .toastui-editor-defaultUI-toolbar button.active,
+#editor .toastui-editor-toolbar button[aria-pressed='true'],
+#editor .toastui-editor-defaultUI-toolbar button[aria-pressed='true'] {
   background-color: var(--gruvbox-bg2) !important;
   border-color: var(--gruvbox-yellow) !important;
 }
 
-/* =========================
-   ICONS (CRITICAL)
-   ========================= */
-
+/* CRITICAL: icons — we DO NOT touch background / background-image at all */
 #editor .toastui-editor-toolbar-icons {
-  background-color: transparent !important;
+  /* Only safe cosmetic props */
+  background-color: transparent !important; /* НЕ background: */
   opacity: 0.95;
 }
 
-#editor .toastui-editor-toolbar-icons {
-  background-image: inherit !important; /* сохраняем спрайт из toastui-editor.min.css */
-  background-repeat: no-repeat !important;
+/* Divider */
+#editor .toastui-editor-toolbar-divider {
+  background-color: var(--gruvbox-bg1) !important;
 }
 
-#editor .toastui-editor-defaultUI-toolbar svg,
-#editor .toastui-editor-defaultUI-toolbar svg *,
+/* SVG icons fallback (some builds use svg) */
 #editor .toastui-editor-toolbar svg,
-#editor .toastui-editor-toolbar svg * {
+#editor .toastui-editor-toolbar svg *,
+#editor .toastui-editor-defaultUI-toolbar svg,
+#editor .toastui-editor-defaultUI-toolbar svg * {
   fill: var(--gruvbox-fg) !important;
   stroke: var(--gruvbox-fg) !important;
 }
-
-/* =========================
-   Mode switch / tabs (Markdown / WYSIWYG)
-   ========================= */
-
-#editor .toastui-editor-mode-switch,
-#editor .toastui-editor-tabs {
-  background-color: var(--gruvbox-bg1) !important;
-  border-top: 1px solid var(--gruvbox-bg1) !important;
-}
-
-#editor .toastui-editor-mode-switch .tab-item,
-#editor .toastui-editor-tabs .tab-item {
-  color: var(--gruvbox-fg) !important;
-}
-
-#editor .toastui-editor-mode-switch .tab-item.active,
-#editor .toastui-editor-tabs .tab-item.active {
-  background-color: var(--gruvbox-bg2) !important;
-  border-color: var(--gruvbox-yellow) !important;
-  color: var(--gruvbox-yellow) !important;
-}
-
-#editor .toastui-editor-mode-switch .tab-item:hover,
-#editor .toastui-editor-tabs .tab-item:hover {
-  background-color: var(--gruvbox-bg2) !important;
-}
-
-/* =========================
-   Content / Preview
-   ========================= */
-
-#editor .toastui-editor-contents {
-  background-color: var(--gruvbox-bg0) !important;
-  color: var(--gruvbox-fg) !important;
-  font-family: inherit;
-}
-
-#editor .toastui-editor-md-preview {
-  background-color: var(--gruvbox-bg0) !important;
-  color: var(--gruvbox-fg) !important;
-  border-left: 1px solid var(--gruvbox-bg1) !important;
-}
-
-#editor .toastui-editor-contents pre,
-#editor .toastui-editor-contents code {
-  background-color: var(--gruvbox-bg1) !important;
-  color: var(--gruvbox-yellow) !important;
-}
-
-/* Popups / dropdowns */
-#editor .toastui-editor-popup,
-#editor .toastui-editor-dropdown {
-  background-color: var(--gruvbox-bg0) !important;
-  border: 1px solid var(--gruvbox-bg2) !important;
-  color: var(--gruvbox-fg) !important;
-}
-
-/* =========================
-   HARD FIX: toolbar icon size
-   ========================= */
-
-#editor .toastui-editor-toolbar-icons {
-  display: inline-block !important;
-
-  width: 24px !important;
-  height: 24px !important;
-  min-width: 24px !important;
-  min-height: 24px !important;
-
-  background-repeat: no-repeat !important;
-  background-position: center center !important;
-  background-size: 24px 24px !important;
-
-  /* защита от глобальных span/button span */
-  line-height: 24px !important;
-  flex: 0 0 24px !important;
-}
-
