@@ -58,6 +58,8 @@
             <div id="tiptap-error"
                  class="mb-2 hidden p-3 rounded border border-red-700 bg-red-900 text-red-100 text-sm whitespace-pre-wrap"></div>
 
+            <div id="tiptap-click-debug" class="text-xs text-gruvbox-fg1 mb-2"></div>
+
             <div id="tiptap-toolbar" class="flex flex-wrap gap-2 mb-2"></div>
 
             <div id="tiptap-editor"
@@ -104,6 +106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const bodyField = document.getElementById("body-field");
     const form = editorElement?.closest("form");
     const errorBox = document.getElementById("tiptap-error");
+    const clickDebug = document.getElementById("tiptap-click-debug");
 
     const toolbarButtonClass =
         "px-3 py-1 rounded border border-gruvbox-bg2 bg-gruvbox-bg text-white text-sm hover:bg-gruvbox-bg1 transition-colors";
@@ -127,6 +130,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     editorElement.textContent = "Loading editor…";
+
+    const formatElementDescriptor = (el) => {
+        if (!el) return "<none>";
+        const id = el.id ? `#${el.id}` : "";
+        const classes = el.className ? `.${String(el.className).trim().replace(/\s+/g, ".")}` : "";
+        return `${el.tagName.toLowerCase()}${id}${classes}`;
+    };
+
+    // Capture click diagnostics (helps detect overlays/pointer-events issues)
+    document.addEventListener(
+        "click",
+        (event) => {
+            const fromPoint = document.elementFromPoint(event.clientX, event.clientY);
+            const targetDescriptor = formatElementDescriptor(event.target);
+            const topDescriptor = formatElementDescriptor(fromPoint);
+
+            if (clickDebug) {
+                clickDebug.textContent = `Top element under cursor: ${topDescriptor} | Click target: ${targetDescriptor}`;
+            }
+
+            console.log("Click capture", { targetDescriptor, topDescriptor, fromPoint, target: event.target });
+        },
+        true
+    );
 
     try {
         // Verify vendored files exist (helps debug CSP / wrong paths / 404)
@@ -238,13 +265,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             onSelectionUpdate: updateToolbarState,
         });
 
-        // Clear loading placeholder
         editorElement.textContent = "";
 
-        // Debug marker for confirmation
         editorElement.dataset.tiptapInitialized = "true";
         editorElement.classList.add("tiptap-ready");
         console.log("TipTap initialized");
+
+        const proseMirrorNode = editorElement.querySelector(".ProseMirror");
+        if (!proseMirrorNode) {
+            showError("TipTap mounted = false (no .ProseMirror)");
+            return;
+        }
 
         toolbarElement.addEventListener("click", (event) => {
             const button = event.target.closest("button[data-action]");
