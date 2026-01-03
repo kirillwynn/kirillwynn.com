@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TipTap Sandbox</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        padding: 24px;
+      }
+
+      #tiptap-editor {
+        border: 1px solid #999;
+        padding: 12px;
+        min-height: 200px;
+      }
+
+      .ProseMirror {
+        outline: none;
+        min-height: 200px;
+      }
+
+      #status {
+        margin-bottom: 12px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TipTap Sandbox</h1>
+    <p>This page isolates the TipTap editor without project styles.</p>
+    <div id="status">Loading TipTap...</div>
+    <div id="tiptap-editor"></div>
+
+    <script type="module">
+      const status = document.getElementById("status");
+      const editorElement = document.getElementById("tiptap-editor");
+
+      const showError = (message) => {
+        status.textContent = message;
+        status.style.color = "#b00020";
+      };
+
+      const showReady = (message) => {
+        status.textContent = message;
+        status.style.color = "#0a7b1f";
+      };
+
+      const loadVendor = async (path) => {
+        try {
+          return await import(path);
+        } catch (error) {
+          showError(`Vendor file missing: ${path}`);
+          throw error;
+        }
+      };
+
+      (async () => {
+        try {
+          const coreModule = await loadVendor("/static/vendor/tiptap/core.js");
+          const starterKitModule = await loadVendor("/static/vendor/tiptap/starter-kit.js");
+          const { Editor } = coreModule;
+          const { StarterKit } = starterKitModule;
+
+          new Editor({
+            element: editorElement,
+            extensions: [StarterKit],
+            content: "<p>Hello from TipTap sandbox. Click and type here.</p>",
+          });
+
+          showReady("TipTap loaded. Click inside the box to edit.");
+        } catch (error) {
+          if (!status.textContent.startsWith("Vendor file missing")) {
+            showError(`Failed to initialize TipTap: ${error?.message || error}`);
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>
