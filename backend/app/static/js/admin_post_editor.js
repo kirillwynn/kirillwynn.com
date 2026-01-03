@@ -1,13 +1,9 @@
 (function(){
     document.addEventListener('DOMContentLoaded', function(){
-        if (typeof window.toastui === 'undefined' || typeof window.toastui.Editor !== 'function') {
-            return;
-        }
-
         var editorElement = document.getElementById('editor');
         var hiddenInput = document.getElementById('body_md') || document.querySelector('input[name="body_md"]');
 
-        if (!editorElement || !hiddenInput) {
+        if (!editorElement || !hiddenInput || typeof window.toastui === 'undefined' || typeof window.toastui.Editor !== 'function') {
             return;
         }
 
