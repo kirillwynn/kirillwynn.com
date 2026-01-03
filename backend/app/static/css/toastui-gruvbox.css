@@ -35,7 +35,7 @@
   background-color: var(--gruvbox-bg1);
 }
 
-/* Mode switch / tabs */
+/* Mode switch / tabs (Markdown / WYSIWYG) */
 .toastui-editor-mode-switch,
 .toastui-editor-tabs {
   background-color: var(--gruvbox-bg1);
@@ -67,6 +67,7 @@
   font-family: inherit;
 }
 
+/* Code blocks */
 .toastui-editor-contents pre,
 .toastui-editor-contents code {
   background-color: var(--gruvbox-bg1);
