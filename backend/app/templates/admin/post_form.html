@@ -77,34 +77,7 @@
     {% endif %}
 </div>
 
-<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
-<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var editorElement = document.getElementById('editor');
-        var hiddenInput = document.getElementById('{{ form.body_md.id }}');
-
-        if (!editorElement || !hiddenInput || typeof toastui === 'undefined' || !toastui.Editor) {
-            return;
-        }
-
-        var editor = new toastui.Editor({
-            el: editorElement,
-            height: '480px',
-            initialEditType: 'markdown',
-            previewStyle: 'vertical',
-            initialValue: hiddenInput.value || '',
-            usageStatistics: false
-        });
-
-        editor.focus();
-
-        var form = hiddenInput.form;
-        if (form) {
-            form.addEventListener('submit', function () {
-                hiddenInput.value = editor.getMarkdown();
-            });
-        }
-    });
-</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/toastui/toastui-editor.min.css') }}">
+<script src="{{ url_for('static', filename='vendor/toastui/toastui-editor-all.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin_post_editor.js') }}"></script>
 {% endblock %}
