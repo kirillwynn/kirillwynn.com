@@ -48,21 +48,9 @@ files = [
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
-name = "dnspython"
-version = "2.7.0"
-description = "DNS toolkit"
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = []
-
-[package.dependencies]
-idna = ">=2.1"
-
-[[package]]
 name = "email-validator"
 version = "2.2.0"
-description = "A robust email address syntax and deliverability validation library"
+description = "Lightweight email validation shim for offline installs"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
@@ -604,4 +592,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "115cf985d932e9bf5f540555bbdd75decbb62cac81e399375fc19f6277f8c1d8"
+content-hash = "e0329a5815119b7b8afc19095c8241f390cd5d2609757029220b2c9b5888b307"
