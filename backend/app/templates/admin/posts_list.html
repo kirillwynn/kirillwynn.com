@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Posts{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-2xl font-semibold text-gruvbox-yellow">Posts</h1>
+        <p class="text-gruvbox-fg1">Manage your published and draft posts.</p>
+    </div>
+    <a href="{{ url_for('admin.posts_new') }}" class="px-4 py-2 bg-gruvbox-yellow text-gruvbox-bg font-semibold rounded hover:bg-yellow-400">
+        New Post
+    </a>
+</div>
+
+<div class="bg-gruvbox-bg0 p-4 rounded shadow space-y-4">
+    {% if posts %}
+        <div class="space-y-3">
+            {% for post in posts %}
+                <div class="flex items-start justify-between border border-gruvbox-bg1 rounded p-4">
+                    <div>
+                        <h2 class="text-xl font-semibold text-white">{{ post.title }}</h2>
+                        <div class="text-sm text-gruvbox-fg1 space-x-2">
+                            <span class="px-2 py-1 rounded text-xs {{ 'bg-green-800 text-green-100' if post.status == 'published' else 'bg-gray-700 text-gray-100' }}">
+                                {{ post.status|capitalize }}
+                            </span>
+                            <span>Created {{ post.created_at.strftime('%Y-%m-%d') }}</span>
+                            {% if post.published_at %}
+                                <span>Published {{ post.published_at.strftime('%Y-%m-%d') }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('admin.posts_edit', post_id=post.id) }}" class="px-3 py-2 bg-gruvbox-bg1 text-white rounded hover:bg-gruvbox-bg">Edit</a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gruvbox-fg1">No posts yet. Create your first one.</p>
+    {% endif %}
+</div>
+{% endblock %}

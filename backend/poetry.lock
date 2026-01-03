@@ -61,6 +61,47 @@ dnspython = "*"
 idna = ">=2.0.0"
 
 [[package]]
+name = "markdown"
+version = "3.6"
+description = "Python implementation of John Gruber's Markdown."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = []
+
+[[package]]
+name = "bleach"
+version = "6.1.0"
+description = "An easy safelist-based HTML-sanitizing tool."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = []
+
+[package.dependencies]
+packaging = ">=23.1"
+six = ">=1.9.0"
+webencodings = "*"
+
+[[package]]
+name = "six"
+version = "1.16.0"
+description = "Python 2 and 3 compatibility utilities"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3"
+groups = ["main"]
+files = []
+
+[[package]]
+name = "webencodings"
+version = "0.5.1"
+description = "Character encoding aliases for legacy web content"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = []
+
+[[package]]
 name = "idna"
 version = "3.11"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -592,4 +633,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "e0329a5815119b7b8afc19095c8241f390cd5d2609757029220b2c9b5888b307"
+content-hash = "a661565dfe1c92f8d1dbc6a4eb7086ccc42fa3c76c47423bd0c5d624baa30d85"
