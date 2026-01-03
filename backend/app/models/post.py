@@ -13,8 +13,11 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     slug = db.Column(db.String(255), unique=True, index=True, nullable=False)
+
+    # Variant A: store rendered HTML for display, keep optional markdown source
     body_html = db.Column(db.Text, nullable=False, default="")
     body_md = db.Column(db.Text)
+
     excerpt = db.Column(db.Text)
     status = db.Column(db.String(20), nullable=False, default="draft", index=True)
     tags = db.Column(db.String(255))
