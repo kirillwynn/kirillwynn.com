@@ -36,4 +36,5 @@ jobs:
             docker compose down
             docker compose up -d --remove-orphans
 
-            docker compose run --rm app flask db upgrade
+            docker compose exec -T app flask --app app:create_app db upgrade
+            docker compose exec -T app flask --app app:create_app db current

@@ -1,11 +1,6 @@
-# kw/app/routes/main.py
-
 import json
 import os
-import re
 
-import bleach
-import markdown
 from flask import Blueprint, abort, current_app, render_template, request
 from flask_login import current_user
 from sqlalchemy import text
@@ -13,8 +8,10 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from ..extensions import db
 from ..models import Post
+from ..utils.sanitizer import generate_excerpt
 
 main_bp = Blueprint('main', __name__)
+
 
 @main_bp.route('/feed')
 def feed():
@@ -23,47 +20,18 @@ def feed():
         .order_by(Post.published_at.desc().nullslast(), Post.created_at.desc())
         .all()
     )
-    return render_template('feed.html', posts=posts, excerpt=_excerpt)
+    return render_template('feed.html', posts=posts, excerpt=generate_excerpt)
 
-
-def _excerpt(text: str, length: int = 200) -> str:
-    stripped = re.sub(r"\s+", " ", re.sub(r"[#>*_`~\-]+", " ", text)).strip()
-    return (stripped[:length] + "...") if len(stripped) > length else stripped
-
-
-def _render_markdown(md_text: str) -> str:
-    html = markdown.markdown(md_text, extensions=["fenced_code", "tables", "nl2br"])
-    clean = bleach.clean(
-        html,
-        tags=[
-            "p",
-            "ul",
-            "ol",
-            "li",
-            "strong",
-            "em",
-            "code",
-            "pre",
-            "h1",
-            "h2",
-            "h3",
-            "blockquote",
-            "a",
-            "br",
-        ],
-        attributes={"a": ["href", "title", "rel"]},
-        protocols=["http", "https", "mailto"],
-        strip=True,
-    )
-    return clean
 
 @main_bp.route('/stash')
 def stash():
     return render_template('stash.html')
 
+
 @main_bp.route('/stack')
 def stack():
     return render_template('stack.html')
+
 
 @main_bp.route('/bridge')
 def bridge():
@@ -74,9 +42,11 @@ def bridge():
     socials_sorted = sorted(socials, key=lambda x: x['order'])
     return render_template('bridge.html', socials=socials_sorted)
 
+
 @main_bp.route('/webhook', methods=['GET', 'POST'])
 def webhook():
     return "Webhook is working! Flask app is running."
+
 
 @main_bp.route('/db-test')
 def db_test():
@@ -87,6 +57,7 @@ def db_test():
         current_app.logger.error("DB test failed", exc_info=e)
         return {"error": str(e)}, 500
 
+
 @main_bp.route('/health')
 def health():
     return {"status": "ok"}, 200
@@ -95,10 +66,13 @@ def health():
 @main_bp.route('/posts/<slug>')
 def post_detail(slug: str):
     post = Post.query.filter_by(slug=slug).first_or_404()
-    is_preview_allowed = current_user.is_authenticated and current_user.is_admin and request.args.get("preview") == "1"
+    is_preview_allowed = (
+        current_user.is_authenticated
+        and current_user.is_admin
+        and request.args.get("preview") == "1"
+    )
 
     if post.status != "published" and not is_preview_allowed:
         abort(404)
 
-    rendered = _render_markdown(post.body_md)
-    return render_template('post_detail.html', post=post, rendered_body=rendered)
+    return render_template('post_detail.html', post=post)

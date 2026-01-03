@@ -6,16 +6,21 @@ from ..extensions import db
 
 class Post(db.Model):
     __tablename__ = "posts"
+    __table_args__ = (
+        db.Index("ix_posts_status_published_at", "status", "published_at"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     slug = db.Column(db.String(255), unique=True, index=True, nullable=False)
-    body_md = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), nullable=False, default="draft")
+    body_html = db.Column(db.Text, nullable=False, default="")
+    body_md = db.Column(db.Text)
+    excerpt = db.Column(db.Text)
+    status = db.Column(db.String(20), nullable=False, default="draft", index=True)
     tags = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    published_at = db.Column(db.DateTime)
+    published_at = db.Column(db.DateTime, index=True)
 
     @staticmethod
     def slugify(text: str) -> str:
