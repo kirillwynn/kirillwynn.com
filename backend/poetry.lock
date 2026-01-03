@@ -55,11 +55,19 @@ optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = []
-develop = false
 
-[package.source]
-type = "directory"
-url = "vendor/email-validator"
+[package.dependencies]
+dnspython = "*"
+idna = ">=2.0.0"
+
+[[package]]
+name = "idna"
+version = "3.11"
+description = "Internationalized Domain Names in Applications (IDNA)"
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = []
 
 [[package]]
 name = "colorama"

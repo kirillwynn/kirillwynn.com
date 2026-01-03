@@ -13,7 +13,7 @@ Flask-WTF = "^1.2.1"
 gunicorn = "^23.0.0"
 SQLAlchemy = "^2.0.0"
 psycopg2-binary = "^2.9.10"
-email-validator = {path = "vendor/email-validator", develop = false}
+email-validator = "^2.2.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
