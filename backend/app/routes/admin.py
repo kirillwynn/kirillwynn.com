@@ -10,6 +10,7 @@ from wtforms.validators import DataRequired, Email, Optional
 
 from ..extensions import db
 from ..models import Post, User
+from ..utils.sanitizer import generate_excerpt, sanitize_html
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -103,7 +104,8 @@ def tiptap_sandbox():
 def _set_post_status_from_form(post: Post, form: PostForm) -> None:
     if form.publish.data:
         post.status = "published"
-        post.published_at = datetime.utcnow()
+        if not post.published_at:
+            post.published_at = datetime.utcnow()
     elif form.unpublish.data:
         post.status = "draft"
         post.published_at = None
@@ -114,8 +116,14 @@ def _set_post_status_from_form(post: Post, form: PostForm) -> None:
 def _save_post_from_form(post: Post, form: PostForm) -> None:
     post.title = form.title.data.strip()
     desired_slug = form.slug.data.strip() if form.slug.data else post.title
+    # Enforce slug uniqueness every save to avoid collisions.
     post.slug = Post.unique_slug(desired_slug, post.id)
-    post.body_md = form.body_md.data
+    raw_html = form.body_md.data or ""
+    # Sanitize HTML before persisting and keep a raw copy for auditing.
+    post.body_raw = raw_html
+    post.body_html = sanitize_html(raw_html)
+    if not post.excerpt:
+        post.excerpt = generate_excerpt(post.body_html)
     post.tags = form.tags.data.strip() if form.tags.data else None
     _set_post_status_from_form(post, form)
     db.session.add(post)
@@ -139,6 +147,8 @@ def posts_new():
 def posts_edit(post_id: int):
     post = db.session.get(Post, post_id) or abort(404)
     form = PostForm(obj=post)
+    if request.method == "GET":
+        form.body_md.data = post.body_raw or post.body_html
     if form.validate_on_submit():
         _save_post_from_form(post, form)
         flash("Post updated", "success")

@@ -11,7 +11,10 @@
                     <a href="{{ url_for('main.post_detail', slug=post.slug) }}" class="hover:text-gruvbox-yellow">{{ post.title }}</a>
                 </h2>
                 <p class="text-sm text-gruvbox-fg1">Published {{ (post.published_at or post.created_at).strftime('%Y-%m-%d') }}</p>
-                <p class="text-gruvbox-fg mt-2">{{ excerpt(post.body_md) }}</p>
+                <p class="text-gruvbox-fg mt-2">{{ post.excerpt or excerpt(post.body_html) }}</p>
+                {% if post.tags %}
+                    <p class="text-xs text-gruvbox-fg1 mt-1">Tags: {{ post.tags }}</p>
+                {% endif %}
                 <a href="{{ url_for('main.post_detail', slug=post.slug) }}" class="inline-block mt-3 text-gruvbox-yellow hover:text-yellow-400">Read more →</a>
             </article>
         {% endfor %}
