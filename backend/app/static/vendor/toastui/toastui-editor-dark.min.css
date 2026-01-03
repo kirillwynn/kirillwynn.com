@@ -1,0 +1,24 @@
+/*! Toast UI Editor Dark Theme - local fallback for CSP */
+.toastui-editor-defaultUI{color:#e5e5e5;background-color:#1f2227;border-color:#2b2f36;}
+.toastui-editor-contents{color:#e5e5e5;background-color:#1b1e23;}
+.toastui-editor-contents pre,.toastui-editor-contents code{background-color:#11151a;color:#d1d5db;}
+.toastui-editor-contents table{border-color:#343a40;}
+.toastui-editor-contents th,.toastui-editor-contents td{border-color:#343a40;}
+.toastui-editor-toolbar{background-color:#1f2227;border-bottom-color:#2b2f36;}
+.toastui-editor-toolbar button{color:#e5e5e5;}
+.toastui-editor-toolbar button:hover,.toastui-editor-toolbar button:focus{background-color:#2b2f36;color:#fff;}
+.toastui-editor-toolbar-icons{color:inherit;}
+.toastui-editor-toolbar-divider{background-color:#2b2f36;}
+.toastui-editor-defaultUI .toastui-editor-md-preview,.toastui-editor-defaultUI .toastui-editor-md-split{background-color:#1b1e23;color:#e5e5e5;}
+.toastui-editor-defaultUI .toastui-editor-md-preview{border-left-color:#2b2f36;}
+.toastui-editor-statusbar{background-color:#1f2227;border-top-color:#2b2f36;color:#a5acb5;}
+.toastui-editor-defaultUI .toastui-editor-mode-switch,.toastui-editor-defaultUI .toastui-editor-tabs{background-color:#1f2227;border-bottom-color:#2b2f36;}
+.toastui-editor-mode-switch .tab-item,.toastui-editor-tabs .tab-item{color:#cfd6de;}
+.toastui-editor-mode-switch .tab-item.active,.toastui-editor-tabs .tab-item.active{color:#fff;border-color:#4372ff;background-color:#2b2f36;}
+.toastui-editor-mode-switch .tab-item:hover,.toastui-editor-tabs .tab-item:hover{background-color:#2b2f36;color:#fff;}
+.toastui-editor-popup,.toastui-editor-dropdown{background-color:#1b1e23;border-color:#2b2f36;color:#e5e5e5;box-shadow:0 6px 24px rgba(0,0,0,.45);}
+.toastui-editor-popup hr,.toastui-editor-dropdown hr{border-color:#2b2f36;}
+.toastui-editor-dropdown .tui-contextmenu__item{color:#e5e5e5;}
+.toastui-editor-dropdown .tui-contextmenu__item:hover{background-color:#2b2f36;}
+.toastui-editor-defaultUI ::-webkit-scrollbar-thumb{background:#2b2f36;}
+.toastui-editor-defaultUI ::-webkit-scrollbar-track{background:transparent;}
