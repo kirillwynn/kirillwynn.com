@@ -51,6 +51,13 @@
         <div>
             {{ form.body_md.label(class_='block text-sm mb-1') }}
 
+            <div id="tiptap-debug-marker" class="text-xs text-red-400 mb-1">
+                DEBUG: post_form template active
+            </div>
+
+            <div id="tiptap-error"
+                 class="mb-2 hidden p-3 rounded border border-red-700 bg-red-900 text-red-100 text-sm whitespace-pre-wrap"></div>
+
             <div id="tiptap-toolbar" class="flex flex-wrap gap-2 mb-2"></div>
 
             <div id="tiptap-editor"
@@ -96,16 +103,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     const toolbarElement = document.getElementById("tiptap-toolbar");
     const bodyField = document.getElementById("body-field");
     const form = editorElement?.closest("form");
+    const errorBox = document.getElementById("tiptap-error");
 
     const toolbarButtonClass =
         "px-3 py-1 rounded border border-gruvbox-bg2 bg-gruvbox-bg text-white text-sm hover:bg-gruvbox-bg1 transition-colors";
     const activeButtonClass =
         "bg-gruvbox-yellow text-gruvbox-bg font-semibold border-gruvbox-yellow";
 
-    if (!(editorElement && bodyField && form && toolbarElement)) return;
+    const showError = (message, detail) => {
+        if (editorElement) {
+            editorElement.textContent = "TipTap failed to initialize";
+        }
+        if (errorBox) {
+            errorBox.classList.remove("hidden");
+            const detailHtml = detail ? `<pre class="mt-1 whitespace-pre-wrap">${detail}</pre>` : "";
+            errorBox.innerHTML = `<div class="font-semibold">TipTap error</div><div>${message}</div>${detailHtml}`;
+        }
+    };
+
+    if (!(editorElement && bodyField && form && toolbarElement)) {
+        showError("Editor container or form fields missing");
+        return;
+    }
+
+    editorElement.textContent = "Loading editor…";
 
     try {
-        // CSP-safe: load TipTap from same-origin (vendored files)
+        // Verify vendored files exist (helps debug CSP / wrong paths / 404)
+        const [coreResponse, starterResponse] = await Promise.all([
+            fetch("/static/vendor/tiptap/core.js", { cache: "no-store" }),
+            fetch("/static/vendor/tiptap/starter-kit.js", { cache: "no-store" }),
+        ]);
+
+        if (!coreResponse.ok) {
+            showError(`Vendor file missing: core.js (HTTP ${coreResponse.status})`);
+            return;
+        }
+
+        if (!starterResponse.ok) {
+            showError(`Vendor file missing: starter-kit.js (HTTP ${starterResponse.status})`);
+            return;
+        }
+
         const [{ Editor }, { default: StarterKit }] = await Promise.all([
             import("/static/vendor/tiptap/core.js"),
             import("/static/vendor/tiptap/starter-kit.js"),
@@ -184,7 +223,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
 
-        // Create editor
         editor = new Editor({
             element: editorElement,
             extensions: [StarterKit],
@@ -200,11 +238,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             onSelectionUpdate: updateToolbarState,
         });
 
-        // Debug marker so you can confirm init happened
+        // Clear loading placeholder
+        editorElement.textContent = "";
+
+        // Debug marker for confirmation
         editorElement.dataset.tiptapInitialized = "true";
+        editorElement.classList.add("tiptap-ready");
         console.log("TipTap initialized");
 
-        // Toolbar handler
         toolbarElement.addEventListener("click", (event) => {
             const button = event.target.closest("button[data-action]");
             if (!button || !editor) return;
@@ -217,12 +258,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             updateToolbarState();
         });
 
-        // Sync on submit
         form.addEventListener("submit", () => {
             bodyField.value = editor.getHTML();
         });
     } catch (error) {
         console.error("Failed to initialize TipTap editor", error);
+        showError(error.message, error.stack);
     }
 });
 </script>
