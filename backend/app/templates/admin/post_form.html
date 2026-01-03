@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Edit Post' if post else 'New Post' }}{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-2xl font-semibold text-gruvbox-yellow">{{ 'Edit Post' if post else 'New Post' }}</h1>
+        {% if post %}
+            <p class="text-gruvbox-fg1">Slug: {{ post.slug }}</p>
+        {% endif %}
+    </div>
+    <a href="{{ url_for('admin.posts_list') }}" class="px-3 py-2 bg-gruvbox-bg1 text-white rounded hover:bg-gruvbox-bg">Back to Posts</a>
+</div>
+
+<div class="bg-gruvbox-bg0 p-6 rounded shadow">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4 space-y-2">
+                {% for category, message in messages %}
+                    <div class="p-3 rounded {{ 'bg-green-800 text-green-100' if category == 'success' else 'bg-gruvbox-bg1 text-gruvbox-fg' }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" class="space-y-4">
+        {{ form.hidden_tag() }}
+        <div>
+            {{ form.title.label(class_='block text-sm mb-1') }}
+            {{ form.title(class_='w-full p-2 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
+            {% for error in form.title.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
+        </div>
+
+        <div>
+            {{ form.slug.label(class_='block text-sm mb-1') }}
+            {{ form.slug(class_='w-full p-2 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
+            <p class="text-xs text-gruvbox-fg1 mt-1">Leave blank to auto-generate from title.</p>
+            {% for error in form.slug.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
+        </div>
+
+        <div>
+            {{ form.tags.label(class_='block text-sm mb-1') }}
+            {{ form.tags(class_='w-full p-2 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
+            <p class="text-xs text-gruvbox-fg1 mt-1">Comma-separated tags (optional).</p>
+        </div>
+
+        <div>
+            {{ form.body_md.label(class_='block text-sm mb-1') }}
+            {{ form.body_md(class_='w-full p-3 h-64 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
+            {% for error in form.body_md.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ error }}</p>
+            {% endfor %}
+            <p class="text-xs text-gruvbox-fg1 mt-1">Supports Markdown.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-3 items-center">
+            {{ form.save_draft(class_='px-4 py-2 bg-gruvbox-bg1 text-white rounded hover:bg-gruvbox-bg') }}
+            {{ form.publish(class_='px-4 py-2 bg-gruvbox-yellow text-gruvbox-bg font-semibold rounded hover:bg-yellow-400') }}
+            {% if post and post.status == 'published' %}
+                {{ form.unpublish(class_='px-4 py-2 bg-red-800 text-red-100 rounded hover:bg-red-700') }}
+            {% endif %}
+        </div>
+    </form>
+
+    {% if post %}
+        <form method="POST" action="{{ url_for('admin.posts_delete', post_id=post.id) }}" class="mt-4 inline-block">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="px-3 py-2 bg-red-900 text-red-100 rounded hover:bg-red-800" onclick="return confirm('Delete this post?')">Delete</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

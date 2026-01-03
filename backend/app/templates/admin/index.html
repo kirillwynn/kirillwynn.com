@@ -5,5 +5,10 @@
     <h1 class="text-2xl font-semibold text-gruvbox-yellow mb-4">Admin Dashboard</h1>
     <p class="text-gruvbox-fg1">Welcome, {{ current_user.name or current_user.email }}.</p>
     <p class="text-gruvbox-fg1 mt-2">Use this area to manage the site.</p>
+    <div class="mt-6">
+        <a href="{{ url_for('admin.posts_list') }}" class="inline-flex items-center px-4 py-2 bg-gruvbox-yellow text-gruvbox-bg font-semibold rounded hover:bg-yellow-400">
+            Manage Posts
+        </a>
+    </div>
 </div>
 {% endblock %}
