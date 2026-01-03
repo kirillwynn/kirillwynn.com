@@ -1,67 +1,107 @@
 /* Toast UI Editor – Gruvbox Dark Overrides */
 
+:root {
+  --gruvbox-bg0: #282828;
+  --gruvbox-bg1: #3c3836;
+  --gruvbox-bg2: #504945;
+  --gruvbox-fg: #ebdbb2;
+  --gruvbox-yellow: #fabd2f;
+}
+
 .toastui-editor-defaultUI {
-  background-color: #1d2021;
-  border: 1px solid #3c3836;
+  background-color: var(--gruvbox-bg0);
+  border: 1px solid var(--gruvbox-bg1);
   border-radius: 6px;
+  color: var(--gruvbox-fg);
 }
 
 /* Toolbar */
 .toastui-editor-toolbar {
-  background-color: #282828;
-  border-bottom: 1px solid #3c3836;
+  background-color: var(--gruvbox-bg1);
+  border-bottom: 1px solid var(--gruvbox-bg1);
 }
 
-.toastui-editor-toolbar-icons {
-  color: #ebdbb2;
-}
-
-.toastui-editor-toolbar-icons:hover {
-  background-color: #3c3836;
-}
-
-.toastui-editor-toolbar-divider {
-  background-color: #3c3836;
-}
-
-/* Buttons */
+.toastui-editor-toolbar-icons,
 .toastui-editor-toolbar button {
-  color: #ebdbb2;
+  color: var(--gruvbox-fg);
 }
 
 .toastui-editor-toolbar button:hover,
 .toastui-editor-toolbar button:focus {
-  background-color: #3c3836;
+  background-color: var(--gruvbox-bg2);
+}
+
+.toastui-editor-toolbar-divider {
+  background-color: var(--gruvbox-bg1);
+}
+
+/* Mode switch / tabs (Markdown / WYSIWYG) */
+.toastui-editor-mode-switch,
+.toastui-editor-tabs {
+  background-color: var(--gruvbox-bg1);
+  border-bottom: 1px solid var(--gruvbox-bg1);
+}
+
+.toastui-editor-mode-switch .tab-item,
+.toastui-editor-tabs .tab-item {
+  color: var(--gruvbox-fg);
+}
+
+.toastui-editor-mode-switch .tab-item.active,
+.toastui-editor-tabs .tab-item.active {
+  background-color: var(--gruvbox-bg2);
+  border-color: var(--gruvbox-yellow);
+  color: var(--gruvbox-yellow);
+}
+
+.toastui-editor-mode-switch .tab-item:hover,
+.toastui-editor-tabs .tab-item:hover {
+  background-color: var(--gruvbox-bg2);
+  color: var(--gruvbox-fg);
 }
 
 /* Editor content area */
 .toastui-editor-contents {
-  background-color: #1d2021;
-  color: #ebdbb2;
+  background-color: var(--gruvbox-bg0);
+  color: var(--gruvbox-fg);
   font-family: inherit;
 }
 
+/* Code blocks */
 .toastui-editor-contents pre,
 .toastui-editor-contents code {
-  background-color: #282828;
-  color: #fabd2f;
+  background-color: var(--gruvbox-bg1);
+  color: var(--gruvbox-yellow);
 }
 
 /* Preview pane */
 .toastui-editor-md-preview {
-  background-color: #1d2021;
-  color: #ebdbb2;
-  border-left: 1px solid #3c3836;
+  background-color: var(--gruvbox-bg0);
+  color: var(--gruvbox-fg);
+  border-left: 1px solid var(--gruvbox-bg1);
 }
 
 /* Tables */
 .toastui-editor-contents table {
-  border-color: #3c3836;
+  border-color: var(--gruvbox-bg1);
 }
 
 .toastui-editor-contents th,
 .toastui-editor-contents td {
-  border-color: #3c3836;
+  border-color: var(--gruvbox-bg1);
+}
+
+/* Popups / dropdowns */
+.toastui-editor-popup,
+.toastui-editor-dropdown {
+  background-color: var(--gruvbox-bg0);
+  border: 1px solid var(--gruvbox-bg2);
+  color: var(--gruvbox-fg);
+}
+
+.toastui-editor-popup hr,
+.toastui-editor-dropdown hr {
+  border-color: var(--gruvbox-bg1);
 }
 
 /* Scrollbars (optional, subtle) */
@@ -70,5 +110,5 @@
 }
 
 .toastui-editor-defaultUI ::-webkit-scrollbar-thumb {
-  background-color: #3c3836;
+  background-color: var(--gruvbox-bg1);
 }
