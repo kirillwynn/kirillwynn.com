@@ -49,7 +49,8 @@
 
         <div>
             {{ form.body_md.label(class_='block text-sm mb-1') }}
-            {{ form.body_md(class_='w-full p-3 h-64 rounded bg-gruvbox-bg1 text-white border border-gruvbox-bg2 focus:border-gruvbox-yellow focus:outline-none') }}
+            <div id="editor" class="border border-gruvbox-bg2 rounded bg-gruvbox-bg1"></div>
+            <input type="hidden" name="{{ form.body_md.name }}" id="{{ form.body_md.id }}" value="{{ form.body_md.data|default('')|e }}">
             {% for error in form.body_md.errors %}
                 <p class="text-red-400 text-sm mt-1">{{ error }}</p>
             {% endfor %}
@@ -75,4 +76,35 @@
         </form>
     {% endif %}
 </div>
+
+<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
+<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var editorElement = document.getElementById('editor');
+        var hiddenInput = document.getElementById('{{ form.body_md.id }}');
+
+        if (!editorElement || !hiddenInput || typeof toastui === 'undefined' || !toastui.Editor) {
+            return;
+        }
+
+        var editor = new toastui.Editor({
+            el: editorElement,
+            height: '480px',
+            initialEditType: 'markdown',
+            previewStyle: 'vertical',
+            initialValue: hiddenInput.value || '',
+            usageStatistics: false
+        });
+
+        editor.focus();
+
+        var form = hiddenInput.form;
+        if (form) {
+            form.addEventListener('submit', function () {
+                hiddenInput.value = editor.getMarkdown();
+            });
+        }
+    });
+</script>
 {% endblock %}
