@@ -10,7 +10,7 @@
         {% endif %}
     </div>
     <div class="prose prose-invert max-w-none">
-        {{ rendered_body | safe }}
+        {{ post.body_html | safe }}
     </div>
     {% if current_user.is_authenticated and current_user.is_admin and post.status != 'published' %}
         <div class="p-3 rounded bg-red-900 text-red-100">You are viewing a draft preview.</div>

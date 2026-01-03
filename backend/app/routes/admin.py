@@ -2,14 +2,18 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf import FlaskForm
 from wtforms import PasswordField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email, Optional
+from sqlalchemy import text
+from sqlalchemy.engine.url import make_url
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..extensions import db
 from ..models import Post, User
+from ..utils.sanitizer import generate_excerpt, sanitize_html
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -103,7 +107,8 @@ def tiptap_sandbox():
 def _set_post_status_from_form(post: Post, form: PostForm) -> None:
     if form.publish.data:
         post.status = "published"
-        post.published_at = datetime.utcnow()
+        if not post.published_at:
+            post.published_at = datetime.utcnow()
     elif form.unpublish.data:
         post.status = "draft"
         post.published_at = None
@@ -114,8 +119,14 @@ def _set_post_status_from_form(post: Post, form: PostForm) -> None:
 def _save_post_from_form(post: Post, form: PostForm) -> None:
     post.title = form.title.data.strip()
     desired_slug = form.slug.data.strip() if form.slug.data else post.title
+    # Enforce slug uniqueness every save to avoid collisions.
     post.slug = Post.unique_slug(desired_slug, post.id)
-    post.body_md = form.body_md.data
+    raw_html = form.body_md.data or ""
+    # Sanitize HTML before persisting and keep a raw copy for auditing.
+    post.body_raw = raw_html
+    post.body_html = sanitize_html(raw_html)
+    if not post.excerpt:
+        post.excerpt = generate_excerpt(post.body_html)
     post.tags = form.tags.data.strip() if form.tags.data else None
     _set_post_status_from_form(post, form)
     db.session.add(post)
@@ -139,6 +150,8 @@ def posts_new():
 def posts_edit(post_id: int):
     post = db.session.get(Post, post_id) or abort(404)
     form = PostForm(obj=post)
+    if request.method == "GET":
+        form.body_md.data = post.body_raw or post.body_html
     if form.validate_on_submit():
         _save_post_from_form(post, form)
         flash("Post updated", "success")
@@ -154,3 +167,33 @@ def posts_delete(post_id: int):
     db.session.commit()
     flash("Post deleted", "success")
     return redirect(url_for("admin.posts_list"))
+
+
+@admin_bp.route("/db-info")
+@admin_required
+def db_info():
+    uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    url = make_url(uri)
+
+    db_meta = {
+        "drivername": url.drivername,
+        "username": url.username,
+        "host": url.host,
+        "port": url.port,
+        "database": url.database,
+    }
+
+    revision = None
+    error = None
+    try:
+        revision = db.session.execute(text("SELECT version_num FROM alembic_version"))\
+            .scalar()
+    except SQLAlchemyError as exc:  # pragma: no cover - debug endpoint
+        current_app.logger.warning("Could not read alembic version", exc_info=exc)
+        error = str(exc)
+
+    return jsonify({
+        "database": db_meta,
+        "alembic_version": revision,
+        "error": error,
+    })

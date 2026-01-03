@@ -23,3 +23,18 @@ The command is idempotent: it creates the admin if missing, or updates the passw
 
 ## Logging in
 Start the server and visit `/admin/login` to access the admin login form. Only the configured admin can sign in. Admin-only routes under `/admin` require authentication and admin status; unauthenticated access is redirected to the login page.
+
+## Database migrations
+Apply database migrations after pulling changes to keep the schema in sync:
+
+```bash
+flask --app app:create_app db upgrade
+```
+
+When working through Docker Compose, run the migration commands inside the app container to ensure the database schema is updated:
+
+```bash
+docker compose exec app flask --app app:create_app db upgrade
+docker compose exec app flask --app app:create_app db current
+docker compose exec app flask --app app:create_app db history
+```
