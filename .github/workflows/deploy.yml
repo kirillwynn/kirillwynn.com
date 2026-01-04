@@ -127,10 +127,6 @@ jobs:
             # This ensures schema and code stay in sync
             docker compose run --rm app flask db upgrade
 
-            # Prepare webroot directory for Let's Encrypt ACME HTTP-01 challenges
-            sudo mkdir -p /var/www/certbot/.well-known/acme-challenge 
-            sudo chmod -R 755 /var/www/certbot
-
             # Start/update the stack using the pulled images
             # --remove-orphans cleans up containers no longer defined
             docker compose up -d --remove-orphans
