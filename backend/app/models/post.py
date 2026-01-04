@@ -3,6 +3,44 @@ import re
 
 from ..extensions import db
 
+# ---------------------------------------------------------------------
+# Association table: posts <-> media_assets (many-to-many)
+# ---------------------------------------------------------------------
+# Why an association table instead of `post.media_asset_id` FK?
+# - One Post can reference many media assets (gallery / multiple images / attachments).
+# - The same MediaAsset can be reused across multiple posts (no duplication).
+# - We can store per-post usage metadata (role, sort_order) on the link itself.
+#
+# NOTE:
+# - This maps to the DB table we created via Alembic: `post_media_assets`.
+# - Even though this is a "Table" (not a Model), SQLAlchemy can still use it
+#   as the `secondary=` join table for many-to-many relationships.
+post_media_assets = db.Table(
+    "post_media_assets",
+
+    # Composite primary key ensures each asset can be linked once per post.
+    db.Column(
+        "post_id",
+        db.Integer,
+        db.ForeignKey("posts.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "media_asset_id",
+        db.BigInteger,
+        db.ForeignKey("media_assets.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
+
+    # Optional "usage metadata" (matches the migration schema).
+    # - role: how the asset is used inside the post (cover/inline/etc.)
+    # - sort_order: stable ordering in galleries
+    # - created_at: audit trail for when it was attached to this post
+    db.Column("role", db.Text, nullable=True),
+    db.Column("sort_order", db.Integer, nullable=True),
+    db.Column("created_at", db.DateTime, nullable=False, default=datetime.utcnow),
+)
+
 
 class Post(db.Model):
     """
@@ -17,6 +55,10 @@ class Post(db.Model):
     - Each post is owned by a User via author_id (FK -> users.id).
       This is the key step that enables "let other people write later"
       without redesigning the table.
+
+    Media-ready:
+    - Many-to-many to MediaAsset through `post_media_assets`.
+      This enables image galleries / attachments / reusable assets.
     """
 
     __tablename__ = "posts"
@@ -45,17 +87,45 @@ class Post(db.Model):
     title = db.Column(db.String(255), nullable=False)
     slug = db.Column(db.String(255), unique=True, index=True, nullable=False)
 
-    # Variant A: store rendered HTML for display, keep optional markdown/source
+    # Variant A:
+    # - body_html: sanitized HTML for safe display (what you actually render)
+    # - body_md: optional source (could be Markdown or editor JSON later)
     body_html = db.Column(db.Text, nullable=False, default="")
     body_md = db.Column(db.Text, nullable=True)
 
     excerpt = db.Column(db.Text)
+
+    # Status design:
+    # - draft: not visible publicly
+    # - published: visible publicly, ordered by published_at
     status = db.Column(db.String(20), nullable=False, default="draft", index=True)
+
+    # Simple tags v1 (comma-separated). Can be normalized later if needed.
     tags = db.Column(db.String(255))
 
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
     published_at = db.Column(db.DateTime, index=True)
+
+    # -----------------------------------------------------------------
+    # Relationships: Media assets attached to this post
+    # -----------------------------------------------------------------
+    # `secondary="post_media_assets"` references the association table above.
+    #
+    # `lazy="selectin"` is a good default for many-to-many:
+    # - Avoids N+1 queries when loading a list of posts + their assets
+    # - Still keeps queries readable and predictable
+    media_assets = db.relationship(
+        "MediaAsset",
+        secondary="post_media_assets",
+        back_populates="posts",
+        lazy="selectin",
+    )
 
     @staticmethod
     def slugify(text: str) -> str:
