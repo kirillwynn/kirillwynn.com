@@ -17,6 +17,13 @@ x-common-env: &common-env
   DB_USER: ${DB_USER}
   DB_PASSWORD: ${DB_PASSWORD}
 
+  # S3 / Object Storage (for media uploads)
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+  S3_REGION: ${S3_REGION}
+  S3_BUCKET: ${S3_BUCKET}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+
 services:
   app:
     # Pull a specific version of the image for reproducible deployments.
