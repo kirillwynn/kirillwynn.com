@@ -64,6 +64,9 @@ services:
       # Mount TLS certificates from the host (Let's Encrypt).
       - /etc/letsencrypt:/etc/letsencrypt:ro
 
+      # Webroot for Let's Encrypt ACME HTTP-01 challenges (used by certbot renew)
+      - /var/www/certbot:/var/www/certbot
+
     # Ensure the app container starts before Nginx.
     # Note: does not guarantee app is "ready", only that it has started.
     depends_on:
