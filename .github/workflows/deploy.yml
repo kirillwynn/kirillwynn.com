@@ -123,6 +123,13 @@ jobs:
             export DB_USER=${{ secrets.DB_USER }}
             export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
 
+            # S3 credentials
+            export S3_ENDPOINT_URL=${{ secrets.S3_ENDPOINT_URL }}
+            export S3_REGION=${{ secrets.S3_REGION }}
+            export S3_BUCKET=${{ secrets.S3_BUCKET }}
+            export S3_ACCESS_KEY_ID=${{ secrets.S3_ACCESS_KEY_ID }}
+            export S3_SECRET_ACCESS_KEY=${{ secrets.S3_SECRET_ACCESS_KEY }}
+
             # Apply database migrations BEFORE starting the new version
             # This ensures schema and code stay in sync
             docker compose run --rm app flask db upgrade
