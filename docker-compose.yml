@@ -80,4 +80,3 @@ networks:
     # Fixed network name makes service discovery predictable and allows
     # optional cross-compose connectivity if needed later.
     name: kw-network
-
