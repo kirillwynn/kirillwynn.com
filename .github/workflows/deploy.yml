@@ -130,4 +130,3 @@ jobs:
             # Start/update the stack using the pulled images
             # --remove-orphans cleans up containers no longer defined
             docker compose up -d --remove-orphans
-
