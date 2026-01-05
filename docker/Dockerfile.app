@@ -1,18 +1,17 @@
 # docker/Dockerfile.app
 #
 # FAANG-ish goals:
-# - Small, secure runtime image
-# - No Node/npm in the final (runtime) layer
+# - Small, secure runtime image (no Node/npm in runtime layer)
 # - Deterministic Tailwind build during image build (no CDN Tailwind in prod)
-# - Good Docker layer caching for faster CI rebuilds
+# - Fast CI rebuilds via Docker layer caching
 #
-# Required repo files (committed):
+# Tailwind "source of truth" (committed):
 #   backend/package.json
-#   backend/package-lock.json   <-- IMPORTANT: needed for `npm ci`
+#   backend/package-lock.json              <-- required for `npm ci`
 #   backend/tailwind.config.js
-#   backend/assets/tailwind.css
+#   backend/app/static/css/tailwind.input.css  <-- ONLY Tailwind input (canonical)
 #
-# Output artifact (generated during build):
+# Tailwind build artifact (generated during build):
 #   backend/app/static/css/tailwind.css
 #
 # Templates should load both:
@@ -27,23 +26,25 @@ FROM node:20-alpine AS frontend-builder
 # Work directory for Tailwind build
 WORKDIR /frontend
 
-# 1) Install node deps (Tailwind CLI) deterministically.
-#    `npm ci` requires *package-lock.json*.
-#    Copying only manifests first maximizes layer cache hits.
+# 1) Install node deps deterministically.
+#    `npm ci` requires a committed package-lock.json.
+#    Copying only manifests first maximizes cache hits.
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-# 2) Copy Tailwind build inputs (config + input CSS).
+# 2) Copy Tailwind config.
 COPY backend/tailwind.config.js ./
-COPY backend/assets ./assets
 
-# 3) Copy ONLY the files Tailwind needs to scan for class usage.
-#    This keeps the build context smaller and improves caching.
-COPY backend/app/templates ./app/templates
-COPY backend/app/static/js ./app/static/js
+# 3) Copy ONLY what Tailwind needs:
+#    - templates + JS to scan for class usage
+#    - static/css to include tailwind.input.css (the build input)
+COPY backend/app/templates   ./app/templates
+COPY backend/app/static/js   ./app/static/js
+COPY backend/app/static/css  ./app/static/css
 
-# 4) Ensure output directory exists (defensive).
-RUN mkdir -p ./app/static/css
+# 4) Defensive sanity check:
+#    If tailwind.input.css is missing, fail the build early with a clear error.
+RUN test -f ./app/static/css/tailwind.input.css
 
 # 5) Build Tailwind CSS into Flask static folder.
 #    The npm script should write to: ./app/static/css/tailwind.css
@@ -63,14 +64,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # System deps:
-# - curl: useful for quick health/debug in container (optional but practical)
-# - build-essential/libpq-dev: NOT needed if you use psycopg[binary] or psycopg2-binary
-#   (We intentionally do NOT install heavy build toolchains in runtime.)
+# - curl: useful for quick debug/health checks inside the container.
+#   (Optional, but practical. Remove if you want an even smaller image.)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry (only used at build time to install deps).
+# Install Poetry (used only to install Python deps during image build).
 RUN pip install --no-cache-dir "poetry==2.1.0"
 
 # Copy dependency manifests first for caching
@@ -78,7 +78,7 @@ COPY backend/pyproject.toml backend/poetry.lock ./
 
 # Install ONLY production dependencies into system site-packages (no venv).
 # NOTE:
-# - We do NOT run `poetry lock` here (locking should happen outside Docker and be committed).
+# - We do NOT run `poetry lock` here; locking should happen outside Docker and be committed.
 RUN poetry config virtualenvs.create false \
     && poetry install --no-root --only main --no-interaction --no-ansi
 
