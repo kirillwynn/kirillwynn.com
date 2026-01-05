@@ -1,13 +1,14 @@
 import json
 import os
 
-from flask import Blueprint, abort, current_app, render_template, request
+from flask import Blueprint, abort, current_app, render_template, request, redirect
 from flask_login import current_user
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..extensions import db, csrf
-from ..models import Post
+from ..models import MediaAsset, Post
+from ..utils.s3 import presign_get
 from ..utils.sanitizer import generate_excerpt
 
 # Public-facing blueprint.
@@ -22,7 +23,7 @@ def feed():
 
     Shows only published posts, ordered by:
     1) published_at (newest first, NULLs last)
-    2) created_at (fallback for drafts that later become published)
+    2) created_at (fallback for posts that were created earlier)
 
     The excerpt generator is passed into the template so it can be reused
     consistently for previews.
@@ -126,6 +127,47 @@ def health():
     return {"status": "ok"}, 200
 
 
+# ---------------------------------------------------------------------
+# Stable media URL (recommended approach)
+# ---------------------------------------------------------------------
+# Why this endpoint exists:
+# - We DO NOT store expiring presigned URLs inside post HTML.
+# - Posts reference stable URLs like /media/<id>.
+# - When a reader opens /media/<id>, the backend generates a short-lived
+#   presigned GET URL and issues an HTTP redirect to object storage.
+#
+# Result:
+# - Posts never "rot" because a link expired.
+# - Bucket can remain private by default.
+# - You can later add access control here (private posts, paid posts, etc.).
+@main_bp.route("/media/<int:asset_id>")
+def media_redirect(asset_id: int):
+    """
+    Redirect to a short-lived presigned GET URL for a MediaAsset.
+
+    Access rules today:
+    - Public access is allowed for assets with status="ready".
+      (If you later need private assets, enforce auth here.)
+    """
+    # If S3 isn't configured, media feature is effectively disabled.
+    if not current_app.config.get("MEDIA_ENABLED", False):
+        abort(503, description="Media storage is not configured")
+
+    asset = db.session.get(MediaAsset, asset_id) or abort(404)
+    if asset.status != "ready":
+        abort(404)
+
+    url = presign_get(
+        bucket=asset.bucket,
+        key=asset.object_key,
+        expires_in=current_app.config["S3_PRESIGN_EXPIRES_IN"],
+    )
+
+    # Use a redirect so the browser downloads/streams directly from object storage.
+    # (No need to proxy the bytes through Flask.)
+    return redirect(url, code=302)
+
+
 @main_bp.route("/posts/<slug>")
 def post_detail(slug: str):
     """
@@ -152,4 +194,3 @@ def post_detail(slug: str):
         abort(404)
 
     return render_template("post_detail.html", post=post)
-
