@@ -6,35 +6,60 @@
     <!-- Responsive layout support -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <!-- Page title is provided by child templates -->
     <title>{% block title %}{% endblock %}</title>
 
     <!--
+      Favicon (browser tab icon).
+
       IMPORTANT:
-      We intentionally DO NOT load "SF Pro Display" from Google Fonts.
+      This must NOT replace your CSS link.
+      It's just an additional asset.
+    -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
 
-      Reason:
-      - SF Pro Display is an Apple system font and is not hosted on Google Fonts.
-      - Requesting it from fonts.googleapis.com returns an HTML error (400),
-        which browsers block as CSS (nosniff), causing console warnings.
+    <!--
+      Fonts.
 
-      The font is still referenced in our CSS as a preferred option,
-      but it will only be used on platforms where it exists (macOS/iOS).
+      NOTE:
+      "SF Pro Display" is an Apple system font and is not hosted on Google Fonts.
+      If you try to load it from fonts.googleapis.com you will get a 400 HTML response,
+      and the browser will block it as a stylesheet (nosniff).
+
+      Current strategy:
+      - We rely on SF Pro Display only where it exists (macOS/iOS).
+      - Otherwise the CSS falls back to system fonts.
+      - Later, if we want a consistent font everywhere:
+        * either pick a real Google Font,
+        * or host font files locally in /static/fonts.
     -->
 
     <!--
       Tailwind via CDN is fine for early-stage iteration.
-      Later (production-hardening) we should compile Tailwind into a local CSS bundle
-      and serve it from /static to remove runtime CDN dependency.
+
+      Production note:
+      - CDN Tailwind injects styles at runtime, and you get warnings in the console.
+      - Later we should build Tailwind into a static CSS bundle and serve it from /static.
     -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Project CSS (Gruvbox theme + TipTap styles) -->
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <!--
+      Project CSS (Gruvbox theme + TipTap styles).
+
+      This is REQUIRED for your custom classes:
+      - bg-gruvbox-bg, text-gruvbox-fg, etc.
+      If you remove this link, the whole site will revert to default Tailwind styling.
+    -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+
+    <!-- Optional per-page extra head content (page-specific CSS/JS) -->
+    {% block head_extra %}{% endblock %}
 </head>
 
 <body class="bg-gruvbox-bg text-gruvbox-fg font-sans min-h-screen flex flex-col transition-colors duration-200">
     <nav class="bg-gruvbox-bg0-h px-4 py-2 shadow-md">
         <div class="max-w-4xl mx-auto flex space-x-4">
+            {# Primary navigation items #}
             {% set nav_items = [
                 {'label': 'Feed', 'endpoint': 'main.feed'},
                 {'label': 'Stash', 'endpoint': 'main.stash'},
@@ -42,25 +67,32 @@
                 {'label': 'Bridge', 'endpoint': 'main.bridge'}
             ] %}
 
-            <!-- Show Admin link only to authenticated admin users -->
+            {# Show Admin link only to authenticated admin users #}
             {% if current_user.is_authenticated and current_user.is_admin %}
                 {% set nav_items = nav_items + [
                     {'label': 'Admin', 'endpoint': 'admin.index'}
                 ] %}
             {% endif %}
 
+            {# Render nav links; highlight active endpoint #}
             {% for item in nav_items %}
                 <a href="{{ url_for(item.endpoint) }}"
                    class="relative px-3 py-1 {% if request.endpoint == item.endpoint %}text-gruvbox-yellow{% else %}text-gruvbox-fg hover:text-gruvbox-yellow{% endif %}">
                     {{ item.label }}
+
+                    {# Active underline indicator #}
                     {% if request.endpoint == item.endpoint %}
                         <span class="absolute bottom-0 left-0 w-full h-0.5 bg-white rounded-b-full"></span>
                     {% endif %}
                 </a>
             {% endfor %}
 
+            {# Admin-only logout action #}
             {% if current_user.is_authenticated and current_user.is_admin %}
-                <a href="{{ url_for('admin.logout') }}" class="px-3 py-1 text-gruvbox-fg hover:text-gruvbox-yellow">Logout</a>
+                <a href="{{ url_for('admin.logout') }}"
+                   class="px-3 py-1 text-gruvbox-fg hover:text-gruvbox-yellow">
+                    Logout
+                </a>
             {% endif %}
         </div>
     </nav>
