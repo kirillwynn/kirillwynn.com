@@ -1,3 +1,4 @@
+{# backend/app/templates/base.html #}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,20 +36,27 @@
     -->
 
     <!--
-      Tailwind via CDN is fine for early-stage iteration.
+      Tailwind: production-ready approach (FAANG-like)
 
-      Production note:
-      - CDN Tailwind injects styles at runtime, and you get warnings in the console.
-      - Later we should build Tailwind into a static CSS bundle and serve it from /static.
+      We DO NOT use the Tailwind CDN in production because:
+      - It injects styles at runtime (harder to debug / reason about)
+      - It causes warnings in the console
+      - It prevents proper caching and integrity guarantees
+      - It can unexpectedly change if CDN behavior changes
+
+      Instead, Tailwind should be compiled at build time into a static file:
+        /static/css/tailwind.css
+
+      This file is produced during Docker build (see Dockerfile.app frontend-builder stage).
     -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet">
 
     <!--
       Project CSS (Gruvbox theme + TipTap styles).
 
       This is REQUIRED for your custom classes:
       - bg-gruvbox-bg, text-gruvbox-fg, etc.
-      If you remove this link, the whole site will revert to default Tailwind styling.
+      Keep it AFTER Tailwind so your overrides win when selectors overlap.
     -->
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 
