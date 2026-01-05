@@ -3,13 +3,25 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 // Vite config
-// - Adds an import alias: "@/..." -> "src/..."
-// - Keeps config minimal; we'll add proxy/CSP later when wiring to backend API.
+// - "@/..." -> "src/..."
+// - Dev proxy:
+//   frontend calls /api/*
+//   Vite forwards to Flask, so we avoid CORS in dev and keep cookies working.
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+    },
+  },
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        // IMPORTANT: if backend serves /api as a prefix, we keep it as-is.
+        // If later backend routes are not under /api, we can rewrite here.
+      },
     },
   },
 });
