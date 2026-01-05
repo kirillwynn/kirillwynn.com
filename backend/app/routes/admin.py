@@ -450,41 +450,46 @@ def media_presign_view(asset_id: int):
 @admin_required
 def db_info():
     """
-    Small diagnostic endpoint for DB connectivity + Alembic version.
-    Admin-only and returns JSON.
+    Minimal DB diagnostic endpoint (admin-only).
 
-    Security:
-    - Masks password in the DB URI
-    - Helpful for confirming migrations in production
+    Why this exists:
+    - During deploys you sometimes need a quick "is DB alive?" + "which migration is applied?" check.
+
+    Security / privacy:
+    - We intentionally DO NOT expose database hostnames, usernames, or URIs.
+      Even though this endpoint is admin-only, logs/screenshots/leaks happen.
+    - We return only booleans + the Alembic revision string.
+
+    Caching:
+    - We force `Cache-Control: no-store` so intermediaries/browsers don't cache diagnostic data.
     """
-    uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-
-    masked_uri = uri
-    try:
-        masked_uri = str(make_url(uri).set(password="***"))
-    except Exception:  # pragma: no cover - defensive masking
-        masked_uri = "<unparsable URI>"
-
-    revision = None
-    db_meta: dict[str, str | None] = {
-        "database_uri": masked_uri,
-        "current_database": None,
-        "current_user": None,
-    }
-    error = None
+    revision: str | None = None
+    error: str | None = None
 
     try:
-        db_meta["current_database"] = db.session.execute(text("SELECT current_database()")).scalar()
-        db_meta["current_user"] = db.session.execute(text("SELECT current_user")).scalar()
+        # Connectivity check + Alembic version.
+        # NOTE: These queries are trivial and safe, but they still prove the DB connection works.
+        db.session.execute(text("SELECT 1")).scalar()
         revision = db.session.execute(text("SELECT version_num FROM alembic_version")).scalar()
     except SQLAlchemyError as exc:  # pragma: no cover - debug endpoint
         current_app.logger.warning("Could not read DB diagnostics", exc_info=exc)
         error = str(exc)
 
-    return jsonify(
-        {
-            "database": db_meta,
-            "alembic_version": revision,
-            "error": error,
-        }
-    )
+    payload = {
+        "status": "ok" if error is None else "error",
+        "db": {
+            # True only if we successfully executed a DB query.
+            "connected": error is None,
+        },
+        "alembic": {
+            # The current alembic revision in the DB (None if DB is unreachable)
+            "version": revision,
+        },
+        # Keep error string for admin troubleshooting (still no secrets)
+        "error": error,
+    }
+
+    # Make sure this is never cached anywhere.
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
