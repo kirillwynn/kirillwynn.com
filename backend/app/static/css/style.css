@@ -9,8 +9,15 @@
     --gruvbox-orange: #fe8019;  /* Orange (hover) */
 }
 
+/*
+  Font strategy (FAANG-like default):
+  - Use a system font stack: fast, reliable, no external CDNs, works offline.
+  - "SF Pro Display" / "SF Pro Text" will be used on macOS/iOS if available.
+  - Other OS will fall back to Segoe UI / Roboto / etc.
+*/
 body {
-    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+                 "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 .bg-gruvbox-bg { background-color: var(--gruvbox-bg); }
