@@ -1,18 +1,21 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
+import uuid
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf import FlaskForm
+from werkzeug.utils import secure_filename
 from wtforms import PasswordField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email, Optional
 from sqlalchemy import text
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..extensions import db
-from ..models import Post, User
+from ..extensions import csrf, db
+from ..models import MediaAsset, Post, User
+from ..utils.s3 import head_object, presign_get, presign_put
 from ..utils.sanitizer import generate_excerpt, sanitize_html
 
 # Admin blueprint:
@@ -73,6 +76,17 @@ def admin_required(view_func):
         return view_func(*args, **kwargs)
 
     return wrapped
+
+
+def _require_media_enabled() -> None:
+    """
+    Media feature gate.
+
+    We keep S3 / media storage optional at app boot time, but if someone tries to
+    hit upload endpoints without S3 config, we fail with 503 (service unavailable).
+    """
+    if not current_app.config.get("MEDIA_ENABLED", False):
+        abort(503, description="Media storage is not configured (S3 env vars missing).")
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])
@@ -190,12 +204,10 @@ def _save_post_from_form(post: Post, form: PostForm) -> None:
     - raw_html -> sanitize_html() -> body_html (safe public rendering)
     - excerpt auto-generated once if not already set
     """
-    # --- NEW: ensure author is set for new posts ---
-    # If post is new (no author_id yet), set it to current admin user.
+    # Ensure author is set for new posts.
     # This is required after adding author_id NOT NULL in the DB.
     if not getattr(post, "author_id", None):
         post.author_id = current_user.id
-    # ---------------------------------------------
 
     post.title = form.title.data.strip()
     desired_slug = form.slug.data.strip() if form.slug.data else post.title
@@ -274,6 +286,164 @@ def posts_delete(post_id: int):
     db.session.commit()
     flash("Post deleted", "success")
     return redirect(url_for("admin.posts_list"))
+
+
+# ---------------------------------------------------------------------
+# Media endpoints (admin-only)
+# ---------------------------------------------------------------------
+# We implement a 2-step upload flow:
+# 1) presign-upload: create DB record + return presigned PUT URL for direct upload
+# 2) commit: verify the object exists in S3 (HEAD) then mark record as "ready"
+#
+# Why:
+# - We never proxy bytes through Flask (scales better).
+# - We keep bucket private; public access is via /media/<id> redirect (stable URL).
+# - DB remains the source of truth for what assets exist and who owns them.
+
+@admin_bp.route("/media/presign-upload", methods=["POST"])
+@admin_required
+@csrf.exempt
+def media_presign_upload():
+    """
+    Step 1: create a MediaAsset record and return a presigned PUT URL.
+
+    Expected JSON payload:
+      - filename (required)
+      - content_type (recommended)
+      - byte_size (required)
+      - kind (optional: image/video/file)
+
+    Response:
+      - asset_id
+      - upload.url + required headers (Content-Type)
+    """
+    _require_media_enabled()
+
+    payload = request.get_json(silent=True) or {}
+    filename = (payload.get("filename") or "").strip()
+    content_type = (payload.get("content_type") or "application/octet-stream").strip()
+    byte_size = int(payload.get("byte_size") or 0)
+    kind = (payload.get("kind") or "file").strip()
+
+    if not filename or byte_size <= 0:
+        return jsonify({"error": "filename and byte_size are required"}), 400
+
+    # Avoid unsafe characters in object keys; preserve some readability.
+    safe_name = secure_filename(filename) or "file"
+    object_key = f"media/{uuid.uuid4().hex}-{safe_name}"
+
+    asset = MediaAsset(
+        owner_id=current_user.id,
+        bucket=current_app.config["S3_BUCKET"],
+        object_key=object_key,
+        original_filename=filename,
+        content_type=content_type,
+        byte_size=byte_size,
+        kind=kind,
+        status="pending",
+    )
+
+    db.session.add(asset)
+    db.session.commit()
+
+    upload_url = presign_put(
+        bucket=asset.bucket,
+        key=asset.object_key,
+        content_type=asset.content_type,
+        expires_in=current_app.config["S3_PRESIGN_EXPIRES_IN"],
+    )
+
+    return jsonify(
+        {
+            "asset_id": asset.id,
+            "object_key": asset.object_key,
+            "upload": {
+                "method": "PUT",
+                "url": upload_url,
+                "headers": {
+                    # Client MUST send this header for signature match.
+                    "Content-Type": asset.content_type,
+                },
+            },
+        }
+    )
+
+
+@admin_bp.route("/media/commit", methods=["POST"])
+@admin_required
+@csrf.exempt
+def media_commit():
+    """
+    Step 2: finalize an uploaded MediaAsset.
+
+    We verify the object exists in S3 (HEAD request). If present, we mark the DB record "ready"
+    and store server-side metadata (etag/content-type/size).
+
+    Expected JSON payload:
+      - asset_id (required)
+
+    Response:
+      - stable_url: a non-expiring URL to reference inside posts (e.g. /media/123)
+    """
+    _require_media_enabled()
+
+    payload = request.get_json(silent=True) or {}
+    asset_id = payload.get("asset_id")
+    if not asset_id:
+        return jsonify({"error": "asset_id is required"}), 400
+
+    asset = db.session.get(MediaAsset, int(asset_id)) or abort(404)
+
+    # Ownership check (future multi-author safety).
+    if asset.owner_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    meta = head_object(bucket=asset.bucket, key=asset.object_key)
+
+    # Update from storage source-of-truth.
+    asset.status = "ready"
+    if meta.get("ETag"):
+        asset.etag = str(meta["ETag"]).strip('"')
+    if meta.get("ContentType"):
+        asset.content_type = meta["ContentType"]
+    if meta.get("ContentLength"):
+        asset.byte_size = int(meta["ContentLength"])
+
+    db.session.add(asset)
+    db.session.commit()
+
+    stable_url = url_for("main.media_redirect", asset_id=asset.id, _external=False)
+    return jsonify({"asset_id": asset.id, "status": asset.status, "stable_url": stable_url})
+
+
+@admin_bp.route("/media/<int:asset_id>/presign-view", methods=["GET"])
+@admin_required
+def media_presign_view(asset_id: int):
+    """
+    Admin-only preview helper: returns a short-lived presigned GET URL.
+
+    This is useful for:
+    - verifying uploads
+    - showing previews in admin UI without making assets globally public
+    """
+    _require_media_enabled()
+
+    asset = db.session.get(MediaAsset, asset_id) or abort(404)
+
+    # Keep it strict: you can preview only your assets (admins can override if desired).
+    if asset.owner_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    if asset.status != "ready":
+        return jsonify({"error": "asset is not ready"}), 400
+
+    url = presign_get(
+        bucket=asset.bucket,
+        key=asset.object_key,
+        expires_in=current_app.config["S3_PRESIGN_EXPIRES_IN"],
+    )
+
+    return jsonify({"url": url, "expires_in": current_app.config["S3_PRESIGN_EXPIRES_IN"]})
 
 
 @admin_bp.route("/db-info")
