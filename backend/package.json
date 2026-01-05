@@ -1,0 +1,10 @@
+{
+  "name": "kw-frontend",
+  "private": true,
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i ./assets/tailwind.css -o ./app/static/css/tailwind.css --minify"
+  }
+}
