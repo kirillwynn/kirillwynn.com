@@ -9,6 +9,7 @@ from .extensions import csrf, db, login_manager, migrate
 from .models import User
 from .routes.main import main_bp
 from .routes.admin import admin_bp
+from .routes.api_auth import api_auth_bp
 
 
 def create_app():
@@ -59,6 +60,7 @@ def create_app():
     # - admin_bp: hidden admin panel for managing posts and authentication
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(api_auth_bp)
 
     # Redirect the site root "/" to the feed route (the main entry point).
     @app.route("/")
