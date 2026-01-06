@@ -1,23 +1,26 @@
-# Ignore system-generated files
+# OS / editor
 .DS_Store
 Thumbs.db
-
-# Ignore logs
-**/*.log
 *.swp
 
-# Ignore Python virtual environments and caches
-venv/
-__pycache__
+# Logs
+*.log
+
+# Python
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
+venv/
+env/
 
-# Ignore Let's Encrypt certificates
-/etc/letsencrypt
-
-# Ignore environment variable files
-.env
-
-# Ignore node
+# Node
 node_modules/
+dist/
+.vite/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
