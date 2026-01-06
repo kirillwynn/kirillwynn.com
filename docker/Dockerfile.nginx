@@ -1,5 +1,8 @@
+# docker/Dockerfile.nginx
 FROM nginx:stable
 
-COPY nginx/nginx.conf /etc/nginx/nginx.conf
+# We rely on official nginx base config.
+# We only provide server blocks (virtual hosts).
+COPY nginx/conf.d/ /etc/nginx/conf.d/
 
 EXPOSE 80 443
