@@ -1,11 +1,22 @@
 name: Build and Deploy
 
 on:
+  # Build images on every push to main
   push:
     branches:
       - main
 
+  # Allow manual runs (useful for prod deploys)
   workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: "Where to deploy"
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+        default: staging
 
 jobs:
   # -------------------------------------------------
@@ -65,18 +76,24 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/kw-app:${{ github.sha }}
 
   # -------------------------------------------------
-  # Deploy to staging environment
+  # Deploy to staging environment (auto on push + manual)
   # -------------------------------------------------
-  deploy:
+  deploy-staging:
     needs: [build-and-push-nginx, build-and-push-flask]
     runs-on: ubuntu-latest
     environment: kw_staging
+
+    # Auto-deploy to staging on push to main.
+    # Also allow manual deploy when workflow_dispatch target == staging.
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_target == 'staging')
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to server
+      - name: Deploy to staging server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -127,7 +144,83 @@ jobs:
             docker pull '${{ vars.DOCKER_USERNAME }}/kw-app:${{ github.sha }}'
 
             # Ensure admin exists BEFORE migrations that depend on it (author_id backfill)
-            docker compose run --rm app flask create-admin
+            docker compose run --rm app flask create-admin || true
+
+            # Apply DB migrations
+            docker compose run --rm app flask db upgrade
+
+            # Start/update the stack
+            docker compose up -d --remove-orphans
+
+            docker compose ps
+
+  # -------------------------------------------------
+  # Deploy to production environment (manual only)
+  # -------------------------------------------------
+  deploy-prod:
+    needs: [build-and-push-nginx, build-and-push-flask]
+    runs-on: ubuntu-latest
+    environment: kw_prod
+
+    # PROD: deploy only by manual workflow_dispatch with deploy_target == prod
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_target == 'prod'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to prod server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+
+            cd ~/projects/kirillwynn.com
+            git pull origin main
+
+            # ---------------------------------------------
+            # Write .env for docker-compose (no leading spaces)
+            # ---------------------------------------------
+            rm -f .env
+            {
+              printf 'APP_ENV=%s\n' '${{ vars.APP_ENV }}'
+              printf 'DOCKER_USERNAME=%s\n' '${{ vars.DOCKER_USERNAME }}'
+              printf 'IMAGE_TAG=%s\n' '${{ github.sha }}'
+
+              printf 'SECRET_KEY=%s\n' '${{ secrets.SECRET_KEY }}'
+
+              printf 'DB_HOST=%s\n' '${{ vars.DB_HOST }}'
+              printf 'DB_PORT=%s\n' '${{ vars.DB_PORT }}'
+              printf 'DB_NAME=%s\n' '${{ vars.DB_NAME }}'
+              printf 'DB_USER=%s\n' '${{ secrets.DB_USER }}'
+              printf 'DB_PASSWORD=%s\n' '${{ secrets.DB_PASSWORD }}'
+
+              # S3 (optional in app, but fine to pass through)
+              printf 'S3_ENDPOINT_URL=%s\n' '${{ vars.S3_ENDPOINT_URL }}'
+              printf 'S3_REGION=%s\n' '${{ vars.S3_REGION }}'
+              printf 'S3_BUCKET=%s\n' '${{ vars.S3_BUCKET }}'
+              printf 'S3_ACCESS_KEY_ID=%s\n' '${{ secrets.S3_ACCESS_KEY_ID }}'
+              printf 'S3_SECRET_ACCESS_KEY=%s\n' '${{ secrets.S3_SECRET_ACCESS_KEY }}'
+
+              # Bootstrap admin (prod): optional; safe to run idempotently
+              printf 'ADMIN_EMAIL=%s\n' '${{ secrets.ADMIN_EMAIL }}'
+              printf 'ADMIN_PASSWORD=%s\n' '${{ secrets.ADMIN_PASSWORD }}'
+              printf 'ADMIN_NAME=%s\n' '${{ secrets.ADMIN_NAME }}'
+            } > .env
+
+            chmod 600 .env
+
+            # Docker Hub login (safer)
+            echo '${{ secrets.DOCKER_PASSWORD }}' | docker login -u '${{ vars.DOCKER_USERNAME }}' --password-stdin
+
+            docker pull '${{ vars.DOCKER_USERNAME }}/kw-nginx:${{ github.sha }}'
+            docker pull '${{ vars.DOCKER_USERNAME }}/kw-app:${{ github.sha }}'
+
+            # Ensure admin exists BEFORE migrations that depend on it (author_id backfill)
+            docker compose run --rm app flask create-admin || true
 
             # Apply DB migrations
             docker compose run --rm app flask db upgrade
