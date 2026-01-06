@@ -1,22 +1,19 @@
-# Ignore Git-related files
-.git
-.gitignore
+# Ignore everything by default
+**
 
-# Ignore logs
-*.log
+# Allow only what Docker builds need
+!backend/**
+!docker/**
+!nginx/**
+!frontend/**
 
-# Ignore Markdown files
-*.md
-
-# Ignore Python virtual environments and caches
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.env
-
-# Ignore Poetry virtual environments
-.poetry/
+# Re-ignore common junk inside allowed dirs
+**/__pycache__/
+**/*.pyc
+**/node_modules/
+**/.vite/
+**/dist/
+**/.DS_Store
+**/*.log
+**/.env
+**/.env.*
