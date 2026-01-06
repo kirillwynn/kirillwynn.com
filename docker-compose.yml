@@ -1,17 +1,13 @@
 # docker-compose.yml
-
-x-common-env: &common-env
-  DB_HOST: ${DB_HOST}
-  DB_PORT: ${DB_PORT}
-  DB_NAME: ${DB_NAME}
-  DB_USER: ${DB_USER}
-  DB_PASSWORD: ${DB_PASSWORD}
-
-  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
-  S3_REGION: ${S3_REGION}
-  S3_BUCKET: ${S3_BUCKET}
-  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
-  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+#
+# This stack runs:
+# - app   : Flask/Gunicorn (internal)
+# - nginx : public edge reverse proxy (TLS termination, routing)
+#
+# Design goals:
+# - Immutable deploys: images pinned by IMAGE_TAG (git SHA)
+# - Runtime config via .env on the server (not committed)
+# - Keep app private behind nginx
 
 services:
   app:
@@ -19,23 +15,34 @@ services:
     container_name: app
     expose:
       - "5000"
-
-    # OPTIONAL: if present on server
-    # (doesn't commit secrets; it's just a convenience for compose)
-    env_file:
-      - .env
-
     environment:
-      # IMPORTANT: staging/local can boot without DB/SECRET_KEY now
-      APP_ENV: ${APP_ENV:-production}
-
-      SECRET_KEY: ${SECRET_KEY}
       FLASK_APP: app
 
-      <<: *common-env
+      # App crypto/session signing
+      SECRET_KEY: ${SECRET_KEY}
 
+      # DB (required by Config)
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      # S3 (optional feature)
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+      S3_REGION: ${S3_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+
+      # Optional bootstrap (create-admin CLI reads these)
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_NAME: ${ADMIN_NAME}
+
+      # Environment marker (staging/prod)
+      APP_ENV: ${APP_ENV}
     restart: always
-
     networks:
       - default
 
@@ -46,16 +53,16 @@ services:
       - "80:80"
       - "443:443"
 
+    # IMPORTANT:
+    # - Do NOT mount nginx.conf from host.
+    # - Config is shipped inside the nginx image (immutable).
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
 
     depends_on:
       - app
-
     restart: always
-
     networks:
       - default
 
