@@ -10,6 +10,7 @@ from .models import User
 from .routes.main import main_bp
 from .routes.admin import admin_bp
 from .routes.api_auth import api_auth_bp
+from .routes.api import api_bp
 
 
 def create_app():
@@ -56,11 +57,14 @@ def create_app():
         return db.session.get(User, int(user_id))
 
     # Register site blueprints.
-    # - main_bp: public pages, feed, post detail, health endpoints
-    # - admin_bp: hidden admin panel for managing posts and authentication
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
+
+    # API blueprints.
+    # - api_auth_bp: /api/auth/login, /api/auth/logout, /api/auth/me
+    # - api_bp: misc API endpoints (e.g. /api/health proxy wiring / helper endpoints)
     app.register_blueprint(api_auth_bp)
+    app.register_blueprint(api_bp)
 
     # Redirect the site root "/" to the feed route (the main entry point).
     @app.route("/")
@@ -68,7 +72,6 @@ def create_app():
         return redirect(url_for("main.feed"))
 
     # CLI command: create/update an admin user from environment variables.
-    # Useful for bootstrapping production without manual DB fiddling.
     @app.cli.command("create-admin")
     def create_admin_command():
         """Create or update the admin user from environment variables."""
@@ -76,15 +79,11 @@ def create_app():
         password = os.getenv("ADMIN_PASSWORD")
         name = os.getenv("ADMIN_NAME")
 
-        # Fail fast if required admin credentials are not provided.
         if not email or not password:
             raise click.ClickException("ADMIN_EMAIL and ADMIN_PASSWORD must be set in the environment.")
 
         email = email.lower().strip()
 
-        # Idempotent behavior:
-        # - If user exists: update password + ensure is_admin=True
-        # - Else: create a new admin user
         user = User.query.filter_by(email=email).first()
         if user:
             user.set_password(password)
@@ -102,4 +101,3 @@ def create_app():
         click.echo(f"Admin user {action}: {email}")
 
     return app
-

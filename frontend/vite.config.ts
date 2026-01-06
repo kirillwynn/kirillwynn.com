@@ -17,7 +17,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:5000",
+        target: "https://staging.secretroom.kirillwynn.com",
         changeOrigin: true,
         // IMPORTANT: if backend serves /api as a prefix, we keep it as-is.
         // If later backend routes are not under /api, we can rewrite here.
