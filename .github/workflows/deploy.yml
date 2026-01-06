@@ -88,7 +88,9 @@ jobs:
             cd ~/projects/kirillwynn.com
             git pull origin main
 
-            # Write .env for docker-compose (no leading spaces, safe for special chars)
+            # ---------------------------------------------
+            # Write .env for docker-compose (safe formatting)
+            # ---------------------------------------------
             rm -f .env
             {
               printf 'APP_ENV=%s\n' '${{ vars.APP_ENV }}'
@@ -103,19 +105,17 @@ jobs:
               printf 'DB_USER=%s\n' '${{ secrets.DB_USER }}'
               printf 'DB_PASSWORD=%s\n' '${{ secrets.DB_PASSWORD }}'
 
-              # S3 (optional in app)
               printf 'S3_ENDPOINT_URL=%s\n' '${{ vars.S3_ENDPOINT_URL }}'
               printf 'S3_REGION=%s\n' '${{ vars.S3_REGION }}'
               printf 'S3_BUCKET=%s\n' '${{ vars.S3_BUCKET }}'
               printf 'S3_ACCESS_KEY_ID=%s\n' '${{ secrets.S3_ACCESS_KEY_ID }}'
               printf 'S3_SECRET_ACCESS_KEY=%s\n' '${{ secrets.S3_SECRET_ACCESS_KEY }}'
 
-              # Bootstrap admin (staging)
+              # Staging admin bootstrap
               printf 'ADMIN_EMAIL=%s\n' '${{ secrets.ADMIN_EMAIL }}'
               printf 'ADMIN_PASSWORD=%s\n' '${{ secrets.ADMIN_PASSWORD }}'
               printf 'ADMIN_NAME=%s\n' '${{ secrets.ADMIN_NAME }}'
             } > .env
-
             chmod 600 .env
 
             # Docker Hub login
@@ -125,12 +125,16 @@ jobs:
             docker pull '${{ vars.DOCKER_USERNAME }}/kw-nginx:${{ github.sha }}'
             docker pull '${{ vars.DOCKER_USERNAME }}/kw-app:${{ github.sha }}'
 
-            # Bootstrap-safe migration order for a fresh DB:
+            # ---------------------------------------------
+            # Migration/bootstrap order (fresh DB safe)
+            # ---------------------------------------------
             # 1) migrate until users table exists
-            # 2) create admin
-            # 3) migrate to head (author_id backfill will now succeed)
             docker compose run --rm app flask db upgrade 202412101500
+
+            # 2) create/update admin (now users table exists)
             docker compose run --rm app flask create-admin || true
+
+            # 3) migrate to head (author_id backfill will now succeed)
             docker compose run --rm app flask db upgrade
 
             # Start/update the stack
@@ -162,7 +166,6 @@ jobs:
             cd ~/projects/kirillwynn.com
             git pull origin main
 
-            # Write .env for docker-compose (no leading spaces, safe for special chars)
             rm -f .env
             {
               printf 'APP_ENV=%s\n' '${{ vars.APP_ENV }}'
@@ -177,29 +180,24 @@ jobs:
               printf 'DB_USER=%s\n' '${{ secrets.DB_USER }}'
               printf 'DB_PASSWORD=%s\n' '${{ secrets.DB_PASSWORD }}'
 
-              # S3 (optional in app)
               printf 'S3_ENDPOINT_URL=%s\n' '${{ vars.S3_ENDPOINT_URL }}'
               printf 'S3_REGION=%s\n' '${{ vars.S3_REGION }}'
               printf 'S3_BUCKET=%s\n' '${{ vars.S3_BUCKET }}'
               printf 'S3_ACCESS_KEY_ID=%s\n' '${{ secrets.S3_ACCESS_KEY_ID }}'
               printf 'S3_SECRET_ACCESS_KEY=%s\n' '${{ secrets.S3_SECRET_ACCESS_KEY }}'
 
-              # Bootstrap admin (prod)
+              # Prod admin bootstrap (idempotent)
               printf 'ADMIN_EMAIL=%s\n' '${{ secrets.ADMIN_EMAIL }}'
               printf 'ADMIN_PASSWORD=%s\n' '${{ secrets.ADMIN_PASSWORD }}'
               printf 'ADMIN_NAME=%s\n' '${{ secrets.ADMIN_NAME }}'
             } > .env
-
             chmod 600 .env
 
-            # Docker Hub login
             echo '${{ secrets.DOCKER_PASSWORD }}' | docker login -u '${{ vars.DOCKER_USERNAME }}' --password-stdin
 
-            # Pull immutable images for this SHA
             docker pull '${{ vars.DOCKER_USERNAME }}/kw-nginx:${{ github.sha }}'
             docker pull '${{ vars.DOCKER_USERNAME }}/kw-app:${{ github.sha }}'
 
-            # Same bootstrap-safe migration order (works for both fresh and existing DBs)
             docker compose run --rm app flask db upgrade 202412101500
             docker compose run --rm app flask create-admin || true
             docker compose run --rm app flask db upgrade
