@@ -22,7 +22,7 @@ export function RootLayout() {
     setBusy(true);
     try {
       await auth.logout();
-      nav("/login", { replace: true });
+      nav("/", { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Logout failed");
     } finally {
@@ -54,8 +54,12 @@ export function RootLayout() {
         </div>
 
         <nav style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link to="/" style={{ textDecoration: "none" }}>
+          <Link to="/app" style={{ textDecoration: "none" }}>
             Home
+          </Link>
+
+          <Link to="/app/posts" style={{ textDecoration: "none" }}>
+            Posts
           </Link>
 
           <button

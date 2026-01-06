@@ -2,7 +2,8 @@
 // Minimal login page for cookie-session auth.
 // - Shows backend error messages
 // - Disables form while submitting
-// - If already authenticated: shows a friendly "Already signed in" screen (no surprise redirect)
+// - Door lives at / (no /login route)
+// - If already authenticated: shows a friendly "Already signed in" screen
 
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -13,8 +14,10 @@ import { useAuth } from "@/lib/AuthProvider";
 function getRedirectTarget(search: string): string {
   const params = new URLSearchParams(search);
   const next = params.get("next");
+  // Keep it safe: only allow internal absolute paths
   if (next && next.startsWith("/")) return next;
-  return "/";
+  // Default landing after login
+  return "/app";
 }
 
 export function LoginPage() {
@@ -49,7 +52,8 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await auth.logout();
-      nav("/login", { replace: true });
+      // Door is /
+      nav("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Logout failed");
     } finally {
@@ -120,7 +124,7 @@ export function LoginPage() {
                 fontWeight: 600,
               }}
             >
-              Go home
+              Enter
             </button>
 
             <button
@@ -155,9 +159,9 @@ export function LoginPage() {
       }}
     >
       <div style={{ width: "100%", maxWidth: 420 }}>
-        <h1 style={{ fontSize: 22, marginBottom: 6 }}>Sign in</h1>
+        <h1 style={{ fontSize: 22, marginBottom: 6 }}>Secret Room</h1>
         <p style={{ opacity: 0.75, marginTop: 0, marginBottom: 16 }}>
-          Use your admin credentials.
+          Sign in to enter.
         </p>
 
         <form
@@ -232,7 +236,7 @@ export function LoginPage() {
               fontWeight: 600,
             }}
           >
-            {submitting ? "Signing in..." : "Sign in"}
+            {submitting ? "Signing in..." : "Enter"}
           </button>
         </form>
       </div>

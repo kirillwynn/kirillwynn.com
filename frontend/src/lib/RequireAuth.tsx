@@ -1,7 +1,7 @@
 // frontend/src/lib/RequireAuth.tsx
 // Route guard for pages that require authentication.
 // - Waits for auth.init() to finish (loading state)
-// - Redirects to /login with ?next=... if not authenticated
+// - Redirects to / with ?next=... if not authenticated
 
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
@@ -21,7 +21,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (!a.authenticated) {
     const next = encodeURIComponent(loc.pathname + loc.search);
-    return <Navigate to={`/login?next=${next}`} replace />;
+    return <Navigate to={`/?next=${next}`} replace />;
   }
 
   return <>{children}</>;
