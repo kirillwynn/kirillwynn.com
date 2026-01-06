@@ -1,8 +1,21 @@
 # docker/Dockerfile.nginx
 FROM nginx:stable
 
-# We rely on official nginx base config.
-# We only provide server blocks (virtual hosts).
+# ------------------------------------------------------------
+# We rely on the official nginx base config.
+# We only ship:
+# - mandatory vhosts in conf.d/ (must always be safe to load)
+# - optional vhosts in /etc/nginx/optional/ (enabled at runtime if deps exist)
+# - a small entrypoint script to enable optional configs safely
+# ------------------------------------------------------------
+
+# Mandatory server blocks (must not depend on missing TLS certs)
 COPY nginx/conf.d/ /etc/nginx/conf.d/
+
+# Optional server blocks (enabled by entrypoint script if certs exist)
+COPY nginx/optional/ /etc/nginx/optional/
+
+# Runtime enablement logic (runs automatically in official nginx image)
+COPY nginx/docker-entrypoint.d/ /docker-entrypoint.d/
 
 EXPOSE 80 443
