@@ -1,13 +1,12 @@
 # docker-compose.yml
 #
 # Services:
-# - app: Flask/Gunicorn (internal)
-# - nginx: edge proxy (TLS termination, routing)
+# - app   : Flask app (Gunicorn), internal-only
+# - nginx : Public edge proxy (TLS termination + routing)
 #
-# Design goals:
-# - Reproducible deploys with immutable image tags (IMAGE_TAG = git SHA)
-# - Fail-fast config enforced by backend Config
-# - Predictable network name: kw-network
+# Key rule (Docker nginx image best practice):
+# - DO NOT mount /etc/nginx/nginx.conf from the repo
+# - Put ONLY server blocks into ./nginx/conf.d/*.conf and mount that directory
 
 x-common-env: &common-env
   DB_HOST: ${DB_HOST}
@@ -16,7 +15,7 @@ x-common-env: &common-env
   DB_USER: ${DB_USER}
   DB_PASSWORD: ${DB_PASSWORD}
 
-  # S3 / Object Storage (for media uploads)
+  # S3 / Object Storage (optional feature gate)
   S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
   S3_REGION: ${S3_REGION}
   S3_BUCKET: ${S3_BUCKET}
@@ -28,12 +27,17 @@ services:
     image: ${DOCKER_USERNAME}/kw-app:${IMAGE_TAG:-latest}
     container_name: app
 
+    # Internal-only port (visible only to other containers on the network)
     expose:
       - "5000"
 
     environment:
+      # Flask session signing, etc.
       SECRET_KEY: ${SECRET_KEY}
+
+      # Some Flask tooling expects this (harmless)
       FLASK_APP: app
+
       <<: *common-env
 
     restart: always
@@ -50,15 +54,13 @@ services:
       - "443:443"
 
     volumes:
-      # IMPORTANT:
-      # Mount the whole nginx folder so we can add per-domain vhost configs
-      # (e.g. staging.secretroom.kirillwynn.com.conf) without rebuilding images.
-      - ./nginx:/etc/nginx:ro
+      # Mount ONLY server blocks into conf.d
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
 
-      # TLS certs from host (Let's Encrypt).
+      # TLS certificates (Let's Encrypt)
       - /etc/letsencrypt:/etc/letsencrypt:ro
 
-      # Webroot for ACME http-01 challenges (certbot renew).
+      # ACME webroot for certbot HTTP-01
       - /var/www/certbot:/var/www/certbot
 
     depends_on:
