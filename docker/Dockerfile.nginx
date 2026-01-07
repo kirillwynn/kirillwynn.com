@@ -1,20 +1,24 @@
 # docker/Dockerfile.nginx
+# Immutable nginx image:
+# - builds frontend (Vite) in CI inside this Docker build
+# - bakes dist into /usr/share/nginx/html
+# - bakes nginx vhost config into /etc/nginx/conf.d
+
+FROM node:20-alpine AS frontend_builder
+WORKDIR /app/frontend
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
 FROM nginx:stable
 
-# ------------------------------------------------------------
-# We rely on the official nginx base config.
-# We only ship:
-# - mandatory vhosts in conf.d/ (must always be safe to load)
-# - optional vhosts in /etc/nginx/optional/ (enabled at runtime if deps exist)
-# - a small entrypoint script to enable optional configs safely
-# ------------------------------------------------------------
-
-# Mandatory server blocks (must not depend on missing TLS certs)
 COPY nginx/conf.d/ /etc/nginx/conf.d/
+COPY --from=frontend_builder /app/frontend/dist/ /usr/share/nginx/html/
 
-# Optional server blocks (enabled by entrypoint script if certs exist)
-
-# Runtime enablement logic (runs automatically in official nginx image)
+# Keep if you need it; otherwise you can remove this line entirely.
 COPY nginx/docker-entrypoint.d/ /docker-entrypoint.d/
 
 EXPOSE 80 443
