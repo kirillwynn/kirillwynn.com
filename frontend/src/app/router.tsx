@@ -11,6 +11,7 @@ import { DebugAuthPage } from "@/pages/DebugAuthPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RequireAuth } from "@/lib/RequireAuth";
 import { PostsPage } from "@/pages/posts/PostsPage";
+import { EditorPage } from "@/pages/editor/EditorPage";
 
 export const router = createBrowserRouter([
   // Hidden door: only /
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: "posts", element: <PostsPage /> },
+      { path: "posts/:id", element: <EditorPage /> },
       { path: "debug/auth", element: <DebugAuthPage /> },
     ],
   },
