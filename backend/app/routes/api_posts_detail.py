@@ -78,7 +78,12 @@ def patch_post(post_id: int):
     if not post:
         return jsonify({"ok": False, "error": "not found"}), 404
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if data is None:
+        # Always return JSON here so the frontend never fails on JSON.parse().
+        return jsonify({"ok": False, "error": "invalid JSON body"}), 400
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "JSON body must be an object"}), 400
 
     changed = False
 
