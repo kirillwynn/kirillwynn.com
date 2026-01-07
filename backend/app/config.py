@@ -67,6 +67,19 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # ---------------------------------------------------------------
+    # SQLAlchemy engine (connection pool hardening)
+    # ---------------------------------------------------------------
+    # Some managed Postgres setups close idle SSL connections.
+    # These settings keep the app resilient:
+    # - pool_pre_ping: checks connection liveness before using it
+    # - pool_recycle: periodically recreates connections to avoid stale SSL sockets
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "280")),  # seconds
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),   # seconds
+    }
+
+    # ---------------------------------------------------------------
     # Session cookies (recommended security defaults)
     # ---------------------------------------------------------------
     SESSION_COOKIE_HTTPONLY = True
