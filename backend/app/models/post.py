@@ -17,7 +17,6 @@ from ..extensions import db
 #   as the `secondary=` join table for many-to-many relationships.
 post_media_assets = db.Table(
     "post_media_assets",
-
     # Composite primary key ensures each asset can be linked once per post.
     db.Column(
         "post_id",
@@ -31,7 +30,6 @@ post_media_assets = db.Table(
         db.ForeignKey("media_assets.id", ondelete="RESTRICT"),
         primary_key=True,
     ),
-
     # Optional "usage metadata" (matches the migration schema).
     # - role: how the asset is used inside the post (cover/inline/etc.)
     # - sort_order: stable ordering in galleries
@@ -48,7 +46,8 @@ class Post(db.Model):
 
     Design notes:
     - Stores sanitized HTML for safe rendering (body_html)
-    - Optionally stores source (body_md) for future editor support / revisions
+    - Stores the rich editor canonical state as TipTap/ProseMirror JSON (body_json)
+    - Optionally stores source (body_md) for export/compatibility
     - Uses 'status' + 'published_at' for feed ordering and drafts
 
     Multi-author ready:
@@ -87,9 +86,11 @@ class Post(db.Model):
     title = db.Column(db.String(255), nullable=False)
     slug = db.Column(db.String(255), unique=True, index=True, nullable=False)
 
-    # Variant A:
-    # - body_html: sanitized HTML for safe display (what you actually render)
-    # - body_md: optional source (could be Markdown or editor JSON later)
+    # Storage strategy:
+    # - body_json: canonical editor state (TipTap/ProseMirror JSON serialized as text)
+    # - body_html: sanitized HTML for safe rendering
+    # - body_md: optional source/export (kept for compatibility)
+    body_json = db.Column(db.Text, nullable=True)
     body_html = db.Column(db.Text, nullable=False, default="")
     body_md = db.Column(db.Text, nullable=True)
 
