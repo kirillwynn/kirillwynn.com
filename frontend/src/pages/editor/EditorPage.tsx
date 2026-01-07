@@ -157,7 +157,7 @@ export function EditorPage() {
       const safeText = body ?? "";
       editor.commands.setContent(
         safeText ? `<p>${escapeHtml(safeText).replace(/\n/g, "<br>")}</p>` : "",
-        false,
+        { emitUpdate: false },
       );
     }
 
@@ -425,7 +425,6 @@ export function EditorPage() {
           active={!!editor?.isActive("codeBlock")}
           onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
         />
-
         <ToolbarButton
           label="Save"
           title="Save now"
@@ -435,10 +434,7 @@ export function EditorPage() {
       </div>
 
       {/* TipTap editor */}
-      <div
-        onBlurCapture={() => flushSaveNow()}
-        style={{ marginBottom: 10 }}
-      >
+      <div onBlurCapture={() => flushSaveNow()} style={{ marginBottom: 10 }}>
         <EditorContent editor={editor} />
       </div>
 
