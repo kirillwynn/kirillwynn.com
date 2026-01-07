@@ -1,22 +1,22 @@
 // frontend/src/pages/editor/EditorPage.tsx
 //
-// Editor page (v3).
+// Editor page (v3 -> v4 internal behavior).
 // - Loads post by id from API
 // - Shows metadata (status + timestamps)
 // - Title is editable (saved via PATCH)
-// - Body uses TipTap rich editor (saved via PATCH as body_md HTML for now)
-// - Autosave via PATCH (debounced) + immediate save on blur
+// - Body uses TipTap rich editor
+// - Autosave via PATCH (debounced) + safe flush on blur/manual
 //
-// NOTE:
-// We currently persist TipTap output as HTML into body_md.
-// Later we can migrate to Markdown or TipTap JSON if needed.
+// v4 change:
+// - Compare and persist TipTap JSON as the canonical authoring format (body_json)
+// - Do NOT send PATCH on toolbar clicks/blur unless the document actually changed
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, patchPost, type PostItem } from "@/api/posts";
 
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 function formatIso(iso: string | null | undefined): string {
@@ -48,6 +48,29 @@ function normalizeTitle(raw: string): string {
   return raw.trim();
 }
 
+function stableStringify(value: unknown): string {
+  // Deterministic JSON stringify (sort keys recursively).
+  // This avoids "different string, same meaning" issues when comparing objects.
+  const seen = new WeakSet<object>();
+
+  function normalize(v: any): any {
+    if (v === null || typeof v !== "object") return v;
+
+    if (seen.has(v)) return null;
+    seen.add(v);
+
+    if (Array.isArray(v)) return v.map(normalize);
+
+    const out: Record<string, any> = {};
+    for (const k of Object.keys(v).sort()) {
+      out[k] = normalize(v[k]);
+    }
+    return out;
+  }
+
+  return JSON.stringify(normalize(value));
+}
+
 export function EditorPage() {
   const params = useParams();
 
@@ -61,14 +84,14 @@ export function EditorPage() {
 
   // Local drafts
   const [titleDraft, setTitleDraft] = useState("");
-  const [bodyDraft, setBodyDraft] = useState("");
+  const [bodyJsonStrDraft, setBodyJsonStrDraft] = useState<string>("");
 
   // Save status (tiny UX)
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
   // Keep last server values to avoid PATCH spam
   const lastServerTitleRef = useRef<string>("");
-  const lastServerBodyRef = useRef<string>("");
+  const lastServerBodyJsonStrRef = useRef<string>("");
 
   // Debounce timer
   const saveTimerRef = useRef<number | null>(null);
@@ -90,9 +113,11 @@ export function EditorPage() {
       },
     },
     onUpdate: ({ editor }) => {
-      // Persist HTML into bodyDraft for now.
-      // This triggers autosave via bodyDraft effect below.
-      setBodyDraft(editor.getHTML());
+      // Canonical authoring format: TipTap JSON.
+      // onUpdate only fires when docChanged === true, so selection/toolbar focus
+      // won't cause drafts to change.
+      const json = editor.getJSON();
+      setBodyJsonStrDraft(stableStringify(json));
     },
   });
 
@@ -142,25 +167,37 @@ export function EditorPage() {
     if (state.kind !== "ready") return;
 
     const title = state.post.title ?? "";
-    const body = state.post.body_md ?? "";
-
     setTitleDraft(title);
-    setBodyDraft(body);
-
     lastServerTitleRef.current = title;
-    lastServerBodyRef.current = body;
 
-    // Update TipTap content without creating an update loop.
-    // The second argument is options; we keep it minimal to avoid TS errors.
+    // Prefer v2 canonical body_json (object) if present, fallback to legacy body_md (HTML).
+    const bodyJsonFromApi = (state.post as any).body_json as JSONContent | null | undefined;
+    const bodyHtmlLegacy = (state.post as any).body_md as string | null | undefined;
+
     if (editor) {
-      editor.commands.setContent(body || "", { emitUpdate: false });
+      if (bodyJsonFromApi && typeof bodyJsonFromApi === "object") {
+        // Set JSON content without emitting update.
+        editor.commands.setContent(bodyJsonFromApi, { emitUpdate: false });
+      } else {
+        // Fallback: we still support HTML for existing posts.
+        editor.commands.setContent(bodyHtmlLegacy || "", { emitUpdate: false });
+      }
+
+      // After hydration, compute canonical JSON string from the editor state.
+      const hydratedJsonStr = stableStringify(editor.getJSON());
+      setBodyJsonStrDraft(hydratedJsonStr);
+      lastServerBodyJsonStrRef.current = hydratedJsonStr;
+    } else {
+      // If editor isn't ready yet, keep drafts empty until it is.
+      setBodyJsonStrDraft("");
+      lastServerBodyJsonStrRef.current = "";
     }
 
     setSaveState({ kind: "idle" });
   }, [state.kind, state.kind === "ready" ? state.post.id : null, editor]);
 
-  function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
-    const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
+  function buildPatch(): Record<string, unknown> | null {
+    const patch: Record<string, unknown> = {};
 
     // Never send invalid title in autosave.
     // If user clears title temporarily, we do not include it in PATCH.
@@ -171,7 +208,12 @@ export function EditorPage() {
       if (nextTitle.length > 0) patch.title = nextTitle;
     }
 
-    if (bodyDraft !== lastServerBodyRef.current) patch.body_md = bodyDraft;
+    // Canonical: body_json
+    if (bodyJsonStrDraft !== lastServerBodyJsonStrRef.current) {
+      // Send object to backend (it will json.dumps to TEXT).
+      // We re-read from editor to avoid any stringify/parse drift.
+      patch.body_json = editor ? editor.getJSON() : null;
+    }
 
     return Object.keys(patch).length ? patch : null;
   }
@@ -181,7 +223,6 @@ export function EditorPage() {
     if (state.kind !== "ready") return;
 
     // Validate title only on explicit user actions.
-    // Formatting clicks should not produce "title cannot be empty" 400.
     const normalizedTitle = normalizeTitle(titleDraft);
     if ((reason === "blur" || reason === "manual") && normalizedTitle.length === 0) {
       setSaveState({ kind: "error", message: "Title cannot be empty." });
@@ -193,7 +234,9 @@ export function EditorPage() {
 
     setSaveState({ kind: "saving" });
     try {
-      const res = await patchPost(postId, patch);
+      // api client typing currently may not include body_json yet.
+      // We keep this change local to the page and rely on backend support.
+      const res = await patchPost(postId, patch as any);
 
       if (!res.ok) {
         setSaveState({ kind: "error", message: res.error || "Failed to save." });
@@ -202,24 +245,35 @@ export function EditorPage() {
 
       if (res.item) {
         const newTitle = res.item.title ?? lastServerTitleRef.current;
-        const newBody = res.item.body_md ?? lastServerBodyRef.current;
-
         lastServerTitleRef.current = newTitle ?? "";
-        lastServerBodyRef.current = newBody ?? "";
-
         setTitleDraft(newTitle ?? "");
-        setBodyDraft(newBody ?? "");
 
-        // Keep editor in sync with server response.
-        if (editor && typeof newBody === "string") {
-          editor.commands.setContent(newBody, { emitUpdate: false });
+        // Re-sync canonical JSON string.
+        // Prefer server body_json if returned; otherwise use current editor state.
+        const newBodyJsonFromApi = (res.item as any).body_json as JSONContent | null | undefined;
+
+        if (editor) {
+          if (newBodyJsonFromApi && typeof newBodyJsonFromApi === "object") {
+            editor.commands.setContent(newBodyJsonFromApi, { emitUpdate: false });
+          }
+
+          const jsonStr = stableStringify(editor.getJSON());
+          setBodyJsonStrDraft(jsonStr);
+          lastServerBodyJsonStrRef.current = jsonStr;
+        } else {
+          // If editor is missing, at least stop spam.
+          lastServerBodyJsonStrRef.current = bodyJsonStrDraft;
         }
 
         setState({ kind: "ready", post: res.item });
       } else {
         // Fallback: assume patch succeeded.
-        if (patch.title !== undefined) lastServerTitleRef.current = patch.title ?? "";
-        if (patch.body_md !== undefined) lastServerBodyRef.current = patch.body_md ?? "";
+        if (patch.title !== undefined) lastServerTitleRef.current = String(patch.title ?? "");
+        if (editor) {
+          const jsonStr = stableStringify(editor.getJSON());
+          lastServerBodyJsonStrRef.current = jsonStr;
+          setBodyJsonStrDraft(jsonStr);
+        }
       }
 
       setSaveState({ kind: "saved", at: Date.now() });
@@ -252,7 +306,7 @@ export function EditorPage() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [titleDraft, bodyDraft]);
+  }, [titleDraft, bodyJsonStrDraft]);
 
   const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
@@ -467,6 +521,8 @@ export function EditorPage() {
           background: "white",
           overflow: "hidden",
         }}
+        // Important: toolbar clicks cause blur on this container.
+        // flushSaveNow will only PATCH if canonical JSON actually changed.
         onBlur={() => flushSaveNow("blur")}
       >
         <EditorContent editor={editor} />
