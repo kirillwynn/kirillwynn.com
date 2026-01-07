@@ -1,10 +1,11 @@
 // frontend/src/pages/editor/EditorPage.tsx
 //
-// Editor page (v2).
+// Editor page (v3).
 // - Loads post by id from API
 // - Shows metadata (status + timestamps)
 // - Title + body_md are editable
 // - Autosave via PATCH (debounced) + immediate save on blur
+// - Adds "dirty-state" UX: Unsaved / Saving / Saved / Error
 // - Still no rich editor yet (textarea for body_md)
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +18,13 @@ type LoadState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "ready"; post: PostItem };
+
+type SaveState =
+  | { kind: "idle" }
+  | { kind: "dirty" }
+  | { kind: "saving" }
+  | { kind: "saved"; at: number }
+  | { kind: "error"; message: string };
 
 function formatIso(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -46,20 +54,44 @@ export function EditorPage() {
   const [titleDraft, setTitleDraft] = useState("");
   const [bodyDraft, setBodyDraft] = useState("");
 
-  // Save status (tiny UX)
-  const [saveState, setSaveState] = useState<
-    | { kind: "idle" }
-    | { kind: "saving" }
-    | { kind: "saved"; at: number }
-    | { kind: "error"; message: string }
-  >({ kind: "idle" });
+  // Save state badge
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
-  // Keep last server values to avoid PATCH spam
+  // Keep last server values to avoid PATCH spam + compute "dirty"
   const lastServerTitleRef = useRef<string>("");
   const lastServerBodyRef = useRef<string>("");
 
   // Debounce timer
   const saveTimerRef = useRef<number | null>(null);
+
+  // Prevent showing "dirty" while hydrating initial data
+  const isHydratingRef = useRef<boolean>(true);
+
+  // Avoid out-of-order PATCH responses winning
+  const saveSeqRef = useRef<number>(0);
+
+  function getNormalizedDrafts() {
+    // Normalize the same way backend validates (trim + no nulls).
+    // NOTE: backend forbids empty title; here we still allow typing, but we won't PATCH invalid payloads.
+    const title = titleDraft;
+    const body = bodyDraft;
+    return { title, body };
+  }
+
+  function computeDirty(): boolean {
+    const { title, body } = getNormalizedDrafts();
+    return title !== lastServerTitleRef.current || body !== lastServerBodyRef.current;
+  }
+
+  function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
+    const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
+    const { title, body } = getNormalizedDrafts();
+
+    if (title !== lastServerTitleRef.current) patch.title = title;
+    if (body !== lastServerBodyRef.current) patch.body_md = body;
+
+    return Object.keys(patch).length ? patch : null;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +103,7 @@ export function EditorPage() {
       }
 
       setState({ kind: "loading" });
+      isHydratingRef.current = true;
 
       try {
         const res = await getPost(postId);
@@ -114,36 +147,79 @@ export function EditorPage() {
     lastServerTitleRef.current = title;
     lastServerBodyRef.current = body;
 
+    // Reset save UX
     setSaveState({ kind: "idle" });
+
+    // Hydration done
+    isHydratingRef.current = false;
   }, [state.kind, state.kind === "ready" ? state.post.id : null]);
 
-  function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
-    const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
+  // Dirty-state tracking: whenever drafts diverge from server, show "Unsaved changes"
+  useEffect(() => {
+    if (state.kind !== "ready") return;
+    if (isHydratingRef.current) return;
 
-    if (titleDraft !== lastServerTitleRef.current) patch.title = titleDraft;
-    if (bodyDraft !== lastServerBodyRef.current) patch.body_md = bodyDraft;
+    const dirty = computeDirty();
 
-    return Object.keys(patch).length ? patch : null;
-  }
+    setSaveState((prev) => {
+      // Do not override "saving" (it has priority).
+      if (prev.kind === "saving") return prev;
+
+      // If not dirty, keep "saved" if we have it; otherwise idle.
+      if (!dirty) {
+        if (prev.kind === "saved") return prev;
+        return { kind: "idle" };
+      }
+
+      // Dirty: show unsaved unless already error (error can stay until next edit).
+      if (prev.kind === "error") return { kind: "dirty" };
+      if (prev.kind === "dirty") return prev;
+      return { kind: "dirty" };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titleDraft, bodyDraft, state.kind]);
 
   async function flushSaveNow() {
     if (!postId) return;
     if (state.kind !== "ready") return;
 
+    // Cancel pending debounce if any
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
     const patch = buildPatch();
     if (!patch) return;
+
+    // Basic client-side guard: avoid PATCH that backend will reject.
+    if (patch.title !== undefined) {
+      const t = String(patch.title ?? "").trim();
+      if (t.length === 0) {
+        setSaveState({ kind: "error", message: "Title cannot be empty." });
+        return;
+      }
+      if (t.length > 200) {
+        setSaveState({ kind: "error", message: "Title too long (max 200)." });
+        return;
+      }
+      patch.title = t;
+    }
+
+    const seq = ++saveSeqRef.current;
 
     setSaveState({ kind: "saving" });
     try {
       const res = await patchPost(postId, patch);
+
+      // Ignore stale responses
+      if (seq !== saveSeqRef.current) return;
 
       if (!res.ok) {
         setSaveState({ kind: "error", message: res.error || "Failed to save." });
         return;
       }
 
-      // If backend returns updated item — adopt it as server source of truth.
-      // IMPORTANT: use functional setState to avoid race conditions with fast consecutive PATCH requests.
       if (res.item) {
         const newTitle = res.item.title ?? titleDraft;
         const newBody = res.item.body_md ?? bodyDraft;
@@ -151,22 +227,20 @@ export function EditorPage() {
         lastServerTitleRef.current = newTitle;
         lastServerBodyRef.current = newBody;
 
-        // Keep drafts aligned with saved values (nice UX, also prevents extra PATCH loops).
+        // Keep drafts aligned with server after save
         setTitleDraft(newTitle);
         setBodyDraft(newBody);
 
-        setState((prev) => {
-          if (prev.kind !== "ready") return prev;
-          return { kind: "ready", post: res.item! };
-        });
+        setState({ kind: "ready", post: res.item });
       } else {
-        // Fallback: assume patch succeeded even if API didn't return item.
-        if (patch.title !== undefined) lastServerTitleRef.current = patch.title ?? "";
-        if (patch.body_md !== undefined) lastServerBodyRef.current = patch.body_md ?? "";
+        // Fallback: assume patch succeeded
+        if (patch.title !== undefined) lastServerTitleRef.current = String(patch.title ?? "");
+        if (patch.body_md !== undefined) lastServerBodyRef.current = String(patch.body_md ?? "");
       }
 
       setSaveState({ kind: "saved", at: Date.now() });
     } catch (e: any) {
+      if (seq !== saveSeqRef.current) return;
       setSaveState({
         kind: "error",
         message: e?.message || "Unexpected error while saving.",
@@ -183,11 +257,11 @@ export function EditorPage() {
     }, 600);
   }
 
-  // Debounced autosave on changes (after initial hydration)
+  // Debounced autosave on changes
   useEffect(() => {
     if (state.kind !== "ready") return;
+    if (isHydratingRef.current) return;
 
-    // If nothing changed vs server, do nothing
     if (!buildPatch()) return;
 
     scheduleDebouncedSave();
@@ -203,20 +277,31 @@ export function EditorPage() {
 
   const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
-  const saveBadge =
-    saveState.kind === "saving"
-      ? "Saving…"
-      : saveState.kind === "saved"
-        ? "Saved"
-        : saveState.kind === "error"
-          ? "Save error"
-          : "";
+  const badgeText =
+    saveState.kind === "dirty"
+      ? "Unsaved changes"
+      : saveState.kind === "saving"
+        ? "Saving…"
+        : saveState.kind === "saved"
+          ? "Saved"
+          : saveState.kind === "error"
+            ? "Save error"
+            : "";
+
+  const badgeBg =
+    saveState.kind === "error"
+      ? "rgba(255,0,0,0.06)"
+      : saveState.kind === "dirty"
+        ? "rgba(255,165,0,0.12)"
+        : "rgba(0,0,0,0.03)";
 
   return (
     <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 900, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>Editor</h1>
-        <p style={{ opacity: 0.7, margin: 0 }}>Post editor (v2). Body is textarea for now.</p>
+        <p style={{ opacity: 0.7, margin: 0 }}>
+          Post editor (v3). Dirty-state + autosave.
+        </p>
       </header>
 
       {/* Status + timestamps + save state */}
@@ -245,19 +330,19 @@ export function EditorPage() {
           <strong>Created:</strong> {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
         </div>
 
-        {saveBadge && (
+        {badgeText && (
           <div style={{ marginLeft: "auto" }}>
             <span
               style={{
-                padding: "4px 8px",
+                padding: "4px 10px",
                 borderRadius: 999,
                 border: "1px solid rgba(0,0,0,0.15)",
-                background: saveState.kind === "error" ? "rgba(255,0,0,0.06)" : "rgba(0,0,0,0.03)",
-                fontWeight: 600,
+                background: badgeBg,
+                fontWeight: 700,
               }}
               title={saveState.kind === "error" ? saveState.message : ""}
             >
-              {saveBadge}
+              {badgeText}
             </span>
           </div>
         )}
