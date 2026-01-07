@@ -3,28 +3,25 @@
 // Editor page (v3).
 // - Loads post by id from API
 // - Shows metadata (status + timestamps)
-// - Title + body_md are editable
-// - Autosave via PATCH (debounced) + immediate save on blur
-// - Adds "dirty-state" UX: Unsaved / Saving / Saved / Error
-// - Still no rich editor yet (textarea for body_md)
+// - Title is editable + autosaved via PATCH (debounced) + immediate save on blur
+// - Body uses TipTap editor (rich UI), stored in body_md as plain text for now
+// - Still no media integration yet
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, patchPost, type PostItem } from "@/api/posts";
+
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Link from "@tiptap/extension-link";
+import Placeholder from "@tiptap/extension-placeholder";
 
 type LoadState =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "ready"; post: PostItem };
-
-type SaveState =
-  | { kind: "idle" }
-  | { kind: "dirty" }
-  | { kind: "saving" }
-  | { kind: "saved"; at: number }
-  | { kind: "error"; message: string };
 
 function formatIso(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -39,6 +36,12 @@ function isEnter(e: React.KeyboardEvent<HTMLInputElement>) {
   return e.key === "Enter";
 }
 
+type SaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved"; at: number }
+  | { kind: "error"; message: string };
+
 export function EditorPage() {
   const params = useParams();
 
@@ -52,47 +55,49 @@ export function EditorPage() {
 
   // Local drafts
   const [titleDraft, setTitleDraft] = useState("");
-  const [bodyDraft, setBodyDraft] = useState("");
 
-  // Save state badge
+  // Save status
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
-  // Keep last server values to avoid PATCH spam + compute "dirty"
+  // Keep last server values to avoid PATCH spam
   const lastServerTitleRef = useRef<string>("");
   const lastServerBodyRef = useRef<string>("");
 
   // Debounce timer
   const saveTimerRef = useRef<number | null>(null);
 
-  // Prevent showing "dirty" while hydrating initial data
-  const isHydratingRef = useRef<boolean>(true);
+  // TipTap editor
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+      }),
+      Placeholder.configure({
+        placeholder: "Write something…",
+      }),
+    ],
+    content: "",
+    editorProps: {
+      attributes: {
+        style: [
+          "min-height: 320px",
+          "padding: 16px",
+          "border-radius: 12px",
+          "border: 1px solid rgba(0,0,0,0.2)",
+          "background: rgba(0,0,0,0.02)",
+          "outline: none",
+          "font-family: ui-sans-serif, system-ui",
+          "font-size: 14px",
+          "line-height: 1.6",
+        ].join("; "),
+      },
+    },
+  });
 
-  // Avoid out-of-order PATCH responses winning
-  const saveSeqRef = useRef<number>(0);
-
-  function getNormalizedDrafts() {
-    // Normalize the same way backend validates (trim + no nulls).
-    // NOTE: backend forbids empty title; here we still allow typing, but we won't PATCH invalid payloads.
-    const title = titleDraft;
-    const body = bodyDraft;
-    return { title, body };
-  }
-
-  function computeDirty(): boolean {
-    const { title, body } = getNormalizedDrafts();
-    return title !== lastServerTitleRef.current || body !== lastServerBodyRef.current;
-  }
-
-  function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
-    const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
-    const { title, body } = getNormalizedDrafts();
-
-    if (title !== lastServerTitleRef.current) patch.title = title;
-    if (body !== lastServerBodyRef.current) patch.body_md = body;
-
-    return Object.keys(patch).length ? patch : null;
-  }
-
+  // Load post
   useEffect(() => {
     let cancelled = false;
 
@@ -103,7 +108,6 @@ export function EditorPage() {
       }
 
       setState({ kind: "loading" });
-      isHydratingRef.current = true;
 
       try {
         const res = await getPost(postId);
@@ -134,7 +138,7 @@ export function EditorPage() {
     };
   }, [postId]);
 
-  // Hydrate drafts from server when post becomes ready / changes
+  // Hydrate drafts when post becomes ready / changes
   useEffect(() => {
     if (state.kind !== "ready") return;
 
@@ -142,78 +146,53 @@ export function EditorPage() {
     const body = state.post.body_md ?? "";
 
     setTitleDraft(title);
-    setBodyDraft(body);
 
     lastServerTitleRef.current = title;
     lastServerBodyRef.current = body;
 
-    // Reset save UX
+    // Set TipTap content once per post load
+    if (editor) {
+      // For now we treat body_md as plain text and put it into a paragraph
+      // (next step will implement real Markdown import/export).
+      const safeText = body ?? "";
+      editor.commands.setContent(
+        safeText ? `<p>${escapeHtml(safeText).replace(/\n/g, "<br>")}</p>` : "",
+        false,
+      );
+    }
+
     setSaveState({ kind: "idle" });
-
-    // Hydration done
-    isHydratingRef.current = false;
-  }, [state.kind, state.kind === "ready" ? state.post.id : null]);
-
-  // Dirty-state tracking: whenever drafts diverge from server, show "Unsaved changes"
-  useEffect(() => {
-    if (state.kind !== "ready") return;
-    if (isHydratingRef.current) return;
-
-    const dirty = computeDirty();
-
-    setSaveState((prev) => {
-      // Do not override "saving" (it has priority).
-      if (prev.kind === "saving") return prev;
-
-      // If not dirty, keep "saved" if we have it; otherwise idle.
-      if (!dirty) {
-        if (prev.kind === "saved") return prev;
-        return { kind: "idle" };
-      }
-
-      // Dirty: show unsaved unless already error (error can stay until next edit).
-      if (prev.kind === "error") return { kind: "dirty" };
-      if (prev.kind === "dirty") return prev;
-      return { kind: "dirty" };
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [titleDraft, bodyDraft, state.kind]);
+  }, [state.kind, state.kind === "ready" ? state.post.id : null, editor]);
+
+  function currentBodyDraft(): string {
+    // For now store as plain text. Rich markdown export comes next.
+    const txt = editor?.getText({ blockSeparator: "\n" }) ?? "";
+    return txt;
+  }
+
+  function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
+    const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
+
+    const bodyNow = currentBodyDraft();
+
+    if (titleDraft !== lastServerTitleRef.current) patch.title = titleDraft;
+    if (bodyNow !== lastServerBodyRef.current) patch.body_md = bodyNow;
+
+    return Object.keys(patch).length ? patch : null;
+  }
 
   async function flushSaveNow() {
     if (!postId) return;
     if (state.kind !== "ready") return;
 
-    // Cancel pending debounce if any
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-
     const patch = buildPatch();
     if (!patch) return;
 
-    // Basic client-side guard: avoid PATCH that backend will reject.
-    if (patch.title !== undefined) {
-      const t = String(patch.title ?? "").trim();
-      if (t.length === 0) {
-        setSaveState({ kind: "error", message: "Title cannot be empty." });
-        return;
-      }
-      if (t.length > 200) {
-        setSaveState({ kind: "error", message: "Title too long (max 200)." });
-        return;
-      }
-      patch.title = t;
-    }
-
-    const seq = ++saveSeqRef.current;
-
     setSaveState({ kind: "saving" });
+
     try {
       const res = await patchPost(postId, patch);
-
-      // Ignore stale responses
-      if (seq !== saveSeqRef.current) return;
 
       if (!res.ok) {
         setSaveState({ kind: "error", message: res.error || "Failed to save." });
@@ -222,25 +201,20 @@ export function EditorPage() {
 
       if (res.item) {
         const newTitle = res.item.title ?? titleDraft;
-        const newBody = res.item.body_md ?? bodyDraft;
+        const newBody = res.item.body_md ?? currentBodyDraft();
 
         lastServerTitleRef.current = newTitle;
         lastServerBodyRef.current = newBody;
 
-        // Keep drafts aligned with server after save
         setTitleDraft(newTitle);
-        setBodyDraft(newBody);
-
         setState({ kind: "ready", post: res.item });
       } else {
-        // Fallback: assume patch succeeded
-        if (patch.title !== undefined) lastServerTitleRef.current = String(patch.title ?? "");
-        if (patch.body_md !== undefined) lastServerBodyRef.current = String(patch.body_md ?? "");
+        if (patch.title !== undefined) lastServerTitleRef.current = patch.title ?? "";
+        if (patch.body_md !== undefined) lastServerBodyRef.current = patch.body_md ?? "";
       }
 
       setSaveState({ kind: "saved", at: Date.now() });
     } catch (e: any) {
-      if (seq !== saveSeqRef.current) return;
       setSaveState({
         kind: "error",
         message: e?.message || "Unexpected error while saving.",
@@ -249,21 +223,16 @@ export function EditorPage() {
   }
 
   function scheduleDebouncedSave() {
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current);
-    }
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       flushSaveNow();
-    }, 600);
+    }, 700);
   }
 
-  // Debounced autosave on changes
+  // Debounced autosave on title changes
   useEffect(() => {
     if (state.kind !== "ready") return;
-    if (isHydratingRef.current) return;
-
     if (!buildPatch()) return;
-
     scheduleDebouncedSave();
 
     return () => {
@@ -273,34 +242,42 @@ export function EditorPage() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [titleDraft, bodyDraft]);
+  }, [titleDraft]);
+
+  // Debounced autosave on editor changes
+  useEffect(() => {
+    if (!editor) return;
+    if (state.kind !== "ready") return;
+
+    const handler = () => {
+      if (!buildPatch()) return;
+      scheduleDebouncedSave();
+    };
+
+    editor.on("update", handler);
+    return () => {
+      editor.off("update", handler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, state.kind]);
 
   const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
-  const badgeText =
-    saveState.kind === "dirty"
-      ? "Unsaved changes"
-      : saveState.kind === "saving"
-        ? "Saving…"
-        : saveState.kind === "saved"
-          ? "Saved"
-          : saveState.kind === "error"
-            ? "Save error"
-            : "";
-
-  const badgeBg =
-    saveState.kind === "error"
-      ? "rgba(255,0,0,0.06)"
-      : saveState.kind === "dirty"
-        ? "rgba(255,165,0,0.12)"
-        : "rgba(0,0,0,0.03)";
+  const saveBadge =
+    saveState.kind === "saving"
+      ? "Saving…"
+      : saveState.kind === "saved"
+        ? "Saved"
+        : saveState.kind === "error"
+          ? "Save error"
+          : "";
 
   return (
     <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 900, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>Editor</h1>
         <p style={{ opacity: 0.7, margin: 0 }}>
-          Post editor (v3). Dirty-state + autosave.
+          Post editor (v3). TipTap rich editor is enabled.
         </p>
       </header>
 
@@ -330,19 +307,19 @@ export function EditorPage() {
           <strong>Created:</strong> {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
         </div>
 
-        {badgeText && (
+        {saveBadge && (
           <div style={{ marginLeft: "auto" }}>
             <span
               style={{
-                padding: "4px 10px",
+                padding: "4px 8px",
                 borderRadius: 999,
                 border: "1px solid rgba(0,0,0,0.15)",
-                background: badgeBg,
-                fontWeight: 700,
+                background: saveState.kind === "error" ? "rgba(255,0,0,0.06)" : "rgba(0,0,0,0.03)",
+                fontWeight: 600,
               }}
               title={saveState.kind === "error" ? saveState.message : ""}
             >
-              {badgeText}
+              {saveBadge}
             </span>
           </div>
         )}
@@ -386,9 +363,7 @@ export function EditorPage() {
           onChange={(e) => setTitleDraft(e.target.value)}
           onBlur={() => flushSaveNow()}
           onKeyDown={(e) => {
-            if (isEnter(e)) {
-              (e.currentTarget as HTMLInputElement).blur();
-            }
+            if (isEnter(e)) (e.currentTarget as HTMLInputElement).blur();
           }}
           style={{
             width: "100%",
@@ -400,63 +375,110 @@ export function EditorPage() {
         />
       </div>
 
-      {/* Body (markdown textarea for now) */}
-      <div style={{ marginBottom: 16 }}>
-        <textarea
-          placeholder="Write markdown…"
-          value={bodyDraft}
-          onChange={(e) => setBodyDraft(e.target.value)}
-          onBlur={() => flushSaveNow()}
-          style={{
-            width: "100%",
-            minHeight: 320,
-            padding: 16,
-            borderRadius: 12,
-            border: "1px solid rgba(0,0,0,0.2)",
-            background: "rgba(0,0,0,0.02)",
-            resize: "vertical",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}
+      {/* Editor toolbar */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+        <ToolbarButton
+          label="B"
+          title="Bold"
+          active={!!editor?.isActive("bold")}
+          onClick={() => editor?.chain().focus().toggleBold().run()}
         />
-        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6 }}>
-          Autosave: edits are saved after a short pause or when you leave the field.
-        </div>
+        <ToolbarButton
+          label="I"
+          title="Italic"
+          active={!!editor?.isActive("italic")}
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
+        />
+        <ToolbarButton
+          label="H1"
+          title="Heading 1"
+          active={!!editor?.isActive("heading", { level: 1 })}
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+        />
+        <ToolbarButton
+          label="H2"
+          title="Heading 2"
+          active={!!editor?.isActive("heading", { level: 2 })}
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+        />
+        <ToolbarButton
+          label="• List"
+          title="Bullet list"
+          active={!!editor?.isActive("bulletList")}
+          onClick={() => editor?.chain().focus().toggleBulletList().run()}
+        />
+        <ToolbarButton
+          label="1. List"
+          title="Ordered list"
+          active={!!editor?.isActive("orderedList")}
+          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+        />
+        <ToolbarButton
+          label="❝"
+          title="Blockquote"
+          active={!!editor?.isActive("blockquote")}
+          onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+        />
+        <ToolbarButton
+          label="Code"
+          title="Code block"
+          active={!!editor?.isActive("codeBlock")}
+          onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
+        />
+
+        <ToolbarButton
+          label="Save"
+          title="Save now"
+          active={false}
+          onClick={() => flushSaveNow()}
+        />
       </div>
 
-      {/* Actions (still disabled; autosave does the job) */}
-      <div style={{ display: "flex", gap: 10 }}>
-        <button
-          disabled
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(0,0,0,0.2)",
-            background: "white",
-            fontWeight: 600,
-            opacity: 0.6,
-            cursor: "not-allowed",
-          }}
-        >
-          Save draft
-        </button>
+      {/* TipTap editor */}
+      <div
+        onBlurCapture={() => flushSaveNow()}
+        style={{ marginBottom: 10 }}
+      >
+        <EditorContent editor={editor} />
+      </div>
 
-        <button
-          disabled
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(0,0,0,0.2)",
-            background: "white",
-            fontWeight: 600,
-            opacity: 0.6,
-            cursor: "not-allowed",
-          }}
-        >
-          Publish
-        </button>
+      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6 }}>
+        Autosave: changes are saved after a short pause or when you leave the field.
       </div>
     </div>
   );
+}
+
+function ToolbarButton(props: {
+  label: string;
+  title: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={props.title}
+      onClick={props.onClick}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(0,0,0,0.18)",
+        background: props.active ? "rgba(0,0,0,0.06)" : "white",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      {props.label}
+    </button>
+  );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
