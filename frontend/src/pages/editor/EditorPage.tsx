@@ -142,7 +142,8 @@ export function EditorPage() {
         return;
       }
 
-      // If backend returns updated item — adopt it as server source of truth
+      // If backend returns updated item — adopt it as server source of truth.
+      // IMPORTANT: use functional setState to avoid race conditions with fast consecutive PATCH requests.
       if (res.item) {
         const newTitle = res.item.title ?? titleDraft;
         const newBody = res.item.body_md ?? bodyDraft;
@@ -150,13 +151,16 @@ export function EditorPage() {
         lastServerTitleRef.current = newTitle;
         lastServerBodyRef.current = newBody;
 
-        // Keep drafts aligned with saved values (optional, but nice)
+        // Keep drafts aligned with saved values (nice UX, also prevents extra PATCH loops).
         setTitleDraft(newTitle);
         setBodyDraft(newBody);
 
-        setState({ kind: "ready", post: res.item });
+        setState((prev) => {
+          if (prev.kind !== "ready") return prev;
+          return { kind: "ready", post: res.item! };
+        });
       } else {
-        // Fallback: assume patch succeeded
+        // Fallback: assume patch succeeded even if API didn't return item.
         if (patch.title !== undefined) lastServerTitleRef.current = patch.title ?? "";
         if (patch.body_md !== undefined) lastServerBodyRef.current = patch.body_md ?? "";
       }
@@ -203,18 +207,16 @@ export function EditorPage() {
     saveState.kind === "saving"
       ? "Saving…"
       : saveState.kind === "saved"
-        ? `Saved`
+        ? "Saved"
         : saveState.kind === "error"
-          ? `Save error`
+          ? "Save error"
           : "";
 
   return (
     <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 900, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>Editor</h1>
-        <p style={{ opacity: 0.7, margin: 0 }}>
-          Post editor (v2). Body is textarea for now.
-        </p>
+        <p style={{ opacity: 0.7, margin: 0 }}>Post editor (v2). Body is textarea for now.</p>
       </header>
 
       {/* Status + timestamps + save state */}
