@@ -3,10 +3,13 @@
 # Post detail API for the Secret Room frontend.
 # - Cookie-session auth (Flask-Login)
 # - Admin-only
-# - GET   /api/posts/<id>   -> returns one post
-# - PATCH /api/posts/<id>   -> updates fields (v1: title + body_md)
+# - GET   /api/posts/<id>  -> returns one post
+# - PATCH /api/posts/<id>  -> updates fields (v2: title + body_json + legacy body_md)
 
 from __future__ import annotations
+
+import json
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -24,17 +27,31 @@ def _require_admin() -> bool:
     return bool(getattr(current_user, "is_admin", False))
 
 
-def _post_to_item(post: Post):
+def _post_to_item(post: Post) -> dict[str, Any]:
+    body_json_value = getattr(post, "body_json", None)
+
+    # Normalize body_json to a JSON object for the client.
+    # We store it as TEXT in DB, so we parse it here.
+    body_json_parsed = None
+    if isinstance(body_json_value, str) and body_json_value.strip():
+        try:
+            body_json_parsed = json.loads(body_json_value)
+        except Exception:
+            # If DB contains invalid JSON, do not crash the API.
+            body_json_parsed = None
+
     return {
         "id": post.id,
         "title": getattr(post, "title", None),
         "slug": getattr(post, "slug", None),
         "status": getattr(post, "status", None),
-        # ✅ Return body_md so editor can hydrate textarea after refresh
-        "body_md": getattr(post, "body_md", None),
         "published_at": post.published_at.isoformat() if getattr(post, "published_at", None) else None,
         "updated_at": post.updated_at.isoformat() if getattr(post, "updated_at", None) else None,
         "created_at": post.created_at.isoformat() if getattr(post, "created_at", None) else None,
+        # v2 canon: authoring format
+        "body_json": body_json_parsed,
+        # legacy/compat (still returned for now)
+        "body_md": getattr(post, "body_md", None),
     }
 
 
@@ -63,11 +80,9 @@ def patch_post(post_id: int):
 
     data = request.get_json(silent=True) or {}
 
-    updated_any = False
+    changed = False
 
-    # -------------------------
-    # v1: allow updating title
-    # -------------------------
+    # v1/v2: title
     if "title" in data:
         title = data.get("title")
         if title is None or not isinstance(title, str):
@@ -80,32 +95,49 @@ def patch_post(post_id: int):
             return jsonify({"ok": False, "error": "title too long (max 200)"}), 400
 
         post.title = title
-        updated_any = True
+        changed = True
 
-    # -------------------------
-    # v1: allow updating body_md
-    # -------------------------
+    # v2 canon: body_json
+    # Accept either:
+    # - object/array (preferred): we will json.dumps() to store in TEXT
+    # - string: must be valid JSON string
+    if "body_json" in data:
+        body_json = data.get("body_json")
+
+        if body_json is None:
+            # Allow clearing
+            post.body_json = None
+            changed = True
+        elif isinstance(body_json, str):
+            # Client might send a JSON string
+            try:
+                json.loads(body_json)  # validate
+            except Exception:
+                return jsonify({"ok": False, "error": "body_json must be valid JSON"}), 400
+            post.body_json = body_json
+            changed = True
+        else:
+            # Object/array -> stringify
+            try:
+                post.body_json = json.dumps(body_json, ensure_ascii=False, separators=(",", ":"))
+            except Exception:
+                return jsonify({"ok": False, "error": "body_json must be JSON-serializable"}), 400
+            changed = True
+
+    # legacy: body_md (keep for compatibility until we fully migrate)
     if "body_md" in data:
         body_md = data.get("body_md")
-
-        # body_md is optional in DB (nullable=True), but for editor it's convenient
-        # to treat empty string as "cleared body".
         if body_md is None:
             post.body_md = None
-            updated_any = True
+            changed = True
         elif not isinstance(body_md, str):
-            return jsonify({"ok": False, "error": "body_md must be a string or null"}), 400
+            return jsonify({"ok": False, "error": "body_md must be a string"}), 400
         else:
-            # allow empty string; optionally cap length to protect DB
-            if len(body_md) > 200_000:
-                return jsonify({"ok": False, "error": "body_md too long (max 200000)"}), 400
             post.body_md = body_md
-            updated_any = True
+            changed = True
 
-    # If client sent nothing we understand, return 400
-    if not updated_any:
+    if not changed:
         return jsonify({"ok": False, "error": "no supported fields to update"}), 400
 
     db.session.commit()
     return jsonify({"ok": True, "item": _post_to_item(post)})
-    
