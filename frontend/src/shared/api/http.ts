@@ -17,6 +17,11 @@ export class HttpError extends Error {
 // --- CSRF (SPA) -------------------------------------------------
 // We keep cookie+session auth and send CSRF token in a header for unsafe methods.
 // Token is fetched from GET /api/csrf and cached in memory.
+//
+// Important: different Flask CSRF setups expect different header names.
+// To maximize compatibility, we set BOTH:
+// - X-CSRFToken
+// - X-CSRF-Token
 // ---------------------------------------------------------------
 
 let csrfToken: string | null = null;
@@ -84,7 +89,6 @@ export async function http<TResponse>(
   const method: HttpMethod = options.method ?? "GET";
   const url = `${env.apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
-  // Add CSRF header for unsafe methods.
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers ?? {}),
@@ -92,13 +96,16 @@ export async function http<TResponse>(
 
   if (isUnsafe(method)) {
     const token = await getCsrfToken(options.signal);
-    // Flask-WTF checks both X-CSRFToken and X-CSRF-Token in many setups; we set the common one.
+
+    // Some Flask CSRF protectors expect "X-CSRF-Token" (with dash),
+    // others accept "X-CSRFToken". Send both to be safe.
     headers["X-CSRFToken"] = token;
+    headers["X-CSRF-Token"] = token;
   }
 
   const res = await fetch(url, {
     method,
-    credentials: "include", // IMPORTANT for session cookies
+    credentials: "include",
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     signal: options.signal,
