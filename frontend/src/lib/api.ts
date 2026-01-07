@@ -19,6 +19,25 @@ export type ApiLoginResponse =
   | { ok: true; user: ApiUser }
   | { ok: false; error: string };
 
+export type ApiPostStatus = "draft" | "published" | string;
+
+export type ApiPostListItem = {
+  id: number;
+  title: string;
+  slug: string;
+  status: ApiPostStatus;
+  updated_at: string | null;
+  published_at: string | null;
+};
+
+export type ApiPostsListResponse =
+  | { ok: true; items: ApiPostListItem[] }
+  | { ok: false; error: string };
+
+export type ApiPostCreateResponse =
+  | { ok: true; post: { id: number; title: string; slug: string; status: ApiPostStatus } }
+  | { ok: false; error: string };
+
 // Low-level request helper.
 // - Always includes cookies
 // - Gracefully handles non-JSON error responses from Flask
@@ -66,6 +85,14 @@ export const api = {
   // Logout and destroy session
   logout: () =>
     request<{ ok: true }>("/api/auth/logout", {
+      method: "POST",
+    }),
+
+  // Posts
+  postsList: () => request<ApiPostsListResponse>("/api/posts"),
+
+  postsCreateDraft: () =>
+    request<ApiPostCreateResponse>("/api/posts", {
       method: "POST",
     }),
 };

@@ -11,6 +11,7 @@ from .routes.main import main_bp
 from .routes.admin import admin_bp
 from .routes.api_auth import api_auth_bp
 from .routes.api import api_bp
+from .routes.api_posts import api_posts_bp
 
 
 def create_app():
@@ -65,6 +66,7 @@ def create_app():
     # - api_bp: misc API endpoints (e.g. /api/health proxy wiring / helper endpoints)
     app.register_blueprint(api_auth_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(api_posts_bp)
 
     # Redirect the site root "/" to the feed route (the main entry point).
     @app.route("/")
