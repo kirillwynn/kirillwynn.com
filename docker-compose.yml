@@ -57,6 +57,19 @@ services:
     # - Do NOT mount nginx.conf from host.
     # - Config is shipped inside the nginx image (immutable).
     volumes:
+      - type: bind
+        source: ./nginx/entrypoint.d
+        target: /docker-entrypoint.d
+        read_only: true
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ./nginx/conf.d
+        target: /etc/nginx/conf.d
+        read_only: true
+        bind:
+          create_host_path: true
+      - ./frontend/dist:/app/frontend/dist:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
 
