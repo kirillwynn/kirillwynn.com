@@ -2,7 +2,7 @@
 //
 // Posts API client.
 
-import { http } from "@/lib/http";
+import { http } from "@/shared/api/http";
 
 export type PostStatus = "draft" | "published";
 
@@ -23,5 +23,5 @@ export type GetPostResponse = {
 };
 
 export async function getPost(id: number): Promise<GetPostResponse> {
-  return http.get<GetPostResponse>(`/api/posts/${id}`);
+  return http<GetPostResponse>(`/api/posts/${id}`, { method: "GET" });
 }
