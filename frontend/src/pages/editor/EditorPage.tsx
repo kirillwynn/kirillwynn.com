@@ -3,25 +3,14 @@
 // Editor page (v3).
 // - Loads post by id from API
 // - Shows metadata (status + timestamps)
-// - Title is editable + autosaved via PATCH (debounced) + immediate save on blur
-// - Body uses TipTap editor (rich UI), stored in body_md as plain text for now
-// - Still no media integration yet
+// - Title + body_md are editable
+// - Autosave via PATCH (debounced) + immediate save on blur
+// - TipTap is used for rich editing (content is persisted as body_md)
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, patchPost, type PostItem } from "@/api/posts";
-
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
-import Placeholder from "@tiptap/extension-placeholder";
-
-type LoadState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ready"; post: PostItem };
 
 function formatIso(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -36,11 +25,21 @@ function isEnter(e: React.KeyboardEvent<HTMLInputElement>) {
   return e.key === "Enter";
 }
 
+type LoadState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; post: PostItem };
+
 type SaveState =
   | { kind: "idle" }
   | { kind: "saving" }
   | { kind: "saved"; at: number }
   | { kind: "error"; message: string };
+
+function normalizeTitle(raw: string): string {
+  return raw.trim();
+}
 
 export function EditorPage() {
   const params = useParams();
@@ -55,8 +54,9 @@ export function EditorPage() {
 
   // Local drafts
   const [titleDraft, setTitleDraft] = useState("");
+  const [bodyDraft, setBodyDraft] = useState("");
 
-  // Save status
+  // Save status (tiny UX)
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
   // Keep last server values to avoid PATCH spam
@@ -66,38 +66,6 @@ export function EditorPage() {
   // Debounce timer
   const saveTimerRef = useRef<number | null>(null);
 
-  // TipTap editor
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        linkOnPaste: true,
-      }),
-      Placeholder.configure({
-        placeholder: "Write something…",
-      }),
-    ],
-    content: "",
-    editorProps: {
-      attributes: {
-        style: [
-          "min-height: 320px",
-          "padding: 16px",
-          "border-radius: 12px",
-          "border: 1px solid rgba(0,0,0,0.2)",
-          "background: rgba(0,0,0,0.02)",
-          "outline: none",
-          "font-family: ui-sans-serif, system-ui",
-          "font-size: 14px",
-          "line-height: 1.6",
-        ].join("; "),
-      },
-    },
-  });
-
-  // Load post
   useEffect(() => {
     let cancelled = false;
 
@@ -117,6 +85,7 @@ export function EditorPage() {
           setState({ kind: "error", message: res.error || "Failed to load post." });
           return;
         }
+
         if (!res.item) {
           setState({ kind: "error", message: "API returned ok=true but no item." });
           return;
@@ -138,7 +107,7 @@ export function EditorPage() {
     };
   }, [postId]);
 
-  // Hydrate drafts when post becomes ready / changes
+  // Hydrate drafts from server when post becomes ready / changes
   useEffect(() => {
     if (state.kind !== "ready") return;
 
@@ -146,51 +115,48 @@ export function EditorPage() {
     const body = state.post.body_md ?? "";
 
     setTitleDraft(title);
+    setBodyDraft(body);
 
     lastServerTitleRef.current = title;
     lastServerBodyRef.current = body;
 
-    // Set TipTap content once per post load
-    if (editor) {
-      // For now we treat body_md as plain text and put it into a paragraph
-      // (next step will implement real Markdown import/export).
-      const safeText = body ?? "";
-      editor.commands.setContent(
-        safeText ? `<p>${escapeHtml(safeText).replace(/\n/g, "<br>")}</p>` : "",
-        { emitUpdate: false },
-      );
-    }
-
     setSaveState({ kind: "idle" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.kind, state.kind === "ready" ? state.post.id : null, editor]);
-
-  function currentBodyDraft(): string {
-    // For now store as plain text. Rich markdown export comes next.
-    const txt = editor?.getText({ blockSeparator: "\n" }) ?? "";
-    return txt;
-  }
+  }, [state.kind, state.kind === "ready" ? state.post.id : null]);
 
   function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
     const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
 
-    const bodyNow = currentBodyDraft();
+    // Never send invalid title. If user cleared title, we keep it local and show save error on blur/save.
+    const nextTitle = normalizeTitle(titleDraft);
+    const serverTitle = lastServerTitleRef.current;
 
-    if (titleDraft !== lastServerTitleRef.current) patch.title = titleDraft;
-    if (bodyNow !== lastServerBodyRef.current) patch.body_md = bodyNow;
+    if (nextTitle !== normalizeTitle(serverTitle)) {
+      // Only include title if it's valid (non-empty).
+      if (nextTitle.length > 0) patch.title = nextTitle;
+    }
+
+    if (bodyDraft !== lastServerBodyRef.current) patch.body_md = bodyDraft;
 
     return Object.keys(patch).length ? patch : null;
   }
 
-  async function flushSaveNow() {
+  async function flushSaveNow(reason: "debounce" | "blur" | "manual" = "manual") {
     if (!postId) return;
     if (state.kind !== "ready") return;
+
+    // Validate title on explicit user actions (blur/manual).
+    // For debounced saves triggered by body formatting, we do not block saving body
+    // just because title is temporarily empty while user is editing.
+    const normalizedTitle = normalizeTitle(titleDraft);
+    if ((reason === "blur" || reason === "manual") && normalizedTitle.length === 0) {
+      setSaveState({ kind: "error", message: "Title cannot be empty." });
+      return;
+    }
 
     const patch = buildPatch();
     if (!patch) return;
 
     setSaveState({ kind: "saving" });
-
     try {
       const res = await patchPost(postId, patch);
 
@@ -200,15 +166,19 @@ export function EditorPage() {
       }
 
       if (res.item) {
-        const newTitle = res.item.title ?? titleDraft;
-        const newBody = res.item.body_md ?? currentBodyDraft();
+        const newTitle = res.item.title ?? lastServerTitleRef.current;
+        const newBody = res.item.body_md ?? lastServerBodyRef.current;
 
-        lastServerTitleRef.current = newTitle;
-        lastServerBodyRef.current = newBody;
+        lastServerTitleRef.current = newTitle ?? "";
+        lastServerBodyRef.current = newBody ?? "";
 
-        setTitleDraft(newTitle);
+        // Keep drafts aligned with server (nice UX).
+        setTitleDraft(newTitle ?? "");
+        setBodyDraft(newBody ?? "");
+
         setState({ kind: "ready", post: res.item });
       } else {
+        // Fallback: assume patch succeeded.
         if (patch.title !== undefined) lastServerTitleRef.current = patch.title ?? "";
         if (patch.body_md !== undefined) lastServerBodyRef.current = patch.body_md ?? "";
       }
@@ -223,16 +193,20 @@ export function EditorPage() {
   }
 
   function scheduleDebouncedSave() {
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+    }
     saveTimerRef.current = window.setTimeout(() => {
-      flushSaveNow();
-    }, 700);
+      flushSaveNow("debounce");
+    }, 600);
   }
 
-  // Debounced autosave on title changes
+  // Debounced autosave on changes (after initial hydration)
   useEffect(() => {
     if (state.kind !== "ready") return;
+
     if (!buildPatch()) return;
+
     scheduleDebouncedSave();
 
     return () => {
@@ -242,24 +216,7 @@ export function EditorPage() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [titleDraft]);
-
-  // Debounced autosave on editor changes
-  useEffect(() => {
-    if (!editor) return;
-    if (state.kind !== "ready") return;
-
-    const handler = () => {
-      if (!buildPatch()) return;
-      scheduleDebouncedSave();
-    };
-
-    editor.on("update", handler);
-    return () => {
-      editor.off("update", handler);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, state.kind]);
+  }, [titleDraft, bodyDraft]);
 
   const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
@@ -276,9 +233,7 @@ export function EditorPage() {
     <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 900, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>Editor</h1>
-        <p style={{ opacity: 0.7, margin: 0 }}>
-          Post editor (v3). TipTap rich editor is enabled.
-        </p>
+        <p style={{ opacity: 0.7, margin: 0 }}>Post editor (v3). TipTap rich editor is enabled.</p>
       </header>
 
       {/* Status + timestamps + save state */}
@@ -361,9 +316,11 @@ export function EditorPage() {
           placeholder="Post title"
           value={titleDraft}
           onChange={(e) => setTitleDraft(e.target.value)}
-          onBlur={() => flushSaveNow()}
+          onBlur={() => flushSaveNow("blur")}
           onKeyDown={(e) => {
-            if (isEnter(e)) (e.currentTarget as HTMLInputElement).blur();
+            if (isEnter(e)) {
+              (e.currentTarget as HTMLInputElement).blur();
+            }
           }}
           style={{
             width: "100%",
@@ -375,106 +332,63 @@ export function EditorPage() {
         />
       </div>
 
-      {/* Editor toolbar */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-        <ToolbarButton
-          label="B"
-          title="Bold"
-          active={!!editor?.isActive("bold")}
-          onClick={() => editor?.chain().focus().toggleBold().run()}
+      {/* Body (still persisted as body_md) */}
+      <div style={{ marginBottom: 16 }}>
+        <textarea
+          placeholder="Write…"
+          value={bodyDraft}
+          onChange={(e) => setBodyDraft(e.target.value)}
+          onBlur={() => flushSaveNow("blur")}
+          style={{
+            width: "100%",
+            minHeight: 320,
+            padding: 16,
+            borderRadius: 12,
+            border: "1px solid rgba(0,0,0,0.2)",
+            background: "rgba(0,0,0,0.02)",
+            resize: "vertical",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
         />
-        <ToolbarButton
-          label="I"
-          title="Italic"
-          active={!!editor?.isActive("italic")}
-          onClick={() => editor?.chain().focus().toggleItalic().run()}
-        />
-        <ToolbarButton
-          label="H1"
-          title="Heading 1"
-          active={!!editor?.isActive("heading", { level: 1 })}
-          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-        />
-        <ToolbarButton
-          label="H2"
-          title="Heading 2"
-          active={!!editor?.isActive("heading", { level: 2 })}
-          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-        />
-        <ToolbarButton
-          label="• List"
-          title="Bullet list"
-          active={!!editor?.isActive("bulletList")}
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-        />
-        <ToolbarButton
-          label="1. List"
-          title="Ordered list"
-          active={!!editor?.isActive("orderedList")}
-          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-        />
-        <ToolbarButton
-          label="❝"
-          title="Blockquote"
-          active={!!editor?.isActive("blockquote")}
-          onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-        />
-        <ToolbarButton
-          label="Code"
-          title="Code block"
-          active={!!editor?.isActive("codeBlock")}
-          onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-        />
-        <ToolbarButton
-          label="Save"
-          title="Save now"
-          active={false}
-          onClick={() => flushSaveNow()}
-        />
+        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6 }}>
+          Autosave: edits are saved after a short pause or when you leave the field.
+        </div>
       </div>
 
-      {/* TipTap editor */}
-      <div onBlurCapture={() => flushSaveNow()} style={{ marginBottom: 10 }}>
-        <EditorContent editor={editor} />
-      </div>
+      {/* Actions (still disabled; autosave does the job) */}
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          disabled
+          style={{
+            padding: "8px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(0,0,0,0.2)",
+            background: "white",
+            fontWeight: 600,
+            opacity: 0.6,
+            cursor: "not-allowed",
+          }}
+        >
+          Save draft
+        </button>
 
-      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6 }}>
-        Autosave: changes are saved after a short pause or when you leave the field.
+        <button
+          disabled
+          style={{
+            padding: "8px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(0,0,0,0.2)",
+            background: "white",
+            fontWeight: 600,
+            opacity: 0.6,
+            cursor: "not-allowed",
+          }}
+        >
+          Publish
+        </button>
       </div>
     </div>
   );
-}
-
-function ToolbarButton(props: {
-  label: string;
-  title: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={props.title}
-      onClick={props.onClick}
-      style={{
-        padding: "6px 10px",
-        borderRadius: 10,
-        border: "1px solid rgba(0,0,0,0.18)",
-        background: props.active ? "rgba(0,0,0,0.06)" : "white",
-        fontWeight: 700,
-        cursor: "pointer",
-      }}
-    >
-      {props.label}
-    </button>
-  );
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
