@@ -1,9 +1,10 @@
 // frontend/src/pages/editor/EditorPage.tsx
 //
-// Editor page (v1, read-only).
+// Editor page (v1).
 // - Loads post by id from API
-// - Displays basic fields read-only
-// - No editor/save/publish logic yet
+// - Shows metadata (status + timestamps)
+// - Title is editable locally (NOT saved yet)
+// - No body editor / save / publish logic yet
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -36,6 +37,9 @@ export function EditorPage() {
   }, [params]);
 
   const [state, setState] = useState<LoadState>({ kind: "idle" });
+
+  // Local draft state for editable fields (v1 = local only, no saving yet).
+  const [titleDraft, setTitleDraft] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -83,10 +87,17 @@ export function EditorPage() {
     };
   }, [postId]);
 
-  const titleValue =
-    state.kind === "ready" ? state.post.title ?? "" : "";
-  const statusValue =
-    state.kind === "ready" ? state.post.status ?? "—" : "—";
+  // When the post loads (or changes), hydrate local draft fields from server data.
+  // IMPORTANT: this is the reason title becomes editable:
+  // - UI uses titleDraft for the input
+  // - titleDraft is initialized from API once state becomes "ready"
+  useEffect(() => {
+    if (state.kind === "ready") {
+      setTitleDraft(state.post.title ?? "");
+    }
+  }, [state.kind, state.kind === "ready" ? state.post.id : null]);
+
+  const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
   return (
     <div
@@ -161,19 +172,20 @@ export function EditorPage() {
         </div>
       )}
 
-      {/* Title */}
+      {/* Title (editable locally, not saved yet) */}
       <div style={{ marginBottom: 12 }}>
         <input
           placeholder="Post title"
-          value={titleValue}
-          readOnly
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          // NOTE: input stays usable even while loading/errors; you can decide later
+          // whether to disable it based on state.kind.
           style={{
             width: "100%",
             fontSize: 18,
             padding: "10px 12px",
             borderRadius: 10,
             border: "1px solid rgba(0,0,0,0.2)",
-            background: "rgba(0,0,0,0.02)",
           }}
         />
       </div>
