@@ -3,8 +3,8 @@
 # Post detail API for the Secret Room frontend.
 # - Cookie-session auth (Flask-Login)
 # - Admin-only
-# - GET  /api/posts/<id> -> returns one post
-# - PATCH /api/posts/<id> -> updates fields (v1: title only)
+# - GET   /api/posts/<id>  -> returns one post
+# - PATCH /api/posts/<id>  -> updates fields (v2: title + body)
 
 from __future__ import annotations
 
@@ -27,12 +27,14 @@ def _require_admin() -> bool:
 def _post_to_item(post: Post):
     return {
         "id": post.id,
-        "title": getattr(post, "title", None),
-        "slug": getattr(post, "slug", None),
-        "status": getattr(post, "status", None),
-        "published_at": post.published_at.isoformat() if getattr(post, "published_at", None) else None,
-        "updated_at": post.updated_at.isoformat() if getattr(post, "updated_at", None) else None,
-        "created_at": post.created_at.isoformat() if getattr(post, "created_at", None) else None,
+        "title": post.title,
+        "slug": post.slug,
+        "status": post.status,
+        "published_at": post.published_at.isoformat() if post.published_at else None,
+        "updated_at": post.updated_at.isoformat() if post.updated_at else None,
+        "created_at": post.created_at.isoformat() if post.created_at else None,
+        # NOTE: body fields intentionally NOT returned yet
+        # they will be added when the editor is wired fully
     }
 
 
@@ -60,26 +62,54 @@ def patch_post(post_id: int):
         return jsonify({"ok": False, "error": "not found"}), 404
 
     data = request.get_json(silent=True) or {}
+    updated_any = False
 
-    # v1: allow updating title only
+    # -------------------------
+    # Update title (v1)
+    # -------------------------
     if "title" in data:
         title = data.get("title")
-        if title is None:
-            # allow clearing? let's forbid for now to keep DB consistent
-            return jsonify({"ok": False, "error": "title must be a string"}), 400
+
         if not isinstance(title, str):
             return jsonify({"ok": False, "error": "title must be a string"}), 400
+
         title = title.strip()
-        if len(title) == 0:
+        if not title:
             return jsonify({"ok": False, "error": "title cannot be empty"}), 400
+
         if len(title) > 200:
             return jsonify({"ok": False, "error": "title too long (max 200)"}), 400
 
         post.title = title
+        updated_any = True
 
-    # If client sent nothing we understand, return 400
-    if "title" not in data:
-        return jsonify({"ok": False, "error": "no supported fields to update"}), 400
+    # -------------------------
+    # Update body (v2: textarea)
+    # -------------------------
+    if "body" in data:
+        body = data.get("body")
+
+        if not isinstance(body, str):
+            return jsonify({"ok": False, "error": "body must be a string"}), 400
+
+        # Source of truth (markdown / textarea for now)
+        post.body_md = body
+
+        # TEMP v2:
+        # Until we introduce markdown / editor rendering,
+        # mirror source into HTML.
+        post.body_html = body
+
+        updated_any = True
+
+    # -------------------------
+    # Nothing to update
+    # -------------------------
+    if not updated_any:
+        return jsonify(
+            {"ok": False, "error": "no supported fields to update"},
+        ), 400
 
     db.session.commit()
     return jsonify({"ok": True, "item": _post_to_item(post)})
+    
