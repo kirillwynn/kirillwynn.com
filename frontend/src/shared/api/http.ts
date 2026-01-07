@@ -14,10 +14,63 @@ export class HttpError extends Error {
   }
 }
 
+// --- CSRF (SPA) -------------------------------------------------
+// We keep cookie+session auth and send CSRF token in a header for unsafe methods.
+// Token is fetched from GET /api/csrf and cached in memory.
+// ---------------------------------------------------------------
+
+let csrfToken: string | null = null;
+let csrfPromise: Promise<string> | null = null;
+
+async function getCsrfToken(signal?: AbortSignal): Promise<string> {
+  if (csrfToken) return csrfToken;
+  if (csrfPromise) return csrfPromise;
+
+  const url = `${env.apiBaseUrl}/api/csrf`;
+
+  csrfPromise = fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+    signal,
+  })
+    .then(async (res) => {
+      const contentType = res.headers.get("content-type") ?? "";
+      const isJson = contentType.includes("application/json");
+      const payload = isJson ? await res.json().catch(() => null) : null;
+
+      if (!res.ok) {
+        const msg =
+          typeof payload === "object" && payload && "error" in (payload as any)
+            ? String((payload as any).error)
+            : `HTTP ${res.status}`;
+        throw new HttpError(msg, res.status, payload);
+      }
+
+      const t = (payload as any)?.csrf_token;
+      if (!t || typeof t !== "string") {
+        throw new Error("CSRF endpoint returned no csrf_token");
+      }
+
+      csrfToken = t;
+      return t;
+    })
+    .finally(() => {
+      csrfPromise = null;
+    });
+
+  return csrfPromise;
+}
+
+function isUnsafe(method: HttpMethod) {
+  return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+}
+
 // Minimal, production-grade-ish wrapper:
 // - base URL from env
 // - JSON by default
 // - credentials included (cookie-based auth)
+// - CSRF header for unsafe methods
 // - consistent error handling
 export async function http<TResponse>(
   path: string,
@@ -28,15 +81,25 @@ export async function http<TResponse>(
     signal?: AbortSignal;
   } = {},
 ): Promise<TResponse> {
+  const method: HttpMethod = options.method ?? "GET";
   const url = `${env.apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
+  // Add CSRF header for unsafe methods.
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers ?? {}),
+  };
+
+  if (isUnsafe(method)) {
+    const token = await getCsrfToken(options.signal);
+    // Flask-WTF checks both X-CSRFToken and X-CSRF-Token in many setups; we set the common one.
+    headers["X-CSRFToken"] = token;
+  }
+
   const res = await fetch(url, {
-    method: options.method ?? "GET",
+    method,
     credentials: "include", // IMPORTANT for session cookies
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-    },
+    headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     signal: options.signal,
   });
