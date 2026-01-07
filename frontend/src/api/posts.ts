@@ -14,9 +14,18 @@ export type PostItem = {
   published_at: string | null;
   updated_at: string | null;
   created_at: string | null;
+
+  // NEW: post body (markdown)
+  body_md?: string | null;
 };
 
 export type GetPostResponse = {
+  ok: boolean;
+  item?: PostItem;
+  error?: string;
+};
+
+export type PatchPostResponse = {
   ok: boolean;
   item?: PostItem;
   error?: string;
@@ -26,19 +35,12 @@ export async function getPost(id: number): Promise<GetPostResponse> {
   return http<GetPostResponse>(`/api/posts/${id}`, { method: "GET" });
 }
 
-// Update post fields (partial update).
-export type PatchPostResponse = {
-  ok: boolean;
-  item?: PostItem;
-  error?: string;
-};
-
 export async function patchPost(
   id: number,
-  data: Partial<Pick<PostItem, "title">>,
+  patch: Partial<Pick<PostItem, "title" | "body_md">>,
 ): Promise<PatchPostResponse> {
-  return http<PatchPostResponse>(`/api/posts/${id}`, {
-    method: "PATCH",
-    body: data,
+  return http<PatchPostResponse>(`/api/posts/${id}`, { 
+    method: "PATCH", 
+    body: patch 
   });
 }

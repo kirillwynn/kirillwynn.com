@@ -1,16 +1,16 @@
 // frontend/src/pages/editor/EditorPage.tsx
 //
-// Editor page (v1).
+// Editor page (v2).
 // - Loads post by id from API
 // - Shows metadata (status + timestamps)
-// - Title is editable AND autosaves on blur/Enter via PATCH /api/posts/:id
-// - No body editor / publish logic yet
+// - Title + body_md are editable
+// - Autosave via PATCH (debounced) + immediate save on blur
+// - Still no rich editor yet (textarea for body_md)
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { getPost, type PostItem } from "@/api/posts";
-import { http, HttpError } from "@/shared/api/http";
+import { getPost, patchPost, type PostItem } from "@/api/posts";
 
 type LoadState =
   | { kind: "idle" }
@@ -27,11 +27,9 @@ function formatIso(iso: string | null | undefined): string {
   }
 }
 
-type PatchPostResponse = {
-  ok: boolean;
-  item?: PostItem;
-  error?: string;
-};
+function isEnter(e: React.KeyboardEvent<HTMLInputElement>) {
+  return e.key === "Enter";
+}
 
 export function EditorPage() {
   const params = useParams();
@@ -44,13 +42,24 @@ export function EditorPage() {
 
   const [state, setState] = useState<LoadState>({ kind: "idle" });
 
-  // Local draft (editable)
+  // Local drafts
   const [titleDraft, setTitleDraft] = useState("");
-  // Remember what we last synced from server (to avoid redundant PATCHes)
-  const lastServerTitleRef = useRef<string>("");
+  const [bodyDraft, setBodyDraft] = useState("");
 
-  const [isSavingTitle, setIsSavingTitle] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  // Save status (tiny UX)
+  const [saveState, setSaveState] = useState<
+    | { kind: "idle" }
+    | { kind: "saving" }
+    | { kind: "saved"; at: number }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  // Keep last server values to avoid PATCH spam
+  const lastServerTitleRef = useRef<string>("");
+  const lastServerBodyRef = useRef<string>("");
+
+  // Debounce timer
+  const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,20 +71,15 @@ export function EditorPage() {
       }
 
       setState({ kind: "loading" });
-      setSaveError(null);
 
       try {
         const res = await getPost(postId);
         if (cancelled) return;
 
         if (!res.ok) {
-          setState({
-            kind: "error",
-            message: res.error || "Failed to load post.",
-          });
+          setState({ kind: "error", message: res.error || "Failed to load post." });
           return;
         }
-
         if (!res.item) {
           setState({ kind: "error", message: "API returned ok=true but no item." });
           return;
@@ -92,83 +96,128 @@ export function EditorPage() {
     }
 
     run();
-
     return () => {
       cancelled = true;
     };
   }, [postId]);
 
-  // Hydrate draft from server when post is loaded/changed
+  // Hydrate drafts from server when post becomes ready / changes
   useEffect(() => {
-    if (state.kind === "ready") {
-      const serverTitle = state.post.title ?? "";
-      setTitleDraft(serverTitle);
-      lastServerTitleRef.current = serverTitle;
-      setSaveError(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (state.kind !== "ready") return;
+
+    const title = state.post.title ?? "";
+    const body = state.post.body_md ?? "";
+
+    setTitleDraft(title);
+    setBodyDraft(body);
+
+    lastServerTitleRef.current = title;
+    lastServerBodyRef.current = body;
+
+    setSaveState({ kind: "idle" });
   }, [state.kind, state.kind === "ready" ? state.post.id : null]);
 
-  async function saveTitleIfNeeded(nextTitle: string) {
+  function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
+    const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
+
+    if (titleDraft !== lastServerTitleRef.current) patch.title = titleDraft;
+    if (bodyDraft !== lastServerBodyRef.current) patch.body_md = bodyDraft;
+
+    return Object.keys(patch).length ? patch : null;
+  }
+
+  async function flushSaveNow() {
     if (!postId) return;
     if (state.kind !== "ready") return;
 
-    const trimmed = nextTitle; // (не трогаем пробелы — решишь позже)
-    if (trimmed === lastServerTitleRef.current) return;
+    const patch = buildPatch();
+    if (!patch) return;
 
-    setIsSavingTitle(true);
-    setSaveError(null);
-
+    setSaveState({ kind: "saving" });
     try {
-      const res = await http<PatchPostResponse>(`/api/posts/${postId}`, {
-        method: "PATCH",
-        body: { title: trimmed },
-      });
+      const res = await patchPost(postId, patch);
 
-      if (!res.ok || !res.item) {
-        setSaveError(res.error || "Failed to save title.");
+      if (!res.ok) {
+        setSaveState({ kind: "error", message: res.error || "Failed to save." });
         return;
       }
 
-      // Update UI with server-confirmed post
-      lastServerTitleRef.current = res.item.title ?? "";
+      // If backend returns updated item — adopt it as server source of truth
+      if (res.item) {
+        const newTitle = res.item.title ?? titleDraft;
+        const newBody = res.item.body_md ?? bodyDraft;
 
-      setState((prev) => {
-        if (prev.kind !== "ready") return prev;
-        return { kind: "ready", post: res.item! };
-      });
+        lastServerTitleRef.current = newTitle;
+        lastServerBodyRef.current = newBody;
 
-      // Keep draft in sync with what server stored
-      setTitleDraft(res.item.title ?? "");
-    } catch (e: any) {
-      if (e instanceof HttpError) {
-        setSaveError(e.message || `HTTP ${e.status}`);
+        // Keep drafts aligned with saved values (optional, but nice)
+        setTitleDraft(newTitle);
+        setBodyDraft(newBody);
+
+        setState({ kind: "ready", post: res.item });
       } else {
-        setSaveError(e?.message || "Unexpected error while saving title.");
+        // Fallback: assume patch succeeded
+        if (patch.title !== undefined) lastServerTitleRef.current = patch.title ?? "";
+        if (patch.body_md !== undefined) lastServerBodyRef.current = patch.body_md ?? "";
       }
-    } finally {
-      setIsSavingTitle(false);
+
+      setSaveState({ kind: "saved", at: Date.now() });
+    } catch (e: any) {
+      setSaveState({
+        kind: "error",
+        message: e?.message || "Unexpected error while saving.",
+      });
     }
   }
 
+  function scheduleDebouncedSave() {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      flushSaveNow();
+    }, 600);
+  }
+
+  // Debounced autosave on changes (after initial hydration)
+  useEffect(() => {
+    if (state.kind !== "ready") return;
+
+    // If nothing changed vs server, do nothing
+    if (!buildPatch()) return;
+
+    scheduleDebouncedSave();
+
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titleDraft, bodyDraft]);
+
   const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
+  const saveBadge =
+    saveState.kind === "saving"
+      ? "Saving…"
+      : saveState.kind === "saved"
+        ? `Saved`
+        : saveState.kind === "error"
+          ? `Save error`
+          : "";
+
   return (
-    <div
-      style={{
-        fontFamily: "ui-sans-serif, system-ui",
-        maxWidth: 900,
-        margin: "0 auto",
-      }}
-    >
+    <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 900, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>Editor</h1>
         <p style={{ opacity: 0.7, margin: 0 }}>
-          Post viewer (v1). Editor will come later.
+          Post editor (v2). Body is textarea for now.
         </p>
       </header>
 
-      {/* Status + timestamps */}
+      {/* Status + timestamps + save state */}
       <div
         style={{
           display: "flex",
@@ -177,34 +226,39 @@ export function EditorPage() {
           marginBottom: 12,
           opacity: 0.85,
           fontSize: 13,
+          alignItems: "center",
         }}
       >
         <div>
           <strong>Status:</strong> {statusValue}
         </div>
         <div>
-          <strong>Updated:</strong>{" "}
-          {state.kind === "ready" ? formatIso(state.post.updated_at) : "—"}
+          <strong>Updated:</strong> {state.kind === "ready" ? formatIso(state.post.updated_at) : "—"}
         </div>
         <div>
           <strong>Published:</strong>{" "}
           {state.kind === "ready" ? formatIso(state.post.published_at) : "—"}
         </div>
         <div>
-          <strong>Created:</strong>{" "}
-          {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
+          <strong>Created:</strong> {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
         </div>
 
-        {/* Title save status */}
-        <div style={{ marginLeft: "auto" }}>
-          {isSavingTitle ? (
-            <span style={{ opacity: 0.75 }}>Saving…</span>
-          ) : saveError ? (
-            <span style={{ color: "crimson" }}>Save failed: {saveError}</span>
-          ) : (
-            <span style={{ opacity: 0.6 }}> </span>
-          )}
-        </div>
+        {saveBadge && (
+          <div style={{ marginLeft: "auto" }}>
+            <span
+              style={{
+                padding: "4px 8px",
+                borderRadius: 999,
+                border: "1px solid rgba(0,0,0,0.15)",
+                background: saveState.kind === "error" ? "rgba(255,0,0,0.06)" : "rgba(0,0,0,0.03)",
+                fontWeight: 600,
+              }}
+              title={saveState.kind === "error" ? saveState.message : ""}
+            >
+              {saveBadge}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Loading / error */}
@@ -237,52 +291,54 @@ export function EditorPage() {
         </div>
       )}
 
-      {/* Title (autosave on blur/Enter) */}
+      {/* Title */}
       <div style={{ marginBottom: 12 }}>
         <input
           placeholder="Post title"
           value={titleDraft}
           onChange={(e) => setTitleDraft(e.target.value)}
-          onBlur={() => saveTitleIfNeeded(titleDraft)}
+          onBlur={() => flushSaveNow()}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              // Enter triggers a save; blur also runs but saveTitleIfNeeded is idempotent.
+            if (isEnter(e)) {
               (e.currentTarget as HTMLInputElement).blur();
             }
           }}
-          disabled={state.kind !== "ready"}
           style={{
             width: "100%",
             fontSize: 18,
             padding: "10px 12px",
             borderRadius: 10,
             border: "1px solid rgba(0,0,0,0.2)",
-            opacity: state.kind !== "ready" ? 0.7 : 1,
           }}
         />
       </div>
 
-      {/* Body placeholder */}
-      <div
-        style={{
-          minHeight: 300,
-          padding: 16,
-          borderRadius: 12,
-          border: "1px solid rgba(0,0,0,0.2)",
-          background: "rgba(0,0,0,0.02)",
-          marginBottom: 16,
-        }}
-      >
-        {state.kind === "ready" ? (
-          <div style={{ opacity: 0.75 }}>
-            Body will be shown here in the next step (when backend returns body fields).
-          </div>
-        ) : (
-          <div style={{ opacity: 0.6 }}>Editor will live here (TipTap / Markdown).</div>
-        )}
+      {/* Body (markdown textarea for now) */}
+      <div style={{ marginBottom: 16 }}>
+        <textarea
+          placeholder="Write markdown…"
+          value={bodyDraft}
+          onChange={(e) => setBodyDraft(e.target.value)}
+          onBlur={() => flushSaveNow()}
+          style={{
+            width: "100%",
+            minHeight: 320,
+            padding: 16,
+            borderRadius: 12,
+            border: "1px solid rgba(0,0,0,0.2)",
+            background: "rgba(0,0,0,0.02)",
+            resize: "vertical",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        />
+        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6 }}>
+          Autosave: edits are saved after a short pause or when you leave the field.
+        </div>
       </div>
 
-      {/* Actions (disabled for v1) */}
+      {/* Actions (still disabled; autosave does the job) */}
       <div style={{ display: "flex", gap: 10 }}>
         <button
           disabled
