@@ -119,8 +119,3 @@ export async function http<TResponse>(
 
   return payload as TResponse;
 }
-
-// TEMP debug helper: can be removed after we verify CSRF works.
-;(window as any).__kwPatchPostTitle = async (id: number, title: string) => {
-  return http(`/api/posts/${id}`, { method: "PATCH", body: { title } });
-};
