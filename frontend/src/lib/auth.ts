@@ -34,7 +34,9 @@ export const auth = {
   // Subscribe to state changes
   subscribe(fn: () => void) {
     listeners.add(fn);
-    return () => listeners.delete(fn);
+    return () => {
+      listeners.delete(fn);
+    }
   },
 
   // Initial session check: call once on app start

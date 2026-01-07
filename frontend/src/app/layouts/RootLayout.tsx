@@ -4,7 +4,7 @@
 // - Displays current user email (if authenticated)
 // - Provides logout action
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 
 import { auth } from "@/lib/auth";
