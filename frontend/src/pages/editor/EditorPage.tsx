@@ -3,13 +3,14 @@
 // Editor page (v1).
 // - Loads post by id from API
 // - Shows metadata (status + timestamps)
-// - Title is editable locally (NOT saved yet)
-// - No body editor / save / publish logic yet
+// - Title is editable AND autosaves on blur/Enter via PATCH /api/posts/:id
+// - No body editor / publish logic yet
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, type PostItem } from "@/api/posts";
+import { http, HttpError } from "@/shared/api/http";
 
 type LoadState =
   | { kind: "idle" }
@@ -26,10 +27,15 @@ function formatIso(iso: string | null | undefined): string {
   }
 }
 
+type PatchPostResponse = {
+  ok: boolean;
+  item?: PostItem;
+  error?: string;
+};
+
 export function EditorPage() {
   const params = useParams();
 
-  // Accept both :id and :postId to be resilient to router changes.
   const postId = useMemo(() => {
     const raw = (params as any).id ?? (params as any).postId;
     const n = Number(raw);
@@ -38,8 +44,13 @@ export function EditorPage() {
 
   const [state, setState] = useState<LoadState>({ kind: "idle" });
 
-  // Local draft state for editable fields (v1 = local only, no saving yet).
+  // Local draft (editable)
   const [titleDraft, setTitleDraft] = useState("");
+  // Remember what we last synced from server (to avoid redundant PATCHes)
+  const lastServerTitleRef = useRef<string>("");
+
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,10 +62,10 @@ export function EditorPage() {
       }
 
       setState({ kind: "loading" });
+      setSaveError(null);
 
       try {
         const res = await getPost(postId);
-
         if (cancelled) return;
 
         if (!res.ok) {
@@ -87,15 +98,58 @@ export function EditorPage() {
     };
   }, [postId]);
 
-  // When the post loads (or changes), hydrate local draft fields from server data.
-  // IMPORTANT: this is the reason title becomes editable:
-  // - UI uses titleDraft for the input
-  // - titleDraft is initialized from API once state becomes "ready"
+  // Hydrate draft from server when post is loaded/changed
   useEffect(() => {
     if (state.kind === "ready") {
-      setTitleDraft(state.post.title ?? "");
+      const serverTitle = state.post.title ?? "";
+      setTitleDraft(serverTitle);
+      lastServerTitleRef.current = serverTitle;
+      setSaveError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.kind, state.kind === "ready" ? state.post.id : null]);
+
+  async function saveTitleIfNeeded(nextTitle: string) {
+    if (!postId) return;
+    if (state.kind !== "ready") return;
+
+    const trimmed = nextTitle; // (не трогаем пробелы — решишь позже)
+    if (trimmed === lastServerTitleRef.current) return;
+
+    setIsSavingTitle(true);
+    setSaveError(null);
+
+    try {
+      const res = await http<PatchPostResponse>(`/api/posts/${postId}`, {
+        method: "PATCH",
+        body: { title: trimmed },
+      });
+
+      if (!res.ok || !res.item) {
+        setSaveError(res.error || "Failed to save title.");
+        return;
+      }
+
+      // Update UI with server-confirmed post
+      lastServerTitleRef.current = res.item.title ?? "";
+
+      setState((prev) => {
+        if (prev.kind !== "ready") return prev;
+        return { kind: "ready", post: res.item! };
+      });
+
+      // Keep draft in sync with what server stored
+      setTitleDraft(res.item.title ?? "");
+    } catch (e: any) {
+      if (e instanceof HttpError) {
+        setSaveError(e.message || `HTTP ${e.status}`);
+      } else {
+        setSaveError(e?.message || "Unexpected error while saving title.");
+      }
+    } finally {
+      setIsSavingTitle(false);
+    }
+  }
 
   const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
@@ -140,6 +194,17 @@ export function EditorPage() {
           <strong>Created:</strong>{" "}
           {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
         </div>
+
+        {/* Title save status */}
+        <div style={{ marginLeft: "auto" }}>
+          {isSavingTitle ? (
+            <span style={{ opacity: 0.75 }}>Saving…</span>
+          ) : saveError ? (
+            <span style={{ color: "crimson" }}>Save failed: {saveError}</span>
+          ) : (
+            <span style={{ opacity: 0.6 }}> </span>
+          )}
+        </div>
       </div>
 
       {/* Loading / error */}
@@ -172,20 +237,27 @@ export function EditorPage() {
         </div>
       )}
 
-      {/* Title (editable locally, not saved yet) */}
+      {/* Title (autosave on blur/Enter) */}
       <div style={{ marginBottom: 12 }}>
         <input
           placeholder="Post title"
           value={titleDraft}
           onChange={(e) => setTitleDraft(e.target.value)}
-          // NOTE: input stays usable even while loading/errors; you can decide later
-          // whether to disable it based on state.kind.
+          onBlur={() => saveTitleIfNeeded(titleDraft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              // Enter triggers a save; blur also runs but saveTitleIfNeeded is idempotent.
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+          disabled={state.kind !== "ready"}
           style={{
             width: "100%",
             fontSize: 18,
             padding: "10px 12px",
             borderRadius: 10,
             border: "1px solid rgba(0,0,0,0.2)",
+            opacity: state.kind !== "ready" ? 0.7 : 1,
           }}
         />
       </div>
