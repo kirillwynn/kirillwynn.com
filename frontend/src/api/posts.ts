@@ -25,3 +25,20 @@ export type GetPostResponse = {
 export async function getPost(id: number): Promise<GetPostResponse> {
   return http<GetPostResponse>(`/api/posts/${id}`, { method: "GET" });
 }
+
+// Update post fields (partial update).
+export type PatchPostResponse = {
+  ok: boolean;
+  item?: PostItem;
+  error?: string;
+};
+
+export async function patchPost(
+  id: number,
+  data: Partial<Pick<PostItem, "title">>,
+): Promise<PatchPostResponse> {
+  return http<PatchPostResponse>(`/api/posts/${id}`, {
+    method: "PATCH",
+    body: data,
+  });
+}
