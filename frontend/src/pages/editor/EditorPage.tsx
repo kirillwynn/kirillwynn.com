@@ -3,14 +3,21 @@
 // Editor page (v3).
 // - Loads post by id from API
 // - Shows metadata (status + timestamps)
-// - Title + body_md are editable
+// - Title is editable (saved via PATCH)
+// - Body uses TipTap rich editor (saved via PATCH as body_md HTML for now)
 // - Autosave via PATCH (debounced) + immediate save on blur
-// - TipTap is used for rich editing (content is persisted as body_md)
+//
+// NOTE:
+// We currently persist TipTap output as HTML into body_md.
+// Later we can migrate to Markdown or TipTap JSON if needed.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, patchPost, type PostItem } from "@/api/posts";
+
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
 
 function formatIso(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -66,6 +73,29 @@ export function EditorPage() {
   // Debounce timer
   const saveTimerRef = useRef<number | null>(null);
 
+  // TipTap editor
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: "",
+    editorProps: {
+      attributes: {
+        style: [
+          "min-height: 320px",
+          "padding: 16px",
+          "outline: none",
+          "font-family: ui-sans-serif, system-ui",
+          "font-size: 14px",
+          "line-height: 1.6",
+        ].join("; "),
+      },
+    },
+    onUpdate: ({ editor }) => {
+      // Persist HTML into bodyDraft for now.
+      // This triggers autosave via bodyDraft effect below.
+      setBodyDraft(editor.getHTML());
+    },
+  });
+
   useEffect(() => {
     let cancelled = false;
 
@@ -120,18 +150,24 @@ export function EditorPage() {
     lastServerTitleRef.current = title;
     lastServerBodyRef.current = body;
 
+    // Update TipTap content without creating an update loop.
+    // The second argument is options; we keep it minimal to avoid TS errors.
+    if (editor) {
+      editor.commands.setContent(body || "", { emitUpdate: false });
+    }
+
     setSaveState({ kind: "idle" });
-  }, [state.kind, state.kind === "ready" ? state.post.id : null]);
+  }, [state.kind, state.kind === "ready" ? state.post.id : null, editor]);
 
   function buildPatch(): Partial<Pick<PostItem, "title" | "body_md">> | null {
     const patch: Partial<Pick<PostItem, "title" | "body_md">> = {};
 
-    // Never send invalid title. If user cleared title, we keep it local and show save error on blur/save.
+    // Never send invalid title in autosave.
+    // If user clears title temporarily, we do not include it in PATCH.
     const nextTitle = normalizeTitle(titleDraft);
-    const serverTitle = lastServerTitleRef.current;
+    const serverTitle = normalizeTitle(lastServerTitleRef.current);
 
-    if (nextTitle !== normalizeTitle(serverTitle)) {
-      // Only include title if it's valid (non-empty).
+    if (nextTitle !== serverTitle) {
       if (nextTitle.length > 0) patch.title = nextTitle;
     }
 
@@ -144,9 +180,8 @@ export function EditorPage() {
     if (!postId) return;
     if (state.kind !== "ready") return;
 
-    // Validate title on explicit user actions (blur/manual).
-    // For debounced saves triggered by body formatting, we do not block saving body
-    // just because title is temporarily empty while user is editing.
+    // Validate title only on explicit user actions.
+    // Formatting clicks should not produce "title cannot be empty" 400.
     const normalizedTitle = normalizeTitle(titleDraft);
     if ((reason === "blur" || reason === "manual") && normalizedTitle.length === 0) {
       setSaveState({ kind: "error", message: "Title cannot be empty." });
@@ -172,9 +207,13 @@ export function EditorPage() {
         lastServerTitleRef.current = newTitle ?? "";
         lastServerBodyRef.current = newBody ?? "";
 
-        // Keep drafts aligned with server (nice UX).
         setTitleDraft(newTitle ?? "");
         setBodyDraft(newBody ?? "");
+
+        // Keep editor in sync with server response.
+        if (editor && typeof newBody === "string") {
+          editor.commands.setContent(newBody, { emitUpdate: false });
+        }
 
         setState({ kind: "ready", post: res.item });
       } else {
@@ -193,9 +232,7 @@ export function EditorPage() {
   }
 
   function scheduleDebouncedSave() {
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current);
-    }
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       flushSaveNow("debounce");
     }, 600);
@@ -204,7 +241,6 @@ export function EditorPage() {
   // Debounced autosave on changes (after initial hydration)
   useEffect(() => {
     if (state.kind !== "ready") return;
-
     if (!buildPatch()) return;
 
     scheduleDebouncedSave();
@@ -228,6 +264,21 @@ export function EditorPage() {
         : saveState.kind === "error"
           ? "Save error"
           : "";
+
+  const btnStyle: React.CSSProperties = {
+    padding: "6px 10px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.18)",
+    background: "white",
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 12,
+  };
+
+  const btnOnStyle: React.CSSProperties = {
+    ...btnStyle,
+    background: "rgba(0,0,0,0.05)",
+  };
 
   return (
     <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 900, margin: "0 auto" }}>
@@ -318,9 +369,7 @@ export function EditorPage() {
           onChange={(e) => setTitleDraft(e.target.value)}
           onBlur={() => flushSaveNow("blur")}
           onKeyDown={(e) => {
-            if (isEnter(e)) {
-              (e.currentTarget as HTMLInputElement).blur();
-            }
+            if (isEnter(e)) (e.currentTarget as HTMLInputElement).blur();
           }}
           style={{
             width: "100%",
@@ -332,32 +381,102 @@ export function EditorPage() {
         />
       </div>
 
-      {/* Body (still persisted as body_md) */}
-      <div style={{ marginBottom: 16 }}>
-        <textarea
-          placeholder="Write…"
-          value={bodyDraft}
-          onChange={(e) => setBodyDraft(e.target.value)}
-          onBlur={() => flushSaveNow("blur")}
-          style={{
-            width: "100%",
-            minHeight: 320,
-            padding: 16,
-            borderRadius: 12,
-            border: "1px solid rgba(0,0,0,0.2)",
-            background: "rgba(0,0,0,0.02)",
-            resize: "vertical",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}
-        />
-        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6 }}>
-          Autosave: edits are saved after a short pause or when you leave the field.
-        </div>
+      {/* TipTap toolbar */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <button
+          type="button"
+          style={editor?.isActive("bold") ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleBold().run()}
+          disabled={!editor}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          style={editor?.isActive("italic") ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
+          disabled={!editor}
+        >
+          I
+        </button>
+        <button
+          type="button"
+          style={editor?.isActive("heading", { level: 1 }) ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+          disabled={!editor}
+        >
+          H1
+        </button>
+        <button
+          type="button"
+          style={editor?.isActive("heading", { level: 2 }) ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+          disabled={!editor}
+        >
+          H2
+        </button>
+        <button
+          type="button"
+          style={editor?.isActive("bulletList") ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleBulletList().run()}
+          disabled={!editor}
+        >
+          • List
+        </button>
+        <button
+          type="button"
+          style={editor?.isActive("orderedList") ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+          disabled={!editor}
+        >
+          1. List
+        </button>
+        <button
+          type="button"
+          style={editor?.isActive("blockquote") ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+          disabled={!editor}
+        >
+          “
+        </button>
+        <button
+          type="button"
+          style={editor?.isActive("codeBlock") ? btnOnStyle : btnStyle}
+          onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
+          disabled={!editor}
+        >
+          Code
+        </button>
+
+        <button
+          type="button"
+          style={{ ...btnStyle, marginLeft: "auto" }}
+          onClick={() => flushSaveNow("manual")}
+          disabled={!editor}
+          title="Manual save"
+        >
+          Save
+        </button>
       </div>
 
-      {/* Actions (still disabled; autosave does the job) */}
+      {/* TipTap editor surface */}
+      <div
+        style={{
+          borderRadius: 12,
+          border: "1px solid rgba(0,0,0,0.2)",
+          background: "white",
+          overflow: "hidden",
+        }}
+        onBlur={() => flushSaveNow("blur")}
+      >
+        <EditorContent editor={editor} />
+      </div>
+
+      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6, marginBottom: 16 }}>
+        Autosave: edits are saved after a short pause or when you leave the editor.
+      </div>
+
+      {/* Actions placeholder */}
       <div style={{ display: "flex", gap: 10 }}>
         <button
           disabled
