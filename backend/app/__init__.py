@@ -13,6 +13,7 @@ from .routes.api_auth import api_auth_bp
 from .routes.api import api_bp
 from .routes.api_posts import api_posts_bp
 from .routes.api_posts_detail import api_posts_detail_bp
+from .routes.api_csrf import api_csrf_bp
 
 
 def create_app():
@@ -77,6 +78,7 @@ def create_app():
     app.register_blueprint(api_bp)
     app.register_blueprint(api_posts_bp)
     app.register_blueprint(api_posts_detail_bp)
+    app.register_blueprint(api_csrf_bp)
 
     # Redirect the site root "/" to the feed route (the main entry point).
     @app.route("/")
