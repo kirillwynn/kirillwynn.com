@@ -13,7 +13,6 @@ FROM nginx:stable
 COPY nginx/conf.d/ /etc/nginx/conf.d/
 
 # Optional server blocks (enabled by entrypoint script if certs exist)
-COPY nginx/optional/ /etc/nginx/optional/
 
 # Runtime enablement logic (runs automatically in official nginx image)
 COPY nginx/docker-entrypoint.d/ /docker-entrypoint.d/
