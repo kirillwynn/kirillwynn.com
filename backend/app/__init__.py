@@ -1,7 +1,7 @@
 import os
 import click
 
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, jsonify, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import Config
@@ -51,6 +51,14 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = "admin.login"
     login_manager.session_protection = "strong"
+
+    # API behavior: do not redirect unauthenticated API requests to HTML login.
+    # Return JSON 401 for /api/*, keep normal redirect for browser/admin.
+    @login_manager.unauthorized_handler
+    def _unauthorized():
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+        return redirect(url_for("admin.login", next=request.full_path))
 
     # Flask-Login callback: how to load a user object from the session user_id.
     @login_manager.user_loader
