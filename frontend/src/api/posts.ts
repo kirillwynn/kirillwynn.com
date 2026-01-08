@@ -37,11 +37,19 @@ export type GetPostResponse = ApiOkResponse<PostItem> | ApiErrorResponse;
 export type PatchPostInput = Partial<Pick<PostItem, "title" | "body_md">>;
 export type PatchPostResponse = ApiOkResponse<PostItem> | ApiErrorResponse;
 
+type RequestOptions = {
+  signal?: AbortSignal;
+  keepalive?: boolean;
+};
+
 /**
  * Fetch single post by id.
  */
-export async function getPost(id: number): Promise<GetPostResponse> {
-  return http<GetPostResponse>(`/api/posts/${id}`, { method: "GET" });
+export async function getPost(id: number, opts: RequestOptions = {}): Promise<GetPostResponse> {
+  return http<GetPostResponse>(`/api/posts/${id}`, {
+    method: "GET",
+    signal: opts.signal,
+  });
 }
 
 /**
@@ -49,10 +57,16 @@ export async function getPost(id: number): Promise<GetPostResponse> {
  * NOTE: This function does not try to validate business rules locally.
  * Backend remains the source of truth (e.g. empty title checks).
  */
-export async function patchPost(id: number, patch: PatchPostInput): Promise<PatchPostResponse> {
+export async function patchPost(
+  id: number,
+  patch: PatchPostInput,
+  opts: RequestOptions = {},
+): Promise<PatchPostResponse> {
   return http<PatchPostResponse>(`/api/posts/${id}`, {
     method: "PATCH",
     body: patch,
+    signal: opts.signal,
+    keepalive: opts.keepalive,
   });
 }
 
@@ -60,15 +74,13 @@ export async function patchPost(id: number, patch: PatchPostInput): Promise<Patc
 /* Prepared for next steps (optional to use right now)                  */
 /* ------------------------------------------------------------------ */
 
-export type ListPostsResponse =
-  | { ok: true; items: PostItem[] }
-  | ApiErrorResponse;
+export type ListPostsResponse = { ok: true; items: PostItem[] } | ApiErrorResponse;
 
 /**
  * List posts (admin feed). Backend endpoint must exist: GET /api/posts
  */
-export async function listPosts(): Promise<ListPostsResponse> {
-  return http<ListPostsResponse>(`/api/posts`, { method: "GET" });
+export async function listPosts(opts: RequestOptions = {}): Promise<ListPostsResponse> {
+  return http<ListPostsResponse>(`/api/posts`, { method: "GET", signal: opts.signal });
 }
 
 export type CreatePostInput = {
@@ -81,9 +93,13 @@ export type CreatePostResponse = ApiOkResponse<PostItem> | ApiErrorResponse;
 /**
  * Create a new post (draft). Backend endpoint must exist: POST /api/posts
  */
-export async function createPost(input: CreatePostInput = {}): Promise<CreatePostResponse> {
+export async function createPost(
+  input: CreatePostInput = {},
+  opts: RequestOptions = {},
+): Promise<CreatePostResponse> {
   return http<CreatePostResponse>(`/api/posts`, {
     method: "POST",
     body: input,
+    signal: opts.signal,
   });
 }

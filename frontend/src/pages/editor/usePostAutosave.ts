@@ -3,8 +3,11 @@
 // Holds autosave logic:
 // - draft states (title + bodyJsonStr)
 // - lastServer snapshot refs (avoid PATCH spam)
-// - buildPatch + debounce + flushSaveNow
-// - hydrateFromServer(post) to sync editor + drafts
+// - debounce + max-wait + manual flush
+// - "Google Docs style" safety flush on:
+//   - Cmd/Ctrl+S
+//   - visibilitychange (tab hidden)
+//   - pagehide (navigate away / close tab)
 //
 // IMPORTANT:
 // Never call `editor.commands.setContent()` as part of autosave responses.
@@ -26,6 +29,10 @@ type FlushReason = "debounce" | "blur" | "manual";
 
 const SAVE_DEBOUNCE_MS = 5000;
 const SAVE_MAX_WAIT_MS = 30000;
+
+type FlushOpts = {
+  keepalive?: boolean;
+};
 
 export function usePostAutosave(args: {
   postId: number | null;
@@ -86,7 +93,7 @@ export function usePostAutosave(args: {
   }, [titleDraft, bodyJsonStrDraft, editor]);
 
   const flushSaveNow = useCallback(
-    async (reason: FlushReason = "manual") => {
+    async (reason: FlushReason = "manual", opts: FlushOpts = {}) => {
       if (!postId) return;
       if (!enabled) return;
 
@@ -111,7 +118,7 @@ export function usePostAutosave(args: {
       const patch = buildPatch();
       if (!patch) return;
 
-      // Capture exactly what we are sending, so we can update "server snapshot" safely
+      // Capture exactly what we are sending, so we can update server snapshots safely
       // even if the user continues typing while the request is in flight.
       const sentTitle = patch.title !== undefined ? String(patch.title ?? "") : null;
       const sentBodyJsonStr = patch.body_json !== undefined ? bodyJsonStrDraft : null;
@@ -120,7 +127,7 @@ export function usePostAutosave(args: {
       setSaveState({ kind: "saving" });
 
       try {
-        const res = await patchPost(postId, patch as any);
+        const res = await patchPost(postId, patch as any, { keepalive: !!opts.keepalive });
 
         if (!res.ok) {
           setSaveState({ kind: "error", message: res.error || "Failed to save." });
@@ -205,7 +212,6 @@ export function usePostAutosave(args: {
 
     const patch = buildPatch();
     if (!patch) {
-      // No changes: clear timers and stay idle-ish.
       clearDebounceTimer();
       clearMaxWaitTimer();
       return;
@@ -213,10 +219,6 @@ export function usePostAutosave(args: {
 
     scheduleDebouncedSave();
     ensureMaxWaitSave();
-
-    return () => {
-      // Keep timers; they are cleared explicitly when clean/disabled/unmounted.
-    };
   }, [
     enabled,
     titleDraft,
@@ -227,6 +229,46 @@ export function usePostAutosave(args: {
     clearDebounceTimer,
     clearMaxWaitTimer,
   ]);
+
+  // Google-Docs style "safety flush":
+  // - Cmd/Ctrl+S
+  // - tab hidden
+  // - pagehide (navigate away / close tab)
+  useEffect(() => {
+    if (!enabled) return;
+    if (!postId) return;
+
+    function onKeyDown(e: KeyboardEvent) {
+      const key = e.key.toLowerCase();
+      if (key !== "s") return;
+
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+
+      e.preventDefault();
+      void flushSaveNow("manual");
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState !== "hidden") return;
+      void flushSaveNow("manual");
+    }
+
+    function onPageHide() {
+      // Best effort: allow request to continue during unload.
+      void flushSaveNow("manual", { keepalive: true });
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [enabled, postId, flushSaveNow]);
 
   // Clear timers on unmount
   useEffect(() => {
@@ -279,7 +321,7 @@ export function usePostAutosave(args: {
       bodyJsonStrDraft,
       setBodyJsonStrDraft,
       saveState,
-      flushSaveNow,
+      flushSaveNow: (reason?: FlushReason) => flushSaveNow(reason ?? "manual"),
       hydrateFromServer,
     }),
     [titleDraft, bodyJsonStrDraft, saveState, flushSaveNow, hydrateFromServer],

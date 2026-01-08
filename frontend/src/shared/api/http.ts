@@ -84,6 +84,7 @@ export async function http<TResponse>(
     body?: unknown;
     headers?: Record<string, string>;
     signal?: AbortSignal;
+    keepalive?: boolean;
   } = {},
 ): Promise<TResponse> {
   const method: HttpMethod = options.method ?? "GET";
@@ -103,12 +104,23 @@ export async function http<TResponse>(
     headers["X-CSRF-Token"] = token;
   }
 
+  // Prepare body once (also helps keepalive sizing).
+  const bodyStr = options.body === undefined ? undefined : JSON.stringify(options.body);
+
+  // Keepalive requests have a payload size limit in browsers.
+  // If too large, we disable keepalive and still try a normal fetch.
+  let keepalive = !!options.keepalive;
+  if (keepalive && bodyStr && bodyStr.length > 60000) {
+    keepalive = false;
+  }
+
   const res = await fetch(url, {
     method,
     credentials: "include",
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: bodyStr,
     signal: options.signal,
+    keepalive,
   });
 
   const contentType = res.headers.get("content-type") ?? "";
