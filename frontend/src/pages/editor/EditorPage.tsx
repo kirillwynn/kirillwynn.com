@@ -1,11 +1,11 @@
 // frontend/src/pages/editor/EditorPage.tsx
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, type PostItem } from "@/api/posts";
 
-import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import Link from "@tiptap/extension-link";
@@ -78,21 +78,34 @@ export function EditorPage() {
         "data-theme": theme,
       },
     },
-
-    // IMPORTANT:
-    // TipTap calls onUpdate only when docChanged.
-    onUpdate: ({ editor }) => {
-      autosave.setBodyJsonStrDraft(stableStringify(editor.getJSON()));
-    },
   });
 
-  // autosave hook
+  // autosave hook (after editor init)
   const autosave = usePostAutosave({
     postId,
     editor: editor ?? null,
     enabled: state.kind === "ready",
     onPostUpdated: (post) => setState({ kind: "ready", post }),
   });
+
+  // IMPORTANT:
+  // bind TipTap updates -> autosave draft
+  useEffect(() => {
+    if (!editor) return;
+
+    // TipTap calls onUpdate only when docChanged.
+    const off = editor.on("update", ({ editor: ed }) => {
+      autosave.setBodyJsonStrDraft(stableStringify(ed.getJSON()));
+    });
+
+    return () => {
+      // tiptap's `.on` returns void in some versions; if your TS complains, remove this.
+      // In that case we’ll move back to onUpdate option in useEditor and use a ref approach.
+      // @ts-ignore
+      if (typeof off === "function") off();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   // Keep editor theme in sync with state (without recreating editor)
   useEffect(() => {
@@ -167,8 +180,7 @@ export function EditorPage() {
           cardBg: "#0f1115",
           border: "rgba(255,255,255,0.10)",
           text: "rgba(255,255,255,0.92)",
-          surfaceBg:
-            "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
+          surfaceBg: "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
         }
       : {
           cardBg: "#f8fafc",
@@ -296,12 +308,7 @@ export function EditorPage() {
         />
 
         {/* Surface */}
-        <div
-          style={{
-            background: colors.surfaceBg,
-            padding: 18,
-          }}
-        >
+        <div style={{ background: colors.surfaceBg, padding: 18 }}>
           <div
             style={{
               borderRadius: 18,

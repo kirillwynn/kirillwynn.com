@@ -7,7 +7,7 @@
 // - Add menu UI-only
 // - Accepts: editor, theme, onToggleTheme, onSave
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 
 import {
@@ -55,7 +55,11 @@ type MenuItem = {
   onSelect: () => void;
 };
 
-function useOutsideClick(ref: React.RefObject<HTMLElement>, onOutside: () => void, enabled: boolean) {
+function useOutsideClick<T extends HTMLElement>(
+  ref: React.RefObject<T | null>,
+  onOutside: () => void,
+  enabled: boolean,
+) {
   useEffect(() => {
     if (!enabled) return;
 
@@ -419,7 +423,9 @@ export function SimpleEditorToolbar(props: {
           icon={<Heading size={18} />}
           label="Heading"
         />
-        {headingMenuOpen && <MenuPanel items={headingMenuItems} onClose={() => setHeadingMenuOpen(false)} />}
+        {headingMenuOpen && (
+          <MenuPanel items={headingMenuItems} onClose={() => setHeadingMenuOpen(false)} />
+        )}
       </div>
 
       <div ref={listMenuRef} style={{ position: "relative" }}>
@@ -431,7 +437,9 @@ export function SimpleEditorToolbar(props: {
           icon={<List size={18} />}
           label="List"
         />
-        {listMenuOpen && <MenuPanel items={listMenuItems} onClose={() => setListMenuOpen(false)} />}
+        {listMenuOpen && (
+          <MenuPanel items={listMenuItems} onClose={() => setListMenuOpen(false)} />
+        )}
       </div>
 
       <ToolButton
@@ -509,7 +517,12 @@ export function SimpleEditorToolbar(props: {
         <Highlighter size={18} />
       </ToolButton>
 
-      <ToolButton title="Link" active={!!editor?.isActive("link")} disabled={!editor} onClick={toggleLink}>
+      <ToolButton
+        title="Link"
+        active={!!editor?.isActive("link")}
+        disabled={!editor}
+        onClick={toggleLink}
+      >
         <Link2 size={18} />
       </ToolButton>
 
