@@ -5,6 +5,10 @@
 // - lastServer snapshot refs (avoid PATCH spam)
 // - buildPatch + debounce + flushSaveNow
 // - hydrateFromServer(post) to sync editor + drafts
+//
+// IMPORTANT:
+// Never call `editor.commands.setContent()` as part of autosave responses.
+// Doing so can override the user's in-flight edits (e.g. during delete) and "bring back" characters.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Editor, JSONContent } from "@tiptap/react";
@@ -19,6 +23,9 @@ export type SaveState =
   | { kind: "error"; message: string };
 
 type FlushReason = "debounce" | "blur" | "manual";
+
+const SAVE_DEBOUNCE_MS = 5000;
+const SAVE_MAX_WAIT_MS = 30000;
 
 export function usePostAutosave(args: {
   postId: number | null;
@@ -39,8 +46,27 @@ export function usePostAutosave(args: {
   const lastServerTitleRef = useRef<string>("");
   const lastServerBodyJsonStrRef = useRef<string>("");
 
-  // Debounce timer
+  // Debounce + max-wait timers
   const saveTimerRef = useRef<number | null>(null);
+  const maxWaitTimerRef = useRef<number | null>(null);
+
+  // Prevent concurrent saves; queue a follow-up save if changes happen during an in-flight request.
+  const inFlightRef = useRef(false);
+  const pendingRef = useRef(false);
+
+  const clearDebounceTimer = useCallback(() => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+  }, []);
+
+  const clearMaxWaitTimer = useCallback(() => {
+    if (maxWaitTimerRef.current) {
+      window.clearTimeout(maxWaitTimerRef.current);
+      maxWaitTimerRef.current = null;
+    }
+  }, []);
 
   const buildPatch = useCallback((): Record<string, unknown> | null => {
     const patch: Record<string, unknown> = {};
@@ -59,23 +85,24 @@ export function usePostAutosave(args: {
     return Object.keys(patch).length ? patch : null;
   }, [titleDraft, bodyJsonStrDraft, editor]);
 
-  const scheduleDebouncedSave = useCallback(() => {
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => {
-      void flushSaveNow("debounce");
-    }, 600);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [postId, enabled, buildPatch, titleDraft, bodyJsonStrDraft, editor]);
-
   const flushSaveNow = useCallback(
     async (reason: FlushReason = "manual") => {
       if (!postId) return;
       if (!enabled) return;
 
+      // If a save is already in-flight, request a follow-up save.
+      if (inFlightRef.current) {
+        pendingRef.current = true;
+        return;
+      }
+
+      // Cancel any scheduled saves when doing an explicit flush attempt.
+      clearDebounceTimer();
+      clearMaxWaitTimer();
+
       const normalizedTitle = normalizeTitle(titleDraft);
 
       // Only enforce “title required” on explicit user actions.
-      // Clicking toolbar should not suddenly error just because title is temporarily empty.
       if ((reason === "blur" || reason === "manual") && normalizedTitle.length === 0) {
         setSaveState({ kind: "error", message: "Title cannot be empty." });
         return;
@@ -84,6 +111,12 @@ export function usePostAutosave(args: {
       const patch = buildPatch();
       if (!patch) return;
 
+      // Capture exactly what we are sending, so we can update "server snapshot" safely
+      // even if the user continues typing while the request is in flight.
+      const sentTitle = patch.title !== undefined ? String(patch.title ?? "") : null;
+      const sentBodyJsonStr = patch.body_json !== undefined ? bodyJsonStrDraft : null;
+
+      inFlightRef.current = true;
       setSaveState({ kind: "saving" });
 
       try {
@@ -94,35 +127,25 @@ export function usePostAutosave(args: {
           return;
         }
 
+        // Update "last server snapshot" WITHOUT mutating the editor content.
         if (res.item) {
-          // Update snapshots/drafts from server response
-          const newTitle = res.item.title ?? lastServerTitleRef.current;
-          lastServerTitleRef.current = newTitle ?? "";
-          setTitleDraft(newTitle ?? "");
+          // Title snapshot: prefer server response (it might normalize), fallback to what we sent.
+          if (typeof res.item.title === "string") {
+            lastServerTitleRef.current = res.item.title;
+          } else if (sentTitle !== null) {
+            lastServerTitleRef.current = sentTitle;
+          }
 
-          const newBodyJsonFromApi = (res.item as any).body_json as JSONContent | null | undefined;
-
-          if (editor) {
-            if (newBodyJsonFromApi && typeof newBodyJsonFromApi === "object") {
-              editor.commands.setContent(newBodyJsonFromApi, { emitUpdate: false });
-            }
-            const jsonStr = stableStringify(editor.getJSON());
-            setBodyJsonStrDraft(jsonStr);
-            lastServerBodyJsonStrRef.current = jsonStr;
-          } else {
-            // If editor is not ready, still advance snapshot
-            lastServerBodyJsonStrRef.current = bodyJsonStrDraft;
+          // Body snapshot: trust what we sent (avoid applying server echo to editor).
+          if (sentBodyJsonStr !== null) {
+            lastServerBodyJsonStrRef.current = sentBodyJsonStr;
           }
 
           onPostUpdated?.(res.item);
         } else {
           // Fallback: assume patch succeeded
-          if (patch.title !== undefined) lastServerTitleRef.current = String(patch.title ?? "");
-          if (editor) {
-            const jsonStr = stableStringify(editor.getJSON());
-            lastServerBodyJsonStrRef.current = jsonStr;
-            setBodyJsonStrDraft(jsonStr);
-          }
+          if (sentTitle !== null) lastServerTitleRef.current = sentTitle;
+          if (sentBodyJsonStr !== null) lastServerBodyJsonStrRef.current = sentBodyJsonStr;
         }
 
         setSaveState({ kind: "saved", at: Date.now() });
@@ -131,25 +154,87 @@ export function usePostAutosave(args: {
           kind: "error",
           message: e?.message || "Unexpected error while saving.",
         });
+      } finally {
+        inFlightRef.current = false;
+
+        // If edits happened while we were saving, try again immediately.
+        if (pendingRef.current) {
+          pendingRef.current = false;
+          window.setTimeout(() => {
+            void flushSaveNow("debounce");
+          }, 0);
+        }
       }
     },
-    [postId, enabled, titleDraft, buildPatch, editor, bodyJsonStrDraft, onPostUpdated],
+    [
+      postId,
+      enabled,
+      titleDraft,
+      buildPatch,
+      bodyJsonStrDraft,
+      onPostUpdated,
+      clearDebounceTimer,
+      clearMaxWaitTimer,
+    ],
   );
 
-  // Debounced autosave on real changes
+  const scheduleDebouncedSave = useCallback(() => {
+    clearDebounceTimer();
+    saveTimerRef.current = window.setTimeout(() => {
+      void flushSaveNow("debounce");
+    }, SAVE_DEBOUNCE_MS);
+  }, [flushSaveNow, clearDebounceTimer]);
+
+  const ensureMaxWaitSave = useCallback(() => {
+    // Start max-wait only once per "dirty session".
+    if (maxWaitTimerRef.current) return;
+    maxWaitTimerRef.current = window.setTimeout(() => {
+      void flushSaveNow("debounce");
+    }, SAVE_MAX_WAIT_MS);
+  }, [flushSaveNow]);
+
+  // Autosave scheduling:
+  // - Debounce: save after user pauses.
+  // - Max-wait: even if user never pauses, save at least once per window.
   useEffect(() => {
-    if (!enabled) return;
-    if (!buildPatch()) return;
+    if (!enabled) {
+      clearDebounceTimer();
+      clearMaxWaitTimer();
+      return;
+    }
+
+    const patch = buildPatch();
+    if (!patch) {
+      // No changes: clear timers and stay idle-ish.
+      clearDebounceTimer();
+      clearMaxWaitTimer();
+      return;
+    }
 
     scheduleDebouncedSave();
+    ensureMaxWaitSave();
 
     return () => {
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
+      // Keep timers; they are cleared explicitly when clean/disabled/unmounted.
     };
-  }, [enabled, titleDraft, bodyJsonStrDraft, buildPatch, scheduleDebouncedSave]);
+  }, [
+    enabled,
+    titleDraft,
+    bodyJsonStrDraft,
+    buildPatch,
+    scheduleDebouncedSave,
+    ensureMaxWaitSave,
+    clearDebounceTimer,
+    clearMaxWaitTimer,
+  ]);
+
+  // Clear timers on unmount
+  useEffect(() => {
+    return () => {
+      clearDebounceTimer();
+      clearMaxWaitTimer();
+    };
+  }, [clearDebounceTimer, clearMaxWaitTimer]);
 
   const hydrateFromServer = useCallback(
     (post: PostItem) => {
@@ -164,7 +249,7 @@ export function usePostAutosave(args: {
         if (bodyJsonFromApi && typeof bodyJsonFromApi === "object") {
           editor.commands.setContent(bodyJsonFromApi, { emitUpdate: false });
         } else {
-          // Fallback: if we have legacy html in body_md
+          // Fallback: legacy HTML/markdown string (best-effort)
           editor.commands.setContent(bodyHtmlLegacy || "", { emitUpdate: false });
         }
 
@@ -176,9 +261,15 @@ export function usePostAutosave(args: {
         lastServerBodyJsonStrRef.current = "";
       }
 
+      pendingRef.current = false;
+      inFlightRef.current = false;
+
+      clearDebounceTimer();
+      clearMaxWaitTimer();
+
       setSaveState({ kind: "idle" });
     },
-    [editor],
+    [editor, clearDebounceTimer, clearMaxWaitTimer],
   );
 
   return useMemo(
