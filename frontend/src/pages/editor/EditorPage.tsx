@@ -40,6 +40,10 @@ export function EditorPage() {
 
   const [state, setState] = useState<LoadState>({ kind: "idle" });
 
+  // TipTap view is created only after the editor is mounted.
+  // We must not call commands like `setContent` before that.
+  const [isEditorMounted, setIsEditorMounted] = useState(false);
+
   // UI state
   const [theme, setTheme] = useState<ThemeMode>("dark");
 
@@ -77,8 +81,15 @@ export function EditorPage() {
     editorProps: {
       attributes: {
         class: "tiptap-prose",
-        "data-theme": theme,
       },
+    },
+
+    onCreate: () => {
+      setIsEditorMounted(true);
+    },
+
+    onDestroy: () => {
+      setIsEditorMounted(false);
     },
   });
 
@@ -109,12 +120,7 @@ export function EditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
-  // Keep editor theme in sync with state (without recreating editor)
-  useEffect(() => {
-    if (!editor) return;
-    const el = editor.view.dom as HTMLElement;
-    el.setAttribute("data-theme", theme);
-  }, [editor, theme]);
+  // Theme is applied declaratively via React styles (no direct DOM mutation).
 
   // Load post
   useEffect(() => {
@@ -161,9 +167,11 @@ export function EditorPage() {
   // Hydrate from server -> drafts + editor content
   useEffect(() => {
     if (state.kind !== "ready") return;
+    if (!editor) return;
+    if (!isEditorMounted) return;
     autosave.hydrateFromServer(state.post);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.kind, state.kind === "ready" ? state.post.id : null, editor]);
+  }, [state.kind, state.kind === "ready" ? state.post.id : null, editor, isEditorMounted]);
 
   const statusValue = state.kind === "ready" ? state.post.status ?? "—" : "—";
 
