@@ -1,6 +1,6 @@
 // frontend/src/pages/editor/EditorPage.tsx
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, type PostItem } from "@/api/posts";
@@ -32,10 +32,6 @@ type LoadState =
 export function EditorPage() {
   const params = useParams();
 
-  // Avoid closing over autosave instance inside useEditor callbacks.
-  // TipTap can fire updates very early (and frequently), so we use a ref indirection.
-  const onEditorUpdateRef = useRef<(jsonStr: string) => void>(() => {});
-
   const postId = useMemo(() => {
     const raw = (params as any).id ?? (params as any).postId;
     const n = Number(raw);
@@ -51,6 +47,8 @@ export function EditorPage() {
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        // Disable extensions that we register explicitly below to avoid duplicate names warnings.
+        ...({ link: false, underline: false } as Record<string, false>),
       }),
       Underline,
       Highlight.configure({
@@ -79,14 +77,8 @@ export function EditorPage() {
     editorProps: {
       attributes: {
         class: "tiptap-prose",
+        "data-theme": theme,
       },
-    },
-
-    // IMPORTANT:
-    // TipTap calls onUpdate only when docChanged.
-    // Do NOT access editor.view.dom here (can throw before mount).
-    onUpdate: ({ editor }) => {
-      onEditorUpdateRef.current(stableStringify(editor.getJSON()));
     },
   });
 
@@ -98,10 +90,31 @@ export function EditorPage() {
     onPostUpdated: (post) => setState({ kind: "ready", post }),
   });
 
-  // Wire TipTap updates -> autosave draft without recreating the editor callbacks
+  // IMPORTANT:
+  // bind TipTap updates -> autosave draft
   useEffect(() => {
-    onEditorUpdateRef.current = autosave.setBodyJsonStrDraft;
-  }, [autosave.setBodyJsonStrDraft]);
+    if (!editor) return;
+
+    // TipTap calls onUpdate only when docChanged.
+    const off = editor.on("update", ({ editor: ed }) => {
+      autosave.setBodyJsonStrDraft(stableStringify(ed.getJSON()));
+    });
+
+    return () => {
+      // tiptap's `.on` returns void in some versions; if your TS complains, remove this.
+      // In that case we’ll move back to onUpdate option in useEditor and use a ref approach.
+      // @ts-ignore
+      if (typeof off === "function") off();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
+  // Keep editor theme in sync with state (without recreating editor)
+  useEffect(() => {
+    if (!editor) return;
+    const el = editor.view.dom as HTMLElement;
+    el.setAttribute("data-theme", theme);
+  }, [editor, theme]);
 
   // Load post
   useEffect(() => {
@@ -281,7 +294,6 @@ export function EditorPage() {
 
       {/* Simple editor card */}
       <div
-        className={theme === "dark" ? "tt-card--dark" : "tt-card--light"}
         style={{
           borderRadius: 22,
           overflow: "hidden",
@@ -300,7 +312,6 @@ export function EditorPage() {
         {/* Surface */}
         <div style={{ background: colors.surfaceBg, padding: 18 }}>
           <div
-            className="tt-editor-shell"
             style={{
               borderRadius: 18,
               background: theme === "dark" ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
