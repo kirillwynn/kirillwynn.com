@@ -10,8 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tiptap/extension-highlight": "^3.15.3",
     "@tiptap/extension-link": "^3.15.3",
     "@tiptap/extension-placeholder": "^3.15.3",
+    "@tiptap/extension-text-align": "^3.15.3",
+    "@tiptap/extension-underline": "^3.15.3",
     "@tiptap/react": "^3.15.3",
     "@tiptap/starter-kit": "^3.15.3",
     "lucide-react": "^0.562.0",
