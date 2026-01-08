@@ -60,6 +60,7 @@ services:
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
+      - /etc/nginx/.htpasswd:/etc/nginx/.htpasswd:ro
 
     depends_on:
       - app
