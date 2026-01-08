@@ -1,11 +1,10 @@
 // frontend/src/pages/editor/SimpleEditorToolbar.tsx
 //
 // Toolbar (Simple Editor style).
-// - Renders 6 groups
-// - Heading/List dropdowns
-// - Theme toggle
-// - Add menu UI-only
-// - Accepts: editor, theme, onToggleTheme, onSave
+// - Compact pill controls (closer to template.tiptap.dev)
+// - Custom rounded tooltips (no native browser "title" tooltips)
+// - Heading dropdown shows current value (P/H1/H2/...)
+// - List dropdown is icon-only (tooltip carries meaning)
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
@@ -76,6 +75,45 @@ function useOutsideClick<T extends HTMLElement>(
   }, [ref, onOutside, enabled]);
 }
 
+function TooltipWrap(props: { label: string; children: ReactNode; disabled?: boolean }) {
+  const { label, children, disabled } = props;
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex" }}
+      onMouseEnter={() => !disabled && setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      <span
+        role="tooltip"
+        style={{
+          position: "absolute",
+          top: -40,
+          left: "50%",
+          transform: open ? "translate(-50%, 0)" : "translate(-50%, 4px)",
+          opacity: open ? 1 : 0,
+          pointerEvents: "none",
+          transition: "opacity 120ms ease, transform 120ms ease",
+          padding: "6px 10px",
+          borderRadius: 12,
+          background: "rgba(255,255,255,0.92)",
+          color: "rgba(17,24,39,0.92)",
+          border: "1px solid rgba(0,0,0,0.08)",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+          fontSize: 12,
+          fontWeight: 700,
+          whiteSpace: "nowrap",
+          zIndex: 50,
+        }}
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
+
 export function SimpleEditorToolbar(props: {
   editor: Editor | null;
   theme: ThemeMode;
@@ -121,50 +159,62 @@ export function SimpleEditorToolbar(props: {
           panelBg: "rgba(255,255,255,0.98)",
         };
 
+  const BTN = {
+    size: 32,
+    radius: 10,
+    icon: 16,
+    pillPaddingX: 8,
+    pillGap: 8,
+  } as const;
+
   function ToolButton(p: {
-    title: string;
+    tooltip: string;
     active?: boolean;
     disabled?: boolean;
     onClick: () => void;
     children: ReactNode;
     width?: number;
   }) {
+    const disabled = !!p.disabled;
+
     return (
-      <button
-        type="button"
-        title={p.title}
-        disabled={p.disabled}
-        onMouseDown={(e) => {
-          // Keep focus in editor; prevents blur-triggered autosave when clicking toolbar.
-          e.preventDefault();
-        }}
-        onClick={p.onClick}
-        style={{
-          width: p.width ?? 36,
-          height: 36,
-          borderRadius: 12,
-          border: `1px solid ${colors.btnBorder}`,
-          background: p.active ? colors.btnActiveBg : "transparent",
-          color: colors.text,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: p.disabled ? "not-allowed" : "pointer",
-          opacity: p.disabled ? 0.5 : 1,
-          transition: "background 120ms ease",
-        }}
-        onMouseEnter={(e) => {
-          if (p.disabled) return;
-          const el = e.currentTarget;
-          if (!p.active) el.style.background = colors.btnHoverBg;
-        }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget;
-          if (!p.active) el.style.background = "transparent";
-        }}
-      >
-        {p.children}
-      </button>
+      <TooltipWrap label={p.tooltip} disabled={disabled}>
+        <button
+          type="button"
+          aria-label={p.tooltip}
+          disabled={disabled}
+          onMouseDown={(e) => {
+            // Keep focus in editor; prevents blur-triggered autosave when clicking toolbar.
+            e.preventDefault();
+          }}
+          onClick={p.onClick}
+          style={{
+            width: p.width ?? BTN.size,
+            height: BTN.size,
+            borderRadius: BTN.radius,
+            border: `1px solid ${colors.btnBorder}`,
+            background: p.active ? colors.btnActiveBg : "transparent",
+            color: colors.text,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: disabled ? "not-allowed" : "pointer",
+            opacity: disabled ? 0.5 : 1,
+            transition: "background 120ms ease",
+          }}
+          onMouseEnter={(e) => {
+            if (disabled) return;
+            const el = e.currentTarget;
+            if (!p.active) el.style.background = colors.btnHoverBg;
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget;
+            if (!p.active) el.style.background = "transparent";
+          }}
+        >
+          {p.children}
+        </button>
+      </TooltipWrap>
     );
   }
 
@@ -173,7 +223,7 @@ export function SimpleEditorToolbar(props: {
       <div
         style={{
           width: 1,
-          height: 22,
+          height: 18,
           background: colors.divider,
           margin: "0 8px",
           alignSelf: "center",
@@ -183,48 +233,57 @@ export function SimpleEditorToolbar(props: {
   }
 
   function MenuButton(p: {
-    title: string;
+    tooltip: string;
     disabled?: boolean;
     active?: boolean;
     onClick: () => void;
     icon: ReactNode;
-    label: string;
+    valueText?: string; // "P", "H1", ...
+    showValue?: boolean;
   }) {
+    const disabled = !!p.disabled;
+
     return (
-      <button
-        type="button"
-        title={p.title}
-        disabled={p.disabled}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={p.onClick}
-        style={{
-          height: 36,
-          padding: "0 10px",
-          borderRadius: 12,
-          border: `1px solid ${colors.btnBorder}`,
-          background: p.active ? colors.btnActiveBg : "transparent",
-          color: colors.text,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          cursor: p.disabled ? "not-allowed" : "pointer",
-          opacity: p.disabled ? 0.5 : 1,
-          transition: "background 120ms ease",
-        }}
-        onMouseEnter={(e) => {
-          if (p.disabled) return;
-          const el = e.currentTarget;
-          if (!p.active) el.style.background = colors.btnHoverBg;
-        }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget;
-          if (!p.active) el.style.background = "transparent";
-        }}
-      >
-        {p.icon}
-        <span style={{ fontWeight: 700, fontSize: 12 }}>{p.label}</span>
-        <ChevronDown size={16} />
-      </button>
+      <TooltipWrap label={p.tooltip} disabled={disabled}>
+        <button
+          type="button"
+          aria-label={p.tooltip}
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={p.onClick}
+          style={{
+            height: BTN.size,
+            padding: `0 ${BTN.pillPaddingX}px`,
+            borderRadius: BTN.radius,
+            border: `1px solid ${colors.btnBorder}`,
+            background: p.active ? colors.btnActiveBg : "transparent",
+            color: colors.text,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: BTN.pillGap,
+            cursor: disabled ? "not-allowed" : "pointer",
+            opacity: disabled ? 0.5 : 1,
+            transition: "background 120ms ease",
+          }}
+          onMouseEnter={(e) => {
+            if (disabled) return;
+            const el = e.currentTarget;
+            if (!p.active) el.style.background = colors.btnHoverBg;
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget;
+            if (!p.active) el.style.background = "transparent";
+          }}
+        >
+          {p.icon}
+          {p.showValue && (
+            <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 0.2 }}>
+              {p.valueText ?? ""}
+            </span>
+          )}
+          <ChevronDown size={16} />
+        </button>
+      </TooltipWrap>
     );
   }
 
@@ -233,7 +292,7 @@ export function SimpleEditorToolbar(props: {
       <div
         style={{
           position: "absolute",
-          top: 44,
+          top: 40,
           left: 0,
           minWidth: 220,
           padding: 8,
@@ -279,7 +338,7 @@ export function SimpleEditorToolbar(props: {
             <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
               {it.active ? <Check size={16} /> : it.icon ?? null}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>{it.label}</span>
+            <span style={{ fontSize: 13, fontWeight: 800 }}>{it.label}</span>
           </button>
         ))}
       </div>
@@ -304,6 +363,15 @@ export function SimpleEditorToolbar(props: {
 
   function isParagraphActive() {
     return !!editor?.isActive("paragraph");
+  }
+
+  function getHeadingValueText() {
+    if (!editor) return "P";
+    if (isHeadingActive(1)) return "H1";
+    if (isHeadingActive(2)) return "H2";
+    if (isHeadingActive(3)) return "H3";
+    if (isHeadingActive(4)) return "H4";
+    return "P";
   }
 
   function isListActive(kind: "bullet" | "ordered" | "task") {
@@ -390,39 +458,39 @@ export function SimpleEditorToolbar(props: {
         alignItems: "center",
         gap: 6,
         flexWrap: "wrap",
-        padding: 12,
+        padding: 10,
         borderBottom: `1px solid ${colors.border}`,
         background: colors.barBg,
         position: "relative",
       }}
     >
-      {/* Group 1: Undo/Redo */}
       <ToolButton
-        title="Undo"
+        tooltip="Undo"
         disabled={!editor || !editor.can().undo()}
         onClick={() => editor?.chain().focus().undo().run()}
       >
-        <Undo2 size={18} />
+        <Undo2 size={BTN.icon} />
       </ToolButton>
+
       <ToolButton
-        title="Redo"
+        tooltip="Redo"
         disabled={!editor || !editor.can().redo()}
         onClick={() => editor?.chain().focus().redo().run()}
       >
-        <Redo2 size={18} />
+        <Redo2 size={BTN.icon} />
       </ToolButton>
 
       <Divider />
 
-      {/* Group 2: Heading + List dropdowns + Quote + Code block */}
       <div ref={headingMenuRef} style={{ position: "relative" }}>
         <MenuButton
-          title="Heading"
+          tooltip="Heading"
           disabled={!editor}
           active={headingMenuOpen}
           onClick={() => setHeadingMenuOpen((v) => !v)}
-          icon={<Heading size={18} />}
-          label="Heading"
+          icon={<Heading size={BTN.icon} />}
+          valueText={getHeadingValueText()}
+          showValue
         />
         {headingMenuOpen && (
           <MenuPanel items={headingMenuItems} onClose={() => setHeadingMenuOpen(false)} />
@@ -431,168 +499,174 @@ export function SimpleEditorToolbar(props: {
 
       <div ref={listMenuRef} style={{ position: "relative" }}>
         <MenuButton
-          title="List"
+          tooltip="List"
           disabled={!editor}
           active={listMenuOpen}
           onClick={() => setListMenuOpen((v) => !v)}
-          icon={<List size={18} />}
-          label="List"
+          icon={<List size={BTN.icon} />}
+          showValue={false}
         />
         {listMenuOpen && <MenuPanel items={listMenuItems} onClose={() => setListMenuOpen(false)} />}
       </div>
 
       <ToolButton
-        title="Blockquote"
+        tooltip="Blockquote"
         active={!!editor?.isActive("blockquote")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleBlockquote().run()}
       >
-        <Quote size={18} />
+        <Quote size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Code block"
+        tooltip="Code block"
         active={!!editor?.isActive("codeBlock")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
       >
-        <CodeSquare size={18} />
+        <CodeSquare size={BTN.icon} />
       </ToolButton>
 
       <Divider />
 
-      {/* Group 3: Bold/Italic/Strike/Code/Underline/Highlight/Link */}
       <ToolButton
-        title="Bold"
+        tooltip="Bold"
         active={!!editor?.isActive("bold")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleBold().run()}
       >
-        <Bold size={18} />
+        <Bold size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Italic"
+        tooltip="Italic"
         active={!!editor?.isActive("italic")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleItalic().run()}
       >
-        <Italic size={18} />
+        <Italic size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Strikethrough"
+        tooltip="Strikethrough"
         active={!!editor?.isActive("strike")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleStrike().run()}
       >
-        <Strikethrough size={18} />
+        <Strikethrough size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Inline code"
+        tooltip="Inline code"
         active={!!editor?.isActive("code")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleCode().run()}
       >
-        <Code size={18} />
+        <Code size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Underline"
+        tooltip="Underline"
         active={!!editor?.isActive("underline")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleUnderline().run()}
       >
-        <UnderlineIcon size={18} />
+        <UnderlineIcon size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Highlight"
+        tooltip="Highlight"
         active={!!editor?.isActive("highlight")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleHighlight().run()}
       >
-        <Highlighter size={18} />
+        <Highlighter size={BTN.icon} />
       </ToolButton>
 
-      <ToolButton title="Link" active={!!editor?.isActive("link")} disabled={!editor} onClick={toggleLink}>
-        <Link2 size={18} />
+      <ToolButton
+        tooltip="Link"
+        active={!!editor?.isActive("link")}
+        disabled={!editor}
+        onClick={toggleLink}
+      >
+        <Link2 size={BTN.icon} />
       </ToolButton>
 
       <Divider />
 
-      {/* Group 4: Superscript/Subscript */}
       <ToolButton
-        title="Superscript"
+        tooltip="Superscript"
         active={!!editor?.isActive("superscript")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleSuperscript().run()}
       >
-        <SuperscriptIcon size={18} />
+        <SuperscriptIcon size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Subscript"
+        tooltip="Subscript"
         active={!!editor?.isActive("subscript")}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleSubscript().run()}
       >
-        <SubscriptIcon size={18} />
+        <SubscriptIcon size={BTN.icon} />
       </ToolButton>
 
       <Divider />
 
-      {/* Group 5: Align */}
       <ToolButton
-        title="Align left"
+        tooltip="Align left"
         active={!!editor?.isActive({ textAlign: "left" })}
         disabled={!editor}
         onClick={() => editor?.chain().focus().setTextAlign("left").run()}
       >
-        <AlignLeft size={18} />
+        <AlignLeft size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Align center"
+        tooltip="Align center"
         active={!!editor?.isActive({ textAlign: "center" })}
         disabled={!editor}
         onClick={() => editor?.chain().focus().setTextAlign("center").run()}
       >
-        <AlignCenter size={18} />
+        <AlignCenter size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Align right"
+        tooltip="Align right"
         active={!!editor?.isActive({ textAlign: "right" })}
         disabled={!editor}
         onClick={() => editor?.chain().focus().setTextAlign("right").run()}
       >
-        <AlignRight size={18} />
+        <AlignRight size={BTN.icon} />
       </ToolButton>
 
       <ToolButton
-        title="Justify"
+        tooltip="Justify"
         active={!!editor?.isActive({ textAlign: "justify" })}
         disabled={!editor}
         onClick={() => editor?.chain().focus().setTextAlign("justify").run()}
       >
-        <AlignJustify size={18} />
+        <AlignJustify size={BTN.icon} />
       </ToolButton>
 
       <Divider />
 
-      {/* Group 6: Add */}
       <div ref={addMenuRef} style={{ position: "relative" }}>
-        <ToolButton title="Add" disabled={!editor} active={addMenuOpen} onClick={() => setAddMenuOpen((v) => !v)}>
-          <Plus size={18} />
+        <ToolButton
+          tooltip="Add"
+          disabled={!editor}
+          active={addMenuOpen}
+          onClick={() => setAddMenuOpen((v) => !v)}
+        >
+          <Plus size={BTN.icon} />
         </ToolButton>
 
         {addMenuOpen && (
           <div
             style={{
               position: "absolute",
-              top: 44,
+              top: 40,
               right: 0,
               width: 320,
               borderRadius: 16,
@@ -650,7 +724,7 @@ export function SimpleEditorToolbar(props: {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => window.alert("Upload will be implemented in the next step.")}
                 style={{
-                  height: 36,
+                  height: 34,
                   padding: "0 12px",
                   borderRadius: 12,
                   border: `1px solid ${colors.btnBorder}`,
@@ -671,41 +745,42 @@ export function SimpleEditorToolbar(props: {
         )}
       </div>
 
-      {/* Right side: theme toggle + save */}
       <div style={{ flex: 1 }} />
 
       <ToolButton
-        title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+        tooltip={theme === "dark" ? "Switch to light" : "Switch to dark"}
         disabled={!editor}
         onClick={onToggleTheme}
       >
-        {theme === "dark" ? <Moon size={18} /> : <Sun size={18} />}
+        {theme === "dark" ? <Moon size={BTN.icon} /> : <Sun size={BTN.icon} />}
       </ToolButton>
 
-      <button
-        type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={onSave}
-        disabled={!editor}
-        title="Save"
-        style={{
-          height: 36,
-          padding: "0 12px",
-          borderRadius: 12,
-          border: `1px solid ${colors.btnBorder}`,
-          background: theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-          color: colors.text,
-          fontWeight: 800,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          cursor: !editor ? "not-allowed" : "pointer",
-          opacity: !editor ? 0.6 : 1,
-        }}
-      >
-        <Save size={18} />
-        Save
-      </button>
+      <TooltipWrap label="Save" disabled={!editor}>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onSave}
+          disabled={!editor}
+          aria-label="Save"
+          style={{
+            height: BTN.size,
+            padding: "0 12px",
+            borderRadius: BTN.radius,
+            border: `1px solid ${colors.btnBorder}`,
+            background: theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+            color: colors.text,
+            fontWeight: 800,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: !editor ? "not-allowed" : "pointer",
+            opacity: !editor ? 0.6 : 1,
+          }}
+        >
+          <Save size={BTN.icon} />
+          Save
+        </button>
+      </TooltipWrap>
     </div>
   );
 }
