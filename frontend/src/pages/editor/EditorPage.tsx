@@ -1,16 +1,3 @@
-// frontend/src/pages/editor/EditorPage.tsx
-//
-// Editor page (v3 -> v4 internal behavior).
-// - Loads post by id from API
-// - Shows metadata (status + timestamps)
-// - Title is editable (saved via PATCH)
-// - Body uses TipTap rich editor
-// - Autosave via PATCH (debounced) + safe flush on blur/manual
-//
-// v4 change:
-// - Compare and persist TipTap JSON as the canonical authoring format (body_json)
-// - Do NOT send PATCH on toolbar clicks/blur unless the document actually changed
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -18,6 +5,22 @@ import { getPost, patchPost, type PostItem } from "@/api/posts";
 
 import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+
+import {
+  Bold,
+  Italic,
+  Heading1,
+  Heading2,
+  List,
+  ListOrdered,
+  Quote,
+  CodeSquare,
+  Undo2,
+  Redo2,
+  Save,
+} from "lucide-react";
+
+import "./tiptap-prose.css";
 
 function formatIso(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -49,22 +52,15 @@ function normalizeTitle(raw: string): string {
 }
 
 function stableStringify(value: unknown): string {
-  // Deterministic JSON stringify (sort keys recursively).
-  // This avoids "different string, same meaning" issues when comparing objects.
   const seen = new WeakSet<object>();
 
   function normalize(v: any): any {
     if (v === null || typeof v !== "object") return v;
-
     if (seen.has(v)) return null;
     seen.add(v);
-
     if (Array.isArray(v)) return v.map(normalize);
-
     const out: Record<string, any> = {};
-    for (const k of Object.keys(v).sort()) {
-      out[k] = normalize(v[k]);
-    }
+    for (const k of Object.keys(v).sort()) out[k] = normalize(v[k]);
     return out;
   }
 
@@ -82,42 +78,26 @@ export function EditorPage() {
 
   const [state, setState] = useState<LoadState>({ kind: "idle" });
 
-  // Local drafts
   const [titleDraft, setTitleDraft] = useState("");
   const [bodyJsonStrDraft, setBodyJsonStrDraft] = useState<string>("");
 
-  // Save status (tiny UX)
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
-  // Keep last server values to avoid PATCH spam
   const lastServerTitleRef = useRef<string>("");
   const lastServerBodyJsonStrRef = useRef<string>("");
 
-  // Debounce timer
   const saveTimerRef = useRef<number | null>(null);
 
-  // TipTap editor
   const editor = useEditor({
     extensions: [StarterKit],
     content: "",
     editorProps: {
       attributes: {
-        style: [
-          "min-height: 320px",
-          "padding: 16px",
-          "outline: none",
-          "font-family: ui-sans-serif, system-ui",
-          "font-size: 14px",
-          "line-height: 1.6",
-        ].join("; "),
+        class: "tiptap-prose",
       },
     },
     onUpdate: ({ editor }) => {
-      // Canonical authoring format: TipTap JSON.
-      // onUpdate only fires when docChanged === true, so selection/toolbar focus
-      // won't cause drafts to change.
-      const json = editor.getJSON();
-      setBodyJsonStrDraft(stableStringify(json));
+      setBodyJsonStrDraft(stableStringify(editor.getJSON()));
     },
   });
 
@@ -162,7 +142,6 @@ export function EditorPage() {
     };
   }, [postId]);
 
-  // Hydrate drafts from server when post becomes ready / changes
   useEffect(() => {
     if (state.kind !== "ready") return;
 
@@ -170,25 +149,20 @@ export function EditorPage() {
     setTitleDraft(title);
     lastServerTitleRef.current = title;
 
-    // Prefer v2 canonical body_json (object) if present, fallback to legacy body_md (HTML).
     const bodyJsonFromApi = (state.post as any).body_json as JSONContent | null | undefined;
     const bodyHtmlLegacy = (state.post as any).body_md as string | null | undefined;
 
     if (editor) {
       if (bodyJsonFromApi && typeof bodyJsonFromApi === "object") {
-        // Set JSON content without emitting update.
         editor.commands.setContent(bodyJsonFromApi, { emitUpdate: false });
       } else {
-        // Fallback: we still support HTML for existing posts.
         editor.commands.setContent(bodyHtmlLegacy || "", { emitUpdate: false });
       }
 
-      // After hydration, compute canonical JSON string from the editor state.
       const hydratedJsonStr = stableStringify(editor.getJSON());
       setBodyJsonStrDraft(hydratedJsonStr);
       lastServerBodyJsonStrRef.current = hydratedJsonStr;
     } else {
-      // If editor isn't ready yet, keep drafts empty until it is.
       setBodyJsonStrDraft("");
       lastServerBodyJsonStrRef.current = "";
     }
@@ -199,8 +173,6 @@ export function EditorPage() {
   function buildPatch(): Record<string, unknown> | null {
     const patch: Record<string, unknown> = {};
 
-    // Never send invalid title in autosave.
-    // If user clears title temporarily, we do not include it in PATCH.
     const nextTitle = normalizeTitle(titleDraft);
     const serverTitle = normalizeTitle(lastServerTitleRef.current);
 
@@ -208,10 +180,7 @@ export function EditorPage() {
       if (nextTitle.length > 0) patch.title = nextTitle;
     }
 
-    // Canonical: body_json
     if (bodyJsonStrDraft !== lastServerBodyJsonStrRef.current) {
-      // Send object to backend (it will json.dumps to TEXT).
-      // We re-read from editor to avoid any stringify/parse drift.
       patch.body_json = editor ? editor.getJSON() : null;
     }
 
@@ -222,7 +191,6 @@ export function EditorPage() {
     if (!postId) return;
     if (state.kind !== "ready") return;
 
-    // Validate title only on explicit user actions.
     const normalizedTitle = normalizeTitle(titleDraft);
     if ((reason === "blur" || reason === "manual") && normalizedTitle.length === 0) {
       setSaveState({ kind: "error", message: "Title cannot be empty." });
@@ -234,8 +202,6 @@ export function EditorPage() {
 
     setSaveState({ kind: "saving" });
     try {
-      // api client typing currently may not include body_json yet.
-      // We keep this change local to the page and rely on backend support.
       const res = await patchPost(postId, patch as any);
 
       if (!res.ok) {
@@ -248,26 +214,21 @@ export function EditorPage() {
         lastServerTitleRef.current = newTitle ?? "";
         setTitleDraft(newTitle ?? "");
 
-        // Re-sync canonical JSON string.
-        // Prefer server body_json if returned; otherwise use current editor state.
         const newBodyJsonFromApi = (res.item as any).body_json as JSONContent | null | undefined;
 
         if (editor) {
           if (newBodyJsonFromApi && typeof newBodyJsonFromApi === "object") {
             editor.commands.setContent(newBodyJsonFromApi, { emitUpdate: false });
           }
-
           const jsonStr = stableStringify(editor.getJSON());
           setBodyJsonStrDraft(jsonStr);
           lastServerBodyJsonStrRef.current = jsonStr;
         } else {
-          // If editor is missing, at least stop spam.
           lastServerBodyJsonStrRef.current = bodyJsonStrDraft;
         }
 
         setState({ kind: "ready", post: res.item });
       } else {
-        // Fallback: assume patch succeeded.
         if (patch.title !== undefined) lastServerTitleRef.current = String(patch.title ?? "");
         if (editor) {
           const jsonStr = stableStringify(editor.getJSON());
@@ -292,7 +253,6 @@ export function EditorPage() {
     }, 600);
   }
 
-  // Debounced autosave on changes (after initial hydration)
   useEffect(() => {
     if (state.kind !== "ready") return;
     if (!buildPatch()) return;
@@ -319,29 +279,59 @@ export function EditorPage() {
           ? "Save error"
           : "";
 
-  const btnStyle: React.CSSProperties = {
-    padding: "6px 10px",
-    borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.18)",
-    background: "white",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontSize: 12,
-  };
+  function ToolButton(props: {
+    title: string;
+    active?: boolean;
+    disabled?: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+  }) {
+    return (
+      <button
+        type="button"
+        title={props.title}
+        onClick={props.onClick}
+        disabled={props.disabled}
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,0.10)",
+          background: props.active ? "rgba(255,255,255,0.10)" : "transparent",
+          color: "rgba(255,255,255,0.92)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: props.disabled ? "not-allowed" : "pointer",
+          opacity: props.disabled ? 0.5 : 1,
+        }}
+      >
+        {props.children}
+      </button>
+    );
+  }
 
-  const btnOnStyle: React.CSSProperties = {
-    ...btnStyle,
-    background: "rgba(0,0,0,0.05)",
-  };
+  function Divider() {
+    return (
+      <div
+        style={{
+          width: 1,
+          height: 22,
+          background: "rgba(255,255,255,0.14)",
+          margin: "0 6px",
+          alignSelf: "center",
+        }}
+      />
+    );
+  }
 
   return (
-    <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 980, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>Editor</h1>
-        <p style={{ opacity: 0.7, margin: 0 }}>Post editor (v3). TipTap rich editor is enabled.</p>
+        <p style={{ opacity: 0.7, margin: 0 }}>Post editor. TipTap rich editor is enabled.</p>
       </header>
 
-      {/* Status + timestamps + save state */}
       <div
         style={{
           display: "flex",
@@ -360,8 +350,7 @@ export function EditorPage() {
           <strong>Updated:</strong> {state.kind === "ready" ? formatIso(state.post.updated_at) : "—"}
         </div>
         <div>
-          <strong>Published:</strong>{" "}
-          {state.kind === "ready" ? formatIso(state.post.published_at) : "—"}
+          <strong>Published:</strong> {state.kind === "ready" ? formatIso(state.post.published_at) : "—"}
         </div>
         <div>
           <strong>Created:</strong> {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
@@ -385,7 +374,6 @@ export function EditorPage() {
         )}
       </div>
 
-      {/* Loading / error */}
       {state.kind === "loading" && (
         <div
           style={{
@@ -415,7 +403,6 @@ export function EditorPage() {
         </div>
       )}
 
-      {/* Title */}
       <div style={{ marginBottom: 12 }}>
         <input
           placeholder="Post title"
@@ -435,134 +422,174 @@ export function EditorPage() {
         />
       </div>
 
-      {/* TipTap toolbar */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-        <button
-          type="button"
-          style={editor?.isActive("bold") ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleBold().run()}
-          disabled={!editor}
-        >
-          B
-        </button>
-        <button
-          type="button"
-          style={editor?.isActive("italic") ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleItalic().run()}
-          disabled={!editor}
-        >
-          I
-        </button>
-        <button
-          type="button"
-          style={editor?.isActive("heading", { level: 1 }) ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-          disabled={!editor}
-        >
-          H1
-        </button>
-        <button
-          type="button"
-          style={editor?.isActive("heading", { level: 2 }) ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-          disabled={!editor}
-        >
-          H2
-        </button>
-        <button
-          type="button"
-          style={editor?.isActive("bulletList") ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-          disabled={!editor}
-        >
-          • List
-        </button>
-        <button
-          type="button"
-          style={editor?.isActive("orderedList") ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-          disabled={!editor}
-        >
-          1. List
-        </button>
-        <button
-          type="button"
-          style={editor?.isActive("blockquote") ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-          disabled={!editor}
-        >
-          “
-        </button>
-        <button
-          type="button"
-          style={editor?.isActive("codeBlock") ? btnOnStyle : btnStyle}
-          onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-          disabled={!editor}
-        >
-          Code
-        </button>
-
-        <button
-          type="button"
-          style={{ ...btnStyle, marginLeft: "auto" }}
-          onClick={() => flushSaveNow("manual")}
-          disabled={!editor}
-          title="Manual save"
-        >
-          Save
-        </button>
-      </div>
-
-      {/* TipTap editor surface */}
+      {/* Editor "card" (Simple-editor-ish) */}
       <div
         style={{
-          borderRadius: 12,
-          border: "1px solid rgba(0,0,0,0.2)",
-          background: "white",
+          borderRadius: 22,
           overflow: "hidden",
+          border: "1px solid rgba(0,0,0,0.10)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+          background: "#0f1115",
         }}
-        // Important: toolbar clicks cause blur on this container.
-        // flushSaveNow will only PATCH if canonical JSON actually changed.
-        onBlur={() => flushSaveNow("blur")}
       >
-        <EditorContent editor={editor} />
+        {/* Toolbar */}
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            padding: 12,
+            borderBottom: "1px solid rgba(255,255,255,0.10)",
+            background: "rgba(255,255,255,0.03)",
+          }}
+        >
+          <ToolButton
+            title="Undo"
+            disabled={!editor || !editor.can().undo()}
+            onClick={() => editor?.chain().focus().undo().run()}
+          >
+            <Undo2 size={18} />
+          </ToolButton>
+
+          <ToolButton
+            title="Redo"
+            disabled={!editor || !editor.can().redo()}
+            onClick={() => editor?.chain().focus().redo().run()}
+          >
+            <Redo2 size={18} />
+          </ToolButton>
+
+          <Divider />
+
+          <ToolButton
+            title="Bold"
+            active={!!editor?.isActive("bold")}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+          >
+            <Bold size={18} />
+          </ToolButton>
+
+          <ToolButton
+            title="Italic"
+            active={!!editor?.isActive("italic")}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+          >
+            <Italic size={18} />
+          </ToolButton>
+
+          <Divider />
+
+          <ToolButton
+            title="Heading 1"
+            active={!!editor?.isActive("heading", { level: 1 })}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+          >
+            <Heading1 size={18} />
+          </ToolButton>
+
+          <ToolButton
+            title="Heading 2"
+            active={!!editor?.isActive("heading", { level: 2 })}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+          >
+            <Heading2 size={18} />
+          </ToolButton>
+
+          <Divider />
+
+          <ToolButton
+            title="Bullet list"
+            active={!!editor?.isActive("bulletList")}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+          >
+            <List size={18} />
+          </ToolButton>
+
+          <ToolButton
+            title="Ordered list"
+            active={!!editor?.isActive("orderedList")}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+          >
+            <ListOrdered size={18} />
+          </ToolButton>
+
+          <ToolButton
+            title="Quote"
+            active={!!editor?.isActive("blockquote")}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+          >
+            <Quote size={18} />
+          </ToolButton>
+
+          <ToolButton
+            title="Code block"
+            active={!!editor?.isActive("codeBlock")}
+            disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
+          >
+            <CodeSquare size={18} />
+          </ToolButton>
+
+          <div style={{ flex: 1 }} />
+
+          <button
+            type="button"
+            onClick={() => flushSaveNow("manual")}
+            disabled={!editor}
+            title="Save"
+            style={{
+              height: 34,
+              padding: "0 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.92)",
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: !editor ? "not-allowed" : "pointer",
+              opacity: !editor ? 0.6 : 1,
+            }}
+          >
+            <Save size={18} />
+            Save
+          </button>
+        </div>
+
+        {/* Surface */}
+        <div
+          style={{
+            background: "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
+            padding: 18,
+          }}
+          onBlur={() => flushSaveNow("blur")}
+        >
+          <div
+            style={{
+              borderRadius: 18,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              padding: 14,
+            }}
+          >
+            {/* make text light inside "dark card" */}
+            <div style={{ color: "rgba(255,255,255,0.92)" }}>
+              <EditorContent editor={editor} />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6, marginBottom: 16 }}>
+      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 8, marginBottom: 16 }}>
         Autosave: edits are saved after a short pause or when you leave the editor.
-      </div>
-
-      {/* Actions placeholder */}
-      <div style={{ display: "flex", gap: 10 }}>
-        <button
-          disabled
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(0,0,0,0.2)",
-            background: "white",
-            fontWeight: 600,
-            opacity: 0.6,
-            cursor: "not-allowed",
-          }}
-        >
-          Save draft
-        </button>
-
-        <button
-          disabled
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(0,0,0,0.2)",
-            background: "white",
-            fontWeight: 600,
-            opacity: 0.6,
-            cursor: "not-allowed",
-          }}
-        >
-          Publish
-        </button>
       </div>
     </div>
   );
