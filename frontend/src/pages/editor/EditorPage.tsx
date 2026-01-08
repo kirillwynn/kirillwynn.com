@@ -50,7 +50,7 @@ export function EditorPage() {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        codeBlock: false,
+        // Keep built-in heading/list/codeBlock enabled.
         // Disable extensions that we register explicitly below to avoid duplicate names warnings.
         ...({ link: false, underline: false } as Record<string, false>),
       }),
@@ -315,22 +315,14 @@ export function EditorPage() {
           onSave={() => autosave.flushSaveNow("manual")}
         />
 
-        {/* Surface (monolithic, no nested frame) */}
-        <div
-          style={{
-            background: colors.surfaceBg,
-            padding: 20,
-            color: colors.text,
-          }}
-        >
+        {/* Surface */}
+        <div style={{ background: colors.surfaceBg, padding: 18, color: colors.text }}>
           <div
             style={{
               minHeight: 220,
               cursor: "text",
             }}
             onMouseDown={() => {
-              // Clicking anywhere inside the surface should focus the editor
-              // without requiring a click precisely on text.
               editor?.chain().focus().run();
             }}
           >

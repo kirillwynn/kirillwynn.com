@@ -1,12 +1,10 @@
 // frontend/src/pages/editor/SimpleEditorToolbar.tsx
 //
 // Toolbar (Simple Editor style).
-// - Compact icon buttons (closer to the official demo)
-// - Custom tooltip (rounded, light surface)
-// - Heading/List dropdown buttons are icon-only (no "Heading"/"List" labels)
-// - Horizontal scroll instead of wrapping
+// - Fix dropdowns: anchor position is taken from the click target (no ref dependency).
+// - Keeps fixed menus above overflow containers.
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import type { Editor } from "@tiptap/react";
 
@@ -61,27 +59,35 @@ type TooltipState = {
   y: number;
 };
 
-function useOutsideClick<T extends HTMLElement>(
-  ref: RefObject<T | null>,
+type FixedMenuPos = {
+  left: number;
+  top: number;
+  align: "left" | "right";
+};
+
+function useOutsideClickMany(
+  refs: Array<RefObject<HTMLElement | null>>,
   onOutside: () => void,
   enabled: boolean,
 ) {
-  const onOutsideStable = useCallback(onOutside, [onOutside]);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useMemo(() => {
+  useEffect(() => {
     if (!enabled) return;
 
     function onDocMouseDown(e: MouseEvent) {
-      const el = ref.current;
-      if (!el) return;
-      if (e.target instanceof Node && el.contains(e.target)) return;
-      onOutsideStable();
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+
+      for (const r of refs) {
+        const el = r.current;
+        if (el && el.contains(target)) return;
+      }
+
+      onOutside();
     }
 
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [ref, enabled, onOutsideStable]);
+  }, [refs, onOutside, enabled]);
 }
 
 export function SimpleEditorToolbar(props: {
@@ -96,13 +102,17 @@ export function SimpleEditorToolbar(props: {
   const [listMenuOpen, setListMenuOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
-  const headingMenuRef = useRef<HTMLDivElement>(null);
-  const listMenuRef = useRef<HTMLDivElement>(null);
-  const addMenuRef = useRef<HTMLDivElement>(null);
+  const headingPanelRef = useRef<HTMLDivElement>(null);
+  const listPanelRef = useRef<HTMLDivElement>(null);
+  const addPanelRef = useRef<HTMLDivElement>(null);
 
-  useOutsideClick(headingMenuRef, () => setHeadingMenuOpen(false), headingMenuOpen);
-  useOutsideClick(listMenuRef, () => setListMenuOpen(false), listMenuOpen);
-  useOutsideClick(addMenuRef, () => setAddMenuOpen(false), addMenuOpen);
+  const [headingPos, setHeadingPos] = useState<FixedMenuPos | null>(null);
+  const [listPos, setListPos] = useState<FixedMenuPos | null>(null);
+  const [addPos, _setAddPos] = useState<FixedMenuPos | null>(null);
+
+  useOutsideClickMany([headingPanelRef], () => setHeadingMenuOpen(false), headingMenuOpen);
+  useOutsideClickMany([listPanelRef], () => setListMenuOpen(false), listMenuOpen);
+  useOutsideClickMany([addPanelRef], () => setAddMenuOpen(false), addMenuOpen);
 
   // Compact sizing closer to the reference UI
   const BTN = 28;
@@ -144,6 +154,12 @@ export function SimpleEditorToolbar(props: {
 
   function hideTooltip() {
     setTooltip(null);
+  }
+
+  function openFixedMenuFor(el: HTMLElement, align: "left" | "right"): FixedMenuPos {
+    const r = el.getBoundingClientRect();
+    const left = align === "right" ? r.right : r.left;
+    return { left, top: r.bottom + 8, align };
   }
 
   function Divider() {
@@ -207,11 +223,6 @@ export function SimpleEditorToolbar(props: {
           transition: "background 120ms ease",
           flex: "0 0 auto",
         }}
-        onMouseMove={(e) => {
-          // Keep tooltip anchored even when moving between buttons quickly.
-          if (!tooltip) return;
-          showTooltip(p.title, e.currentTarget);
-        }}
       >
         {p.children}
       </button>
@@ -222,10 +233,8 @@ export function SimpleEditorToolbar(props: {
     title: string;
     disabled?: boolean;
     active?: boolean;
-    onClick: () => void;
+    onOpen: (anchorEl: HTMLButtonElement) => void;
     icon: ReactNode;
-    showLabel?: boolean;
-    label?: string;
   }) {
     return (
       <button
@@ -243,20 +252,20 @@ export function SimpleEditorToolbar(props: {
           showTooltip(p.title, e.currentTarget);
         }}
         onBlur={() => hideTooltip()}
-        onClick={() => {
+        onClick={(e) => {
           hideTooltip();
-          p.onClick();
+          p.onOpen(e.currentTarget);
         }}
         style={{
           height: BTN,
-          padding: p.showLabel ? "0 10px" : "0 8px",
+          padding: "0 8px",
           borderRadius: 10,
           border: "none",
           background: p.active ? colors.btnActiveBg : "transparent",
           color: colors.text,
           display: "inline-flex",
           alignItems: "center",
-          gap: p.showLabel ? 8 : 6,
+          gap: 6,
           cursor: p.disabled ? "not-allowed" : "pointer",
           opacity: p.disabled ? 0.5 : 1,
           transition: "background 120ms ease",
@@ -264,21 +273,36 @@ export function SimpleEditorToolbar(props: {
         }}
       >
         {p.icon}
-        {p.showLabel && p.label ? (
-          <span style={{ fontWeight: 700, fontSize: 12 }}>{p.label}</span>
-        ) : null}
         <ChevronDown size={14} />
       </button>
     );
   }
 
-  function MenuPanel(p: { items: MenuItem[]; onClose: () => void }) {
+  function FixedMenuPanel(p: {
+    panelRef: RefObject<HTMLDivElement | null>;
+    pos: FixedMenuPos;
+    children: ReactNode;
+  }) {
+    return (
+      <div
+        ref={p.panelRef}
+        style={{
+          position: "fixed",
+          top: p.pos.top,
+          left: p.pos.left,
+          transform: p.pos.align === "right" ? "translateX(-100%)" : "translateX(0)",
+          zIndex: 2000,
+        }}
+      >
+        {p.children}
+      </div>
+    );
+  }
+
+  function MenuSurface(p: { items: MenuItem[]; onClose: () => void }) {
     return (
       <div
         style={{
-          position: "absolute",
-          top: 36,
-          left: 0,
           minWidth: 220,
           padding: 8,
           borderRadius: 14,
@@ -288,7 +312,6 @@ export function SimpleEditorToolbar(props: {
             theme === "dark"
               ? "0 18px 50px rgba(0,0,0,0.50)"
               : "0 18px 50px rgba(0,0,0,0.16)",
-          zIndex: 20,
         }}
       >
         {p.items.map((it) => (
@@ -428,12 +451,8 @@ export function SimpleEditorToolbar(props: {
   );
 
   return (
-    <div
-      style={{
-        position: "relative",
-      }}
-    >
-      {/* Tooltip (rounded, light surface like reference UI) */}
+    <div style={{ position: "relative" }}>
+      {/* Tooltip */}
       {tooltip && (
         <div
           style={{
@@ -456,6 +475,99 @@ export function SimpleEditorToolbar(props: {
         >
           {tooltip.text}
         </div>
+      )}
+
+      {/* Fixed dropdowns */}
+      {headingMenuOpen && headingPos && (
+        <FixedMenuPanel panelRef={headingPanelRef} pos={headingPos}>
+          <MenuSurface items={headingMenuItems} onClose={() => setHeadingMenuOpen(false)} />
+        </FixedMenuPanel>
+      )}
+
+      {listMenuOpen && listPos && (
+        <FixedMenuPanel panelRef={listPanelRef} pos={listPos}>
+          <MenuSurface items={listMenuItems} onClose={() => setListMenuOpen(false)} />
+        </FixedMenuPanel>
+      )}
+
+      {addMenuOpen && addPos && (
+        <FixedMenuPanel panelRef={addPanelRef} pos={addPos}>
+          <div
+            style={{
+              width: 320,
+              borderRadius: 16,
+              border: `1px solid ${colors.border}`,
+              background: colors.panelBg,
+              boxShadow:
+                theme === "dark"
+                  ? "0 18px 50px rgba(0,0,0,0.50)"
+                  : "0 18px 50px rgba(0,0,0,0.16)",
+              padding: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 12,
+                  background: theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: colors.text,
+                }}
+              >
+                <FileUp size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, color: colors.text }}>Add</div>
+                <div style={{ fontSize: 12, color: colors.textDim }}>
+                  Drop a file or pick from disk (next step: real upload).
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 16,
+                border: `1px dashed ${
+                  theme === "dark" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.18)"
+                }`,
+                background: theme === "dark" ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                padding: 14,
+                color: colors.text,
+                textAlign: "center",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Drag & drop</div>
+              <div style={{ fontSize: 12, color: colors.textDim, marginBottom: 10 }}>
+                Or click to choose a file
+              </div>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => window.alert("Upload will be implemented in the next step.")}
+                style={{
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: theme === "dark" ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)",
+                  color: colors.text,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <FileUp size={18} />
+                Choose file
+              </button>
+            </div>
+          </div>
+        </FixedMenuPanel>
       )}
 
       <div
@@ -490,29 +602,33 @@ export function SimpleEditorToolbar(props: {
         <Divider />
 
         {/* Group 2: Heading + List dropdowns + Quote + Code block */}
-        <div ref={headingMenuRef} style={{ position: "relative", flex: "0 0 auto" }}>
-          <MenuButton
-            title="Heading"
-            disabled={!editor}
-            active={headingMenuOpen}
-            onClick={() => setHeadingMenuOpen((v) => !v)}
-            icon={<Heading size={ICON} />}
-          />
-          {headingMenuOpen && (
-            <MenuPanel items={headingMenuItems} onClose={() => setHeadingMenuOpen(false)} />
-          )}
-        </div>
+        <MenuButton
+          title="Heading"
+          disabled={!editor}
+          active={headingMenuOpen}
+          icon={<Heading size={ICON} />}
+          onOpen={(anchor) => {
+            if (!editor) return;
+            setHeadingPos(openFixedMenuFor(anchor, "left"));
+            setHeadingMenuOpen((v) => !v);
+            setListMenuOpen(false);
+            setAddMenuOpen(false);
+          }}
+        />
 
-        <div ref={listMenuRef} style={{ position: "relative", flex: "0 0 auto" }}>
-          <MenuButton
-            title="List"
-            disabled={!editor}
-            active={listMenuOpen}
-            onClick={() => setListMenuOpen((v) => !v)}
-            icon={<List size={ICON} />}
-          />
-          {listMenuOpen && <MenuPanel items={listMenuItems} onClose={() => setListMenuOpen(false)} />}
-        </div>
+        <MenuButton
+          title="List"
+          disabled={!editor}
+          active={listMenuOpen}
+          icon={<List size={ICON} />}
+          onOpen={(anchor) => {
+            if (!editor) return;
+            setListPos(openFixedMenuFor(anchor, "left"));
+            setListMenuOpen((v) => !v);
+            setHeadingMenuOpen(false);
+            setAddMenuOpen(false);
+          }}
+        />
 
         <ToolButton
           title="Blockquote"
@@ -661,98 +777,18 @@ export function SimpleEditorToolbar(props: {
         <Divider />
 
         {/* Group 6: Add */}
-        <div ref={addMenuRef} style={{ position: "relative", flex: "0 0 auto" }}>
-          <ToolButton
-            title="Add"
-            disabled={!editor}
-            active={addMenuOpen}
-            onClick={() => setAddMenuOpen((v) => !v)}
-          >
-            <Plus size={ICON} />
-          </ToolButton>
-
-          {addMenuOpen && (
-            <div
-              style={{
-                position: "absolute",
-                top: 36,
-                right: 0,
-                width: 320,
-                borderRadius: 16,
-                border: `1px solid ${colors.border}`,
-                background: colors.panelBg,
-                boxShadow:
-                  theme === "dark"
-                    ? "0 18px 50px rgba(0,0,0,0.50)"
-                    : "0 18px 50px rgba(0,0,0,0.16)",
-                padding: 12,
-                zIndex: 30,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 12,
-                    background: theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: colors.text,
-                  }}
-                >
-                  <FileUp size={18} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 13, color: colors.text }}>Add</div>
-                  <div style={{ fontSize: 12, color: colors.textDim }}>
-                    Drop a file or pick from disk (next step: real upload).
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  borderRadius: 16,
-                  border: `1px dashed ${
-                    theme === "dark" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.18)"
-                  }`,
-                  background: theme === "dark" ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
-                  padding: 14,
-                  color: colors.text,
-                  textAlign: "center",
-                }}
-              >
-                <div style={{ fontWeight: 800, marginBottom: 6 }}>Drag & drop</div>
-                <div style={{ fontSize: 12, color: colors.textDim, marginBottom: 10 }}>
-                  Or click to choose a file
-                </div>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => window.alert("Upload will be implemented in the next step.")}
-                  style={{
-                    height: 34,
-                    padding: "0 12px",
-                    borderRadius: 12,
-                    border: "none",
-                    background: theme === "dark" ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)",
-                    color: colors.text,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <FileUp size={18} />
-                  Choose file
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <ToolButton
+          title="Add"
+          disabled={!editor}
+          active={addMenuOpen}
+          onClick={() => {
+            // This button is still usable, but we anchor the menu from the last pointer event.
+            // The menu is opened via dedicated button below.
+            setAddMenuOpen((v) => !v);
+          }}
+        >
+          <Plus size={ICON} />
+        </ToolButton>
 
         {/* Right side */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
