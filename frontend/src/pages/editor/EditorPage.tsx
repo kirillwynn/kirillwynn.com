@@ -1,3 +1,5 @@
+// frontend/src/pages/editor/EditorPage.tsx
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -18,6 +20,8 @@ import {
   Undo2,
   Redo2,
   Save,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 import "./tiptap-prose.css";
@@ -87,6 +91,9 @@ export function EditorPage() {
   const lastServerBodyJsonStrRef = useRef<string>("");
 
   const saveTimerRef = useRef<number | null>(null);
+
+  // UI-only theme toggle (stub for now)
+  const [uiTheme, setUiTheme] = useState<"dark" | "light">("dark");
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -350,7 +357,8 @@ export function EditorPage() {
           <strong>Updated:</strong> {state.kind === "ready" ? formatIso(state.post.updated_at) : "—"}
         </div>
         <div>
-          <strong>Published:</strong> {state.kind === "ready" ? formatIso(state.post.published_at) : "—"}
+          <strong>Published:</strong>{" "}
+          {state.kind === "ready" ? formatIso(state.post.published_at) : "—"}
         </div>
         <div>
           <strong>Created:</strong> {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
@@ -420,6 +428,50 @@ export function EditorPage() {
             border: "1px solid rgba(0,0,0,0.2)",
           }}
         />
+      </div>
+
+      {/* Top segmented tabs (Simple-editor-ish) */}
+      <div style={{ display: "flex", justifyContent: "center", margin: "14px 0 10px" }}>
+        <div
+          style={{
+            display: "inline-flex",
+            gap: 6,
+            padding: 6,
+            borderRadius: 999,
+            border: "1px solid rgba(0,0,0,0.10)",
+            background: "rgba(0,0,0,0.03)",
+          }}
+        >
+          {[
+            { key: "agent", label: "Agent editor" },
+            { key: "notion", label: "Notion-like editor" },
+            { key: "simple", label: "Simple editor" },
+            { key: "headless", label: "Headless editor" },
+          ].map((t) => {
+            const active = t.key === "simple";
+            return (
+              <button
+                key={t.key}
+                type="button"
+                disabled={!active}
+                title={active ? "Current" : "Not implemented yet"}
+                style={{
+                  height: 34,
+                  padding: "0 14px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(0,0,0,0.10)",
+                  background: active ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.75)",
+                  color: "rgba(0,0,0,0.85)",
+                  fontWeight: 700,
+                  cursor: active ? "default" : "not-allowed",
+                  opacity: active ? 1 : 0.55,
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Editor "card" (Simple-editor-ish) */}
@@ -538,6 +590,27 @@ export function EditorPage() {
           </ToolButton>
 
           <div style={{ flex: 1 }} />
+
+          {/* Theme toggle (UI-only) */}
+          <button
+            type="button"
+            onClick={() => setUiTheme((t) => (t === "dark" ? "light" : "dark"))}
+            title="Toggle theme (UI only)"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.92)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            {uiTheme === "dark" ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
 
           <button
             type="button"
