@@ -8,6 +8,7 @@
 // - Accepts: editor, theme, onToggleTheme, onSave
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
 import type { Editor } from "@tiptap/react";
 
 import {
@@ -50,13 +51,13 @@ export type ThemeMode = "dark" | "light";
 type MenuItem = {
   id: string;
   label: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   active?: boolean;
   onSelect: () => void;
 };
 
 function useOutsideClick<T extends HTMLElement>(
-  ref: React.RefObject<T | null>,
+  ref: RefObject<T | null>,
   onOutside: () => void,
   enabled: boolean,
 ) {
@@ -125,7 +126,7 @@ export function SimpleEditorToolbar(props: {
     active?: boolean;
     disabled?: boolean;
     onClick: () => void;
-    children: React.ReactNode;
+    children: ReactNode;
     width?: number;
   }) {
     return (
@@ -186,7 +187,7 @@ export function SimpleEditorToolbar(props: {
     disabled?: boolean;
     active?: boolean;
     onClick: () => void;
-    icon: React.ReactNode;
+    icon: ReactNode;
     label: string;
   }) {
     return (
@@ -437,9 +438,7 @@ export function SimpleEditorToolbar(props: {
           icon={<List size={18} />}
           label="List"
         />
-        {listMenuOpen && (
-          <MenuPanel items={listMenuItems} onClose={() => setListMenuOpen(false)} />
-        )}
+        {listMenuOpen && <MenuPanel items={listMenuItems} onClose={() => setListMenuOpen(false)} />}
       </div>
 
       <ToolButton
@@ -517,12 +516,7 @@ export function SimpleEditorToolbar(props: {
         <Highlighter size={18} />
       </ToolButton>
 
-      <ToolButton
-        title="Link"
-        active={!!editor?.isActive("link")}
-        disabled={!editor}
-        onClick={toggleLink}
-      >
+      <ToolButton title="Link" active={!!editor?.isActive("link")} disabled={!editor} onClick={toggleLink}>
         <Link2 size={18} />
       </ToolButton>
 
@@ -590,12 +584,7 @@ export function SimpleEditorToolbar(props: {
 
       {/* Group 6: Add */}
       <div ref={addMenuRef} style={{ position: "relative" }}>
-        <ToolButton
-          title="Add"
-          disabled={!editor}
-          active={addMenuOpen}
-          onClick={() => setAddMenuOpen((v) => !v)}
-        >
+        <ToolButton title="Add" disabled={!editor} active={addMenuOpen} onClick={() => setAddMenuOpen((v) => !v)}>
           <Plus size={18} />
         </ToolButton>
 
