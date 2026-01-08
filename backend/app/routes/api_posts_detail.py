@@ -16,6 +16,8 @@ from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.models import Post
+from app.utils.sanitizer import generate_excerpt, sanitize_html
+from app.utils.tiptap_renderer import render_tiptap_json
 
 
 api_posts_detail_bp = Blueprint("api_posts_detail", __name__, url_prefix="/api/posts")
@@ -106,27 +108,39 @@ def patch_post(post_id: int):
     # Accept either:
     # - object/array (preferred): we will json.dumps() to store in TEXT
     # - string: must be valid JSON string
+    body_json_updated = False
+    body_json_payload = None
+
     if "body_json" in data:
         body_json = data.get("body_json")
 
         if body_json is None:
             # Allow clearing
             post.body_json = None
-            changed = True
+            body_json_payload = None
+            body_json_updated = True
         elif isinstance(body_json, str):
             # Client might send a JSON string
             try:
-                json.loads(body_json)  # validate
+                body_json_payload = json.loads(body_json)
             except Exception:
                 return jsonify({"ok": False, "error": "body_json must be valid JSON"}), 400
             post.body_json = body_json
-            changed = True
+            body_json_updated = True
         else:
             # Object/array -> stringify
             try:
                 post.body_json = json.dumps(body_json, ensure_ascii=False, separators=(",", ":"))
             except Exception:
                 return jsonify({"ok": False, "error": "body_json must be JSON-serializable"}), 400
+            body_json_payload = body_json
+            body_json_updated = True
+
+        if body_json_updated:
+            rendered_html = render_tiptap_json(body_json_payload)
+            sanitized_html = sanitize_html(rendered_html)
+            post.body_html = sanitized_html
+            post.excerpt = generate_excerpt(sanitized_html)
             changed = True
 
     # legacy: body_md (keep for compatibility until we fully migrate)

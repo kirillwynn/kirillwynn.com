@@ -13,16 +13,24 @@ ALLOWED_TAGS = [
     "strong",
     "em",
     "s",
+    "u",
+    "mark",
+    "sup",
+    "sub",
     "blockquote",
     "ul",
     "ol",
     "li",
     "pre",
     "code",
+    "hr",
     "a",
 ]
 
-ALLOWED_ATTRIBUTES = {"a": ["href", "title", "target", "rel"]}
+ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target", "rel"],
+    "*": ["class"],
+}
 
 
 class TargetBlankRelFilter(Filter):

@@ -28,6 +28,14 @@ body {
 .text-gruvbox-yellow { color: var(--gruvbox-yellow); }
 .border-gruvbox-bg1 { border-color: var(--gruvbox-bg1); }
 
+.align-left { text-align: left; }
+.align-center { text-align: center; }
+.align-right { text-align: right; }
+.align-justify { text-align: justify; }
+
+.task-list { padding-left: 1.25rem; }
+.task-item { list-style: none; }
+
 .shadow-md {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
