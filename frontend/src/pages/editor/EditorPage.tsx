@@ -1,7 +1,6 @@
 // frontend/src/pages/editor/EditorPage.tsx
 
 import { useEffect, useMemo, useState } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import { useParams } from "react-router-dom";
 
 import { getPost, type PostItem } from "@/api/posts";
@@ -17,8 +16,6 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Superscript from "@tiptap/extension-superscript";
 import Subscript from "@tiptap/extension-subscript";
-
-import { TextSelection } from "@tiptap/pm/state";
 
 import "./tiptap-prose.css";
 
@@ -86,14 +83,17 @@ export function EditorPage() {
         class: "tiptap-prose",
       },
     },
+
     onCreate: () => {
       setIsEditorMounted(true);
     },
+
     onDestroy: () => {
       setIsEditorMounted(false);
     },
   });
 
+  // autosave hook (after editor init)
   const autosave = usePostAutosave({
     postId,
     editor: editor ?? null,
@@ -101,20 +101,26 @@ export function EditorPage() {
     onPostUpdated: (post) => setState({ kind: "ready", post }),
   });
 
+  // IMPORTANT:
+  // bind TipTap updates -> autosave draft
   useEffect(() => {
     if (!editor) return;
 
+    // TipTap calls onUpdate only when docChanged.
     const off = editor.on("update", ({ editor: ed }) => {
       autosave.setBodyJsonStrDraft(stableStringify(ed.getJSON()));
     });
 
     return () => {
+      // tiptap's `.on` returns void in some versions; if your TS complains, remove this.
+      // In that case we’ll move back to onUpdate option in useEditor and use a ref approach.
       // @ts-ignore
       if (typeof off === "function") off();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
+  // Load post
   useEffect(() => {
     let cancelled = false;
 
@@ -183,36 +189,13 @@ export function EditorPage() {
           border: "rgba(255,255,255,0.10)",
           text: "rgba(255,255,255,0.92)",
           surfaceBg: "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
-          editorBg: "rgba(255,255,255,0.02)",
         }
       : {
           cardBg: "#f8fafc",
           border: "rgba(0,0,0,0.10)",
           text: "rgba(0,0,0,0.86)",
           surfaceBg: "linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.01))",
-          editorBg: "rgba(0,0,0,0.02)",
         };
-
-  function onEditorShellMouseDown(e: ReactMouseEvent<HTMLDivElement>) {
-    if (!editor) return;
-
-    const target = e.target as HTMLElement | null;
-    if (target?.closest?.(".ProseMirror")) return;
-
-    e.preventDefault();
-
-    const view = editor.view;
-    const coords = view.posAtCoords({ left: e.clientX, top: e.clientY });
-
-    if (coords) {
-      const tr = view.state.tr.setSelection(
-        TextSelection.near(view.state.doc.resolve(coords.pos)),
-      );
-      view.dispatch(tr);
-    }
-
-    editor.commands.focus();
-  }
 
   return (
     <div style={{ fontFamily: "ui-sans-serif, system-ui", maxWidth: 980, margin: "0 auto" }}>
@@ -221,6 +204,7 @@ export function EditorPage() {
         <p style={{ opacity: 0.7, margin: 0 }}>Post editor. TipTap rich editor is enabled.</p>
       </header>
 
+      {/* Status line */}
       <div
         style={{
           display: "flex",
@@ -239,8 +223,7 @@ export function EditorPage() {
           <strong>Updated:</strong> {state.kind === "ready" ? formatIso(state.post.updated_at) : "—"}
         </div>
         <div>
-          <strong>Published:</strong>{" "}
-          {state.kind === "ready" ? formatIso(state.post.published_at) : "—"}
+          <strong>Published:</strong> {state.kind === "ready" ? formatIso(state.post.published_at) : "—"}
         </div>
         <div>
           <strong>Created:</strong> {state.kind === "ready" ? formatIso(state.post.created_at) : "—"}
@@ -254,9 +237,7 @@ export function EditorPage() {
                 borderRadius: 999,
                 border: "1px solid rgba(0,0,0,0.15)",
                 background:
-                  autosave.saveState.kind === "error"
-                    ? "rgba(255,0,0,0.06)"
-                    : "rgba(0,0,0,0.03)",
+                  autosave.saveState.kind === "error" ? "rgba(255,0,0,0.06)" : "rgba(0,0,0,0.03)",
                 fontWeight: 600,
               }}
               title={autosave.saveState.kind === "error" ? autosave.saveState.message : ""}
@@ -267,6 +248,7 @@ export function EditorPage() {
         )}
       </div>
 
+      {/* Loading / error */}
       {state.kind === "loading" && (
         <div
           style={{
@@ -296,6 +278,7 @@ export function EditorPage() {
         </div>
       )}
 
+      {/* Title */}
       <div style={{ marginBottom: 12 }}>
         <input
           placeholder="Post title"
@@ -315,6 +298,7 @@ export function EditorPage() {
         />
       </div>
 
+      {/* Simple editor card */}
       <div
         style={{
           borderRadius: 22,
@@ -331,18 +315,23 @@ export function EditorPage() {
           onSave={() => autosave.flushSaveNow("manual")}
         />
 
-        <div style={{ background: colors.surfaceBg, padding: 18 }}>
+        {/* Surface (monolithic, no nested frame) */}
+        <div
+          style={{
+            background: colors.surfaceBg,
+            padding: 20,
+            color: colors.text,
+          }}
+        >
           <div
-            onMouseDown={onEditorShellMouseDown}
             style={{
-              borderRadius: 18,
-              background: colors.editorBg,
-              border: `1px solid ${colors.border}`,
-              color: colors.text,
-              // The editor itself owns padding via ProseMirror CSS.
-              padding: 0,
-              // Make the whole surface feel like one monolithic input.
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+              minHeight: 220,
+              cursor: "text",
+            }}
+            onMouseDown={() => {
+              // Clicking anywhere inside the surface should focus the editor
+              // without requiring a click precisely on text.
+              editor?.chain().focus().run();
             }}
           >
             <EditorContent editor={editor} />
