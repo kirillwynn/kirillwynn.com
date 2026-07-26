@@ -36,7 +36,13 @@ export function safeReturnTo(
     value: string | null | undefined,
     fallback = "/",
 ): string {
-    if (!value || hasControlCharacter(value) || value.includes("\\")) {
+    if (
+        !value ||
+        !value.startsWith("/") ||
+        value.startsWith("//") ||
+        hasControlCharacter(value) ||
+        value.includes("\\")
+    ) {
         return fallback;
     }
 
@@ -49,7 +55,12 @@ export function safeReturnTo(
     } catch {
         return fallback;
     }
-    if (hasControlCharacter(decoded) || decoded.includes("\\")) {
+    if (
+        !decoded.startsWith("/") ||
+        decoded.startsWith("//") ||
+        hasControlCharacter(decoded) ||
+        decoded.includes("\\")
+    ) {
         return fallback;
     }
 
@@ -59,16 +70,11 @@ export function safeReturnTo(
     } catch {
         return fallback;
     }
-    if (
-        url.origin !== "https://return-to.invalid" ||
-        url.hash ||
-        !decoded.startsWith("/") ||
-        decoded.startsWith("//")
-    ) {
+    if (url.origin !== "https://return-to.invalid" || url.hash) {
         return fallback;
     }
 
-    const pathname = decodeURIComponent(url.pathname);
+    const pathname = decoded.split("?", 1)[0];
     if (
         pathname === "/" ||
         pathname === "/bridge" ||

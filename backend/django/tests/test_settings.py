@@ -5,10 +5,17 @@ import sys
 import pytest
 
 PRODUCTION_SECRET = "s" * 32
+OAUTH_CREDENTIAL_NAMES = (
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "GITHUB_OAUTH_CLIENT_ID",
+    "GITHUB_OAUTH_CLIENT_SECRET",
+)
 
 
 def production_environment():
     environment = os.environ.copy()
+    environment.pop("SOCIALACCOUNT_REQUESTS_TIMEOUT", None)
     environment.update(
         {
             "DJANGO_SETTINGS_MODULE": "config.settings.production",
@@ -226,17 +233,19 @@ def test_allauth_uses_classic_sessions_minimal_scopes_and_settings_apps(settings
 
 
 @pytest.mark.parametrize(
-    "missing_name",
-    [
-        "GOOGLE_OAUTH_CLIENT_ID",
-        "GOOGLE_OAUTH_CLIENT_SECRET",
-        "GITHUB_OAUTH_CLIENT_ID",
-        "GITHUB_OAUTH_CLIENT_SECRET",
-    ],
+    "credential_name",
+    OAUTH_CREDENTIAL_NAMES,
 )
-def test_production_settings_require_every_oauth_credential(missing_name):
+@pytest.mark.parametrize("missing_value", [None, "", " ", "\t", "\n"])
+def test_production_settings_reject_missing_or_blank_oauth_credentials(
+    credential_name,
+    missing_value,
+):
     environment = production_environment()
-    environment.pop(missing_name)
+    if missing_value is None:
+        environment.pop(credential_name)
+    else:
+        environment[credential_name] = missing_value
 
     result = subprocess.run(
         [sys.executable, "-c", "from config.settings import production"],
@@ -247,7 +256,103 @@ def test_production_settings_require_every_oauth_credential(missing_name):
     )
 
     assert result.returncode != 0
-    assert f"Missing required production environment variables: {missing_name}" in result.stderr
+    assert result.stderr.rstrip().endswith(
+        "django.core.exceptions.ImproperlyConfigured: "
+        f"Missing required production environment variables: {credential_name}"
+    )
+    for value in production_environment().values():
+        if "production-check" in value or "production-secret-check" in value:
+            assert value not in result.stdout
+            assert value not in result.stderr
+
+
+def test_production_settings_strip_oauth_credentials_and_build_both_apps():
+    environment = production_environment()
+    for name in OAUTH_CREDENTIAL_NAMES:
+        environment[name] = f" \t{environment[name]}\n"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from config.settings import production as s; "
+                "assert s.SOCIALACCOUNT_PROVIDERS['google']['APPS']; "
+                "assert s.SOCIALACCOUNT_PROVIDERS['github']['APPS']; "
+                "assert all(value == value.strip() for value in s.OAUTH_CREDENTIALS.values())"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        " ",
+        "\t",
+        "\n",
+        "0",
+        "-1",
+        "nan",
+        "NaN",
+        "inf",
+        "-inf",
+        "infinity",
+        "sensitive-invalid-timeout",
+    ],
+)
+def test_production_settings_reject_invalid_socialaccount_timeout(value):
+    environment = production_environment()
+    environment["SOCIALACCOUNT_REQUESTS_TIMEOUT"] = value
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert result.stderr.rstrip().endswith(
+        "django.core.exceptions.ImproperlyConfigured: "
+        "SOCIALACCOUNT_REQUESTS_TIMEOUT must be a finite positive number"
+    )
+    assert "sensitive-invalid-timeout" not in result.stderr
+    for credential_name in OAUTH_CREDENTIAL_NAMES:
+        assert environment[credential_name] not in result.stdout
+        assert environment[credential_name] not in result.stderr
+
+
+def test_production_settings_accept_positive_finite_socialaccount_timeout():
+    environment = production_environment()
+    environment["SOCIALACCOUNT_REQUESTS_TIMEOUT"] = " \t2.75\n"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from config.settings import production as s; "
+                "assert s.SOCIALACCOUNT_REQUESTS_TIMEOUT == 2.75"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
 
 
 def test_production_cookie_and_proxy_hardening():

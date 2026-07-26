@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 5 implemented and verified; awaiting owner review
+Overall state: Milestone 5 remediation implemented and verified; awaiting owner review
 
 ## Current repository state
 
@@ -118,9 +118,16 @@ Overall state: Milestone 5 implemented and verified; awaiting owner review
   explicit production trusted-origin/credential requirements added.
 - [x] `GET /api/me/` and CSRF-protected `POST /api/auth/logout/` added with
   private/no-store responses and minimal current-user/provider data.
-- [x] Backend-only return-to allowlisting covers `/`, `/bridge`, `/account`,
-  and Unicode `/posts/<slug>` routes while rejecting external, encoded,
-  backslash, control-character, and internal-service targets.
+- [x] Backend-only canonical return-to validation requires exactly one leading
+  slash before and after strict decoding, then allowlists `/`, `/bridge`,
+  `/account`, and Unicode `/posts/<slug>` while rejecting network-path,
+  malformed/double-encoded, backslash, control-character, fragment, extra-path,
+  and internal-service targets.
+- [x] Google and GitHub OAuth initiation/state/callback regression coverage
+  proves malicious `next` values are discarded and callbacks fall back to `/`.
+- [x] Production OAuth credential validation trims values before fail-fast
+  checks, rejects missing/empty/whitespace-only values, guarantees both provider
+  `APPS`, and requires a finite positive provider timeout.
 - [x] Fixed Next.js same-origin rewrites added only for `/accounts/*`,
   `/api/me/`, and `/api/auth/logout/`, preserving the existing frontend API
   routes.
@@ -246,65 +253,56 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-26:
 
-- `python3 -m uv lock --check` — passed; 52 packages resolved, including
-  django-allauth 65.18.0 and its locked socialaccount dependencies.
-- `python3 -m uv run --frozen ruff format --check .` — passed (67 files).
-- `python3 -m uv run --frozen ruff check .` — passed.
-- `python3 -m uv run --frozen python manage.py check
-  --settings=config.settings.test` — passed.
-- `python3 -m uv run --frozen python manage.py makemigrations --check --dry-run
-  --settings=config.settings.test` — passed; no changes detected.
-- `python3 -m uv run --frozen pytest` — passed; 137 tests. Milestone 5 coverage
-  includes mocked Google/GitHub signup and repeated login, verified/unverified
-  email boundaries, automatic and explicit provider connection, identity
-  ownership, cancelled/tampered/failed callbacks, unavailable and banned
-  accounts, no `SocialToken`, admin password login, current-user data, masked
-  CSRF, logout enforcement, return-to attacks, cookie/proxy settings, missing
-  production credentials, session rotation, and owner promotion.
+- `python3 -m uv lock --check` — passed; 52 packages resolved.
+- `ruff format --check .` — passed (67 files); `ruff check .` — passed.
+- Django test-settings system check and
+  `makemigrations --check --dry-run` — passed; no schema drift.
+- Full `pytest` — passed; 248 tests. The remediation matrix exercises every
+  malicious return-to value through the helper and real django-allauth POST,
+  stored state, and mocked callback for both Google and GitHub. Triple/multiple
+  slash, encoded/double-encoded network paths, backslashes, raw/encoded
+  controls, absolute/scheme URLs, malformed percent escapes, service routes,
+  and extra slug segments all fall back to `/`.
+- Production settings tests cover each of the four OAuth variables when
+  missing, empty, space-only, tab-only, and newline-only; accidental outer
+  whitespace is trimmed, both provider `APPS` must exist, and credential values
+  do not appear in errors or captured output. Provider timeout coverage rejects
+  zero, negative, NaN, infinity, empty/whitespace, and nonnumeric values while
+  accepting a whitespace-padded finite positive number.
+- Related regressions remain covered: POST-only social login, no retained
+  `SocialToken`, verified-email-only linking, identity ownership, CMS/Admin
+  password login, private/no-store current-user responses, CSRF logout, session
+  rotation, `__Host-` cookies, one-proxy trust, and owner promotion.
 - Empty-file SQLite migration passed through all Django, Wagtail,
   `wagtail_headless_preview.0001_initial`, blog, allauth `account.0009`, and
   `socialaccount.0006` migrations. The six socialaccount migrations also
-  reversed to zero and applied forward again. Milestone 5 creates no
+  reversed to zero and applied forward again. The remediation creates no
   project-owned schema migration.
-- `python3 -m uv run --frozen python manage.py check --deploy` with production
-  settings and safe non-secret verification values — passed; the
+- Production `manage.py check --deploy` with safe non-secret verification
+  values — passed; the
   Wagtail-required `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally
   silenced.
-- Production settings regression tests confirm that `PUBLIC_SITE_URL` is
-  mandatory, normalized, and origin-only; all four OAuth credentials and the
-  CSRF trusted-origin configuration are mandatory; hardened `__Host-` cookies
-  and a one-proxy trust boundary are selected; and short revalidation secrets
-  remain rejected.
 - Node.js 24.18.0 and npm 11.16.0 were selected through fnm.
-- `npm ci` — passed from the updated npm lockfile; 208 packages installed.
+- `npm ci` was not rerun because neither dependency manifest nor lockfile
+  changed during remediation.
 - `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
-- `npm test` — passed; 76 Vitest tests in 11 files. Auth coverage includes
-  anonymous/authenticated header states, POST form/CSRF fields, provider
-  availability and connections, malicious return-to rejection, escaped display
-  names, logout and expired-session recovery, generic OAuth failures, Escape
-  focus restoration, route-change menu closure, and browser-storage/security
-  boundaries.
+- Full `npm test` — passed; 76 Vitest tests in 11 files. Frontend parity now
+  covers the same triple/multiple slash, encoded path, backslash, control,
+  malformed-percent, scheme, service-route, and extra-path attacks and confirms
+  that every fallback remains on the base origin.
 - `npm run build` — passed with Next.js 16.2.11 and React/React DOM 19.2.8;
   Feed, posts, login, and account are dynamic server routes; Bridge remains
-  statically rendered; existing frontend API routes remain present.
+  statically rendered; Draft Mode and revalidation routes remain present.
 - `npm audit` — passed; zero vulnerabilities.
 - A post-build browser-asset scan passed with no internal Django origin,
-  credential environment names, provider test IDs, revalidation verification
-  value, or `X-Session-Token` under `.next/static`. Project auth modules are
-  also tested to contain no `localStorage` or `sessionStorage` auth path.
-- Local production-build HTTP integration through the Next.js public origin
-  passed for anonymous `/api/me/` plus `Set-Cookie`, CSRF-protected Google and
-  GitHub POST initiation, public-origin callbacks, Google PKCE/online/minimal
-  scopes, GitHub `user:email`, logout 204, and no collision with Draft Mode or
-  revalidation routes. The integration caught and fixed Next.js trailing-slash
-  normalization and forwarded-host callback construction before completion.
+  credential names, build-time verification value, or `X-Session-Token` under
+  `.next/static`; auth source modules contain no browser-stored token path.
 - In-app Browser discovery returned no available browser backends. Screenshot
-  QA, real Tab traversal, and live 375x812/1440x900 viewport inspection could
-  not run and are not represented by jsdom tests.
+  QA of login return-to and the user menu could not run.
 - Docker, PostgreSQL server binaries, and `pg_isready` are not installed, so
   Docker/Compose and PostgreSQL-backed migrations/session/OAuth checks were not
-  run. SQLite and local HTTP results are not represented as PostgreSQL or
-  container verification.
+  run. SQLite results are not represented as PostgreSQL or container
+  verification.
 - Real Google/GitHub credentials were not used. Live consent, provider-hosted
   cancellation screens, staging callbacks, and production callbacks were not
   tested; all provider HTTP/callback automation used mocks.

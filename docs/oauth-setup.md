@@ -27,6 +27,12 @@ settings allow an omitted provider pair and `/api/me/` reports that provider as
 unavailable. Never create a `SocialApp` row for Google or GitHub, because mixing
 database and settings applications makes provider selection ambiguous.
 
+Credential values are trimmed before provider applications and the production
+required-environment matrix are built. Missing, empty, and whitespace-only
+values all fail closed; a successful production import guarantees non-empty
+Google and GitHub `APPS`. `SOCIALACCOUNT_REQUESTS_TIMEOUT` defaults to five
+seconds and, when configured, must be a finite positive number.
+
 The GitHub Environments for staging and production must each supply the four
 names above (client IDs as environment variables or secrets according to the
 workflow policy; client secrets as secrets). They are intentionally not added or
@@ -86,6 +92,23 @@ Django rotates the session key on login. Production trusts exactly one reverse
 proxy for allauth client-IP handling and uses
 `SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")`. Configure
 `DJANGO_CSRF_TRUSTED_ORIGINS` explicitly per deployed environment.
+
+## Safe return destinations
+
+Django is the authoritative return-to boundary. A destination is decoded
+exactly once with strict UTF-8 percent handling and must begin with exactly one
+slash in both its raw and decoded forms. Schemes, authorities, fragments,
+backslashes, control characters, malformed percent escapes, double encoding,
+and network-path references are rejected before the product allowlist is
+evaluated. Django's `url_has_allowed_host_and_scheme` is an additional
+defense-in-depth check.
+
+Only `/`, `/bridge`, `/account`, and `/posts/<unicode-slug>` are accepted. A
+query string is retained only for one of those paths and cannot contain raw or
+encoded control characters. `/login`, arbitrary frontend routes, and the
+`/api`, `/accounts`, `/cms`, and `/django-admin` service boundaries are never
+valid return destinations. Invalid values are not stored in OAuth state and
+fall back to `/`.
 
 ## Site owner
 

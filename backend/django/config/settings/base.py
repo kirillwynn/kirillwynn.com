@@ -1,11 +1,25 @@
+import math
 import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 def env_list(name: str, default: str = "") -> list[str]:
     return [value.strip() for value in os.environ.get(name, default).split(",") if value.strip()]
+
+
+def positive_finite_float(name: str, default: str) -> float:
+    raw_value = os.environ.get(name, default).strip()
+    try:
+        value = float(raw_value)
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} must be a finite positive number") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ImproperlyConfigured(f"{name} must be a finite positive number")
+    return value
 
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
@@ -132,14 +146,24 @@ SOCIALACCOUNT_EMAIL_REQUIRED = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_LOGIN_ON_GET = False
 SOCIALACCOUNT_STORE_TOKENS = False
-SOCIALACCOUNT_REQUESTS_TIMEOUT = float(os.environ.get("SOCIALACCOUNT_REQUESTS_TIMEOUT", "5"))
+SOCIALACCOUNT_REQUESTS_TIMEOUT = positive_finite_float("SOCIALACCOUNT_REQUESTS_TIMEOUT", "5")
 ALLAUTH_TRUSTED_PROXY_COUNT = int(os.environ.get("ALLAUTH_TRUSTED_PROXY_COUNT", "0"))
+
+OAUTH_CREDENTIALS = {
+    name: os.environ.get(name, "").strip()
+    for name in (
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET",
+        "GITHUB_OAUTH_CLIENT_ID",
+        "GITHUB_OAUTH_CLIENT_SECRET",
+    )
+}
 
 
 def social_app(provider: str) -> list[dict[str, str]]:
     prefix = provider.upper()
-    client_id = os.environ.get(f"{prefix}_OAUTH_CLIENT_ID", "").strip()
-    secret = os.environ.get(f"{prefix}_OAUTH_CLIENT_SECRET", "").strip()
+    client_id = OAUTH_CREDENTIALS[f"{prefix}_OAUTH_CLIENT_ID"]
+    secret = OAUTH_CREDENTIALS[f"{prefix}_OAUTH_CLIENT_SECRET"]
     if not client_id or not secret:
         return []
     return [

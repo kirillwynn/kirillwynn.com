@@ -191,6 +191,17 @@ session, and has `Cache-Control: private, no-store` plus `Vary: Cookie`.
 Repeated anonymous logout is also a safe `204`. Missing or invalid CSRF on an
 authenticated session returns `403`; GET returns `405` and never changes state.
 
+### OAuth return destinations
+
+OAuth `next` is a backend-enforced product allowlist rather than an arbitrary
+relative URL. Only `/`, `/bridge`, `/account`, and
+`/posts/<valid-unicode-slug>` may be retained, with an optional query string.
+The raw and strictly decoded value must each begin with exactly one `/`.
+Schemes, authorities, fragments, multiple leading slashes, backslashes,
+controls, malformed or repeated percent encoding, service routes, and extra
+post path segments are discarded. An invalid value is not stored in OAuth state
+and the callback redirects to `/`.
+
 ## StreamField discriminated union
 
 Every block has exactly `id`, `type`, and `value`. `id` is Wagtail's stable

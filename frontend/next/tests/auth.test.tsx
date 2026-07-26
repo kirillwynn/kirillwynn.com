@@ -130,17 +130,44 @@ describe("auth forms and return-to policy", () => {
             "/bridge?from=menu item",
         );
         for (const attack of [
-            "https://evil.example/",
             "//evil.example",
+            "///evil.example",
+            "///posts/foo",
+            "////posts/foo",
+            "/%2F%2Fposts/foo",
+            "/%2f%2fposts/foo",
+            "/%252F%252Fposts/foo",
+            "/\\evil",
             "javascript:alert(1)",
+            "data:text/html,boom",
+            "http://evil.example/",
+            "https://evil.example/",
             "/posts/good\\evil",
-            "%252F%252Fevil.example",
+            "/posts/good%5Cevil",
+            "/posts/good\rheader",
+            "/posts/good\nheader",
+            "/posts/good\theader",
+            "/posts/good%0Dheader",
+            "/posts/good%0Aheader",
+            "/posts/good%09header",
+            "/posts/good?value=ok\r\nLocation: //evil.example",
+            "/bridge?value=%0D%0ALocation%3A%20%2F%2Fevil.example",
+            "/account?value=%09header",
+            "/posts/good%",
+            "/posts/good%2",
+            "/posts/good%GG",
             "/api/me/",
             "/accounts/google/login/",
             "/cms/",
             "/django-admin/",
+            "/login",
+            "/posts/good/extra",
         ]) {
-            expect(safeReturnTo(attack)).toBe("/");
+            const result = safeReturnTo(attack);
+            expect(result).toBe("/");
+            expect(new URL(result, "https://example.com").origin).toBe(
+                "https://example.com",
+            );
         }
     });
 

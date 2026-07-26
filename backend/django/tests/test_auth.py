@@ -9,8 +9,44 @@ from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, override_settings
 
 from apps.users.adapters import SiteAccountAdapter
+from apps.users.return_to import safe_return_to
 
 pytestmark = pytest.mark.django_db
+
+MALICIOUS_RETURN_TO_VALUES = [
+    "//evil.example",
+    "///evil.example",
+    "///posts/foo",
+    "////posts/foo",
+    "/%2F%2Fposts/foo",
+    "/%2f%2fposts/foo",
+    "/%252F%252Fposts/foo",
+    r"/\evil",
+    r"/posts/foo\evil",
+    "/posts/foo%5Cevil",
+    "/posts/foo\rheader",
+    "/posts/foo\nheader",
+    "/posts/foo\theader",
+    "/posts/foo%0Dheader",
+    "/posts/foo%0Aheader",
+    "/posts/foo%09header",
+    "/posts/foo?value=ok\r\nLocation: //evil.example",
+    "/bridge?value=%0D%0ALocation%3A%20%2F%2Fevil.example",
+    "/account?value=%09header",
+    "http://evil.example/",
+    "https://evil.example/",
+    "javascript:alert(1)",
+    "data:text/html,boom",
+    "/posts/foo%",
+    "/posts/foo%2",
+    "/posts/foo%GG",
+    "/api/me/",
+    "/accounts/google/login/",
+    "/cms/",
+    "/django-admin/",
+    "/login",
+    "/posts/foo/bar",
+]
 
 
 def mocked_social_login(adapter, provider, uid, email, *, verified=True, name="Reader"):
@@ -26,6 +62,36 @@ def mocked_social_login(adapter, provider, uid, email, *, verified=True, name="R
         email_addresses=[EmailAddress(email=email, verified=verified, primary=True)],
         provider=provider_instance,
     )
+
+
+def complete_oauth_callback(
+    client,
+    provider,
+    state,
+    uid,
+    email,
+    *,
+    verified=True,
+):
+    adapter_path = (
+        "allauth.socialaccount.providers.google.views.GoogleOAuth2Adapter"
+        if provider == "google"
+        else "allauth.socialaccount.providers.github.views.GitHubOAuth2Adapter"
+    )
+    with (
+        patch(f"{adapter_path}.get_access_token_data", return_value={"access_token": "temporary"}),
+        patch(
+            f"{adapter_path}.complete_login",
+            autospec=True,
+            side_effect=lambda adapter, request, app, token, **kwargs: mocked_social_login(
+                adapter, provider, uid, email, verified=verified
+            ),
+        ),
+    ):
+        return client.get(
+            f"/accounts/{provider}/login/callback/",
+            {"code": "mock-code", "state": state},
+        )
 
 
 def oauth_callback(
@@ -50,25 +116,14 @@ def oauth_callback(
     assert start.status_code == 302
     state = parse_qs(urlsplit(start.headers["Location"]).query)["state"][0]
 
-    adapter_path = (
-        "allauth.socialaccount.providers.google.views.GoogleOAuth2Adapter"
-        if provider == "google"
-        else "allauth.socialaccount.providers.github.views.GitHubOAuth2Adapter"
+    return complete_oauth_callback(
+        client,
+        provider,
+        state,
+        uid,
+        email,
+        verified=verified,
     )
-    with (
-        patch(f"{adapter_path}.get_access_token_data", return_value={"access_token": "temporary"}),
-        patch(
-            f"{adapter_path}.complete_login",
-            autospec=True,
-            side_effect=lambda adapter, request, app, token, **kwargs: mocked_social_login(
-                adapter, provider, uid, email, verified=verified
-            ),
-        ),
-    ):
-        return client.get(
-            f"/accounts/{provider}/login/callback/",
-            {"code": "mock-code", "state": state},
-        )
 
 
 @pytest.mark.parametrize("provider", ["google", "github"])
@@ -378,27 +433,13 @@ def test_unavailable_provider_returns_safe_generic_state():
 
 @pytest.mark.parametrize(
     "value",
-    [
-        "https://evil.example/",
-        "//evil.example/",
-        "javascript:alert(1)",
-        "data:text/html,boom",
-        r"/posts/good\\evil",
-        "/posts/good\x00evil",
-        "%2F%2Fevil.example",
-        "%252F%252Fevil.example",
-        "/api/me/",
-        "/accounts/google/login/",
-        "/cms/",
-        "/django-admin/",
-        "/posts/a/b",
-        "/login",
-    ],
+    MALICIOUS_RETURN_TO_VALUES,
 )
 def test_return_to_rejects_unsafe_or_service_routes(value):
     request = RequestFactory().get("/")
     adapter = SiteAccountAdapter(request)
 
+    assert safe_return_to(value) == "/"
     assert adapter.is_safe_url(value) is False
 
 
@@ -421,18 +462,34 @@ def test_return_to_accepts_only_allowlisted_frontend_routes(value):
     assert adapter.is_safe_url(value) is True
 
 
-def test_malicious_next_is_not_stashed_in_oauth_state():
+@pytest.mark.parametrize("provider", ["google", "github"])
+@pytest.mark.parametrize("next_url", MALICIOUS_RETURN_TO_VALUES)
+def test_malicious_next_is_not_stashed_or_returned_after_oauth_callback(provider, next_url):
     client = Client(enforce_csrf_checks=True)
     token = client.get("/api/me/").json()["csrf_token"]
 
     response = client.post(
-        "/accounts/google/login/",
+        f"/accounts/{provider}/login/",
         {
             "csrfmiddlewaretoken": token,
-            "next": "https://evil.example/",
+            "next": next_url,
         },
     )
+    assert response.status_code == 302
     state = parse_qs(urlsplit(response.headers["Location"]).query)["state"][0]
 
-    assert "evil.example" not in response.headers["Location"]
     assert client.session["socialaccount_states"][state][0].get("next") is None
+
+    callback = complete_oauth_callback(
+        client,
+        provider,
+        state,
+        f"{provider}-redirect-regression",
+        f"{provider}-redirect@example.com",
+    )
+
+    assert callback.status_code == 302
+    assert callback.headers["Location"] == "/"
+    parsed_location = urlsplit(callback.headers["Location"])
+    assert not parsed_location.scheme
+    assert not parsed_location.netloc

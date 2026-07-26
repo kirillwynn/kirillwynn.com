@@ -19,10 +19,7 @@ required_environment = {
     "FRONTEND_PREVIEW_URL": os.environ.get("FRONTEND_PREVIEW_URL"),
     "REVALIDATION_URL": os.environ.get("REVALIDATION_URL"),
     "REVALIDATION_SECRET": os.environ.get("REVALIDATION_SECRET"),
-    "GOOGLE_OAUTH_CLIENT_ID": os.environ.get("GOOGLE_OAUTH_CLIENT_ID"),
-    "GOOGLE_OAUTH_CLIENT_SECRET": os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET"),
-    "GITHUB_OAUTH_CLIENT_ID": os.environ.get("GITHUB_OAUTH_CLIENT_ID"),
-    "GITHUB_OAUTH_CLIENT_SECRET": os.environ.get("GITHUB_OAUTH_CLIENT_SECRET"),
+    **OAUTH_CREDENTIALS,  # noqa: F405
 }
 missing_environment = [name for name, value in required_environment.items() if not value]
 if missing_environment:
