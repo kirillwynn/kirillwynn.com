@@ -6,6 +6,6 @@ app_name = "blog_api"
 
 urlpatterns = [
     path("posts/", PostListAPIView.as_view(), name="post-list"),
-    path("posts/<slug:slug>/", PostDetailAPIView.as_view(), name="post-detail"),
+    path("posts/<str:slug>/", PostDetailAPIView.as_view(), name="post-detail"),
     path("preview/resolve/", PreviewResolveAPIView.as_view(), name="preview-resolve"),
 ]

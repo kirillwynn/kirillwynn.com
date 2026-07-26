@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 3 complete; awaiting owner review
+Overall state: Milestone 3 audit remediated; awaiting owner review
 
 ## Current repository state
 
@@ -76,6 +76,10 @@ Overall state: Milestone 3 complete; awaiting owner review
   strict TypeScript, Draft Mode entry/exit, diagnostic post preview, and HMAC
   revalidation.
 - [x] API contract and ADR 0002 documented.
+- [x] Milestone 3 audit remediated: explicit public-origin URLs, relative
+  pagination, end-to-end Unicode slugs, aligned stable-ID/current/previous-slug
+  cache tags, 32-byte revalidation secrets, environment-derived preview cookie
+  security, and expanded Docker build-context exclusions.
 
 ## Milestone transition
 
@@ -158,8 +162,9 @@ Out of scope for that session:
   backend to the final image layout deliberately.
 - Docker build, Docker Compose config, and PostgreSQL-backed migrations remain
   unverified because Docker and PostgreSQL server binaries are not available
-  locally. The Compose file parses as valid YAML, and the Docker build context
-  and ignore rules were checked statically.
+  locally. The Compose file parses as valid YAML. The Docker ignore rules were
+  checked statically against the 138 MiB local `.next`, 407 MiB `node_modules`,
+  and TypeScript build-info artifacts.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - Email DNS records and provider credentials do not exist in the current
@@ -184,49 +189,48 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 2026-07-26:
 
 - `python3 -m uv lock --check` — passed; 46 packages resolved.
-- Synced environment reports Python 3.12.13, Django 5.2.16, Wagtail 7.4.2,
-  Django REST Framework 3.17.1, `wagtail-headless-preview` 0.9.0, and Ruff
-  0.12.12.
-- `python3 -m uv run --frozen ruff format --check .` — passed (58 files).
+- `python3 -m uv run --frozen ruff format --check .` — passed (59 files).
 - `python3 -m uv run --frozen ruff check .` — passed.
 - `python3 -m uv run --frozen python manage.py check
   --settings=config.settings.test` — passed.
 - `python3 -m uv run --frozen python manage.py makemigrations --check --dry-run
   --settings=config.settings.test` — passed; no changes detected.
-- `python3 -m uv run --frozen pytest` — passed; 66 tests, including exact list,
-  detail, and 13-block contracts; visibility and query-count policy; preview
-  expiry/tampering/snapshot binding; outbox transactionality, signing, failure,
-  retry, and idempotency.
+- `python3 -m uv run --frozen pytest` — passed; 84 tests. Coverage includes an
+  internal `Host: django:8000` with `PUBLIC_SITE_URL=https://kirillwynn.com`,
+  canonical/rendition/lead/Open Graph/pagination/preview URL leakage checks,
+  Unicode detail/canonical/internal-link and lifecycle revalidation, current
+  and previous slug tags, absolute CDN URL preservation, short-secret rejection,
+  and Secure/non-Secure preview cookie modes.
 - Empty-file SQLite migration passed through all Django, Wagtail,
   `wagtail_headless_preview.0001_initial`, and
-  `blog.0002_revalidationevent_previewsnapshot` migrations.
-- `migrate blog 0001` followed by `migrate blog 0002` passed on that clean
-  SQLite database, verifying reverse/forward behavior for the new project
+  `blog.0003_alter_revalidationevent_previous_slug_and_more` migrations.
+- `migrate blog 0002` followed by `migrate blog 0003` passed on that clean
+  SQLite database, verifying reverse/forward behavior for the new Unicode-slug
   migration.
 - `python3 -m uv run --frozen python manage.py check --deploy` with production
   settings and safe non-secret verification values — passed; the
   Wagtail-required `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally
   silenced.
-- Production-settings regression tests confirm that Wagtail admin, frontend
-  preview, revalidation URL, and revalidation secret configuration are
-  mandatory.
-- Node.js 24.18.0 and npm 11.16.0 were installed through fnm.
-- `npm ci` — passed; 156 packages audited with zero known vulnerabilities.
+- Production settings regression tests confirm that `PUBLIC_SITE_URL` is
+  mandatory, normalized, and origin-only, and that production/runtime rejects
+  `REVALIDATION_SECRET` values shorter than 32 UTF-8 bytes.
+- Node.js 24.18.0 was selected through fnm. `npm ci` was not needed because
+  neither dependencies nor lockfile changed.
 - `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
-- `npm test` — passed; 10 Vitest tests across HMAC, timestamp/tampering,
-  duplicate/allowlist behavior, Draft Mode entry/open-redirect handling, token
-  removal, and server-only boundaries.
+- `npm test` — passed; 37 Vitest tests in 6 files, including Unicode HMAC,
+  parse/derive allowlists, unsafe slug rejection, single URL encoding,
+  current/previous cache tags, and both preview cookie security modes.
 - `npm run build` — passed with Next.js 16.2.11 and React/React DOM 19.2.8;
   `/api/draft`, `/api/draft/disable`, `/api/revalidate`, and `/posts/[slug]`
   are dynamic server routes. Built browser assets contain no revalidation
   secret name/value.
-- Live local Django/Next.js integration passed for public list/detail, signed
-  and duplicate revalidation, tampered revalidation rejection, immutable Draft
-  Mode snapshot entry, and Draft Mode exit. No preview credential appeared in
-  request URLs or Django logs.
+- Live local production-build Django/Next.js integration passed for the
+  percent-encoded `/posts/привет-мир` route and server-rendered Unicode post.
+  Signed Unicode revalidation returned `duplicate: false` and then
+  `duplicate: true` for the identical event.
+- Static Docker-context audit confirmed `.dockerignore` excludes `.next`,
+  coverage, build info, package-manager caches/debug logs, and existing
+  `node_modules`; no user caches were deleted.
 - Docker, PostgreSQL server binaries, and `pg_isready` are not installed, so
   Docker and PostgreSQL-backed migration/search checks were not run. SQLite
   results are not represented as PostgreSQL verification.
-- The in-app browser had no available browser backend, so visual checks at
-  375x812 and 1440x900 could not run. The diagnostic page's SSR/HTTP flow and
-  keyboard-visible focus CSS were verified non-visually.

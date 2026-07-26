@@ -17,6 +17,9 @@ export function revalidationSecret(): string {
     if (!secret) {
         throw new Error("REVALIDATION_SECRET is required at runtime");
     }
+    if (Buffer.byteLength(secret, "utf8") < 32) {
+        throw new Error("REVALIDATION_SECRET must be at least 32 bytes");
+    }
     return secret;
 }
 
@@ -29,4 +32,8 @@ export function revalidationWindowSeconds(): number {
 
 export function previewTtlSeconds(): number {
     return positiveInteger(process.env.PREVIEW_TOKEN_TTL_SECONDS, 600);
+}
+
+export function previewCookieSecure(): boolean {
+    return process.env.NODE_ENV === "production";
 }

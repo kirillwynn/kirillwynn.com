@@ -18,8 +18,8 @@ class RevalidationEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     action = models.CharField(max_length=16, choices=Action.choices)
     page_id = models.PositiveBigIntegerField()
-    slug = models.SlugField(max_length=255)
-    previous_slug = models.SlugField(max_length=255, blank=True)
+    slug = models.SlugField(max_length=255, allow_unicode=True)
+    previous_slug = models.SlugField(max_length=255, blank=True, allow_unicode=True)
     occurred_at = models.DateTimeField()
     state = models.CharField(
         max_length=16,

@@ -6,6 +6,7 @@ import urllib.request
 from datetime import UTC, timedelta
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -42,6 +43,8 @@ def encode_event_body(event):
 
 def sign_revalidation_body(body, timestamp, secret=None):
     signing_secret = settings.REVALIDATION_SECRET if secret is None else secret
+    if len(signing_secret.encode()) < 32:
+        raise ImproperlyConfigured("REVALIDATION_SECRET must be at least 32 bytes")
     message = str(timestamp).encode() + b"." + body
     digest = hmac.new(signing_secret.encode(), message, hashlib.sha256).hexdigest()
     return f"{SIGNATURE_VERSION}={digest}"

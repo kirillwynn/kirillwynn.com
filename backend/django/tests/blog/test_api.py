@@ -1,15 +1,17 @@
+import json
 from datetime import timedelta
 
 import pytest
 from django.core import signing
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 from wagtail.models import PageViewRestriction
 
-from apps.blog.api.serializers import API_VERSION, IMAGE_RENDITION_SPECS
+from apps.blog.api.serializers import API_VERSION, IMAGE_RENDITION_SPECS, _absolute_url
 from apps.blog.models import BlogPostPage, PreviewSnapshot
 from apps.blog.services.preview import PREVIEW_SIGNING_SALT, _credential_digest
 from tests.blog.test_blocks import all_block_values
@@ -78,7 +80,7 @@ def test_list_contract_is_paginated_compact_and_exact(blog_post):
         {"name": "Wagtail", "slug": "wagtail"},
     ]
     assert result["canonical_path"] == "/posts/published-post"
-    assert result["canonical_url"] == "http://testserver/posts/published-post"
+    assert result["canonical_url"] == "http://localhost:3000/posts/published-post"
     assert result["seo"] == {
         "title": "Published post",
         "description": "A concise draft excerpt.",
@@ -277,9 +279,17 @@ def test_image_renditions_and_open_graph_fallback_are_structured(blog_post, wagt
         set(rendition) == {"url", "width", "height"} for rendition in image["renditions"].values()
     )
     assert all(
-        rendition["url"].startswith("http://testserver/media/")
+        rendition["url"].startswith("http://localhost:3000/media/")
         for rendition in image["renditions"].values()
     )
+
+
+@override_settings(PUBLIC_SITE_URL="https://kirillwynn.com")
+def test_absolute_storage_urls_pass_through_unchanged():
+    cdn_url = "https://cdn.example.com/media/rendition.jpg"
+
+    assert _absolute_url(cdn_url) == cdn_url
+    assert _absolute_url("/media/rendition.jpg") == ("https://kirillwynn.com/media/rendition.jpg")
 
 
 def test_pagination_enforces_maximum_page_size(blog_index):
@@ -291,7 +301,101 @@ def test_pagination_enforces_maximum_page_size(blog_index):
     assert response.status_code == 200
     assert response.data["count"] == 51
     assert len(response.data["results"]) == 50
-    assert "page=2" in response.data["next"]
+    assert response.data["next"] == "/api/v1/posts/?page=2&page_size=999"
+
+
+def test_unicode_slug_detail_canonical_and_internal_link(blog_index, blog_post):
+    target = make_post(blog_index, number="target")
+    target.slug = "привет-мир"
+    target = publish(target)
+    blog_post.body = [
+        (
+            "rich_text",
+            f'<p><a linktype="page" id="{target.pk}">Русская публикация</a></p>',
+        ),
+        (
+            "link",
+            {
+                "text": "Русская публикация",
+                "internal_page": target,
+                "external_url": "",
+            },
+        ),
+    ]
+    published = publish(blog_post)
+
+    response = APIClient().get(reverse("blog_api:post-detail", kwargs={"slug": target.slug}))
+    source = APIClient().get(reverse("blog_api:post-detail", kwargs={"slug": published.slug}))
+
+    assert response.status_code == 200
+    assert response.data["slug"] == "привет-мир"
+    assert response.data["canonical_path"] == "/posts/привет-мир"
+    assert response.data["canonical_url"] == (
+        "http://localhost:3000/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80"
+    )
+    assert source.data["body"][0]["value"]["html"] == (
+        '<p><a href="/posts/привет-мир">Русская публикация</a></p>'
+    )
+    assert source.data["body"][1]["value"]["href"] == "/posts/привет-мир"
+
+
+@override_settings(
+    PUBLIC_SITE_URL="https://kirillwynn.com",
+    ALLOWED_HOSTS=["django"],
+)
+def test_frontend_urls_never_leak_internal_django_origin(blog_index, blog_post, wagtail_image):
+    for number in range(10):
+        make_post(blog_index, number=f"pagination-{number}")
+    blog_post.title = "Public origin"
+    blog_post.slug = "привет-мир"
+    blog_post.body = [
+        {
+            "type": "image",
+            "value": {
+                "image": wagtail_image.pk,
+                "decorative": False,
+                "alt_text": "Public image",
+            },
+        }
+    ]
+    published = publish(blog_post)
+    _, credential = issue_headless_preview(published)
+
+    client = APIClient(HTTP_HOST="django:8000")
+    detail = client.get(reverse("blog_api:post-detail", kwargs={"slug": published.slug}))
+    listing = client.get(reverse("blog_api:post-list"))
+    preview = client.post(
+        reverse("blog_api:preview-resolve"),
+        {"credential": credential},
+        format="json",
+    )
+
+    assert detail.status_code == listing.status_code == preview.status_code == 200
+    assert detail.data["canonical_url"].startswith("https://kirillwynn.com/posts/")
+    assert detail.data["open_graph"]["image"] is not None
+    assert all(
+        item["url"].startswith("https://kirillwynn.com/media/")
+        for item in detail.data["open_graph"]["image"]["renditions"].values()
+    )
+    lead_image = next(
+        item["lead_image"] for item in listing.data["results"] if item["id"] == published.pk
+    )
+    assert lead_image is not None
+    assert listing.data["next"].startswith("/api/v1/posts/?")
+    assert listing.data["previous"] is None
+    assert preview.data["canonical_url"] == detail.data["canonical_url"]
+    assert preview.data["open_graph"]["image"] == detail.data["open_graph"]["image"]
+
+    serialized = json.dumps(
+        {
+            "detail": detail.data,
+            "listing": listing.data,
+            "preview": preview.data,
+        }
+    )
+    assert "django:8000" not in serialized
+    assert "localhost:8000" not in serialized
+    assert "testserver" not in serialized
 
 
 def test_public_visibility_policy_excludes_every_non_public_state(blog_index):
@@ -345,6 +449,7 @@ def test_headless_preview_is_bound_to_one_immutable_snapshot_and_no_store(blog_p
     assert response["Location"] == "http://frontend.test/api/draft"
     assert "token" not in response["Location"]
     assert response.cookies["kw_preview_credential"]["httponly"]
+    assert not response.cookies["kw_preview_credential"]["secure"]
     assert response["Cache-Control"] == "private, no-store"
 
     blog_post.title = "Snapshot two"
@@ -360,6 +465,14 @@ def test_headless_preview_is_bound_to_one_immutable_snapshot_and_no_store(blog_p
     assert resolved.data["canonical_path"] == f"/posts/{blog_post.slug}"
     assert resolved["Cache-Control"] == "private, no-store"
     assert resolved["Pragma"] == "no-cache"
+
+
+@override_settings(PREVIEW_COOKIE_SECURE=True)
+def test_production_preview_entry_cookie_is_secure_on_internal_http(blog_post):
+    response, _ = issue_headless_preview(blog_post)
+
+    assert response["Location"].startswith("http://")
+    assert response.cookies["kw_preview_credential"]["secure"]
 
 
 @pytest.mark.parametrize("mutation", ["missing", "tampered"])

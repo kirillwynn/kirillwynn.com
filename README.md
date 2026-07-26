@@ -71,6 +71,9 @@ Milestones 1–3 are available under `backend/django/` and `frontend/next/`:
   `wagtail-headless-preview` 0.9.0;
 - signed cache revalidation backed by a durable database outbox and retry
   command;
+- Unicode post slugs across public detail, preview, and signed revalidation;
+- public-origin canonical/media URLs through `PUBLIC_SITE_URL`, with
+  origin-independent relative pagination links;
 - a minimal Next.js 16.2.11 App Router application for Draft Mode diagnostics
   and HMAC revalidation;
 - locked production and development dependencies.
@@ -130,6 +133,13 @@ Public content routes:
 - `http://localhost:8000/api/v1/preview/resolve/` (server-to-server preview
   resolution only).
 
+`PUBLIC_SITE_URL` is public configuration, not a secret. It defaults to
+`http://localhost:3000` in local settings and is required in production as an
+HTTP(S) origin without a path, query, or fragment. The backend uses it for
+fallback canonical URLs and local media/rendition URLs even when Next.js calls
+Django through an internal host. Absolute S3/CDN URLs and authored canonical
+URLs are preserved. Pagination links are relative API URLs.
+
 Retry pending cache events:
 
 ```bash
@@ -168,6 +178,10 @@ The Milestone 3 frontend contains only:
 
 It is not the final public UI. Tailwind, Feed, Bridge, metadata rendering, and
 the full body-block renderer belong to Milestone 4.
+
+`REVALIDATION_SECRET` must contain at least 32 UTF-8 bytes. Django and Next.js
+reject a shorter runtime production value. Production preview cookies are
+always Secure; local HTTP preview remains available without Secure cookies.
 
 `uv.lock` is the complete development lock. `requirements.lock` is an exported,
 fully pinned production dependency set used by the Django container. When

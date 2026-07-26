@@ -3,13 +3,18 @@ import { notFound } from "next/navigation";
 
 import { getPublicPost, resolvePreview } from "@/lib/server/django";
 import { PREVIEW_SNAPSHOT_COOKIE } from "@/lib/server/preview-cookies";
+import { decodeRouteSlug } from "@/lib/slug";
 
 export default async function DiagnosticPostPage({
     params,
 }: {
     params: Promise<{ slug: string }>;
 }) {
-    const { slug } = await params;
+    const { slug: encodedSlug } = await params;
+    const slug = decodeRouteSlug(encodedSlug);
+    if (!slug) {
+        notFound();
+    }
     const draft = await draftMode();
     const cookieStore = await cookies();
 

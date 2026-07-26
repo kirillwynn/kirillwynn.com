@@ -120,12 +120,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 WAGTAIL_SITE_NAME = "kirillwynn.com"
 WAGTAILADMIN_BASE_URL = os.environ.get("WAGTAIL_ADMIN_BASE_URL", "http://localhost:8000")
+PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "http://localhost:3000").rstrip("/")
 FRONTEND_PREVIEW_URL = os.environ.get(
     "FRONTEND_PREVIEW_URL",
     "http://localhost:3000/api/draft",
 )
 PREVIEW_TOKEN_TTL_SECONDS = int(os.environ.get("PREVIEW_TOKEN_TTL_SECONDS", "600"))
 PREVIEW_ENTRY_COOKIE_NAME = "kw_preview_credential"
+PREVIEW_COOKIE_SECURE = False
 WAGTAIL_HEADLESS_PREVIEW = {
     "CLIENT_URLS": {"default": FRONTEND_PREVIEW_URL},
     "REDIRECT_ON_PREVIEW": True,

@@ -85,6 +85,14 @@ def test_seo_and_open_graph_fallbacks(blog_post):
     assert blog_post.resolved_canonical_url == "https://example.com/canonical"
 
 
+def test_fallback_canonical_url_uses_public_origin_with_unicode_slug(blog_post):
+    blog_post.slug = "привет-мир"
+
+    assert blog_post.resolved_canonical_url == (
+        "http://localhost:3000/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80"
+    )
+
+
 def test_post_uses_wagtail_publication_fields_without_custom_status():
     field_names = {field.name for field in BlogPostPage._meta.get_fields()}
 

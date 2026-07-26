@@ -1,6 +1,8 @@
 from datetime import UTC
 from urllib.parse import urlparse
 
+from django.conf import settings
+from django.utils.encoding import iri_to_uri
 from rest_framework import serializers
 from wagtail.images import get_image_model
 from wagtail.rich_text import expand_db_html
@@ -21,12 +23,13 @@ def _timestamp(value):
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _absolute_url(request, url):
+def _absolute_url(url):
     if not url:
         return None
     if urlparse(url).scheme in {"http", "https"}:
         return url
-    return request.build_absolute_uri(url)
+    path = url if url.startswith("/") else f"/{url}"
+    return f"{settings.PUBLIC_SITE_URL}{iri_to_uri(path)}"
 
 
 def _image_context(image):
@@ -37,7 +40,7 @@ def _image_context(image):
     return alt, decorative
 
 
-def serialize_image(image, *, request, alt=None, decorative=None):
+def serialize_image(image, *, alt=None, decorative=None):
     if image is None:
         return None
 
@@ -56,7 +59,7 @@ def serialize_image(image, *, request, alt=None, decorative=None):
         "height": image.height,
         "renditions": {
             name: {
-                "url": _absolute_url(request, renditions[spec].url),
+                "url": _absolute_url(renditions[spec].url),
                 "width": renditions[spec].width,
                 "height": renditions[spec].height,
             }
@@ -83,7 +86,7 @@ def _serialize_table(value):
     }
 
 
-def serialize_body(body, *, request):
+def serialize_body(body):
     serialized = []
     for block in body:
         block_type = block.block_type
@@ -98,11 +101,9 @@ def serialize_body(body, *, request):
                 "text": value["text"],
             }
         elif block_type == "image":
-            serialized_value = serialize_image(value, request=request)
+            serialized_value = serialize_image(value)
         elif block_type == "gallery":
-            serialized_value = {
-                "images": [serialize_image(image, request=request) for image in value]
-            }
+            serialized_value = {"images": [serialize_image(image) for image in value]}
         elif block_type == "quote":
             serialized_value = {
                 "text": value["text"],
@@ -224,16 +225,15 @@ def prepare_list_lead_images(pages):
     return result
 
 
-def _metadata(page, request, *, lead_image=None):
+def _metadata(page, *, lead_image=None):
     path = f"/posts/{page.slug}"
     if lead_image is None:
         image = page.open_graph_image or _fallback_body_image(page)
-        image_data = serialize_image(image, request=request)
+        image_data = serialize_image(image)
     else:
         image, alt, decorative = lead_image
         image_data = serialize_image(
             image,
-            request=request,
             alt=alt,
             decorative=decorative,
         )
@@ -247,7 +247,7 @@ def _metadata(page, request, *, lead_image=None):
         "updated_at": _timestamp(page.last_published_at),
         "tags": _tags(page),
         "canonical_path": path,
-        "canonical_url": page.canonical_url or request.build_absolute_uri(path),
+        "canonical_url": page.canonical_url or f"{settings.PUBLIC_SITE_URL}{iri_to_uri(path)}",
         "seo": {
             "title": page.seo_title or page.title,
             "description": page.search_description or page.excerpt,
@@ -264,7 +264,6 @@ class PostListSerializer(serializers.BaseSerializer):
     def to_representation(self, instance):
         data = _metadata(
             instance,
-            self.context["request"],
             lead_image=self.context["lead_images"].get(instance.pk),
         )
         data["lead_image"] = data["open_graph"]["image"]
@@ -273,6 +272,6 @@ class PostListSerializer(serializers.BaseSerializer):
 
 class PostDetailSerializer(serializers.BaseSerializer):
     def to_representation(self, instance):
-        data = _metadata(instance, self.context["request"])
-        data["body"] = serialize_body(instance.body, request=self.context["request"])
+        data = _metadata(instance)
+        data["body"] = serialize_body(instance.body)
         return data

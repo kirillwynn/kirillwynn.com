@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { isValidSlug } from "@/lib/slug";
+
 export const REVALIDATION_ACTIONS = [
     "published",
     "updated",
@@ -26,7 +28,6 @@ const EVENT_KEYS = new Set([
 ]);
 const UUID_PATTERN =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SLUG_PATTERN = /^[-a-zA-Z0-9_]{1,255}$/;
 const SIGNATURE_PATTERN = /^v1=([0-9a-f]{64})$/;
 
 export function signBody(
@@ -101,10 +102,10 @@ export function parseEvent(body: string): RevalidationEvent | null {
         !Number.isSafeInteger(record.page_id) ||
         record.page_id <= 0 ||
         typeof record.slug !== "string" ||
-        !SLUG_PATTERN.test(record.slug) ||
+        !isValidSlug(record.slug) ||
         (record.previous_slug !== undefined &&
             (typeof record.previous_slug !== "string" ||
-                !SLUG_PATTERN.test(record.previous_slug))) ||
+                !isValidSlug(record.previous_slug))) ||
         typeof record.occurred_at !== "string" ||
         Number.isNaN(Date.parse(record.occurred_at))
     ) {
@@ -123,9 +124,14 @@ export function parseEvent(body: string): RevalidationEvent | null {
 }
 
 export function deriveInvalidations(event: RevalidationEvent) {
-    const tags = ["posts", `post:${String(event.page_id)}`];
+    const tags = [
+        "posts",
+        `post:${String(event.page_id)}`,
+        `post-slug:${event.slug}`,
+    ];
     const paths = ["/", `/posts/${event.slug}`];
     if (event.previous_slug && event.previous_slug !== event.slug) {
+        tags.push(`post-slug:${event.previous_slug}`);
         paths.push(`/posts/${event.previous_slug}`);
     }
     return { tags, paths };

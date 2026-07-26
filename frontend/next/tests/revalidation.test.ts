@@ -20,8 +20,8 @@ const body = JSON.stringify({
     event_id: "d9428888-122b-4b16-9f86-4d959146b441",
     occurred_at: "2027-01-15T08:00:00Z",
     page_id: 42,
-    previous_slug: "old-slug",
-    slug: "new-slug",
+    previous_slug: "старый-мир",
+    slug: "привет-мир",
 });
 
 beforeEach(() => {
@@ -82,8 +82,13 @@ describe("signed revalidation", () => {
             throw new Error("Expected a valid event");
         }
         expect(deriveInvalidations(event)).toEqual({
-            tags: ["posts", "post:42"],
-            paths: ["/", "/posts/new-slug", "/posts/old-slug"],
+            tags: [
+                "posts",
+                "post:42",
+                "post-slug:привет-мир",
+                "post-slug:старый-мир",
+            ],
+            paths: ["/", "/posts/привет-мир", "/posts/старый-мир"],
         });
         expect(
             parseEvent(
@@ -93,6 +98,49 @@ describe("signed revalidation", () => {
                 }),
             ),
         ).toBeNull();
+    });
+
+    it.each([
+        [""],
+        ["with/slash"],
+        ["with\\backslash"],
+        ["control\u0000character"],
+        ["line\nbreak"],
+        ["."],
+        [".."],
+        ["a".repeat(256)],
+    ])("rejects unsafe slug %j", (slug) => {
+        expect(
+            parseEvent(
+                JSON.stringify({
+                    ...JSON.parse(body),
+                    slug,
+                }),
+            ),
+        ).toBeNull();
+        expect(
+            parseEvent(
+                JSON.stringify({
+                    ...JSON.parse(body),
+                    previous_slug: slug,
+                }),
+            ),
+        ).toBeNull();
+    });
+
+    it("accepts Unicode letters, numbers, hyphens and underscores", () => {
+        const event = parseEvent(
+            JSON.stringify({
+                ...JSON.parse(body),
+                slug: "пост_2026-日本語",
+                previous_slug: "версия_1",
+            }),
+        );
+
+        expect(event).toMatchObject({
+            slug: "пост_2026-日本語",
+            previous_slug: "версия_1",
+        });
     });
 
     it("recognizes duplicate event IDs while keeping delivery idempotent", () => {

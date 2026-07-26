@@ -6,6 +6,7 @@ import urllib.error
 from datetime import timedelta
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.test import override_settings
 from django.utils import timezone
@@ -19,6 +20,7 @@ from apps.blog.services.revalidation import (
 )
 
 pytestmark = pytest.mark.django_db
+REVALIDATION_SECRET = "s" * 32
 
 
 class SuccessfulResponse:
@@ -34,26 +36,29 @@ def publish(page):
 
 
 def test_publish_update_slug_change_and_unpublish_create_durable_events(blog_post):
+    blog_post.slug = "привет-мир"
     published = publish(blog_post)
     first = RevalidationEvent.objects.get()
     assert first.action == RevalidationEvent.Action.PUBLISHED
     assert first.page_id == published.pk
-    assert first.slug == "draft-post"
+    assert first.slug == "привет-мир"
     assert first.state == RevalidationEvent.State.PENDING
     assert first.attempt_count == 0
 
-    published.slug = "renamed-post"
+    published.slug = "новый-мир"
     published.title = "Updated"
     published = publish(published)
     second = RevalidationEvent.objects.order_by("created_at", "pk").last()
     assert second.action == RevalidationEvent.Action.UPDATED
-    assert second.slug == "renamed-post"
-    assert second.previous_slug == "draft-post"
+    assert second.slug == "новый-мир"
+    assert second.previous_slug == "привет-мир"
 
     published.unpublish()
     third = RevalidationEvent.objects.order_by("created_at", "pk").last()
     assert third.action == RevalidationEvent.Action.UNPUBLISHED
-    assert third.slug == "renamed-post"
+    assert third.slug == "новый-мир"
+
+    assert json.loads(encode_event_body(second))["previous_slug"] == "привет-мир"
 
 
 def test_scheduled_publication_and_expiry_create_events(blog_post):
@@ -81,9 +86,9 @@ def test_hmac_signature_covers_timestamp_and_exact_raw_body(blog_post):
     body = encode_event_body(event)
     timestamp = 1_800_000_000
 
-    signature = sign_revalidation_body(body, timestamp, secret="shared-secret")
+    signature = sign_revalidation_body(body, timestamp, secret=REVALIDATION_SECRET)
     expected = hmac.new(
-        b"shared-secret",
+        REVALIDATION_SECRET.encode(),
         str(timestamp).encode() + b"." + body,
         hashlib.sha256,
     ).hexdigest()
@@ -99,9 +104,17 @@ def test_hmac_signature_covers_timestamp_and_exact_raw_body(blog_post):
     }
 
 
+def test_runtime_rejects_short_revalidation_secret():
+    with pytest.raises(
+        ImproperlyConfigured,
+        match="REVALIDATION_SECRET must be at least 32 bytes",
+    ):
+        sign_revalidation_body(b"{}", 1_800_000_000, secret="short")
+
+
 @override_settings(
     REVALIDATION_URL="http://frontend.test/api/revalidate",
-    REVALIDATION_SECRET="shared-secret",
+    REVALIDATION_SECRET=REVALIDATION_SECRET,
 )
 def test_delivery_success_signs_request_and_marks_delivered(blog_post):
     publish(blog_post)
@@ -130,7 +143,7 @@ def test_delivery_success_signs_request_and_marks_delivered(blog_post):
 
 @override_settings(
     REVALIDATION_URL="http://frontend.test/api/revalidate",
-    REVALIDATION_SECRET="shared-secret",
+    REVALIDATION_SECRET=REVALIDATION_SECRET,
 )
 def test_network_failure_is_pending_and_retry_succeeds(blog_post):
     publish(blog_post)
@@ -154,7 +167,7 @@ def test_network_failure_is_pending_and_retry_succeeds(blog_post):
 
 @override_settings(
     REVALIDATION_URL="http://frontend.test/api/revalidate",
-    REVALIDATION_SECRET="shared-secret",
+    REVALIDATION_SECRET=REVALIDATION_SECRET,
 )
 def test_non_2xx_failure_is_retained(blog_post):
     publish(blog_post)
@@ -177,7 +190,7 @@ def test_non_2xx_failure_is_retained(blog_post):
 
 @override_settings(
     REVALIDATION_URL="http://frontend.test/api/revalidate",
-    REVALIDATION_SECRET="shared-secret",
+    REVALIDATION_SECRET=REVALIDATION_SECRET,
 )
 def test_duplicate_delivery_is_idempotent(blog_post):
     publish(blog_post)
@@ -198,7 +211,7 @@ def test_duplicate_delivery_is_idempotent(blog_post):
 
 @override_settings(
     REVALIDATION_URL="http://frontend.test/api/revalidate",
-    REVALIDATION_SECRET="shared-secret",
+    REVALIDATION_SECRET=REVALIDATION_SECRET,
 )
 def test_management_command_processes_pending_events(blog_post, monkeypatch):
     publish(blog_post)

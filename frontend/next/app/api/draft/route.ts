@@ -2,7 +2,7 @@ import { cookies, draftMode } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { enterDraftMode } from "@/lib/draft-entry";
-import { previewTtlSeconds } from "@/lib/server/config";
+import { previewCookieSecure, previewTtlSeconds } from "@/lib/server/config";
 import { resolvePreview } from "@/lib/server/django";
 import {
     PREVIEW_ENTRY_COOKIE,
@@ -28,17 +28,18 @@ export async function GET(request: Request) {
         new URL(result.path, request.url),
         303,
     );
+    const secure = previewCookieSecure();
     response.cookies.set(PREVIEW_SNAPSHOT_COOKIE, result.credential, {
         httpOnly: true,
         sameSite: "lax",
-        secure: new URL(request.url).protocol === "https:",
+        secure,
         maxAge: previewTtlSeconds(),
         path: "/posts",
     });
     response.cookies.set(PREVIEW_ENTRY_COOKIE, "", {
         httpOnly: true,
         sameSite: "lax",
-        secure: new URL(request.url).protocol === "https:",
+        secure,
         maxAge: 0,
         expires: new Date(0),
         path: "/api/draft",

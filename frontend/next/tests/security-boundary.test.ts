@@ -28,5 +28,12 @@ describe("server-only security boundary", () => {
         const draftRoute = source("app/api/draft/route.ts");
         expect(draftRoute).toContain('path: "/posts"');
         expect(draftRoute).not.toContain("searchParams");
+        expect(draftRoute).toContain("previewCookieSecure()");
+        expect(draftRoute).not.toContain("request.url).protocol");
+    });
+
+    it("percent-encodes slugs in server-to-server content fetches", () => {
+        const django = source("lib/server/django.ts");
+        expect(django).toContain("encodeURIComponent(slug)");
     });
 });

@@ -20,7 +20,7 @@ export async function getPublicPost(slug: string): Promise<PostDetail | null> {
     const response = await fetch(
         `${djangoApiUrl()}/api/v1/posts/${encodeURIComponent(slug)}/`,
         {
-            next: { tags: ["posts", `post-slug:${slug}`] },
+            next: { tags: [`post-slug:${slug}`] },
         },
     );
     if (response.status === 404) {

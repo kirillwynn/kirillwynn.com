@@ -37,6 +37,18 @@ The explicit DRF contract was selected over exposing Wagtail API v2 directly so
 that field names, frontend routes, fallbacks, image sizes, and the StreamField
 union remain stable while Wagtail models evolve. GraphQL is not introduced.
 
+Frontend-facing absolute local URLs use the explicit `PUBLIC_SITE_URL` origin.
+It defaults to `http://localhost:3000` locally and is mandatory and validated in
+production as an HTTP(S) origin without a path, query, or fragment. This keeps
+internal Next.js-to-Django hosts out of canonical and rendition URLs. Absolute
+HTTP(S) storage URLs pass through unchanged, and an authored canonical URL
+continues to take precedence. Pagination uses relative API URLs so its contract
+is origin-independent.
+
+Page detail lookup accepts Wagtail's Unicode slugs without allowing `/`.
+Canonical and internal frontend paths use `/posts/<unicode-slug>`, while
+server-to-server fetches percent-encode the slug as one URL segment.
+
 ### StreamField
 
 Every body item is a discriminated union:
@@ -88,10 +100,23 @@ database transaction as the lifecycle change. The payload contains only:
 Delivery is a POST to the configured Next.js route. The signature is
 HMAC-SHA256 over `<unix timestamp>.<raw JSON body>`, sent as
 `X-Revalidation-Timestamp` and `X-Revalidation-Signature: v1=<hex>`. Next.js
-uses constant-time comparison and a 300-second default acceptance window. It
-derives the allowlisted `posts` and `post:<page-id>` tags and `/` plus
-`/posts/<slug>` paths; callers cannot supply tags or paths. Next.js 16.2 uses
-`revalidateTag(tag, "max")`.
+uses constant-time comparison and a 300-second default acceptance window.
+Signed slugs may contain Unicode letters and numbers, `-`, and `_`, up to the
+Wagtail field limit; separators, control characters, and dot segments are
+rejected. It derives the allowlisted `posts`, `post:<page-id>`, and
+`post-slug:<current-slug>` tags, plus
+`post-slug:<previous-slug>` on rename. It derives `/` and the matching current
+and previous `/posts/<slug>` paths. Callers cannot supply tags or paths.
+Next.js 16.2 uses `revalidateTag(tag, "max")`.
+
+The post list is tagged `posts`; a slug detail fetch is tagged only with its
+`post-slug:<slug>` key. Stable-ID tags support caches keyed by page identity.
+This retains list invalidation while avoiding global detail eviction.
+
+Production/runtime HMAC configuration requires a revalidation secret of at
+least 32 UTF-8 bytes. Preview cookies are always `Secure` in production based
+on explicit environment mode, even when the application reconstructs an
+internal HTTP request; local HTTP keeps non-Secure cookies.
 
 ### Failure and retry
 

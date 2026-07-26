@@ -26,6 +26,16 @@
 **/*.sqlite3
 **/*.db
 **/node_modules/
+**/.next/
+**/coverage/
+**/*.tsbuildinfo
+**/.npm/
+**/.yarn/
+**/.pnpm-store/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
 **/.vite/
 **/dist/
 **/build/

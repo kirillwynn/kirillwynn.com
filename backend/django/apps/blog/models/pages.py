@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models, transaction
+from django.utils.encoding import iri_to_uri
 from modelcluster.contrib.taggit import ClusterTaggableManager
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import StreamField
@@ -90,7 +91,8 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
 
     @property
     def resolved_canonical_url(self):
-        return self.canonical_url or self.full_url
+        path = iri_to_uri(f"/posts/{self.slug}")
+        return self.canonical_url or f"{settings.PUBLIC_SITE_URL}{path}"
 
     @property
     def resolved_open_graph_title(self):
@@ -143,7 +145,7 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
             self._issued_preview_credential,
             max_age=settings.PREVIEW_TOKEN_TTL_SECONDS,
             httponly=True,
-            secure=request.is_secure(),
+            secure=settings.PREVIEW_COOKIE_SECURE,
             samesite="Lax",
             path="/api/draft",
         )

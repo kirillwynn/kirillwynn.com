@@ -81,4 +81,22 @@ describe("Draft Mode entry", () => {
             ),
         ).toBeNull();
     });
+
+    it("derives the real Next route for a Unicode slug", async () => {
+        const resolve = vi.fn().mockResolvedValue(
+            post({
+                slug: "привет-мир",
+                canonical_path: "/posts/привет-мир",
+                canonical_url:
+                    "https://example.com/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80",
+            }),
+        );
+
+        await expect(
+            enterDraftMode("opaque-credential", resolve, vi.fn()),
+        ).resolves.toMatchObject({
+            ok: true,
+            path: "/posts/привет-мир",
+        });
+    });
 });

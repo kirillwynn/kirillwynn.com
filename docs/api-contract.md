@@ -8,6 +8,12 @@ All timestamps are ISO 8601 UTC strings with a `Z` suffix. Public endpoints are
 anonymous, JSON-only, and read-only. Unknown, draft, unpublished, future,
 expired, and restricted posts all produce the normal detail 404.
 
+Frontend-facing absolute local URLs are based on the configured public origin,
+not the host of the Django request. `PUBLIC_SITE_URL` defaults locally to
+`http://localhost:3000`; production requires a valid HTTP(S) origin with no
+path, query, or fragment. A trailing slash is removed. Absolute HTTP(S)
+storage URLs, such as S3 or CDN URLs, pass through unchanged.
+
 ## Public routes
 
 ### `GET /api/v1/posts/`
@@ -17,7 +23,8 @@ Query parameters:
 - `page`: positive page number;
 - `page_size`: default `10`, maximum `50`.
 
-The list never contains `body`.
+The list never contains `body`. `next` and `previous` are relative API URLs,
+such as `/api/v1/posts/?page=2`; they never include an origin.
 
 ```json
 {
@@ -54,11 +61,13 @@ The list never contains `body`.
 }
 ```
 
-### `GET /api/v1/posts/<slug>/`
+### `GET /api/v1/posts/<unicode-slug>/`
 
 The detail resource has the same metadata fields as a list item and adds
 `body`. It omits the list-only `lead_image`; the resolved Open Graph image is in
-`open_graph.image`.
+`open_graph.image`. Slugs may contain Unicode letters and numbers, `-`, and
+`_`, so both `/api/v1/posts/привет-мир/` and the corresponding percent-encoded
+request URL resolve the same resource. A slug never contains `/`.
 
 ```json
 {
@@ -108,8 +117,8 @@ Fallbacks:
   description, then excerpt;
 - `open_graph.image`: explicit image, then the first body image, then the first
   gallery image;
-- `canonical_url`: explicit canonical URL, otherwise the absolute frontend URL
-  for `canonical_path`.
+- `canonical_url`: explicit canonical URL, otherwise `PUBLIC_SITE_URL` plus the
+  URI-encoded `canonical_path`.
 
 Tags are sorted by `(slug, name)`.
 
@@ -185,8 +194,8 @@ renditions.
 ```
 
 Small originals are not upscaled, so returned dimensions can be below the
-rendition key. URLs are made absolute and remain compatible with an absolute
-future S3 storage URL.
+rendition key. Relative local media URLs use `PUBLIC_SITE_URL`. Absolute
+HTTP(S) S3/CDN URLs are returned unchanged.
 
 ## Preview resolution
 
@@ -243,5 +252,16 @@ The signed bytes are:
 <timestamp>.<exact raw request body>
 ```
 
-Next.js accepts the default 300-second window and derives `posts`,
-`post:<page_id>`, `/`, `/posts/<slug>`, and the optional previous-slug path.
+Next.js accepts the default 300-second window and derives only:
+
+- tags `posts`, `post:<page_id>`, and `post-slug:<slug>`;
+- `post-slug:<previous_slug>` when a rename supplies a distinct previous slug;
+- paths `/`, `/posts/<slug>`, and the optional previous-slug post path.
+
+List fetches use `posts`; detail fetches use their `post-slug:<slug>` tag
+without the global list tag. Stable-ID tags remain available to caches keyed by
+page identity. This keeps one post update from evicting every cached detail.
+
+Current and previous slugs may use Unicode letters and numbers, `-`, and `_`,
+up to 255 Unicode code points. Slash, backslash, control characters, empty
+values, and dot segments are rejected before invalidation.
