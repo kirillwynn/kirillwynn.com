@@ -26,3 +26,7 @@ class TopLevelCommentPagination(RelativeCursorPagination):
 
 class ThreadReplyPagination(RelativeCursorPagination):
     ordering = ("created_at", "id")
+
+
+class ReactionParticipantPagination(RelativeCursorPagination):
+    ordering = ("created_at", "id")

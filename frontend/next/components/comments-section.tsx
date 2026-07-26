@@ -364,6 +364,8 @@ export function CommentsSection({ slug }: { slug: string }) {
                         onChange={replaceComment}
                         onReply={openThread}
                         onSessionExpired={() => void refresh()}
+                        reactionReturnTo={returnTo(slug)}
+                        slug={slug}
                     />
                 ))}
             </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ReactionBar } from "@/components/reaction-bar";
 import {
     CommentApiError,
     deletePublicComment,
@@ -37,6 +38,8 @@ export function CommentCard({
     onChange,
     onReply,
     onSessionExpired,
+    reactionReturnTo,
+    slug,
     compact = false,
     allowPendingReply = false,
 }: {
@@ -47,6 +50,8 @@ export function CommentCard({
         | ((comment: PublicComment, trigger: HTMLButtonElement) => void)
         | null;
     onSessionExpired: () => void;
+    reactionReturnTo: string;
+    slug: string;
     compact?: boolean;
     allowPendingReply?: boolean;
 }) {
@@ -93,10 +98,13 @@ export function CommentCard({
                 ...comment,
                 body: null,
                 status: "deleted",
+                reactions: [],
+                reactions_updated_locally: false,
                 viewer: {
                     ...comment.viewer,
                     can_edit: false,
                     can_delete: false,
+                    can_react: false,
                 },
             });
         } catch (caught) {
@@ -245,6 +253,27 @@ export function CommentCard({
                                 : ""}
                         </span>
                     ) : null}
+                </div>
+            ) : null}
+
+            {!editing && comment.status === "visible" ? (
+                <div className="mt-2">
+                    <ReactionBar
+                        initialReactions={comment.reactions}
+                        onChange={(reactions) => {
+                            onChange({
+                                ...comment,
+                                reactions,
+                                reactions_updated_locally: true,
+                            });
+                        }}
+                        target={{
+                            kind: "comment",
+                            id: comment.id,
+                            slug,
+                            returnTo: reactionReturnTo,
+                        }}
+                    />
                 </div>
             ) : null}
 

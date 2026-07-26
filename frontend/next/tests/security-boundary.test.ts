@@ -54,10 +54,14 @@ describe("server-only security boundary", () => {
             "components/thread-panel.tsx",
             "components/post-card.tsx",
             "components/post-body.tsx",
+            "components/post-reactions.tsx",
             "components/preview-banner.tsx",
+            "components/reaction-bar.tsx",
             "lib/bridge.ts",
             "lib/comment-drafts.ts",
             "lib/comments.ts",
+            "lib/reaction-storage.ts",
+            "lib/reactions.ts",
         ]) {
             const contents = source(path);
             expect(contents).not.toContain("DJANGO_API_URL");
@@ -77,6 +81,19 @@ describe("server-only security boundary", () => {
         expect(config).toContain('source: "/api/me/"');
         expect(config).toContain('source: "/api/auth/logout/"');
         expect(config).toContain('source: "/api/v1/posts/:slug/comments/"');
+        expect(config).toContain('source: "/api/v1/reactions/config/"');
+        expect(config).toContain(
+            'source: "/api/v1/posts/:slug/reactions/toggle/"',
+        );
+        expect(config).toContain(
+            'source: "/api/v1/posts/:slug/reactions/:emoji/participants/"',
+        );
+        expect(config).toContain(
+            'source: "/api/v1/comments/:id/reactions/toggle/"',
+        );
+        expect(config).toContain(
+            'source: "/api/v1/comments/:id/reactions/:emoji/participants/"',
+        );
         expect(config).toContain('source: "/api/v1/comments/:id/thread/"');
         expect(config).toContain('source: "/api/v1/comments/:id/replies/"');
         expect(config).toContain('source: "/api/v1/comments/:id/"');

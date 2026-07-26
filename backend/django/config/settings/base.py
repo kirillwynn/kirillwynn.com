@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "wagtail_headless_preview",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
+    "wagtail.contrib.settings",
     "wagtail.contrib.table_block",
     "wagtail.embeds",
     "wagtail.sites",
@@ -220,6 +221,10 @@ COMMENT_CREATE_RATE_LIMIT_WINDOW_SECONDS = positive_int(
 COMMENT_MUTATION_RATE_LIMIT_COUNT = positive_int("COMMENT_MUTATION_RATE_LIMIT_COUNT", "30")
 COMMENT_MUTATION_RATE_LIMIT_WINDOW_SECONDS = positive_int(
     "COMMENT_MUTATION_RATE_LIMIT_WINDOW_SECONDS", "60"
+)
+REACTION_TOGGLE_RATE_LIMIT_COUNT = positive_int("REACTION_TOGGLE_RATE_LIMIT_COUNT", "60")
+REACTION_TOGGLE_RATE_LIMIT_WINDOW_SECONDS = positive_int(
+    "REACTION_TOGGLE_RATE_LIMIT_WINDOW_SECONDS", "60"
 )
 
 LANGUAGE_CODE = "en-us"

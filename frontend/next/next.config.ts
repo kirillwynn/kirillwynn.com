@@ -46,6 +46,34 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/v1/posts/:slug/comments/`,
             },
             {
+                source: "/api/v1/reactions/config/",
+                destination: `${django}/api/v1/reactions/config/`,
+            },
+            {
+                source: "/api/v1/posts/:slug/reactions/",
+                destination: `${django}/api/v1/posts/:slug/reactions/`,
+            },
+            {
+                source: "/api/v1/posts/:slug/reactions/toggle/",
+                destination: `${django}/api/v1/posts/:slug/reactions/toggle/`,
+            },
+            {
+                source: "/api/v1/posts/:slug/reactions/:emoji/participants/",
+                destination: `${django}/api/v1/posts/:slug/reactions/:emoji/participants/`,
+            },
+            {
+                source: "/api/v1/comments/:id/reactions/",
+                destination: `${django}/api/v1/comments/:id/reactions/`,
+            },
+            {
+                source: "/api/v1/comments/:id/reactions/toggle/",
+                destination: `${django}/api/v1/comments/:id/reactions/toggle/`,
+            },
+            {
+                source: "/api/v1/comments/:id/reactions/:emoji/participants/",
+                destination: `${django}/api/v1/comments/:id/reactions/:emoji/participants/`,
+            },
+            {
                 source: "/api/v1/comments/:id/thread/",
                 destination: `${django}/api/v1/comments/:id/thread/`,
             },

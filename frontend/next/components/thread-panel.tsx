@@ -284,6 +284,8 @@ export function ThreadPanel({
                             textareaRef.current?.focus();
                         }}
                         onSessionExpired={() => void refresh()}
+                        reactionReturnTo={returnTo(slug, root.id)}
+                        slug={slug}
                     />
                 </div>
 
@@ -316,6 +318,8 @@ export function ThreadPanel({
                                 textareaRef.current?.focus();
                             }}
                             onSessionExpired={() => void refresh()}
+                            reactionReturnTo={returnTo(slug, root.id)}
+                            slug={slug}
                         />
                     ))}
                     {next ? (

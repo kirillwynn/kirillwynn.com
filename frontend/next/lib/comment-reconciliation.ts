@@ -27,7 +27,28 @@ function reconcile(
         comments.set(comment.id, comment);
     }
     for (const comment of incoming) {
-        comments.set(comment.id, comment);
+        const existing = comments.get(comment.id);
+        if (
+            comment.status === "visible" &&
+            existing?.reactions_updated_locally &&
+            !comment.reactions_updated_locally
+        ) {
+            comments.set(comment.id, {
+                ...comment,
+                reactions: existing.reactions,
+                reactions_updated_locally: true,
+            });
+        } else {
+            comments.set(comment.id, {
+                ...comment,
+                reactions:
+                    comment.status === "visible" ? comment.reactions : [],
+                reactions_updated_locally:
+                    comment.status === "visible"
+                        ? comment.reactions_updated_locally
+                        : false,
+            });
+        }
     }
     return Array.from(comments.values()).sort(compare);
 }

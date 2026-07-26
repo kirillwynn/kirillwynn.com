@@ -46,11 +46,12 @@ Do not copy that note into the repository.
 - [Content API contract](docs/api-contract.md)
 - [ADR 0001: Django/Wagtail and Next.js](docs/decisions/0001-django-wagtail-nextjs.md)
 - [ADR 0002: Content API, preview, and revalidation](docs/decisions/0002-content-api-preview-revalidation.md)
+- [ADR 0003: Concrete Unicode reaction contract](docs/decisions/0003-unicode-reaction-contract.md)
 - [Codex project instructions](AGENTS.md)
 
 ## Current state
 
-Milestones 1–6 are available under `backend/django/` and `frontend/next/`:
+Milestones 1–7 are available under `backend/django/` and `frontend/next/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -91,6 +92,12 @@ Milestones 1–6 are available under `backend/django/` and `frontend/next/`:
 - plain-text post comments and one-level Slack-style threads with cursor
   pagination, soft deletion, moderation tombstones, protected identities, and
   database-backed per-user mutation limits;
+- concrete post/comment Unicode reactions with transactional target locks,
+  grouped viewer state, private cursor-paginated participants, and Wagtail
+  quick-reaction settings;
+- accessible post/comment/reply reaction pills, a lazy local Unicode picker,
+  bounded recent emoji, optimistic rollback, and confirmation-based OAuth
+  continuation;
 - an accessible desktop thread drawer and mobile full-screen thread layer with
   pinned root/composer, focus restoration, query-string navigation, and
   sessionStorage-backed pending OAuth drafts;
@@ -169,10 +176,23 @@ Discussion routes:
 - `POST /api/v1/comments/<id>/replies/`;
 - `PATCH/DELETE /api/v1/comments/<id>/`.
 
+Reaction routes:
+
+- `GET /api/v1/reactions/config/`;
+- `GET /api/v1/posts/<unicode-slug>/reactions/`;
+- `POST /api/v1/posts/<unicode-slug>/reactions/toggle/`;
+- `GET /api/v1/comments/<id>/reactions/`;
+- `POST /api/v1/comments/<id>/reactions/toggle/`;
+- exact post/comment participant endpoints documented in
+  [the API contract](docs/api-contract.md).
+
 Comment mutations use Django sessions, normal CSRF, and the per-user fixed
 windows configured by the four `COMMENT_*_RATE_LIMIT_*` environment values.
 Defaults are 10 creates/replies and 30 edits/deletes per 60 seconds. Comment
 responses are always `private, no-store` and never enter the public post cache.
+Reaction toggles default to 60 per 60 seconds through the two
+`REACTION_TOGGLE_RATE_LIMIT_*` values. Reaction responses use the same
+private/no-store viewer boundary.
 
 `PUBLIC_SITE_URL` is public configuration, not a secret. It defaults to
 `http://localhost:3000` in local settings and is required in production as an
@@ -222,6 +242,8 @@ The public frontend includes:
   connection state;
 - client-side comments below public posts and a responsive Slack-style thread
   layer; comments are deliberately omitted from Draft Mode;
+- post, comment, and reply reactions with quick actions, local lazy picker,
+  participants, recent emoji, and no Draft Mode reaction UI;
 - a keyboard/touch accessible current-user menu and CSRF-protected logout;
 - loading, upstream error, empty, and not-found states.
 

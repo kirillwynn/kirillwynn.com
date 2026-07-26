@@ -5,7 +5,8 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connection
 
-from apps.discussions.models import CommentRateLimitBucket
+from apps.discussions.models import CommentRateLimitBucket, CommentReaction, PostReaction
+from apps.discussions.reactions import toggle_comment_reaction, toggle_post_reaction
 from apps.discussions.services import (
     consume_comment_rate_limit,
     edit_comment,
@@ -84,3 +85,26 @@ def test_edit_delete_race_serializes_to_deleted_state(public_post, user):
     assert comment.deleted_at is not None
     assert "deleted" in results
     assert set(results) <= {"deleted", "edited", "ValidationError"}
+
+
+def test_parallel_post_and_comment_toggles_return_to_original_state(public_post, user):
+    from apps.discussions.services import create_top_level_comment
+
+    comment = create_top_level_comment(post=public_post, author=user, body="Root")
+    post_results = _run_concurrently(
+        [
+            lambda: toggle_post_reaction(post_id=public_post.pk, user=user, emoji="🔥")[1],
+            lambda: toggle_post_reaction(post_id=public_post.pk, user=user, emoji="🔥")[1],
+        ]
+    )
+    comment_results = _run_concurrently(
+        [
+            lambda: toggle_comment_reaction(comment_id=comment.pk, user=user, emoji="🎉")[1],
+            lambda: toggle_comment_reaction(comment_id=comment.pk, user=user, emoji="🎉")[1],
+        ]
+    )
+
+    assert sorted(post_results) == [False, True]
+    assert sorted(comment_results) == [False, True]
+    assert not PostReaction.objects.filter(post=public_post, user=user, emoji="🔥").exists()
+    assert not CommentReaction.objects.filter(comment=comment, user=user, emoji="🎉").exists()

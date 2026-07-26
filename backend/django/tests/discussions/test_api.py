@@ -62,6 +62,7 @@ def test_anonymous_list_contract_plain_text_headers_and_no_n_plus_one(
         "edited_at",
         "reply_count",
         "last_reply_at",
+        "reactions",
         "viewer",
     }
     assert result["body"] == '<script>alert("text only")</script>'
@@ -77,6 +78,7 @@ def test_anonymous_list_contract_plain_text_headers_and_no_n_plus_one(
         "can_edit": False,
         "can_delete": False,
         "can_reply": False,
+        "can_react": False,
     }
 
 

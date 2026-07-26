@@ -2,6 +2,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
+from wagtail.contrib.settings.models import BaseSiteSetting
+
+from apps.discussions.emoji import normalize_emoji
 
 
 class Comment(models.Model):
@@ -149,3 +152,108 @@ class CommentRateLimitBucket(models.Model):
                 name="discussion_unique_rate_bucket",
             )
         ]
+
+
+class ReactionModel(models.Model):
+    emoji = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+
+    def clean(self):
+        super().clean()
+        self.emoji = normalize_emoji(self.emoji)
+
+    def save(self, *args, **kwargs):
+        self.emoji = normalize_emoji(self.emoji)
+        return super().save(*args, **kwargs)
+
+
+class PostReaction(ReactionModel):
+    post = models.ForeignKey(
+        "blog.BlogPostPage",
+        on_delete=models.PROTECT,
+        related_name="reactions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="post_reactions",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("post", "user", "emoji"),
+                name="discussion_unique_post_reaction",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("post", "emoji", "created_at", "id"),
+                name="discussion_post_reaction_idx",
+            )
+        ]
+
+
+class CommentReaction(ReactionModel):
+    comment = models.ForeignKey(
+        Comment,
+        on_delete=models.PROTECT,
+        related_name="reactions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="comment_reactions",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("comment", "user", "emoji"),
+                name="discussion_unique_comment_reaction",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("comment", "emoji", "created_at", "id"),
+                name="discussion_comment_react_idx",
+            )
+        ]
+
+
+class ReactionRateLimitBucket(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reaction_rate_limit_bucket",
+    )
+    window_started_at = models.DateTimeField()
+    request_count = models.PositiveIntegerField(default=0)
+
+
+class ReactionSettings(BaseSiteSetting):
+    quick_reaction_one = models.CharField(max_length=128, default="👍")
+    quick_reaction_two = models.CharField(max_length=128, default="❤️")
+    quick_reaction_three = models.CharField(max_length=128, default="🎉")
+
+    @property
+    def quick_reactions(self):
+        return [
+            self.quick_reaction_one,
+            self.quick_reaction_two,
+            self.quick_reaction_three,
+        ]
+
+    def clean(self):
+        super().clean()
+        normalized = [normalize_emoji(value) for value in self.quick_reactions]
+        if len(set(normalized)) != 3:
+            raise ValidationError("Quick reactions must be distinct after normalization.")
+        (
+            self.quick_reaction_one,
+            self.quick_reaction_two,
+            self.quick_reaction_three,
+        ) = normalized

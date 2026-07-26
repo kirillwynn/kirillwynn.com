@@ -27,6 +27,7 @@ import {
     type PublicComment,
     type ThreadPage,
 } from "@/lib/comments";
+import { resetReactionConfigForTests } from "@/lib/reactions";
 
 const anonymous: MeResponse = {
     authenticated: false,
@@ -73,10 +74,12 @@ function comment(overrides: Partial<PublicComment> = {}): PublicComment {
         edited_at: null,
         reply_count: 1,
         last_reply_at: "2026-07-26T20:05:00Z",
+        reactions: [],
         viewer: {
             can_edit: false,
             can_delete: false,
             can_reply: false,
+            can_react: false,
         },
         ...overrides,
     };
@@ -151,6 +154,11 @@ async function renderComments(
         if (url === "/api/me/") {
             return Promise.resolve(response(me));
         }
+        if (url === "/api/v1/reactions/config/") {
+            return Promise.resolve(
+                response({ quick_reactions: ["👍", "❤️", "🎉"] }),
+            );
+        }
         if (url.includes("/thread/") && thread) {
             return Promise.resolve(response(thread));
         }
@@ -174,6 +182,7 @@ async function renderComments(
 }
 
 beforeEach(() => {
+    resetReactionConfigForTests();
     vi.stubGlobal("fetch", vi.fn());
     window.sessionStorage.clear();
     window.history.replaceState(
@@ -454,6 +463,27 @@ describe("comment reconciliation", () => {
         expect(merged.map((root) => root.id)).toEqual([3, 2, 1]);
         expect(merged.at(-1)?.body).toBe("Fresh root");
     });
+
+    it("preserves authoritative local reaction state across cursor reconciliation", () => {
+        const locallyReacted = comment({
+            reactions: [
+                {
+                    emoji: "👩‍💻",
+                    count: 2,
+                    viewer_reacted: true,
+                    participants:
+                        "/api/v1/comments/7/reactions/%F0%9F%91%A9%E2%80%8D%F0%9F%92%BB/participants/",
+                },
+            ],
+            reactions_updated_locally: true,
+        });
+        const staleCursorCopy = comment({ reactions: [] });
+
+        const [merged] = reconcileRoots([locallyReacted], [staleCursorCopy]);
+
+        expect(merged.reactions).toEqual(locallyReacted.reactions);
+        expect(merged.reactions_updated_locally).toBe(true);
+    });
 });
 
 describe("comments and Slack-style thread UI", () => {
@@ -607,6 +637,7 @@ describe("comments and Slack-style thread UI", () => {
                 can_edit: true,
                 can_delete: true,
                 can_reply: true,
+                can_react: true,
             },
         });
         vi.mocked(fetch).mockResolvedValueOnce(response(created, 201));
@@ -641,6 +672,7 @@ describe("comments and Slack-style thread UI", () => {
                 can_edit: true,
                 can_delete: true,
                 can_reply: true,
+                can_react: true,
             },
         });
         const { container, root } = await renderComments(
@@ -854,6 +886,7 @@ describe("comments and Slack-style thread UI", () => {
                 can_edit: false,
                 can_delete: false,
                 can_reply: true,
+                can_react: true,
             },
         });
         const authenticatedRender = await renderComments(
@@ -916,6 +949,7 @@ describe("comments and Slack-style thread UI", () => {
                 can_edit: false,
                 can_delete: false,
                 can_reply: true,
+                can_react: true,
             },
         });
         const initialReplies = Array.from({ length: 20 }, (_, index) =>
@@ -1028,6 +1062,7 @@ describe("comments and Slack-style thread UI", () => {
                 can_edit: false,
                 can_delete: false,
                 can_reply: true,
+                can_react: true,
             },
         });
         const reply = comment({
@@ -1078,7 +1113,7 @@ describe("comments and Slack-style thread UI", () => {
         });
     });
 
-    it("keeps comments out of Draft Mode and forbids HTML/reaction shortcuts", () => {
+    it("keeps discussions and reactions out of Draft Mode and forbids HTML injection", () => {
         const postPage = readFileSync("app/posts/[slug]/page.tsx", "utf8");
         const commentSources = [
             "../components/comment-card.tsx",
@@ -1087,14 +1122,13 @@ describe("comments and Slack-style thread UI", () => {
         ].map((path) => readFileSync(path.replace("../", ""), "utf8"));
         const css = readFileSync("app/globals.css", "utf8");
 
+        expect(postPage).toContain("!preview ? (");
         expect(postPage).toContain(
-            "!preview ? <CommentsSection slug={post.slug} /> : null",
+            "<PostReactions id={post.id} slug={post.slug} />",
         );
+        expect(postPage).toContain("<CommentsSection slug={post.slug} />");
         expect(commentSources.join("\n")).not.toContain(
             "dangerouslySetInnerHTML",
-        );
-        expect(commentSources.join("\n").toLowerCase()).not.toContain(
-            "reaction",
         );
         expect(css).toContain("height: 100dvh");
         expect(css).toContain("env(safe-area-inset-bottom)");

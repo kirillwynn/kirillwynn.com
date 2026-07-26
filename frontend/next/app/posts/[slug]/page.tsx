@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { DateTime } from "@/components/date-time";
 import { CommentsSection } from "@/components/comments-section";
 import { PostBody } from "@/components/post-body";
+import { PostReactions } from "@/components/post-reactions";
 import { PreviewBanner } from "@/components/preview-banner";
 import { Tags } from "@/components/tags";
 import { postMetadata } from "@/lib/metadata";
@@ -66,7 +67,12 @@ export default async function PostPage({ params }: PostPageProps) {
                 <PostBody blocks={post.body} />
             </div>
 
-            {!preview ? <CommentsSection slug={post.slug} /> : null}
+            {!preview ? (
+                <>
+                    <PostReactions id={post.id} slug={post.slug} />
+                    <CommentsSection slug={post.slug} />
+                </>
+            ) : null}
         </article>
     );
 }

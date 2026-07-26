@@ -13,6 +13,7 @@ dependencies = [
     "django-allauth[socialaccount]==65.18.0",
     "django-treebeard==5.2.0",
     "djangorestframework==3.17.1",
+    "emoji==2.15.0",
     "gunicorn==23.0.0",
     "psycopg[binary]==3.2.12",
     "Wagtail==7.4.2",

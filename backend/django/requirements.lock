@@ -59,6 +59,8 @@ djangorestframework==3.17.1
     #   wagtail
 draftjs-exporter==5.2.0
     # via wagtail
+emoji==2.15.0
+    # via kirillwynn-backend
 et-xmlfile==2.0.0
     # via openpyxl
 filetype==1.2.0

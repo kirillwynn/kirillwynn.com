@@ -1,3 +1,5 @@
+import type { ReactionGroup } from "@/lib/reactions";
+
 export type CommentStatus = "visible" | "deleted" | "hidden";
 
 export type CommentAuthor = {
@@ -10,6 +12,7 @@ export type CommentViewer = {
     can_edit: boolean;
     can_delete: boolean;
     can_reply: boolean;
+    can_react: boolean;
 };
 
 export type PublicComment = {
@@ -25,6 +28,8 @@ export type PublicComment = {
     edited_at: string | null;
     reply_count: number;
     last_reply_at: string | null;
+    reactions: ReactionGroup[];
+    reactions_updated_locally?: boolean;
     viewer: CommentViewer;
 };
 

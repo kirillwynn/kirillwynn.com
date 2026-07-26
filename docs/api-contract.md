@@ -238,10 +238,19 @@ mutation returns `403`.
   "edited_at": null,
   "reply_count": 2,
   "last_reply_at": "2026-07-26T20:05:00.000000Z",
+  "reactions": [
+    {
+      "emoji": "🔥",
+      "count": 2,
+      "viewer_reacted": false,
+      "participants": "/api/v1/comments/123/reactions/%F0%9F%94%A5/participants/"
+    }
+  ],
   "viewer": {
     "can_edit": false,
     "can_delete": false,
-    "can_reply": false
+    "can_reply": false,
+    "can_react": false
   }
 }
 ```
@@ -360,6 +369,141 @@ Counts and windows are configured through
 fail settings initialization. A limit response is `429`, includes
 `Retry-After`, and does not create one database row per request. This is normal
 application abuse protection, not future edge/DDoS protection.
+
+## Reactions
+
+Reaction reads are anonymous; mutations use the same Django session,
+active/non-banned user, and CSRF boundary as comments. Every reaction response,
+including config, errors, aggregates, toggles, and participant pages, has:
+
+```text
+Cache-Control: private, no-store
+Vary: Cookie
+```
+
+Post reaction routes reuse the canonical public post policy. Comment routes
+also require a post accepted by that policy. Draft, unpublished, future,
+expired, restricted, and unknown targets return 404.
+
+### Canonical emoji key
+
+Toggle payloads accept exactly:
+
+```json
+{"emoji": "👩‍💻"}
+```
+
+Unexpected fields are rejected. Django requires a string, normalizes it to NFC,
+limits it to 32 Unicode code points and 128 UTF-8 bytes, and accepts exactly one
+standard RGI Unicode emoji sequence through `emoji` 2.15.0. ZWJ sequences,
+skin-tone modifiers, flags, keycaps, gender variants, and meaningful variation
+selectors are preserved. Text, multiple emoji, shortcode/custom emoji,
+whitespace, controls/bidi formatting, lone components, and malformed sequences
+are rejected.
+
+Groups are ordered by canonical emoji key and have:
+
+```json
+{
+  "emoji": "🔥",
+  "count": 12,
+  "viewer_reacted": true,
+  "participants": "/api/v1/posts/post/reactions/%F0%9F%94%A5/participants/"
+}
+```
+
+`participants` is an exact relative endpoint for that target and emoji.
+
+### Post aggregates and toggle
+
+- `GET /api/v1/posts/<unicode-slug>/reactions/`
+- `POST /api/v1/posts/<unicode-slug>/reactions/toggle/`
+
+The GET response is:
+
+```json
+{"reactions": []}
+```
+
+Toggle adds the viewer's `(post, emoji)` row when absent and removes it when
+present. A user may hold several different emoji on one post. It returns the
+complete authoritative aggregate:
+
+```json
+{
+  "action": "added",
+  "reactions": []
+}
+```
+
+`action` is `added` or `removed`; clients replace optimistic state with
+`reactions`.
+
+### Comment aggregates and toggle
+
+- `GET /api/v1/comments/<id>/reactions/`
+- `POST /api/v1/comments/<id>/reactions/toggle/`
+
+The shapes match post reactions. Top-level comments and replies use the same
+contract. Comment list and thread representations embed their aggregate and
+viewer state, loaded in bounded grouped queries for the whole cursor page.
+
+Deleted or hidden tombstones return an empty aggregate, never expose
+participants, and reject new toggles with 403. Existing rows remain for
+moderation history. Client cursor reconciliation preserves a newer locally
+confirmed reaction aggregate by stable comment ID while still refreshing the
+rest of the comment.
+
+### Participants
+
+- `GET /api/v1/posts/<unicode-slug>/reactions/<emoji>/participants/`
+- `GET /api/v1/comments/<id>/reactions/<emoji>/participants/`
+
+Participants use a fixed page size of 20 and stable `(created_at, id)` cursor
+ordering. `next` and `previous` are relative and must match the same exact
+target/emoji endpoint.
+
+```json
+{
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 42,
+      "display_name": "Kirill",
+      "is_site_author": false
+    }
+  ]
+}
+```
+
+Email, OAuth/provider identity, tokens, session information, and moderation
+metadata are never present.
+
+### Quick reaction config
+
+`GET /api/v1/reactions/config/`
+
+```json
+{"quick_reactions": ["👍", "❤️", "🎉"]}
+```
+
+The three distinct canonical values come from the Wagtail
+`ReactionSettings` Site Setting. No Wagtail model IDs or internal metadata are
+returned.
+
+### Concurrency and rate limit
+
+Toggles lock the concrete post or comment row in one database transaction.
+This serializes all competing toggles for a target; the unique
+`(target, user, emoji)` constraint is the final duplicate boundary. Two
+sequential same-user/same-emoji toggles return to the original state.
+
+One database-backed fixed-window bucket is locked per user. Defaults are 60
+toggle requests per 60 seconds, configured through
+`REACTION_TOGGLE_RATE_LIMIT_COUNT` and
+`REACTION_TOGGLE_RATE_LIMIT_WINDOW_SECONDS`. Invalid/non-positive settings fail
+initialization. A limit response is 429 with integer `Retry-After`.
 
 ## StreamField discriminated union
 

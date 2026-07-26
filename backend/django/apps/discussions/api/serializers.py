@@ -24,11 +24,15 @@ def _author(user):
     }
 
 
+def serialize_reaction_participant(user):
+    return _author(user)
+
+
 def _can_interact(user):
     return bool(user.is_authenticated and user.is_active and not user.is_banned)
 
 
-def serialize_comment(comment, *, viewer):
+def serialize_comment(comment, *, viewer, reactions=()):
     status = comment.public_status
     root = comment.thread_root if comment.thread_root_id else comment
     can_interact = _can_interact(viewer)
@@ -54,6 +58,7 @@ def serialize_comment(comment, *, viewer):
         "edited_at": _timestamp(comment.edited_at),
         "reply_count": getattr(comment, "reply_count", 0),
         "last_reply_at": _timestamp(getattr(comment, "last_reply_at", None)),
+        "reactions": list(reactions) if status == "visible" else [],
         "viewer": {
             "can_edit": (
                 can_interact
@@ -67,5 +72,6 @@ def serialize_comment(comment, *, viewer):
                 and thread_allows_replies
                 and comment.moderation_state != Comment.ModerationState.HIDDEN
             ),
+            "can_react": can_interact and status == "visible",
         },
     }

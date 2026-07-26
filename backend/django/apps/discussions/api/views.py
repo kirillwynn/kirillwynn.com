@@ -1,6 +1,7 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Max
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
@@ -10,11 +11,30 @@ from rest_framework.views import APIView
 
 from apps.blog.services.visibility import public_blog_posts
 from apps.discussions.api.pagination import (
+    ReactionParticipantPagination,
     ThreadReplyPagination,
     TopLevelCommentPagination,
 )
-from apps.discussions.api.serializers import serialize_comment
-from apps.discussions.models import Comment, CommentRateLimitBucket
+from apps.discussions.api.serializers import (
+    serialize_comment,
+    serialize_reaction_participant,
+)
+from apps.discussions.emoji import normalize_emoji
+from apps.discussions.models import (
+    Comment,
+    CommentRateLimitBucket,
+    CommentReaction,
+    PostReaction,
+    ReactionSettings,
+)
+from apps.discussions.reactions import (
+    ReactionRateLimitExceeded,
+    ReactionTargetUnavailable,
+    comment_reaction_groups,
+    post_reaction_groups_for_post,
+    toggle_comment_reaction,
+    toggle_post_reaction,
+)
 from apps.discussions.services import (
     RateLimitExceeded,
     consume_comment_rate_limit,
@@ -92,6 +112,13 @@ def _body(request):
     return request.data["body"]
 
 
+def _emoji(request):
+    _validate_payload(request, allowed={"emoji"})
+    if "emoji" not in request.data:
+        raise ValidationError({"emoji": "This field is required."})
+    return normalize_emoji(request.data["emoji"])
+
+
 class CommentAPIViewMixin:
     permission_classes = [AllowAny]
 
@@ -139,7 +166,15 @@ class PostCommentListCreateAPIView(CommentAPIViewMixin, APIView):
         post = _public_post_or_404(slug)
         paginator = TopLevelCommentPagination()
         page = paginator.paginate_queryset(_roots(post), request, view=self)
-        results = [serialize_comment(comment, viewer=request.user) for comment in page]
+        grouped = comment_reaction_groups(page, viewer=request.user)
+        results = [
+            serialize_comment(
+                comment,
+                viewer=request.user,
+                reactions=grouped[comment.pk],
+            )
+            for comment in page
+        ]
         return paginator.get_paginated_response(results)
 
     def post(self, request, slug):
@@ -149,7 +184,7 @@ class PostCommentListCreateAPIView(CommentAPIViewMixin, APIView):
         comment = create_top_level_comment(post=post, author=user, body=_body(request))
         comment.reply_count = 0
         comment.last_reply_at = None
-        return Response(serialize_comment(comment, viewer=user), status=201)
+        return Response(serialize_comment(comment, viewer=user, reactions=[]), status=201)
 
 
 class CommentThreadAPIView(CommentAPIViewMixin, APIView):
@@ -166,10 +201,22 @@ class CommentThreadAPIView(CommentAPIViewMixin, APIView):
         )
         paginator = ThreadReplyPagination()
         page = paginator.paginate_queryset(replies, request, view=self)
+        grouped = comment_reaction_groups([root, *page], viewer=request.user)
         response = paginator.get_paginated_response(
-            [serialize_comment(reply, viewer=request.user) for reply in page]
+            [
+                serialize_comment(
+                    reply,
+                    viewer=request.user,
+                    reactions=grouped[reply.pk],
+                )
+                for reply in page
+            ]
         )
-        response.data["root"] = serialize_comment(root, viewer=request.user)
+        response.data["root"] = serialize_comment(
+            root,
+            viewer=request.user,
+            reactions=grouped[root.pk],
+        )
         return response
 
 
@@ -181,7 +228,7 @@ class CommentReplyAPIView(CommentAPIViewMixin, APIView):
         user = self._mutating_user(request)
         self._consume(user, CommentRateLimitBucket.Scope.CREATE)
         reply = create_reply(target_id=pk, author=user, body=_body(request))
-        return Response(serialize_comment(reply, viewer=user), status=201)
+        return Response(serialize_comment(reply, viewer=user, reactions=[]), status=201)
 
 
 class CommentDetailAPIView(CommentAPIViewMixin, APIView):
@@ -204,7 +251,8 @@ class CommentDetailAPIView(CommentAPIViewMixin, APIView):
                 .filter(pk=comment.pk)
                 .get()
             )
-        return Response(serialize_comment(comment, viewer=user))
+        grouped = comment_reaction_groups([comment], viewer=user)
+        return Response(serialize_comment(comment, viewer=user, reactions=grouped[comment.pk]))
 
     def delete(self, request, pk):
         _public_comment_or_404(pk)
@@ -212,3 +260,136 @@ class CommentDetailAPIView(CommentAPIViewMixin, APIView):
         self._consume(user, CommentRateLimitBucket.Scope.MUTATION)
         soft_delete_comment(comment_id=pk, actor=user)
         return Response(status=204)
+
+
+class ReactionThrottled(APIException):
+    status_code = 429
+    default_detail = "Too many reaction toggles. Please try again later."
+    default_code = "reaction_rate_limited"
+
+    def __init__(self, retry_after):
+        self.retry_after = retry_after
+        super().__init__()
+
+
+class ReactionAPIViewMixin(CommentAPIViewMixin):
+    def handle_exception(self, exc):
+        if isinstance(exc, ReactionRateLimitExceeded):
+            exc = ReactionThrottled(exc.retry_after)
+        elif isinstance(exc, ReactionTargetUnavailable):
+            exc = Http404()
+        response = super().handle_exception(exc)
+        if isinstance(exc, ReactionThrottled):
+            response["Retry-After"] = str(exc.retry_after)
+        return response
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        exception = getattr(response, "exception", None)
+        if isinstance(exception, ReactionThrottled):
+            response["Retry-After"] = str(exception.retry_after)
+        return response
+
+
+class PostReactionAPIView(ReactionAPIViewMixin, APIView):
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request, slug):
+        post = _public_post_or_404(slug)
+        return Response({"reactions": post_reaction_groups_for_post(post, viewer=request.user)})
+
+
+class PostReactionToggleAPIView(ReactionAPIViewMixin, APIView):
+    http_method_names = ["post", "options"]
+
+    def post(self, request, slug):
+        post = _public_post_or_404(slug)
+        user = self._mutating_user(request)
+        post, added = toggle_post_reaction(
+            post_id=post.pk,
+            user=user,
+            emoji=_emoji(request),
+        )
+        return Response(
+            {
+                "action": "added" if added else "removed",
+                "reactions": post_reaction_groups_for_post(post, viewer=user),
+            }
+        )
+
+
+class CommentReactionAPIView(ReactionAPIViewMixin, APIView):
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request, pk):
+        comment = _public_comment_or_404(pk)
+        grouped = comment_reaction_groups([comment], viewer=request.user)
+        return Response({"reactions": grouped[comment.pk]})
+
+
+class CommentReactionToggleAPIView(ReactionAPIViewMixin, APIView):
+    http_method_names = ["post", "options"]
+
+    def post(self, request, pk):
+        _public_comment_or_404(pk)
+        user = self._mutating_user(request)
+        comment, added = toggle_comment_reaction(
+            comment_id=pk,
+            user=user,
+            emoji=_emoji(request),
+        )
+        grouped = comment_reaction_groups([comment], viewer=user)
+        return Response(
+            {
+                "action": "added" if added else "removed",
+                "reactions": grouped[comment.pk],
+            }
+        )
+
+
+class ReactionParticipantAPIView(ReactionAPIViewMixin, APIView):
+    model = None
+    target_field = ""
+
+    def reactions(self, request, **kwargs):
+        raise NotImplementedError
+
+    def get(self, request, **kwargs):
+        emoji_value = normalize_emoji(kwargs["emoji"])
+        queryset = (
+            self.reactions(request, **kwargs)
+            .filter(emoji=emoji_value)
+            .select_related("user")
+            .order_by("created_at", "id")
+        )
+        paginator = ReactionParticipantPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        return paginator.get_paginated_response(
+            [serialize_reaction_participant(reaction.user) for reaction in page]
+        )
+
+
+class PostReactionParticipantAPIView(ReactionParticipantAPIView):
+    http_method_names = ["get", "head", "options"]
+
+    def reactions(self, request, **kwargs):
+        post = _public_post_or_404(kwargs["slug"])
+        return PostReaction.objects.filter(post=post)
+
+
+class CommentReactionParticipantAPIView(ReactionParticipantAPIView):
+    http_method_names = ["get", "head", "options"]
+
+    def reactions(self, request, **kwargs):
+        comment = _public_comment_or_404(kwargs["pk"])
+        if comment.public_status != "visible":
+            raise Http404
+        return CommentReaction.objects.filter(comment=comment)
+
+
+class ReactionConfigAPIView(ReactionAPIViewMixin, APIView):
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request):
+        configured = ReactionSettings.for_request(request)
+        return Response({"quick_reactions": configured.quick_reactions})
