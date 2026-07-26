@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { DateTime } from "@/components/date-time";
+import { CommentsSection } from "@/components/comments-section";
 import { PostBody } from "@/components/post-body";
 import { PreviewBanner } from "@/components/preview-banner";
 import { Tags } from "@/components/tags";
@@ -64,6 +65,8 @@ export default async function PostPage({ params }: PostPageProps) {
             <div className="mt-10">
                 <PostBody blocks={post.body} />
             </div>
+
+            {!preview ? <CommentsSection slug={post.slug} /> : null}
         </article>
     );
 }

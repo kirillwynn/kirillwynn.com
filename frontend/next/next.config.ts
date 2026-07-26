@@ -41,6 +41,22 @@ const nextConfig: NextConfig = {
                 source: "/api/auth/logout/",
                 destination: `${django}/api/auth/logout/`,
             },
+            {
+                source: "/api/v1/posts/:slug/comments/",
+                destination: `${django}/api/v1/posts/:slug/comments/`,
+            },
+            {
+                source: "/api/v1/comments/:id/thread/",
+                destination: `${django}/api/v1/comments/:id/thread/`,
+            },
+            {
+                source: "/api/v1/comments/:id/replies/",
+                destination: `${django}/api/v1/comments/:id/replies/`,
+            },
+            {
+                source: "/api/v1/comments/:id/",
+                destination: `${django}/api/v1/comments/:id/`,
+            },
         ]);
     },
     turbopack: {

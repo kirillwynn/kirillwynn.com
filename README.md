@@ -50,7 +50,7 @@ Do not copy that note into the repository.
 
 ## Current state
 
-Milestones 1–5 are available under `backend/django/` and `frontend/next/`:
+Milestones 1–6 are available under `backend/django/` and `frontend/next/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -88,6 +88,12 @@ Milestones 1–5 are available under `backend/django/` and `frontend/next/`:
 - Django database-backed sessions, same-origin cookies, and standard CSRF;
 - `/api/me/`, CSRF-protected `POST /api/auth/logout/`, `/login`, `/account`,
   and the authenticated header menu;
+- plain-text post comments and one-level Slack-style threads with cursor
+  pagination, soft deletion, moderation tombstones, protected identities, and
+  database-backed per-user mutation limits;
+- an accessible desktop thread drawer and mobile full-screen thread layer with
+  pinned root/composer, focus restoration, query-string navigation, and
+  sessionStorage-backed pending OAuth drafts;
 - verified-email provider linking without retained provider tokens, JWT,
   Auth.js, or browser-stored session tokens;
 - locked production and development dependencies.
@@ -156,6 +162,18 @@ Public content routes:
 - `http://localhost:8000/api/v1/preview/resolve/` (server-to-server preview
   resolution only).
 
+Discussion routes:
+
+- `GET/POST /api/v1/posts/<unicode-slug>/comments/`;
+- `GET /api/v1/comments/<id>/thread/`;
+- `POST /api/v1/comments/<id>/replies/`;
+- `PATCH/DELETE /api/v1/comments/<id>/`.
+
+Comment mutations use Django sessions, normal CSRF, and the per-user fixed
+windows configured by the four `COMMENT_*_RATE_LIMIT_*` environment values.
+Defaults are 10 creates/replies and 30 edits/deletes per 60 seconds. Comment
+responses are always `private, no-store` and never enter the public post cache.
+
 `PUBLIC_SITE_URL` is public configuration, not a secret. It defaults to
 `http://localhost:3000` in local settings and is required in production as an
 HTTP(S) origin without a path, query, or fragment. The backend uses it for
@@ -202,6 +220,8 @@ The public frontend includes:
 - signed `POST /api/revalidate`;
 - `/login` and `/account` with Google/GitHub POST initiation and provider
   connection state;
+- client-side comments below public posts and a responsive Slack-style thread
+  layer; comments are deliberately omitted from Draft Mode;
 - a keyboard/touch accessible current-user menu and CSRF-protected logout;
 - loading, upstream error, empty, and not-found states.
 

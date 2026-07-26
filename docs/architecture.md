@@ -176,6 +176,23 @@ The `Comment` model contains:
 
 User-provided arbitrary HTML is not accepted.
 
+`post`, `author`, `thread_root`, `reply_to_user`, and moderation identity use
+concrete foreign keys. Post and user identity deletion is protected while
+comments exist, and a root with replies cannot be hard-deleted through the
+normal API or admin UI. Database constraints enforce self-root, reply-shape,
+and moderation-shape invariants; the transactional discussions service also
+enforces cross-row rules that a root is top-level and shares the reply's post.
+
+Top-level comments use a stable newest-first cursor; replies use a stable
+oldest-first cursor and always point directly to their top-level root. Replying
+to a reply derives `reply_to_user` from the selected target and does not create
+another visual or persistence depth.
+
+Comment mutations use Django `SessionAuthentication`, normal same-origin CSRF,
+and a database-backed fixed-window limiter keyed by `(user, scope)`. A unique
+row per create/reply or edit/delete scope is locked transactionally, avoiding
+the cross-process and non-atomic behavior of DRF's local-memory throttle.
+
 ## Reactions
 
 Unicode emoji reactions are supported on posts and comments, including replies.

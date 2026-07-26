@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 5 remediation implemented and verified; awaiting owner review
+Overall state: Milestone 6 implemented and verified; awaiting owner review
 
 ## Current repository state
 
@@ -139,32 +139,57 @@ Overall state: Milestone 5 remediation implemented and verified; awaiting owner 
 - [x] OAuth setup, callback URLs, GitHub Environment names, session/API
   contracts, and external application tasks documented without creating or
   modifying provider applications or deployment secrets.
+- [x] Concrete `Comment` model added with protected post/user identities,
+  direct top-level roots, derived reply mentions, soft deletion, moderation
+  state, UTC timestamps, database constraints, and stable indexes.
+- [x] Anonymous comment/thread reads and session/CSRF-protected create, reply,
+  edit, and delete APIs added under exact versioned routes.
+- [x] The canonical public post visibility service gates every discussion
+  route; draft, unpublished, future, expired, and restricted posts remain 404.
+- [x] Cursor pagination provides newest-first roots, oldest-first one-level
+  replies, relative links, and annotated reply counts/activity without N+1.
+- [x] Plain-text normalization, 5000-code-point limit, control-character
+  rejection, escaped React text rendering, hidden/deleted tombstones, and
+  no-op edit behavior added.
+- [x] Django Admin hide/unhide and user ban/unban actions added with ordinary
+  hard comment deletion disabled.
+- [x] Database-backed fixed-window per-user mutation limits added with one row
+  per `(user, scope)`, row locking, race-safe unique creation, `429`, and
+  `Retry-After`.
+- [x] Public post comments UI added with anonymous, authenticated, banned,
+  loading, empty, retry, validation, edit/delete, and cursor load-more states.
+- [x] Slack-style desktop drawer and mobile full-screen thread layer added with
+  pinned root/composer, one-level replies, mention labels, query-string
+  navigation, Escape/focus handling, safe-area padding, and scroll containment.
+- [x] Comment and reply drafts survive OAuth/session expiry through bounded,
+  TTL-scoped `sessionStorage` namespaces and are never submitted automatically.
+- [x] Exact comment rewrites added without a generic `/api/:path*` proxy or
+  collision with auth, Draft Mode, or revalidation.
 
 ## Milestone transition
 
-Milestone 5 is complete. The application auth/session slice is implemented
-without changing the accepted Django/Next.js ownership boundary. External OAuth
-applications, live provider consent, Nginx production routing, discussions, and
-deployment remain deliberately separate work.
+Milestone 6 is complete. Django owns discussion persistence, authorization,
+moderation, and rate limiting; Next.js owns the no-store interactive comments
+and responsive thread presentation. The existing classic allauth session/CSRF
+boundary is unchanged. Emoji reactions were not started.
 
 ### Next recommended session
 
-Milestone 6: comments and Slack-style threads.
+Milestone 7: concrete post and comment emoji reactions.
 
 Scope:
 
-1. Add concrete post comment and one-depth thread models with preserved foreign
-   keys, moderation state, soft deletion, and UTC timestamps.
-2. Add authenticated REST create/edit/delete/reply APIs with permissions,
-   CSRF, rate limits, plain-text input, and pagination.
-3. Add desktop thread panel and mobile full-screen thread UI while preserving a
-   pending comment across OAuth return.
-4. Cover ownership, moderation, banned-user, XSS, concurrency, keyboard, and
-   mobile behavior.
+1. Add concrete `PostReaction` and `CommentReaction` tables with normal foreign
+   keys and unique `(target, user, normalized emoji)` constraints.
+2. Define Unicode emoji normalization/validation and transactional toggle
+   behavior.
+3. Add aggregated reaction counts and viewer state to public APIs without
+   weakening discussion caching or permissions.
+4. Add accessible pills/picker and optimistic rollback for posts, comments,
+   and replies.
 
 Out of scope for that session:
 
-- reactions;
 - search and tag filtering;
 - email subscriptions;
 - S3 storage and production deployment;
@@ -173,15 +198,13 @@ Out of scope for that session:
 
 ### Exit criteria
 
-- Google/GitHub mocked flows, verified-email linking, sessions, CSRF, logout,
-  safe return-to, and owner promotion pass backend coverage.
-- Anonymous and authenticated auth UI, provider forms, error/unavailable state,
-  account connection, expired session, and keyboard menu pass frontend
-  coverage.
-- Existing Feed, Bridge, public posts, and Draft Mode remain operational.
-- No provider credential, token, CSRF value, session key, or internal Django
-  origin enters browser assets.
-- OAuth documentation and the local Obsidian checklist are current.
+- Unique constraints and transactional toggles are verified on PostgreSQL.
+- Post/comment/reply aggregations and viewer state avoid N+1 queries.
+- Unicode emoji validation rejects non-emoji/confusable invalid keys.
+- Accessible reaction UI works by keyboard and touch with correct optimistic
+  rollback.
+- Existing Feed, Bridge, auth, Draft Mode, and Milestone 6 discussions remain
+  operational.
 
 ## Milestone queue
 
@@ -190,7 +213,7 @@ Out of scope for that session:
 - [x] Milestone 3 — REST content API, preview, and cache revalidation.
 - [x] Milestone 4 — Next.js shell, Feed, post renderer, and Bridge.
 - [x] Milestone 5 — Google/GitHub OAuth and session integration.
-- [ ] Milestone 6 — comments and Slack-style threads.
+- [x] Milestone 6 — comments and Slack-style threads.
 - [ ] Milestone 7 — post and comment reactions.
 - [ ] Milestone 8 — PostgreSQL search and tag filtering.
 - [ ] Milestone 9 — email subscriptions and durable outbox worker.
@@ -230,6 +253,12 @@ Out of scope for that session:
   locally. The Compose file parses as valid YAML. The Docker ignore rules were
   checked statically against the 138 MiB local `.next`, 407 MiB `node_modules`,
   and TypeScript build-info artifacts.
+- PostgreSQL-only row-lock concurrency tests for rate-bucket creation and
+  edit/delete serialization exist but were skipped locally because the test
+  database is SQLite. The production model was not weakened for SQLite.
+- No in-app Browser or Chrome backend was connected, so 375x812 and 1440x900
+  screenshots, real viewport keyboard behavior, touch keyboard avoidance, and
+  visual scroll-containment checks remain unverified.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - Email DNS records and provider credentials do not exist in the current
@@ -252,6 +281,36 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 ## Last verification
 
 2026-07-26:
+
+- `python3 -m uv lock --check` — passed with a writable temporary uv cache; 52
+  packages resolved and no dependency files changed.
+- Ruff format/check, Django test-settings system check, and
+  `makemigrations --check --dry-run` — passed.
+- Full `pytest` — passed: 280 tests; two PostgreSQL-only concurrency tests
+  skipped on SQLite. The new matrix covers models/constraints, visibility,
+  permissions, CSRF, body security, tombstones, moderation, ownership,
+  flattening, ordering, cursor stability, N+1 bounds, headers, rate limits,
+  admin protection, and migration reversal.
+- A new empty SQLite database applied the complete migration chain, reversed
+  `discussions` to zero, and applied `discussions.0001_initial` again.
+- Production `manage.py check --deploy` — passed with safe non-secret
+  verification values; one intentional Wagtail iframe warning remains silenced.
+- `npm ci` was not run because `package.json` and `package-lock.json` did not
+  change.
+- Prettier, ESLint, TypeScript, and full Vitest — passed: 88 tests in 12 files.
+- Production Next.js build — passed with safe public/verification configuration
+  after running outside the sandbox so Turbopack could bind its local CSS
+  worker port.
+- `npm audit` — passed against the registry with zero vulnerabilities.
+- Post-build `.next/static` scan found no internal Django origin, verification
+  secret, provider credential name, session identifier, or `X-Session-Token`.
+  Comment sources contain no `dangerouslySetInnerHTML` or reaction model/UI.
+- Browser runtime discovery returned no connected backends. Responsive
+  screenshots and live Tab/Escape/scroll/touch-keyboard QA could not run.
+- Docker and PostgreSQL server binaries remain unavailable. PostgreSQL locking
+  semantics and Compose integration were not represented as verified.
+
+Milestone 5 verification remains recorded below:
 
 - `python3 -m uv lock --check` — passed; 52 packages resolved.
 - `ruff format --check .` — passed (67 files); `ruff check .` — passed.

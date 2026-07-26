@@ -22,6 +22,17 @@ def positive_finite_float(name: str, default: str) -> float:
     return value
 
 
+def positive_int(name: str, default: str) -> int:
+    raw_value = os.environ.get(name, default).strip()
+    try:
+        value = int(raw_value)
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} must be a positive integer") from None
+    if value <= 0:
+        raise ImproperlyConfigured(f"{name} must be a positive integer")
+    return value
+
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 DEBUG = False
 ALLOWED_HOSTS: list[str] = []
@@ -30,6 +41,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.users",
     "apps.blog",
+    "apps.discussions",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -200,6 +212,15 @@ CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_HTTPONLY = True
 
 SITE_OWNER_EMAIL = os.environ.get("SITE_OWNER_EMAIL", "").strip()
+
+COMMENT_CREATE_RATE_LIMIT_COUNT = positive_int("COMMENT_CREATE_RATE_LIMIT_COUNT", "10")
+COMMENT_CREATE_RATE_LIMIT_WINDOW_SECONDS = positive_int(
+    "COMMENT_CREATE_RATE_LIMIT_WINDOW_SECONDS", "60"
+)
+COMMENT_MUTATION_RATE_LIMIT_COUNT = positive_int("COMMENT_MUTATION_RATE_LIMIT_COUNT", "30")
+COMMENT_MUTATION_RATE_LIMIT_WINDOW_SECONDS = positive_int(
+    "COMMENT_MUTATION_RATE_LIMIT_WINDOW_SECONDS", "60"
+)
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

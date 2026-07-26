@@ -45,14 +45,19 @@ describe("server-only security boundary", () => {
             "app/login/page.tsx",
             "components/account-panel.tsx",
             "components/auth-provider.tsx",
+            "components/comment-card.tsx",
+            "components/comments-section.tsx",
             "components/login-panel.tsx",
             "components/provider-form.tsx",
             "components/site-header.tsx",
             "components/site-footer.tsx",
+            "components/thread-panel.tsx",
             "components/post-card.tsx",
             "components/post-body.tsx",
             "components/preview-banner.tsx",
             "lib/bridge.ts",
+            "lib/comment-drafts.ts",
+            "lib/comments.ts",
         ]) {
             const contents = source(path);
             expect(contents).not.toContain("DJANGO_API_URL");
@@ -71,6 +76,10 @@ describe("server-only security boundary", () => {
         expect(config).toContain('source: "/accounts/:path*/"');
         expect(config).toContain('source: "/api/me/"');
         expect(config).toContain('source: "/api/auth/logout/"');
+        expect(config).toContain('source: "/api/v1/posts/:slug/comments/"');
+        expect(config).toContain('source: "/api/v1/comments/:id/thread/"');
+        expect(config).toContain('source: "/api/v1/comments/:id/replies/"');
+        expect(config).toContain('source: "/api/v1/comments/:id/"');
         expect(config).not.toContain("searchParams");
         expect(config).not.toContain("NEXT_PUBLIC_");
         expect(config).not.toContain('source: "/api/:path*"');
