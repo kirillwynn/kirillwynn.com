@@ -50,7 +50,7 @@ Do not copy that note into the repository.
 
 ## Current state
 
-Milestones 1–3 are available under `backend/django/` and `frontend/next/`:
+Milestones 1–4 are available under `backend/django/` and `frontend/next/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -74,8 +74,16 @@ Milestones 1–3 are available under `backend/django/` and `frontend/next/`:
 - Unicode post slugs across public detail, preview, and signed revalidation;
 - public-origin canonical/media URLs through `PUBLIC_SITE_URL`, with
   origin-independent relative pagination links;
-- a minimal Next.js 16.2.11 App Router application for Draft Mode diagnostics
-  and HMAC revalidation;
+- a public Next.js 16.2.11 App Router shell with Tailwind CSS 4.3.3;
+- a server-rendered paginated Feed and full post pages with all 13 typed
+  StreamField renderers;
+- responsive 480/960/1440 rendition rendering, accessible content tables,
+  read-only checklists, and server-rendered syntax highlighting with a safe
+  plain-text fallback;
+- per-post canonical, SEO, Open Graph article, and Draft Mode noindex metadata;
+- a responsive Bridge page with the eight legacy profile links and reused SVG
+  assets;
+- private immutable Draft Mode rendering and HMAC revalidation;
 - locked production and development dependencies.
 
 Existing files under `backend/app/`, `frontend/`, `docker/`, `nginx/`, and the
@@ -159,7 +167,7 @@ uv run python manage.py makemigrations --check --dry-run --settings=config.setti
 uv run pytest
 ```
 
-## Minimal Next.js preview frontend
+## Next.js public frontend
 
 Node.js 24 LTS and npm are required. The legacy Vite frontend remains unchanged.
 
@@ -170,18 +178,28 @@ npm ci
 npm run dev
 ```
 
-The Milestone 3 frontend contains only:
+The Milestone 4 frontend includes:
 
+- `/` — the server-rendered public Feed with accessible pagination;
+- `/posts/[slug]` — public and private Draft Mode post rendering;
+- `/bridge` — the eight approved profile links and team labels;
 - `/api/draft` and `/api/draft/disable`;
 - signed `POST /api/revalidate`;
-- a diagnostic server-rendered `/posts/[slug]`.
+- loading, upstream error, empty, and not-found states.
 
-It is not the final public UI. Tailwind, Feed, Bridge, metadata rendering, and
-the full body-block renderer belong to Milestone 4.
+The Feed fetch uses only the `posts` cache tag. Public post details use only
+`post-slug:<slug>`. Draft snapshots are resolved server-to-server with
+`cache: "no-store"` and never enter the public cache.
 
 `REVALIDATION_SECRET` must contain at least 32 UTF-8 bytes. Django and Next.js
 reject a shorter runtime production value. Production preview cookies are
 always Secure; local HTTP preview remains available without Secure cookies.
+
+`PUBLIC_SITE_URL` is public server-rendering configuration rather than a
+secret. It defaults to `http://localhost:3000` outside production and is
+required in production as an HTTP(S) origin without a path, query, or fragment.
+It is used for static-page metadata and must never be replaced with the
+server-to-server `DJANGO_API_URL`.
 
 `uv.lock` is the complete development lock. `requirements.lock` is an exported,
 fully pinned production dependency set used by the Django container. When

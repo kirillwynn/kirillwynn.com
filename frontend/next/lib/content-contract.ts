@@ -46,7 +46,23 @@ export type ContentBlock =
           }
       >;
 
-export type PostDetail = {
+export type ContentTag = {
+    name: string;
+    slug: string;
+};
+
+export type SeoMetadata = {
+    title: string;
+    description: string;
+};
+
+export type OpenGraphMetadata = {
+    title: string;
+    description: string;
+    image: ContentImage | null;
+};
+
+export type PostMetadata = {
     api_version: "1.0";
     id: number;
     slug: string;
@@ -54,14 +70,24 @@ export type PostDetail = {
     excerpt: string;
     published_at: string | null;
     updated_at: string | null;
-    tags: Array<{ name: string; slug: string }>;
+    tags: ContentTag[];
     canonical_path: string;
     canonical_url: string;
-    seo: { title: string; description: string };
-    open_graph: {
-        title: string;
-        description: string;
-        image: ContentImage | null;
-    };
+    seo: SeoMetadata;
+    open_graph: OpenGraphMetadata;
+};
+
+export type PostListItem = PostMetadata & {
+    lead_image: ContentImage | null;
+};
+
+export type PostListResponse = {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: PostListItem[];
+};
+
+export type PostDetail = PostMetadata & {
     body: ContentBlock[];
 };

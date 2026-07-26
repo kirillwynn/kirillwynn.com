@@ -1,57 +1,69 @@
-import { cookies, draftMode } from "next/headers";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getPublicPost, resolvePreview } from "@/lib/server/django";
-import { PREVIEW_SNAPSHOT_COOKIE } from "@/lib/server/preview-cookies";
-import { decodeRouteSlug } from "@/lib/slug";
+import { DateTime } from "@/components/date-time";
+import { PostBody } from "@/components/post-body";
+import { PreviewBanner } from "@/components/preview-banner";
+import { Tags } from "@/components/tags";
+import { postMetadata } from "@/lib/metadata";
+import { loadPost } from "@/lib/server/post-loader";
 
-export default async function DiagnosticPostPage({
-    params,
-}: {
+type PostPageProps = {
     params: Promise<{ slug: string }>;
-}) {
-    const { slug: encodedSlug } = await params;
-    const slug = decodeRouteSlug(encodedSlug);
-    if (!slug) {
+};
+
+export async function generateMetadata({
+    params,
+}: PostPageProps): Promise<Metadata> {
+    const loaded = await loadPost((await params).slug);
+    if (loaded.status === "not-found") {
+        return {
+            title: "Post not found",
+            robots: { index: false, follow: false },
+        };
+    }
+    return postMetadata(loaded.post, loaded.preview);
+}
+
+export default async function PostPage({ params }: PostPageProps) {
+    const loaded = await loadPost((await params).slug);
+    if (loaded.status === "not-found") {
         notFound();
     }
-    const draft = await draftMode();
-    const cookieStore = await cookies();
-
-    let post;
-    if (draft.isEnabled) {
-        const credential = cookieStore.get(PREVIEW_SNAPSHOT_COOKIE)?.value;
-        if (!credential) {
-            notFound();
-        }
-        post = await resolvePreview(credential);
-    } else {
-        post = await getPublicPost(slug);
-    }
-
-    if (!post || post.slug !== slug) {
-        notFound();
-    }
+    const { post, preview } = loaded;
 
     return (
-        <main>
-            <p>
-                <strong>
-                    {draft.isEnabled ? "Draft snapshot" : "Public API"}
-                </strong>
-            </p>
-            <h1>{post.title}</h1>
-            <p>{post.excerpt}</p>
-            <p>
-                Page ID {post.id}; contract {post.api_version};{" "}
-                {post.body.length} body blocks.
-            </p>
-            <pre>{JSON.stringify(post.body, null, 2)}</pre>
-            {draft.isEnabled ? (
-                <p>
-                    <a href="/api/draft/disable">Exit Draft Mode</a>
+        <article className="mx-auto max-w-3xl">
+            {preview ? <PreviewBanner /> : null}
+
+            <header className="border-b border-stone-200 pb-9">
+                <p className="eyebrow">Post</p>
+                <h1 className="mt-3 break-words text-balance text-4xl font-semibold tracking-tight text-stone-950 sm:text-5xl">
+                    {post.title}
+                </h1>
+                <p className="mt-5 break-words text-xl leading-8 text-stone-600">
+                    {post.excerpt}
                 </p>
-            ) : null}
-        </main>
+                <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm text-stone-500">
+                    {post.published_at ? (
+                        <DateTime
+                            value={post.published_at}
+                            label="Published "
+                        />
+                    ) : null}
+                    {post.updated_at &&
+                    post.updated_at !== post.published_at ? (
+                        <DateTime value={post.updated_at} label="Updated " />
+                    ) : null}
+                </div>
+                <div className="mt-5">
+                    <Tags tags={post.tags} />
+                </div>
+            </header>
+
+            <div className="mt-10">
+                <PostBody blocks={post.body} />
+            </div>
+        </article>
     );
 }

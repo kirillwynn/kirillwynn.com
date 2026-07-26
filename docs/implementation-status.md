@@ -4,15 +4,15 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 3 audit remediated; awaiting owner review
+Overall state: Milestone 4 implemented and verified; awaiting owner review
 
 ## Current repository state
 
 - The `main` branch contains the deployed legacy Flask/React implementation.
 - The legacy database and Alembic history are experimental.
 - The new Django/Wagtail backend is isolated under `backend/django/`.
-- The minimal Next.js Draft Mode and revalidation application is isolated under
-  `frontend/next/`; the legacy Vite frontend remains unchanged.
+- The public Next.js application is isolated under `frontend/next/`; the legacy
+  Vite frontend remains unchanged.
 - Existing GitHub Actions, Nginx configuration, S3 utilities, social icons, and
   deployment secrets are reference material for the rebuild.
 - The root `docker-compose.yml` remains the legacy deployment stack.
@@ -80,46 +80,69 @@ Overall state: Milestone 3 audit remediated; awaiting owner review
   pagination, end-to-end Unicode slugs, aligned stable-ID/current/previous-slug
   cache tags, 32-byte revalidation secrets, environment-derived preview cookie
   security, and expanded Docker build-context exclusions.
+- [x] Tailwind CSS 4.3.3 and its PostCSS integration added without upgrading
+  Next.js 16.2.11 or React 19.2.8.
+- [x] Mobile-first public shell added with system fonts, Feed/Bridge
+  navigation, an honestly disabled Login control, footer, skip link, visible
+  focus, and reduced-motion handling.
+- [x] Typed public post-list client added with positive-page validation, the
+  `posts` list cache tag, granular detail cache tags, Unicode route boundaries,
+  and distinct 404/upstream handling.
+- [x] Server-rendered Feed added with semantic post cards, lead renditions,
+  tags as metadata, accessible pagination, and empty/loading/error/not-found
+  states.
+- [x] Public and Draft Mode post pages now share one exhaustive renderer for all
+  13 StreamField blocks; diagnostic JSON and internal identifiers were removed.
+- [x] Fixed responsive image renditions, decorative/contextual alt behavior,
+  accessible table headers, read-only checklists, safe links, and server-side
+  code highlighting with an unknown-language plain-text fallback added.
+- [x] Per-post SEO, canonical, Open Graph article metadata, timestamps, tags,
+  images, and Draft Mode noindex metadata added.
+- [x] Bridge added with exactly eight approved external links, the reused
+  legacy SVG assets, and Yandex/Deeplay team labels.
+- [x] Frontend coverage expanded from 37 to 65 Vitest tests, including every
+  block type, Feed/client/cache behavior, metadata, preview, Bridge, disabled
+  Login, and browser-bundle security boundaries.
 
 ## Milestone transition
 
-Milestone 3 is complete. Its exit criteria pass with the local/test
-filesystem-storage and SQLite configuration. S3, PostgreSQL-backed
-verification, Nginx routing, and production scheduler invocation remain
-deliberately separate infrastructure work.
+Milestone 4 is complete. Its functional and automated exit criteria pass
+against the existing content API contract. S3, PostgreSQL-backed verification,
+Nginx routing, OAuth, discussions, and production deployment remain deliberately
+separate work.
 
 ### Next recommended session
 
-Milestone 4: public Next.js shell, Feed, post renderer, and Bridge.
+Milestone 5: Google/GitHub OAuth and same-origin session integration.
 
 Scope:
 
-1. Build the mobile-first Next.js layout and navigation without changing the
-   content contract.
-2. Implement the paginated Feed and post cards from `/api/v1/posts/`.
-3. Replace the diagnostic page with renderers for all 13 typed body blocks.
-4. Add public metadata, canonical, and Open Graph rendering.
-5. Implement Bridge from configuration or Wagtail Site Settings.
-6. Add component/Playwright coverage at 375x812 and 1440x900, including
-   keyboard focus and non-hover behavior.
+1. Add django-allauth Google and GitHub providers with minimal scopes and no
+   retained provider tokens when identity is sufficient.
+2. Add the current-user API, same-origin session cookies, CSRF protection, and
+   safe return-to behavior.
+3. Replace the disabled Login control with real login/user-menu states.
+4. Cover account linking, logout, callback failures, open redirects, and
+   authenticated navigation.
 
 Out of scope for that session:
 
-- public Feed/post visual implementation beyond the minimal preview endpoint;
-- OAuth, comments, and reactions;
+- comments, Slack-style threads, and reactions;
 - search and tag filtering;
+- email subscriptions;
 - S3 storage and production deployment;
 - Nginx or production infrastructure changes;
 - deletion of legacy reference files.
 
 ### Exit criteria
 
-- Anonymous clients receive only currently public posts.
-- Every content field and StreamField block has a stable versioned contract.
-- Draft Mode renders one short-lived immutable snapshot without a browser URL
-  token or public cache entry.
-- Publish/unpublish cache events survive frontend failure and retry safely.
-- Backend and minimal frontend verification pass.
+- Feed, public/Unicode post, Draft preview/exit, not-found, and Bridge render
+  through the public Next.js shell.
+- Every one of the 13 content blocks is rendered exhaustively and accessibly.
+- List/detail/preview cache boundaries preserve the Milestone 3 contract.
+- Canonical and Open Graph article metadata use public origins; Draft Mode is
+  noindex.
+- Backend and frontend automated verification pass.
 - The status file and local Obsidian checklist are updated.
 
 ## Milestone queue
@@ -127,7 +150,7 @@ Out of scope for that session:
 - [x] Milestone 1 — repository foundation and Django/Wagtail skeleton.
 - [x] Milestone 2 — content pages, StreamField blocks, tags, media, revisions.
 - [x] Milestone 3 — REST content API, preview, and cache revalidation.
-- [ ] Milestone 4 — Next.js shell, Feed, post renderer, and Bridge.
+- [x] Milestone 4 — Next.js shell, Feed, post renderer, and Bridge.
 - [ ] Milestone 5 — Google/GitHub OAuth and session integration.
 - [ ] Milestone 6 — comments and Slack-style threads.
 - [ ] Milestone 7 — post and comment reactions.
@@ -204,9 +227,6 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 - Empty-file SQLite migration passed through all Django, Wagtail,
   `wagtail_headless_preview.0001_initial`, and
   `blog.0003_alter_revalidationevent_previous_slug_and_more` migrations.
-- `migrate blog 0002` followed by `migrate blog 0003` passed on that clean
-  SQLite database, verifying reverse/forward behavior for the new Unicode-slug
-  migration.
 - `python3 -m uv run --frozen python manage.py check --deploy` with production
   settings and safe non-secret verification values — passed; the
   Wagtail-required `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally
@@ -214,23 +234,31 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 - Production settings regression tests confirm that `PUBLIC_SITE_URL` is
   mandatory, normalized, and origin-only, and that production/runtime rejects
   `REVALIDATION_SECRET` values shorter than 32 UTF-8 bytes.
-- Node.js 24.18.0 was selected through fnm. `npm ci` was not needed because
-  neither dependencies nor lockfile changed.
+- Node.js 24.18.0 and npm 11.16.0 were selected through fnm.
+- `npm ci` — passed from the updated npm lockfile; 171 packages installed.
 - `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
-- `npm test` — passed; 37 Vitest tests in 6 files, including Unicode HMAC,
-  parse/derive allowlists, unsafe slug rejection, single URL encoding,
-  current/previous cache tags, and both preview cookie security modes.
+- `npm test` — passed; 65 Vitest tests in 10 files. Coverage includes the
+  original 37 preview/revalidation tests plus list pagination/cache tags,
+  Unicode links, 404/upstream separation, every one of the 13 renderers,
+  responsive images and alt behavior, table headers, safe links, unknown code
+  languages, metadata, Draft Mode noindex/banner, Bridge, disabled Login, and
+  browser-facing security boundaries.
 - `npm run build` — passed with Next.js 16.2.11 and React/React DOM 19.2.8;
-  `/api/draft`, `/api/draft/disable`, `/api/revalidate`, and `/posts/[slug]`
-  are dynamic server routes. Built browser assets contain no revalidation
-  secret name/value.
-- Live local production-build Django/Next.js integration passed for the
-  percent-encoded `/posts/привет-мир` route and server-rendered Unicode post.
-  Signed Unicode revalidation returned `duplicate: false` and then
-  `duplicate: true` for the identical event.
-- Static Docker-context audit confirmed `.dockerignore` excludes `.next`,
-  coverage, build info, package-manager caches/debug logs, and existing
-  `node_modules`; no user caches were deleted.
+  Feed and post routes are dynamic server routes and Bridge is statically
+  rendered.
+- `npm audit` — passed; zero vulnerabilities.
+- A post-build browser-asset scan passed with no `DJANGO_API_URL`,
+  `REVALIDATION_SECRET`, verification value, `localhost:8000`, or
+  `django:8000` matches under `.next/static`.
+- Local production-build HTTP integration against a contract fixture passed
+  for Feed, normal and percent-encoded Unicode posts, Bridge, not-found UI,
+  Draft Mode entry, private preview banner/title/noindex, preview exit, and
+  return to public content.
+- In-app Browser discovery returned no available browser backends. Visual
+  screenshot QA, real keyboard traversal, and live 375x812/1440x900 viewport
+  inspection could not run; responsive breakpoints, wrapping, semantic focus
+  controls, and reduced-motion behavior were checked statically and by
+  component tests instead.
 - Docker, PostgreSQL server binaries, and `pg_isready` are not installed, so
   Docker and PostgreSQL-backed migration/search checks were not run. SQLite
   results are not represented as PostgreSQL verification.

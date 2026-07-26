@@ -20,3 +20,7 @@ export function decodeRouteSlug(value: string): string | null {
         return null;
     }
 }
+
+export function postPath(slug: string): string | null {
+    return isValidSlug(slug) ? `/posts/${encodeURIComponent(slug)}` : null;
+}
