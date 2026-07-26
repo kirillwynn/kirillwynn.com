@@ -9,11 +9,30 @@
 
 # Re-ignore common junk inside allowed dirs
 **/__pycache__/
-**/*.pyc
+**/*.py[cod]
+**/.venv/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.hypothesis/
+**/.tox/
+**/.nox/
+**/.coverage
+**/.coverage.*
+**/htmlcov/
+**/staticfiles/
+**/media/
+**/*.sqlite
+**/*.sqlite3
+**/*.db
 **/node_modules/
 **/.vite/
 **/dist/
+**/build/
+**/*.egg-info/
 **/.DS_Store
 **/*.log
+**/*.tmp
+**/*.swp
 **/.env
 **/.env.*

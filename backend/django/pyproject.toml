@@ -9,7 +9,7 @@ description = "Django and Wagtail backend for kirillwynn.com"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "Django==5.2.15",
+    "Django==5.2.16",
     "django-treebeard==5.2.0",
     "djangorestframework==3.17.1",
     "gunicorn==23.0.0",

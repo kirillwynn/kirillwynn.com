@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: backend foundation implemented
+Overall state: Milestone 1 audit remediation complete; awaiting owner review
 
 ## Current repository state
 
@@ -35,7 +35,7 @@ Overall state: backend foundation implemented
 - [x] Initial architecture ADR added.
 - [x] Cross-session development workflow added.
 - [x] Legacy application and infrastructure inventoried without deletion.
-- [x] Django 5.2.15 LTS and Wagtail 7.4.2 LTS scaffolded.
+- [x] Django 5.2.16 LTS and Wagtail 7.4.2 LTS scaffolded.
 - [x] Django REST Framework and PostgreSQL environment configuration added.
 - [x] Custom `users.User` created in the initial project migration.
 - [x] Local, test, and production settings separated.
@@ -45,12 +45,17 @@ Overall state: backend foundation implemented
 - [x] Python 3.12.13 and all Python dependencies locked.
 - [x] Pytest, pytest-django, Ruff, system checks, and smoke tests added.
 - [x] Local PostgreSQL/Django Compose stack documented.
+- [x] Milestone 1 audit remediated: Django security patch, production Wagtail
+  URL validation, Docker context exclusions, and configuration coverage added.
 
-## Active milestone
+## Milestone transition
 
-Milestone 2: Wagtail content models and authoring foundation.
+Milestone 1 audit remediation is complete and pending owner review. Milestone 2
+has not started.
 
 ### Next recommended session
+
+Milestone 2: Wagtail content models and authoring foundation.
 
 Scope:
 
@@ -103,8 +108,10 @@ Out of scope for that session:
 - The new backend currently coexists at `backend/django/` so the legacy Docker
   build remains intact. A later infrastructure milestone must promote the new
   backend to the final image layout deliberately.
-- The new Docker/PostgreSQL development stack was not executed in this session
-  because Docker and PostgreSQL server binaries were not available locally.
+- Docker build, Docker Compose config, and PostgreSQL-backed migrations remain
+  unverified because Docker and PostgreSQL server binaries are not available
+  locally. The Compose file parses as valid YAML, and the Docker build context
+  and ignore rules were checked statically.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - Email DNS records and provider credentials do not exist in the current
@@ -128,19 +135,26 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-26:
 
-- `uv run ruff format --check .` — passed (24 files).
-- `uv run ruff check .` — passed.
-- `uv run python manage.py check --settings=config.settings.test` — passed.
-- `uv run python manage.py makemigrations --check --dry-run
+- `python3 -m uv lock --check` — passed; 45 packages resolved.
+- Synced environment reports Python 3.12.13, Django 5.2.16, Wagtail 7.4.2,
+  Django REST Framework 3.17.1, and Ruff 0.12.12.
+- `python3 -m uv run --frozen ruff format --check .` — passed (25 files).
+- `python3 -m uv run --frozen ruff check .` — passed.
+- `python3 -m uv run --frozen python manage.py check
+  --settings=config.settings.test` — passed.
+- `python3 -m uv run --frozen python manage.py makemigrations --check --dry-run
   --settings=config.settings.test` — passed; no changes detected.
-- `uv run pytest` — passed; 6 tests.
-- `python manage.py migrate --noinput` with test settings — passed from an
+- `python3 -m uv run --frozen pytest` — passed; 8 tests.
+- `python3 -m uv run --frozen python manage.py migrate --noinput
+  --settings=config.settings.test` — passed from an
   empty in-memory SQLite database, including the custom user baseline and all
   Wagtail migrations.
-- `python manage.py check --deploy --settings=config.settings.production` with
-  non-secret verification values — passed; the Wagtail-required
+- `python3 -m uv run --frozen python manage.py check --deploy` with production
+  settings and safe non-secret verification values — passed; the
+  Wagtail-required
   `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally silenced.
-- Live development-server smoke requests — `/api/health/` returned 200;
-  `/django-admin/` and `/cms/` returned authentication redirects.
-- PostgreSQL migration and Docker image/Compose checks were not run because
-  neither Docker nor a PostgreSQL server is installed in the local environment.
+- The production-settings regression test confirms that a missing
+  `WAGTAIL_ADMIN_BASE_URL` raises `ImproperlyConfigured`.
+- Docker image build and `docker compose config` were not run because Docker is
+  not installed. Static checks confirmed valid Compose YAML, required Docker
+  context exclusions, and matching build-context paths.

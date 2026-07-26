@@ -11,6 +11,7 @@ required_environment = {
     "POSTGRES_DB": os.environ.get("POSTGRES_DB"),
     "POSTGRES_USER": os.environ.get("POSTGRES_USER"),
     "POSTGRES_PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+    "WAGTAIL_ADMIN_BASE_URL": os.environ.get("WAGTAIL_ADMIN_BASE_URL"),
 }
 missing_environment = [name for name, value in required_environment.items() if not value]
 if missing_environment:
@@ -22,6 +23,7 @@ if missing_environment:
 DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")  # noqa: F405
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")  # noqa: F405
+WAGTAILADMIN_BASE_URL = os.environ["WAGTAIL_ADMIN_BASE_URL"]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True

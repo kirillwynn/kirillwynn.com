@@ -51,7 +51,7 @@ Do not copy that note into the repository.
 The first backend foundation is available under `backend/django/`:
 
 - Python 3.12.13;
-- Django 5.2.15 LTS;
+- Django 5.2.16 LTS;
 - Wagtail 7.4.2 LTS at `/cms/`;
 - Django REST Framework 3.17.1;
 - PostgreSQL configuration through environment variables;
