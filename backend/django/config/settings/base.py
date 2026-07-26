@@ -16,6 +16,11 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.users",
     "apps.blog",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.github",
+    "allauth.socialaccount.providers.google",
     "wagtail_headless_preview",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -46,12 +51,14 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
+USE_X_FORWARDED_HOST = True
 
 TEMPLATES = [
     {
@@ -105,6 +112,70 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 AUTH_USER_MODEL = "users.User"
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+ACCOUNT_ADAPTER = "apps.users.adapters.SiteAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "apps.users.adapters.SiteSocialAccountAdapter"
+SOCIALACCOUNT_ONLY = True
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*"]
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
+
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+SOCIALACCOUNT_LOGIN_ON_GET = False
+SOCIALACCOUNT_STORE_TOKENS = False
+SOCIALACCOUNT_REQUESTS_TIMEOUT = float(os.environ.get("SOCIALACCOUNT_REQUESTS_TIMEOUT", "5"))
+ALLAUTH_TRUSTED_PROXY_COUNT = int(os.environ.get("ALLAUTH_TRUSTED_PROXY_COUNT", "0"))
+
+
+def social_app(provider: str) -> list[dict[str, str]]:
+    prefix = provider.upper()
+    client_id = os.environ.get(f"{prefix}_OAUTH_CLIENT_ID", "").strip()
+    secret = os.environ.get(f"{prefix}_OAUTH_CLIENT_SECRET", "").strip()
+    if not client_id or not secret:
+        return []
+    return [
+        {
+            "name": f"{provider.title()} OAuth",
+            "client_id": client_id,
+            "secret": secret,
+            "key": "",
+        }
+    ]
+
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "APPS": social_app("google"),
+        "SCOPE": ["openid", "profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+        "OAUTH_PKCE_ENABLED": True,
+        "EMAIL_AUTHENTICATION": True,
+    },
+    "github": {
+        "APPS": social_app("github"),
+        "SCOPE": ["user:email"],
+        "EMAIL_AUTHENTICATION": True,
+    },
+}
+
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_PATH = "/"
+CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_PATH = "/"
+CSRF_COOKIE_HTTPONLY = True
+
+SITE_OWNER_EMAIL = os.environ.get("SITE_OWNER_EMAIL", "").strip()
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

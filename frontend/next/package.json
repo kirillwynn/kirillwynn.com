@@ -29,6 +29,7 @@
     "@types/react": "19.2.5",
     "@types/react-dom": "19.2.3",
     "eslint": "10.8.0",
+    "jsdom": "29.1.1",
     "postcss": "8.5.23",
     "prettier": "3.7.4",
     "tailwindcss": "4.3.3",

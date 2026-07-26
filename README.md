@@ -50,7 +50,7 @@ Do not copy that note into the repository.
 
 ## Current state
 
-Milestones 1–4 are available under `backend/django/` and `frontend/next/`:
+Milestones 1–5 are available under `backend/django/` and `frontend/next/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -84,6 +84,12 @@ Milestones 1–4 are available under `backend/django/` and `frontend/next/`:
 - a responsive Bridge page with the eight legacy profile links and reused SVG
   assets;
 - private immutable Draft Mode rendering and HMAC revalidation;
+- classic Google/GitHub OAuth through django-allauth 65.18.0;
+- Django database-backed sessions, same-origin cookies, and standard CSRF;
+- `/api/me/`, CSRF-protected `POST /api/auth/logout/`, `/login`, `/account`,
+  and the authenticated header menu;
+- verified-email provider linking without retained provider tokens, JWT,
+  Auth.js, or browser-stored session tokens;
 - locked production and development dependencies.
 
 Existing files under `backend/app/`, `frontend/`, `docker/`, `nginx/`, and the
@@ -106,6 +112,8 @@ The Django container waits for PostgreSQL, applies migrations, and starts at
 `http://localhost:8000`. Useful routes:
 
 - `http://localhost:8000/api/health/`
+- `http://localhost:3000/login`
+- `http://localhost:3000/account`
 - `http://localhost:8000/cms/`
 - `http://localhost:8000/django-admin/`
 
@@ -114,6 +122,13 @@ Create a local administrator after the services are running:
 ```bash
 docker compose -f compose.dev.yml exec django python manage.py createsuperuser
 ```
+
+OAuth applications are optional for local content development. When configured,
+set the four `GOOGLE_OAUTH_*` and `GITHUB_OAUTH_*` variables from
+`.env.example`; unavailable providers remain disabled in the UI. Browser flows
+must start on `http://localhost:3000`, whose fixed rewrites preserve Django
+cookies and `Set-Cookie` headers. See [OAuth setup](docs/oauth-setup.md) for
+callbacks, scopes, staging/production isolation, and owner promotion.
 
 Stop the stack without deleting its database volume:
 
@@ -178,14 +193,20 @@ npm ci
 npm run dev
 ```
 
-The Milestone 4 frontend includes:
+The public frontend includes:
 
 - `/` — the server-rendered public Feed with accessible pagination;
 - `/posts/[slug]` — public and private Draft Mode post rendering;
 - `/bridge` — the eight approved profile links and team labels;
 - `/api/draft` and `/api/draft/disable`;
 - signed `POST /api/revalidate`;
+- `/login` and `/account` with Google/GitHub POST initiation and provider
+  connection state;
+- a keyboard/touch accessible current-user menu and CSRF-protected logout;
 - loading, upstream error, empty, and not-found states.
+
+OAuth initiation is a normal CSRF-protected browser POST to django-allauth. The
+OAuth redirect is never sent through client-side fetch.
 
 The Feed fetch uses only the `posts` cache tag. Public post details use only
 `post-slug:<slug>`. Draft snapshots are resolved server-to-server with

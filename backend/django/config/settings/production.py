@@ -9,6 +9,7 @@ from config.settings.base import *  # noqa: F403
 required_environment = {
     "DJANGO_SECRET_KEY": SECRET_KEY,  # noqa: F405
     "DJANGO_ALLOWED_HOSTS": os.environ.get("DJANGO_ALLOWED_HOSTS"),
+    "DJANGO_CSRF_TRUSTED_ORIGINS": os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS"),
     "POSTGRES_HOST": os.environ.get("POSTGRES_HOST"),
     "POSTGRES_DB": os.environ.get("POSTGRES_DB"),
     "POSTGRES_USER": os.environ.get("POSTGRES_USER"),
@@ -18,6 +19,10 @@ required_environment = {
     "FRONTEND_PREVIEW_URL": os.environ.get("FRONTEND_PREVIEW_URL"),
     "REVALIDATION_URL": os.environ.get("REVALIDATION_URL"),
     "REVALIDATION_SECRET": os.environ.get("REVALIDATION_SECRET"),
+    "GOOGLE_OAUTH_CLIENT_ID": os.environ.get("GOOGLE_OAUTH_CLIENT_ID"),
+    "GOOGLE_OAUTH_CLIENT_SECRET": os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET"),
+    "GITHUB_OAUTH_CLIENT_ID": os.environ.get("GITHUB_OAUTH_CLIENT_ID"),
+    "GITHUB_OAUTH_CLIENT_SECRET": os.environ.get("GITHUB_OAUTH_CLIENT_SECRET"),
 }
 missing_environment = [name for name, value in required_environment.items() if not value]
 if missing_environment:
@@ -75,8 +80,16 @@ SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_NAME = "__Host-sessionid"
+SESSION_COOKIE_PATH = "/"
+SESSION_COOKIE_DOMAIN = None
 CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_NAME = "__Host-csrftoken"
+CSRF_COOKIE_PATH = "/"
+CSRF_COOKIE_DOMAIN = None
+ALLAUTH_TRUSTED_PROXY_COUNT = 1
 SECURE_HSTS_SECONDS = 31_536_000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True

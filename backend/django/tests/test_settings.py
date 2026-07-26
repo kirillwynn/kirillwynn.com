@@ -14,6 +14,7 @@ def production_environment():
             "DJANGO_SETTINGS_MODULE": "config.settings.production",
             "DJANGO_SECRET_KEY": "production-check-only",
             "DJANGO_ALLOWED_HOSTS": "example.com",
+            "DJANGO_CSRF_TRUSTED_ORIGINS": "https://example.com",
             "POSTGRES_HOST": "db",
             "POSTGRES_DB": "app",
             "POSTGRES_USER": "app",
@@ -23,6 +24,10 @@ def production_environment():
             "FRONTEND_PREVIEW_URL": "https://example.com/api/draft",
             "REVALIDATION_URL": "https://example.com/api/revalidate",
             "REVALIDATION_SECRET": PRODUCTION_SECRET,
+            "GOOGLE_OAUTH_CLIENT_ID": "google-production-check",
+            "GOOGLE_OAUTH_CLIENT_SECRET": "google-production-secret-check",
+            "GITHUB_OAUTH_CLIENT_ID": "github-production-check",
+            "GITHUB_OAUTH_CLIENT_SECRET": "github-production-secret-check",
         }
     )
     return environment
@@ -194,3 +199,83 @@ def test_headless_preview_settings_use_redirect_and_short_ttl(settings):
         "ENFORCE_TRAILING_SLASH": False,
     }
     assert settings.PREVIEW_TOKEN_TTL_SECONDS == 600
+
+
+def test_allauth_uses_classic_sessions_minimal_scopes_and_settings_apps(settings):
+    assert "allauth.socialaccount" in settings.INSTALLED_APPS
+    assert settings.AUTHENTICATION_BACKENDS == [
+        "django.contrib.auth.backends.ModelBackend",
+        "allauth.account.auth_backends.AuthenticationBackend",
+    ]
+    assert settings.SOCIALACCOUNT_ONLY is True
+    assert settings.SOCIALACCOUNT_LOGIN_ON_GET is False
+    assert settings.SOCIALACCOUNT_STORE_TOKENS is False
+    assert settings.SESSION_ENGINE == "django.contrib.sessions.backends.db"
+    assert settings.USE_X_FORWARDED_HOST is True
+    assert settings.SOCIALACCOUNT_PROVIDERS["google"]["SCOPE"] == [
+        "openid",
+        "profile",
+        "email",
+    ]
+    assert settings.SOCIALACCOUNT_PROVIDERS["google"]["AUTH_PARAMS"] == {"access_type": "online"}
+    assert settings.SOCIALACCOUNT_PROVIDERS["google"]["OAUTH_PKCE_ENABLED"] is True
+    assert settings.SOCIALACCOUNT_PROVIDERS["github"]["SCOPE"] == ["user:email"]
+    assert "APP" not in settings.SOCIALACCOUNT_PROVIDERS["google"]
+    assert "VERIFIED_EMAIL" not in settings.SOCIALACCOUNT_PROVIDERS["google"]
+    assert "VERIFIED_EMAIL" not in settings.SOCIALACCOUNT_PROVIDERS["github"]
+
+
+@pytest.mark.parametrize(
+    "missing_name",
+    [
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET",
+        "GITHUB_OAUTH_CLIENT_ID",
+        "GITHUB_OAUTH_CLIENT_SECRET",
+    ],
+)
+def test_production_settings_require_every_oauth_credential(missing_name):
+    environment = production_environment()
+    environment.pop(missing_name)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert f"Missing required production environment variables: {missing_name}" in result.stderr
+
+
+def test_production_cookie_and_proxy_hardening():
+    environment = production_environment()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from config.settings import production as s; "
+                "print(s.SESSION_COOKIE_NAME, s.CSRF_COOKIE_NAME, "
+                "s.SESSION_COOKIE_SECURE, s.SESSION_COOKIE_HTTPONLY, "
+                "s.CSRF_COOKIE_SECURE, s.CSRF_COOKIE_HTTPONLY, "
+                "s.SESSION_COOKIE_SAMESITE, s.ALLAUTH_TRUSTED_PROXY_COUNT)"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.stdout.strip() == ("__Host-sessionid __Host-csrftoken True True True True Lax 1")
+
+
+def test_local_http_uses_standard_cookie_names(settings):
+    assert settings.SESSION_COOKIE_NAME == "sessionid"
+    assert settings.CSRF_COOKIE_NAME == "csrftoken"
+    assert settings.SESSION_COOKIE_SECURE is False
+    assert settings.CSRF_COOKIE_SECURE is False
+    assert settings.ALLAUTH_TRUSTED_PROXY_COUNT == 0

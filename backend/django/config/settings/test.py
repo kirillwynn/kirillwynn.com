@@ -2,6 +2,8 @@ from config.settings.base import *  # noqa: F403
 
 SECRET_KEY = "test-only"
 ALLOWED_HOSTS = ["testserver", "127.0.0.1", "localhost"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http"
 
 DATABASES = {
     "default": {
@@ -24,3 +26,29 @@ WAGTAIL_HEADLESS_PREVIEW = {
 }
 REVALIDATION_URL = ""
 REVALIDATION_SECRET = "test-revalidation-secret"
+
+SOCIALACCOUNT_PROVIDERS = {
+    **SOCIALACCOUNT_PROVIDERS,  # noqa: F405
+    "google": {
+        **SOCIALACCOUNT_PROVIDERS["google"],  # noqa: F405
+        "APPS": [
+            {
+                "name": "Google OAuth test",
+                "client_id": "google-test-client-id",
+                "secret": "google-test-client-secret",
+                "key": "",
+            }
+        ],
+    },
+    "github": {
+        **SOCIALACCOUNT_PROVIDERS["github"],  # noqa: F405
+        "APPS": [
+            {
+                "name": "GitHub OAuth test",
+                "client_id": "github-test-client-id",
+                "secret": "github-test-client-secret",
+                "key": "",
+            }
+        ],
+    },
+}

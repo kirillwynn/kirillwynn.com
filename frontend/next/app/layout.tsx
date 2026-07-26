@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { AuthProvider } from "@/components/auth-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { publicSiteUrl } from "@/lib/server/config";
@@ -35,14 +36,16 @@ export default function RootLayout({
                 <a className="skip-link" href="#main-content">
                     Skip to content
                 </a>
-                <SiteHeader />
-                <main
-                    id="main-content"
-                    className="site-container w-full flex-1 py-10 sm:py-14"
-                >
-                    {children}
-                </main>
-                <SiteFooter />
+                <AuthProvider>
+                    <SiteHeader />
+                    <main
+                        id="main-content"
+                        className="site-container w-full flex-1 py-10 sm:py-14"
+                    >
+                        {children}
+                    </main>
+                    <SiteFooter />
+                </AuthProvider>
             </body>
         </html>
     );

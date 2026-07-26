@@ -122,6 +122,75 @@ Fallbacks:
 
 Tags are sorted by `(slug, name)`.
 
+## Session authentication
+
+Browser authentication uses Django database-backed sessions and standard Django
+CSRF on the same public origin. It does not use JWT, Auth.js/NextAuth,
+`localStorage` tokens, or `X-Session-Token`.
+
+### `GET /api/me/`
+
+This endpoint uses DRF `SessionAuthentication` with `AllowAny`. It always calls
+Django `get_token()`, sets the CSRF cookie when needed, and returns a masked
+CSRF token suitable for a subsequent same-origin POST.
+
+Anonymous response:
+
+```json
+{
+  "authenticated": false,
+  "user": null,
+  "providers": {
+    "google": {"available": true, "connected": false},
+    "github": {"available": true, "connected": false}
+  },
+  "csrf_token": "<masked token>"
+}
+```
+
+Authenticated response:
+
+```json
+{
+  "authenticated": true,
+  "user": {
+    "id": 123,
+    "display_name": "Reader",
+    "email": "reader@example.com",
+    "is_admin": false,
+    "is_banned": false,
+    "can_interact": true
+  },
+  "providers": {
+    "google": {"available": true, "connected": true},
+    "github": {"available": true, "connected": false}
+  },
+  "csrf_token": "<masked token>"
+}
+```
+
+`available` means a complete settings-based provider credential pair is present.
+`connected` is derived from the user's `SocialAccount` records. `can_interact`
+is false for banned users; an inactive user's Django session is rejected and is
+therefore represented as anonymous.
+
+The response never contains provider `extra_data`, OAuth tokens, a session key,
+staff permission details, credentials, or provider payloads. Every response has:
+
+```text
+Cache-Control: private, no-store
+Vary: Cookie
+```
+
+### `POST /api/auth/logout/`
+
+Logout accepts only POST. For an authenticated session,
+`SessionAuthentication` requires a valid masked token in `X-CSRFToken` (or the
+normal CSRF form field). Success returns `204 No Content`, flushes the Django
+session, and has `Cache-Control: private, no-store` plus `Vary: Cookie`.
+Repeated anonymous logout is also a safe `204`. Missing or invalid CSRF on an
+authenticated session returns `403`; GET returns `405` and never changes state.
+
 ## StreamField discriminated union
 
 Every block has exactly `id`, `type`, and `value`. `id` is Wagtail's stable

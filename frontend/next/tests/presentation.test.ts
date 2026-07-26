@@ -95,11 +95,10 @@ describe("feed presentation", () => {
 });
 
 describe("shell and preview controls", () => {
-    it("renders Login as an honestly disabled control", () => {
+    it("reserves a stable account control while auth state loads", () => {
         const html = renderToStaticMarkup(createElement(SiteHeader));
-        expect(html).toContain("Login");
-        expect(html).toContain("disabled");
-        expect(html).toContain('aria-disabled="true"');
+        expect(html).toContain("Loading account");
+        expect(html).toContain("min-w-20");
         expect(html).not.toContain('href="/accounts');
     });
 
