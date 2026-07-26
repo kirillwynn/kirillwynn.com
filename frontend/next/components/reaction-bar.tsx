@@ -5,6 +5,7 @@ import {
     Suspense,
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from "react";
@@ -17,11 +18,15 @@ import {
     savePendingReaction,
 } from "@/lib/reaction-storage";
 import {
+    coordinateReactionMutation,
+    hydrateReactionMutation,
+    reactionMutationTargetKey,
+    subscribeReactionMutation,
+} from "@/lib/reaction-mutation-coordinator";
+import {
     getReactionConfig,
     getReactionParticipants,
     ReactionApiError,
-    reactionParticipantPath,
-    toggleReaction,
     type ReactionChange,
     type ReactionGroup,
     type ReactionParticipant,
@@ -29,40 +34,6 @@ import {
 } from "@/lib/reactions";
 
 const EmojiPicker = lazy(() => import("@/components/emoji-picker"));
-
-function optimisticGroups(
-    current: ReactionGroup[],
-    target: ReactionTarget,
-    emoji: string,
-): ReactionGroup[] {
-    const existing = current.find((group) => group.emoji === emoji);
-    if (!existing) {
-        return [
-            ...current,
-            {
-                emoji,
-                count: 1,
-                viewer_reacted: true,
-                participants: reactionParticipantPath(target, emoji),
-            },
-        ].sort((left, right) =>
-            left.emoji < right.emoji ? -1 : left.emoji > right.emoji ? 1 : 0,
-        );
-    }
-    const count = existing.count + (existing.viewer_reacted ? -1 : 1);
-    if (count === 0) {
-        return current.filter((group) => group.emoji !== emoji);
-    }
-    return current.map((group) =>
-        group.emoji === emoji
-            ? {
-                  ...group,
-                  count,
-                  viewer_reacted: !group.viewer_reacted,
-              }
-            : group,
-    );
-}
 
 function reactionError(error: unknown): string {
     if (error instanceof ReactionApiError) {
@@ -105,7 +76,6 @@ export function ReactionBar({
     >("idle");
     const pickerTrigger = useRef<HTMLButtonElement>(null);
     const busyRef = useRef(false);
-    const mutationRevisionRef = useRef(0);
     const participantRequestRef = useRef(0);
     const participantAbortRef = useRef<AbortController | null>(null);
     const participantGroupRef = useRef<string | null>(null);
@@ -115,16 +85,21 @@ export function ReactionBar({
     const mountedRef = useRef(true);
     const pointerTypeRef = useRef<string | null>(null);
     const lastTouchAtRef = useRef(0);
-    const targetKey = `${target.kind}:${String(target.id)}:${target.slug}`;
-    const latestTargetKeyRef = useRef(targetKey);
-    latestTargetKeyRef.current = targetKey;
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+    const initialReactionsRef = useRef(initialReactions);
+    initialReactionsRef.current = initialReactions;
+    const mutationTarget = useMemo(
+        () => target,
+        [target.id, target.kind, target.returnTo, target.slug],
+    );
+    const mutationTargetKey = reactionMutationTargetKey(mutationTarget);
+    const instanceTargetKey = `${target.kind}:${String(target.id)}:${target.slug}`;
+    const latestTargetKeyRef = useRef(instanceTargetKey);
+    latestTargetKeyRef.current = instanceTargetKey;
     const user = me?.authenticated ? me.user : null;
     const canInteract = Boolean(user?.can_interact);
     const interactionDisabled = Boolean(user && !canInteract);
-
-    useEffect(() => {
-        setReactions(initialReactions);
-    }, [initialReactions]);
 
     const closeParticipants = useCallback((restoreFocus: boolean): void => {
         participantRequestRef.current += 1;
@@ -154,11 +129,44 @@ export function ReactionBar({
     }, []);
 
     useEffect(() => {
-        mutationRevisionRef.current += 1;
-        busyRef.current = false;
-        setBusy(false);
         closeParticipants(false);
-    }, [closeParticipants, targetKey]);
+    }, [closeParticipants, instanceTargetKey]);
+
+    useEffect(
+        () =>
+            subscribeReactionMutation(
+                mutationTarget,
+                initialReactionsRef.current,
+                ({ change, error: mutationError, snapshot }) => {
+                    if (
+                        !mountedRef.current ||
+                        instanceTargetKey !== latestTargetKeyRef.current
+                    ) {
+                        return;
+                    }
+                    busyRef.current = snapshot.busy;
+                    setBusy(snapshot.busy);
+                    setReactions(snapshot.reactions);
+                    if (change) {
+                        if (change.source === "optimistic") {
+                            setError(null);
+                            setNotice(null);
+                        } else if (change.source === "authoritative") {
+                            setError(null);
+                        }
+                        onChangeRef.current?.(change);
+                    }
+                    if (mutationError !== undefined) {
+                        setError(reactionError(mutationError));
+                    }
+                },
+            ),
+        [instanceTargetKey, mutationTarget],
+    );
+
+    useEffect(() => {
+        hydrateReactionMutation(mutationTarget, initialReactions);
+    }, [initialReactions, mutationTarget, mutationTargetKey]);
 
     useEffect(() => {
         function keydown(event: KeyboardEvent): void {
@@ -201,15 +209,6 @@ export function ReactionBar({
         setPendingEmoji(loadPendingReaction(target));
     }, [authStatus, target.id, target.kind, target.slug]);
 
-    function update(
-        next: ReactionGroup[],
-        source: ReactionChange["source"],
-        revision: number,
-    ): void {
-        setReactions(next);
-        onChange?.({ reactions: next, revision, source });
-    }
-
     async function performToggle(
         emoji: string,
         fromPending = false,
@@ -229,63 +228,41 @@ export function ReactionBar({
             setNotice(null);
             return false;
         }
-        const previous = reactions;
-        const revision = mutationRevisionRef.current + 1;
-        mutationRevisionRef.current = revision;
-        const mutationTargetKey = targetKey;
-        busyRef.current = true;
-        setBusy(true);
-        setError(null);
-        setNotice(null);
-        update(
-            optimisticGroups(previous, target, emoji),
-            "optimistic",
-            revision,
+        const initiatingTargetKey = instanceTargetKey;
+        const mutation = coordinateReactionMutation(
+            mutationTarget,
+            reactions,
+            emoji,
+            me.csrf_token,
         );
-        try {
-            const authoritative = await toggleReaction(
-                target,
-                emoji,
-                me.csrf_token,
-            );
-            if (
-                !mountedRef.current ||
-                revision !== mutationRevisionRef.current ||
-                mutationTargetKey !== latestTargetKeyRef.current
-            ) {
-                return false;
-            }
-            update(authoritative, "authoritative", revision);
+        if (!mutation.started) {
+            return false;
+        }
+        const outcome = await mutation.outcome;
+        if (outcome.status === "authoritative") {
             rememberReaction(emoji);
             if (fromPending) {
                 clearPendingReaction(target);
-                setPendingEmoji(null);
+                if (
+                    mountedRef.current &&
+                    initiatingTargetKey === latestTargetKeyRef.current
+                ) {
+                    setPendingEmoji(null);
+                }
             }
             return true;
-        } catch (caught) {
-            if (
-                !mountedRef.current ||
-                revision !== mutationRevisionRef.current ||
-                mutationTargetKey !== latestTargetKeyRef.current
-            ) {
-                return false;
-            }
-            update(previous, "rollback", revision);
-            setError(reactionError(caught));
-            if (caught instanceof ReactionApiError && caught.status === 403) {
-                await refresh();
-            }
-            return false;
-        } finally {
+        }
+        if (outcome.status === "rollback") {
             if (
                 mountedRef.current &&
-                revision === mutationRevisionRef.current &&
-                mutationTargetKey === latestTargetKeyRef.current
+                initiatingTargetKey === latestTargetKeyRef.current &&
+                outcome.error instanceof ReactionApiError &&
+                outcome.error.status === 403
             ) {
-                busyRef.current = false;
-                setBusy(false);
+                await refresh();
             }
         }
+        return false;
     }
 
     async function confirmPending(): Promise<void> {
@@ -341,7 +318,7 @@ export function ReactionBar({
             if (
                 !mountedRef.current ||
                 requestId !== participantRequestRef.current ||
-                targetKey !== latestTargetKeyRef.current
+                instanceTargetKey !== latestTargetKeyRef.current
             ) {
                 return;
             }
@@ -362,7 +339,7 @@ export function ReactionBar({
                 !mountedRef.current ||
                 requestId !== participantRequestRef.current ||
                 controller.signal.aborted ||
-                targetKey !== latestTargetKeyRef.current
+                instanceTargetKey !== latestTargetKeyRef.current
             ) {
                 return;
             }

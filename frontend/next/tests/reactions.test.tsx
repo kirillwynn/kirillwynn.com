@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from "react";
+import { act, type ReactNode, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,7 +9,9 @@ import { CommentCard } from "@/components/comment-card";
 import { PostReactions } from "@/components/post-reactions";
 import { ReactionBar } from "@/components/reaction-bar";
 import type { MeResponse } from "@/lib/auth";
+import { applyCommentReactionChange } from "@/lib/comment-reconciliation";
 import type { PublicComment } from "@/lib/comments";
+import { resetReactionMutationCoordinatorForTests } from "@/lib/reaction-mutation-coordinator";
 import {
     clearPendingReaction,
     isValidStoredEmoji,
@@ -23,6 +25,7 @@ import {
     getReactionParticipants,
     resetReactionConfigForTests,
     toggleReaction,
+    type ReactionChange,
     type ReactionGroup,
     type ReactionTarget,
 } from "@/lib/reactions";
@@ -59,6 +62,13 @@ const postTarget: Extract<ReactionTarget, { kind: "post" }> = {
     id: 9,
     slug: "привет-мир",
     returnTo: "/posts/привет-мир",
+};
+
+const commentTarget: Extract<ReactionTarget, { kind: "comment" }> = {
+    kind: "comment",
+    id: 7,
+    slug: "привет-мир",
+    returnTo: "/posts/привет-мир?thread=7",
 };
 
 function group(overrides: Partial<ReactionGroup> = {}): ReactionGroup {
@@ -221,6 +231,57 @@ function pointerEvent(type: string, pointerType: string): Event {
     return event;
 }
 
+function DuplicateReactionBars({
+    onMutation,
+    target = commentTarget,
+}: {
+    onMutation: (change: ReactionChange) => void;
+    target?: ReactionTarget;
+}) {
+    const [parent, setParent] = useState(
+        comment({
+            reactions: [
+                group({
+                    participants:
+                        "/api/v1/comments/7/reactions/%F0%9F%94%A5/participants/",
+                }),
+            ],
+        }),
+    );
+
+    function change(changeEvent: ReactionChange): void {
+        onMutation(changeEvent);
+        setParent((current) =>
+            applyCommentReactionChange(current, changeEvent),
+        );
+    }
+
+    return (
+        <>
+            <output
+                data-count={parent.reactions[0]?.count ?? 0}
+                data-pending={
+                    parent.reaction_pending_revision === undefined
+                        ? "none"
+                        : String(parent.reaction_pending_revision)
+                }
+                data-viewer-reacted={
+                    parent.reactions[0]?.viewer_reacted ?? false
+                }
+            />
+            {["list", "thread"].map((instance) => (
+                <div data-instance={instance} key={instance}>
+                    <ReactionBar
+                        initialReactions={parent.reactions}
+                        onChange={change}
+                        target={target}
+                    />
+                </div>
+            ))}
+        </>
+    );
+}
+
 beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
     vi.stubGlobal(
@@ -239,6 +300,7 @@ beforeEach(() => {
     window.sessionStorage.clear();
     window.localStorage.clear();
     resetReactionConfigForTests();
+    resetReactionMutationCoordinatorForTests();
     (
         globalThis as typeof globalThis & {
             IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -605,6 +667,182 @@ describe("reaction mutation state", () => {
         expect(meCalls).toBe(2);
         expect(container.textContent).toContain("session expired");
         expect(buttonByLabel(container, "Add 🔥 reaction")).toBeDefined();
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("coordinates duplicate comment instances through one shared mutation owner", async () => {
+        const firstToggle = deferred<Response>();
+        const secondToggle = deferred<Response>();
+        const changes: ReactionChange[] = [];
+        let toggleCalls = 0;
+        defaultFetch(signedIn, (url, options) => {
+            if (options?.method !== "POST" || !url.includes("/toggle/")) {
+                return null;
+            }
+            const pending = toggleCalls === 0 ? firstToggle : secondToggle;
+            toggleCalls += 1;
+            return pending.promise;
+        });
+        const { container, root } = await render(
+            <DuplicateReactionBars
+                onMutation={(change) => {
+                    changes.push(change);
+                }}
+            />,
+        );
+        const first = container.querySelector('[data-instance="list"]');
+        const second = container.querySelector('[data-instance="thread"]');
+
+        act(() => {
+            buttonByLabel(first ?? container, "Add 🔥 reaction")?.click();
+        });
+        await flush();
+        expect(
+            container.querySelector("output")?.getAttribute("data-pending"),
+        ).not.toBe("none");
+        expect(
+            buttonByLabel(second ?? container, "Remove 🔥 reaction")?.disabled,
+        ).toBe(true);
+        act(() => {
+            buttonByLabel(second ?? container, "Remove 🔥 reaction")?.click();
+        });
+        expect(toggleCalls).toBe(1);
+
+        await act(async () => {
+            firstToggle.resolve(
+                response({
+                    action: "added",
+                    reactions: [group({ count: 4, viewer_reacted: true })],
+                }),
+            );
+            await firstToggle.promise;
+        });
+        await flush();
+        expect(
+            container.querySelector("output")?.getAttribute("data-count"),
+        ).toBe("4");
+        expect(
+            container.querySelector("output")?.getAttribute("data-pending"),
+        ).toBe("none");
+        expect(
+            container
+                .querySelector("output")
+                ?.getAttribute("data-viewer-reacted"),
+        ).toBe("true");
+
+        act(() => {
+            buttonByLabel(second ?? container, "Remove 🔥 reaction")?.click();
+        });
+        expect(toggleCalls).toBe(2);
+        await act(async () => {
+            secondToggle.resolve(
+                response({
+                    action: "removed",
+                    reactions: [group({ count: 3, viewer_reacted: false })],
+                }),
+            );
+            await secondToggle.promise;
+        });
+        await flush();
+
+        const optimisticRevisions = changes
+            .filter((change) => change.source === "optimistic")
+            .map((change) => change.revision);
+        expect(new Set(optimisticRevisions).size).toBe(2);
+        expect(optimisticRevisions[0]).not.toBe(optimisticRevisions.at(-1));
+        expect(
+            container.querySelector("output")?.getAttribute("data-count"),
+        ).toBe("3");
+        expect(
+            container.querySelector("output")?.getAttribute("data-pending"),
+        ).toBe("none");
+        expect(
+            buttonByLabel(first ?? container, "Add 🔥 reaction"),
+        ).toBeDefined();
+        expect(
+            buttonByLabel(second ?? container, "Add 🔥 reaction"),
+        ).toBeDefined();
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("does not let one pending target block or overwrite another target", async () => {
+        const pendingPost = deferred<Response>();
+        const otherTarget: ReactionTarget = {
+            kind: "comment",
+            id: 88,
+            slug: "привет-мир",
+            returnTo: "/posts/привет-мир?thread=88",
+        };
+        defaultFetch(signedIn, (url, options) => {
+            if (options?.method !== "POST" || !url.includes("/toggle/")) {
+                return null;
+            }
+            return url.includes("/posts/")
+                ? pendingPost.promise
+                : Promise.resolve(
+                      response({
+                          action: "added",
+                          reactions: [
+                              group({ count: 8, viewer_reacted: true }),
+                          ],
+                      }),
+                  );
+        });
+        const { container, root } = await render(
+            <>
+                <div data-target="post">
+                    <ReactionBar
+                        initialReactions={[group()]}
+                        target={postTarget}
+                    />
+                </div>
+                <div data-target="comment">
+                    <ReactionBar
+                        initialReactions={[group()]}
+                        target={otherTarget}
+                    />
+                </div>
+            </>,
+        );
+        const post = container.querySelector('[data-target="post"]');
+        const other = container.querySelector('[data-target="comment"]');
+        act(() => {
+            buttonByLabel(post ?? container, "Add 🔥 reaction")?.click();
+            buttonByLabel(other ?? container, "Add 🔥 reaction")?.click();
+        });
+        await flush();
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.filter((call) => call[1]?.method === "POST"),
+        ).toHaveLength(2);
+        expect(
+            buttonByLabel(other ?? container, "View 8 participants for 🔥"),
+        ).toBeDefined();
+        expect(
+            buttonByLabel(post ?? container, "Remove 🔥 reaction")?.disabled,
+        ).toBe(true);
+
+        await act(async () => {
+            pendingPost.resolve(
+                response({
+                    action: "added",
+                    reactions: [group({ count: 5, viewer_reacted: true })],
+                }),
+            );
+            await pendingPost.promise;
+        });
+        await flush();
+        expect(
+            buttonByLabel(post ?? container, "View 5 participants for 🔥"),
+        ).toBeDefined();
+        expect(
+            buttonByLabel(other ?? container, "View 8 participants for 🔥"),
+        ).toBeDefined();
         act(() => {
             root.unmount();
         });

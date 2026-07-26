@@ -32,6 +32,7 @@ import {
     type PublicComment,
     type ThreadPage,
 } from "@/lib/comments";
+import { resetReactionMutationCoordinatorForTests } from "@/lib/reaction-mutation-coordinator";
 import { resetReactionConfigForTests } from "@/lib/reactions";
 
 const anonymous: MeResponse = {
@@ -123,6 +124,20 @@ async function flush(): Promise<void> {
     });
 }
 
+function deferred<T>(): {
+    promise: Promise<T>;
+    reject: (reason?: unknown) => void;
+    resolve: (value: T) => void;
+} {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, reject, resolve };
+}
+
 function typeInTextarea(
     textarea: HTMLTextAreaElement | null,
     value: string,
@@ -153,18 +168,43 @@ function clickWithoutNavigation(link: HTMLAnchorElement | null): void {
     });
 }
 
+function buttonByLabel(
+    container: ParentNode,
+    label: string,
+): HTMLButtonElement | undefined {
+    return Array.from(
+        container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.getAttribute("aria-label") === label);
+}
+
+function mainCommentCard(
+    container: ParentNode,
+    commentId: number,
+): HTMLElement | undefined {
+    return Array.from(
+        container.querySelectorAll<HTMLElement>(
+            `[data-comment-id="${String(commentId)}"]`,
+        ),
+    ).find((card) => card.closest('[role="dialog"]') === null);
+}
+
 async function renderComments(
     me: MeResponse,
     roots: PublicComment[],
     thread?: ThreadPage,
+    extra?: (url: string, options?: RequestInit) => Promise<Response> | null,
 ): Promise<{ container: HTMLDivElement; root: Root }> {
-    vi.mocked(fetch).mockImplementation((input) => {
+    vi.mocked(fetch).mockImplementation((input, options) => {
         const url =
             typeof input === "string"
                 ? input
                 : input instanceof URL
                   ? input.href
                   : input.url;
+        const handled = extra?.(url, options);
+        if (handled) {
+            return handled;
+        }
         if (url === "/api/me/") {
             return Promise.resolve(response(me));
         }
@@ -197,6 +237,7 @@ async function renderComments(
 
 beforeEach(() => {
     resetReactionConfigForTests();
+    resetReactionMutationCoordinatorForTests();
     vi.stubGlobal("fetch", vi.fn());
     window.sessionStorage.clear();
     window.history.replaceState(
@@ -1192,6 +1233,148 @@ describe("comments and Slack-style thread UI", () => {
             root.unmount();
         });
     });
+
+    it.each(["success", "rollback"] as const)(
+        "settles a root reaction in the parent after the thread closes: %s",
+        async (settlement) => {
+            const toggle = deferred<Response>();
+            const rootComment = comment({
+                reactions: [reaction(1)],
+                viewer: {
+                    can_edit: false,
+                    can_delete: false,
+                    can_reply: true,
+                    can_react: true,
+                },
+            });
+            const threadPage: ThreadPage = {
+                ...page([]),
+                root: rootComment,
+            };
+            const consoleError = vi
+                .spyOn(console, "error")
+                .mockImplementation(() => undefined);
+            const { container, root } = await renderComments(
+                authenticated,
+                [rootComment],
+                threadPage,
+                (url, options) =>
+                    options?.method === "POST" && url.includes("/toggle/")
+                        ? toggle.promise
+                        : null,
+            );
+            const replyTrigger = Array.from(
+                container.querySelectorAll<HTMLButtonElement>("button"),
+            ).find(
+                (button) =>
+                    button.textContent === "Reply" &&
+                    button.closest('[role="dialog"]') === null,
+            );
+            act(() => {
+                replyTrigger?.click();
+            });
+            await flush();
+            const dialog = container.querySelector('[role="dialog"]');
+            expect(dialog).not.toBeNull();
+
+            act(() => {
+                buttonByLabel(dialog ?? container, "Add 🔥 reaction")?.click();
+            });
+            await flush();
+            const parentDuringMutation = mainCommentCard(container, 7);
+            expect(
+                buttonByLabel(
+                    parentDuringMutation ?? container,
+                    "Remove 🔥 reaction",
+                )?.disabled,
+            ).toBe(true);
+            expect(
+                buttonByLabel(
+                    parentDuringMutation ?? container,
+                    "View 2 participants for 🔥",
+                ),
+            ).toBeDefined();
+
+            act(() => {
+                buttonByLabel(container, "Close thread")?.click();
+            });
+            await flush();
+            expect(container.querySelector('[role="dialog"]')).toBeNull();
+
+            await act(async () => {
+                if (settlement === "success") {
+                    toggle.resolve(
+                        response({
+                            action: "added",
+                            reactions: [reaction(5, true)],
+                        }),
+                    );
+                    await toggle.promise;
+                } else {
+                    toggle.reject(new Error("offline"));
+                    await toggle.promise.catch(() => undefined);
+                }
+            });
+            await flush();
+
+            const parentAfterSettlement = mainCommentCard(container, 7);
+            if (settlement === "success") {
+                expect(
+                    buttonByLabel(
+                        parentAfterSettlement ?? container,
+                        "View 5 participants for 🔥",
+                    ),
+                ).toBeDefined();
+                expect(
+                    buttonByLabel(
+                        parentAfterSettlement ?? container,
+                        "Remove 🔥 reaction",
+                    )?.disabled,
+                ).toBe(false);
+            } else {
+                expect(
+                    buttonByLabel(
+                        parentAfterSettlement ?? container,
+                        "View 1 participant for 🔥",
+                    ),
+                ).toBeDefined();
+                expect(
+                    buttonByLabel(
+                        parentAfterSettlement ?? container,
+                        "Add 🔥 reaction",
+                    )?.disabled,
+                ).toBe(false);
+            }
+
+            threadPage.root = {
+                ...rootComment,
+                reactions: [reaction(9, false)],
+            };
+            act(() => {
+                replyTrigger?.click();
+            });
+            await flush();
+            expect(
+                buttonByLabel(
+                    mainCommentCard(container, 7) ?? container,
+                    "View 9 participants for 🔥",
+                ),
+            ).toBeDefined();
+            expect(
+                consoleError.mock.calls.some((call) =>
+                    call.some(
+                        (value) =>
+                            typeof value === "string" &&
+                            value.toLowerCase().includes("unmounted"),
+                    ),
+                ),
+            ).toBe(false);
+            consoleError.mockRestore();
+            act(() => {
+                root.unmount();
+            });
+        },
+    );
 
     it("keeps discussions and reactions out of Draft Mode and forbids HTML injection", () => {
         const postPage = readFileSync("app/posts/[slug]/page.tsx", "utf8");

@@ -60,6 +60,7 @@ describe("server-only security boundary", () => {
             "lib/bridge.ts",
             "lib/comment-drafts.ts",
             "lib/comments.ts",
+            "lib/reaction-mutation-coordinator.ts",
             "lib/reaction-storage.ts",
             "lib/reactions.ts",
         ]) {

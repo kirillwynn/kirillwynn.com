@@ -101,12 +101,22 @@ after default emoji-presentation characters. This compact validator is part of
 the reaction client, while the full Emoji Mart dataset remains behind the lazy
 picker import.
 
-A synchronous in-flight guard prevents double-click toggles. Each mutation also
-has a target-bound revision: comment reconciliation preserves an optimistic
-aggregate only while that revision is pending, accepts only its matching
-authoritative or rollback result, and then allows later server comment/thread
-responses to refresh the aggregate. Tombstones clear reactions and the pending
-revision unconditionally.
+A shared client coordinator owns mutation state by concrete target kind and ID.
+It allows at most one in-flight toggle for that target, assigns a revision
+unique across coordinator-owned mutations, and broadcasts one optimistic/busy
+snapshot plus its authoritative or rollback settlement to every mounted list
+or thread representation. Different targets remain independent. The request is
+not owned by the initiating component lifecycle, so closing a thread only
+unsubscribes that copy; another mounted copy still receives settlement and
+clears the transient marker.
+
+Comment reconciliation preserves an optimistic aggregate only while the
+coordinator revision is pending, accepts only its matching authoritative or
+rollback result, and then allows later server comment/thread responses to
+refresh the aggregate. Tombstones clear reactions and the pending revision
+unconditionally. This shared single-flight boundary also supplies the
+double-click guard; a stale component cannot start or settle a competing
+mutation for the same target.
 
 Participant reads carry an `AbortController` and monotonically increasing
 request identity. Target/group changes, close, and unmount invalidate the
@@ -133,6 +143,8 @@ Positive:
 - toggles have clear PostgreSQL serialization semantics;
 - participant privacy and cursor boundaries are explicit;
 - comment aggregation remains bounded as page size grows;
+- duplicate list/thread reaction controls share mutation ownership across
+  component lifecycles;
 - picker data never leaves the site or inflates the initial post bundle.
 
 Negative:

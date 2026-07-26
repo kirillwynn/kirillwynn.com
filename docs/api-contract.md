@@ -461,6 +461,17 @@ or cursor responses may replace the aggregate. An older mutation result cannot
 settle a newer revision, and a tombstone always clears both reactions and the
 pending marker.
 
+Reaction mutation ownership is shared by every mounted representation of one
+concrete `(target kind, target ID)`. The coordinator permits one in-flight
+toggle per target, assigns revisions globally across coordinator-owned
+mutations, and broadcasts the same optimistic, busy, authoritative, or rollback
+snapshot to list and thread copies. The network request and settlement outlive
+the initiating component subscription: closing a thread removes that
+subscriber but the remaining comment card still receives the matching result
+and clears its transient marker. A different target has an independent
+single-flight slot. Component-local lifecycle checks do not own or discard the
+mutation result.
+
 ### Participants
 
 - `GET /api/v1/posts/<unicode-slug>/reactions/<emoji>/participants/`

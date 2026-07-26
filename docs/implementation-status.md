@@ -4,9 +4,9 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 7 remediation implemented and locally verified; the
-PostgreSQL and live-browser checks remain skipped because those runtimes are
-unavailable
+Overall state: Milestone 7 second remediation implemented and locally verified;
+PostgreSQL-only and live-browser checks remain skipped because those runtimes
+are unavailable
 
 ## Current repository state
 
@@ -220,6 +220,9 @@ unavailable
 - [x] Comment reaction reconciliation now uses mutation revisions with
   transient optimistic markers; matching authoritative/rollback results settle
   them, later server aggregates refresh normally, and tombstones always win.
+- [x] A shared per-target frontend coordinator now gives duplicate list/thread
+  reaction controls one single-flight request, one globally unique mutation
+  revision, and lifecycle-independent authoritative/rollback settlement.
 
 ## Milestone transition
 
@@ -227,9 +230,10 @@ Milestone 7 and its boundary remediation are complete. Django owns concrete
 post/comment reaction persistence, safe Unicode validation, aggregation,
 participant privacy, transactional toggles, and database-backed rate limiting.
 Next.js owns the lazy local picker, strict local storage hygiene, one pending
-intent per target, race-safe accessible participant surfaces, revisioned
-optimistic state, and explicit post-OAuth intent confirmation. The existing
-content, preview, OAuth, and comment contracts remain intact.
+intent per target, race-safe accessible participant surfaces, shared per-target
+mutation coordination, revisioned optimistic state, and explicit post-OAuth
+intent confirmation. The existing content, preview, OAuth, and comment
+contracts remain intact.
 
 ### Next recommended session
 
@@ -313,9 +317,9 @@ Out of scope for that session:
   weakened or imitated for SQLite.
 - No in-app Browser or Chrome backend was connected, so 375x812 and 1440x900
   screenshots, real picker keyboard behavior, participant request switching,
-  hover/mobile tap, Escape/focus return, thread reaction interaction,
-  optimistic rollback, touch keyboard avoidance, and visual scroll-containment
-  checks remain unverified.
+  hover/mobile tap, Escape/focus return, live close-during-root-reaction
+  settlement, thread reaction interaction, optimistic rollback, touch keyboard
+  avoidance, and visual scroll-containment checks remain unverified.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - Email DNS records and provider credentials do not exist in the current
@@ -351,15 +355,15 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   `discussions.0002` migration was then reversed to `0001` and reapplied.
 - Production `manage.py check --deploy` — passed with safe non-secret
   verification values; one intentional Wagtail iframe warning remains silenced.
-- `npm ci` — passed with 210 packages under Node.js 24.18.0 and npm 11.16.0
-  after adding exact `emoji-regex` 10.6.0.
-- Prettier, ESLint, TypeScript, and full Vitest — passed: 121 tests in 13 files.
-  New regressions cover malformed ZWJ/flag/variation storage, every Emoji Mart
-  native sequence, newest/single pending intent and full-target cleanup,
-  deferred participant success/error races, current-group cursor ID
-  deduplication, close/target/unmount invalidation, Escape focus restoration,
-  hover/touch gating, and revisioned comment optimistic/authoritative/rollback
-  reconciliation with tombstone precedence.
+- `npm ci` was not rerun for the second remediation because neither dependency
+  manifest nor lockfile changed; the existing lock remains the verified
+  210-package install under Node.js 24.18.0 and npm 11.16.0.
+- Prettier, ESLint, TypeScript, and full Vitest — passed: 125 tests in 13 files.
+  The second remediation adds cross-instance coverage for one shared request
+  and unique coordinator revisions, per-target independence, and closing the
+  thread before either authoritative success or network rollback. In both close
+  cases the parent settles and accepts a later fresh thread aggregate without
+  an unmounted-component state update.
 - Production Next.js build — passed with safe public/verification configuration
   after running outside the sandbox so Turbopack could bind its local CSS
   worker port.
@@ -369,8 +373,8 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   The roughly 424 KiB picker dataset is emitted as a lazy chunk and is absent
   from the initial post-page entry.
 - Browser runtime discovery and the required troubleshooting probe returned no
-  connected Browser or Chrome backends. Responsive screenshots and live
-  participant race/touch/Escape/focus QA could not run.
+  connected Browser or Chrome backends. The live close-during-pending-root-
+  reaction scenario and responsive/interaction QA could not run.
 - Docker and PostgreSQL server binaries remain unavailable. PostgreSQL locking
   semantics, concurrency tests, and Compose integration were not represented as
   verified.
