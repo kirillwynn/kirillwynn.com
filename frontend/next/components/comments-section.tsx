@@ -10,7 +10,12 @@ import {
     loadCommentDraft,
     saveCommentDraft,
 } from "@/lib/comment-drafts";
-import { reconcileRoots } from "@/lib/comment-reconciliation";
+import {
+    applyCommentReactionChange,
+    applyCommentReactionChangeToList,
+    reconcileComment,
+    reconcileRoots,
+} from "@/lib/comment-reconciliation";
 import {
     COMMENT_BODY_CODE_POINT_LIMIT,
     codePointLength,
@@ -23,6 +28,7 @@ import {
     getThread,
     type PublicComment,
 } from "@/lib/comments";
+import type { ReactionChange } from "@/lib/reactions";
 
 function returnTo(slug: string): string {
     return `/posts/${slug}`;
@@ -105,9 +111,25 @@ export function CommentsSection({ slug }: { slug: string }) {
         }
         setComments((current) => reconcileRoots(current, [changed]));
         setOpenRoot((current) =>
-            current?.id === changed.id ? { ...current, ...changed } : current,
+            current?.id === changed.id
+                ? reconcileComment(current, changed)
+                : current,
         );
     }, []);
+
+    const changeCommentReaction = useCallback(
+        (commentId: number, change: ReactionChange) => {
+            setComments((current) =>
+                applyCommentReactionChangeToList(current, commentId, change),
+            );
+            setOpenRoot((current) =>
+                current?.id === commentId
+                    ? applyCommentReactionChange(current, change)
+                    : current,
+            );
+        },
+        [],
+    );
 
     const closeFromHistory = useCallback(() => {
         setOpenRoot(null);
@@ -362,6 +384,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                         csrfToken={me?.csrf_token ?? null}
                         key={comment.id}
                         onChange={replaceComment}
+                        onReactionChange={changeCommentReaction}
                         onReply={openThread}
                         onSessionExpired={() => void refresh()}
                         reactionReturnTo={returnTo(slug)}
@@ -385,6 +408,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                     initialRoot={openRoot}
                     onClose={closeThread}
                     onRootChange={replaceComment}
+                    onRootReactionChange={changeCommentReaction}
                     slug={slug}
                 />
             ) : null}

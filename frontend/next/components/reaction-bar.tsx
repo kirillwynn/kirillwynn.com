@@ -1,6 +1,13 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import {
+    lazy,
+    Suspense,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -15,6 +22,7 @@ import {
     ReactionApiError,
     reactionParticipantPath,
     toggleReaction,
+    type ReactionChange,
     type ReactionGroup,
     type ReactionParticipant,
     type ReactionTarget,
@@ -75,7 +83,7 @@ export function ReactionBar({
     target,
 }: {
     initialReactions: ReactionGroup[];
-    onChange?: (reactions: ReactionGroup[]) => void;
+    onChange?: (change: ReactionChange) => void;
     target: ReactionTarget;
 }) {
     const { me, refresh, status: authStatus } = useAuth();
@@ -97,6 +105,19 @@ export function ReactionBar({
     >("idle");
     const pickerTrigger = useRef<HTMLButtonElement>(null);
     const busyRef = useRef(false);
+    const mutationRevisionRef = useRef(0);
+    const participantRequestRef = useRef(0);
+    const participantAbortRef = useRef<AbortController | null>(null);
+    const participantGroupRef = useRef<string | null>(null);
+    const participantTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const suppressParticipantFocusRef = useRef(false);
+    const participantButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+    const mountedRef = useRef(true);
+    const pointerTypeRef = useRef<string | null>(null);
+    const lastTouchAtRef = useRef(0);
+    const targetKey = `${target.kind}:${String(target.id)}:${target.slug}`;
+    const latestTargetKeyRef = useRef(targetKey);
+    latestTargetKeyRef.current = targetKey;
     const user = me?.authenticated ? me.user : null;
     const canInteract = Boolean(user?.can_interact);
     const interactionDisabled = Boolean(user && !canInteract);
@@ -104,6 +125,56 @@ export function ReactionBar({
     useEffect(() => {
         setReactions(initialReactions);
     }, [initialReactions]);
+
+    const closeParticipants = useCallback((restoreFocus: boolean): void => {
+        participantRequestRef.current += 1;
+        participantAbortRef.current?.abort();
+        participantAbortRef.current = null;
+        participantGroupRef.current = null;
+        const trigger = participantTriggerRef.current;
+        participantTriggerRef.current = null;
+        setParticipantGroup(null);
+        setParticipants([]);
+        setParticipantsNext(null);
+        setParticipantsStatus("idle");
+        if (restoreFocus && trigger) {
+            suppressParticipantFocusRef.current = true;
+            trigger.focus();
+            suppressParticipantFocusRef.current = false;
+        }
+    }, []);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            participantRequestRef.current += 1;
+            participantAbortRef.current?.abort();
+        };
+    }, []);
+
+    useEffect(() => {
+        mutationRevisionRef.current += 1;
+        busyRef.current = false;
+        setBusy(false);
+        closeParticipants(false);
+    }, [closeParticipants, targetKey]);
+
+    useEffect(() => {
+        function keydown(event: KeyboardEvent): void {
+            if (
+                event.key === "Escape" &&
+                participantGroupRef.current !== null
+            ) {
+                event.preventDefault();
+                closeParticipants(true);
+            }
+        }
+        document.addEventListener("keydown", keydown);
+        return () => {
+            document.removeEventListener("keydown", keydown);
+        };
+    }, [closeParticipants]);
 
     useEffect(() => {
         let active = true;
@@ -128,11 +199,15 @@ export function ReactionBar({
             return;
         }
         setPendingEmoji(loadPendingReaction(target));
-    }, [authStatus, target]);
+    }, [authStatus, target.id, target.kind, target.slug]);
 
-    function update(next: ReactionGroup[]): void {
+    function update(
+        next: ReactionGroup[],
+        source: ReactionChange["source"],
+        revision: number,
+    ): void {
         setReactions(next);
-        onChange?.(next);
+        onChange?.({ reactions: next, revision, source });
     }
 
     async function performToggle(
@@ -155,34 +230,61 @@ export function ReactionBar({
             return false;
         }
         const previous = reactions;
+        const revision = mutationRevisionRef.current + 1;
+        mutationRevisionRef.current = revision;
+        const mutationTargetKey = targetKey;
         busyRef.current = true;
         setBusy(true);
         setError(null);
         setNotice(null);
-        update(optimisticGroups(previous, target, emoji));
+        update(
+            optimisticGroups(previous, target, emoji),
+            "optimistic",
+            revision,
+        );
         try {
             const authoritative = await toggleReaction(
                 target,
                 emoji,
                 me.csrf_token,
             );
-            update(authoritative);
+            if (
+                !mountedRef.current ||
+                revision !== mutationRevisionRef.current ||
+                mutationTargetKey !== latestTargetKeyRef.current
+            ) {
+                return false;
+            }
+            update(authoritative, "authoritative", revision);
             rememberReaction(emoji);
             if (fromPending) {
-                clearPendingReaction(target, emoji);
+                clearPendingReaction(target);
                 setPendingEmoji(null);
             }
             return true;
         } catch (caught) {
-            update(previous);
+            if (
+                !mountedRef.current ||
+                revision !== mutationRevisionRef.current ||
+                mutationTargetKey !== latestTargetKeyRef.current
+            ) {
+                return false;
+            }
+            update(previous, "rollback", revision);
             setError(reactionError(caught));
             if (caught instanceof ReactionApiError && caught.status === 403) {
                 await refresh();
             }
             return false;
         } finally {
-            busyRef.current = false;
-            setBusy(false);
+            if (
+                mountedRef.current &&
+                revision === mutationRevisionRef.current &&
+                mutationTargetKey === latestTargetKeyRef.current
+            ) {
+                busyRef.current = false;
+                setBusy(false);
+            }
         }
     }
 
@@ -194,7 +296,7 @@ export function ReactionBar({
             (group) => group.emoji === pendingEmoji && group.viewer_reacted,
         );
         if (alreadyPresent) {
-            clearPendingReaction(target, pendingEmoji);
+            clearPendingReaction(target);
             setNotice(`Your ${pendingEmoji} reaction is already active.`);
             setPendingEmoji(null);
             return;
@@ -205,14 +307,28 @@ export function ReactionBar({
     async function openParticipants(
         group: ReactionGroup,
         cursor?: string,
+        trigger?: HTMLButtonElement | null,
     ): Promise<void> {
-        if (!cursor && participantGroup?.emoji === group.emoji) {
+        if (!cursor && participantGroupRef.current === group.emoji) {
+            if (trigger) {
+                participantTriggerRef.current = trigger;
+            }
             return;
+        }
+        participantGroupRef.current = group.emoji;
+        const requestId = participantRequestRef.current + 1;
+        participantRequestRef.current = requestId;
+        participantAbortRef.current?.abort();
+        const controller = new AbortController();
+        participantAbortRef.current = controller;
+        if (trigger) {
+            participantTriggerRef.current = trigger;
         }
         setParticipantGroup(group);
         setParticipantsStatus("loading");
         if (!cursor) {
             setParticipants([]);
+            setParticipantsNext(null);
         }
         try {
             const page = await getReactionParticipants(
@@ -220,14 +336,67 @@ export function ReactionBar({
                 group.emoji,
                 group.participants,
                 cursor,
+                controller.signal,
             );
+            if (
+                !mountedRef.current ||
+                requestId !== participantRequestRef.current ||
+                targetKey !== latestTargetKeyRef.current
+            ) {
+                return;
+            }
             setParticipants((current) =>
-                cursor ? [...current, ...page.results] : page.results,
+                Array.from(
+                    new Map(
+                        (cursor
+                            ? [...current, ...page.results]
+                            : page.results
+                        ).map((participant) => [participant.id, participant]),
+                    ).values(),
+                ),
             );
             setParticipantsNext(page.next);
             setParticipantsStatus("ready");
         } catch {
+            if (
+                !mountedRef.current ||
+                requestId !== participantRequestRef.current ||
+                controller.signal.aborted ||
+                targetKey !== latestTargetKeyRef.current
+            ) {
+                return;
+            }
             setParticipantsStatus("error");
+        } finally {
+            if (requestId === participantRequestRef.current) {
+                participantAbortRef.current = null;
+            }
+        }
+    }
+
+    function pointerDown(pointerType: string): void {
+        pointerTypeRef.current = pointerType;
+        if (pointerType === "touch") {
+            lastTouchAtRef.current = Date.now();
+        }
+    }
+
+    function pointerUp(): void {
+        window.setTimeout(() => {
+            pointerTypeRef.current = null;
+        }, 0);
+    }
+
+    function hoverParticipants(group: ReactionGroup): void {
+        if (
+            window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
+            Date.now() - lastTouchAtRef.current > 1000
+        ) {
+            void openParticipants(
+                group,
+                undefined,
+                participantButtonRefs.current.get(group.emoji),
+            );
         }
     }
 
@@ -246,8 +415,30 @@ export function ReactionBar({
                     <span
                         className={`reaction-pill ${group.viewer_reacted ? "reaction-pill-active" : ""}`}
                         key={group.emoji}
-                        onFocus={() => void openParticipants(group)}
-                        onMouseEnter={() => void openParticipants(group)}
+                        onFocus={(event) => {
+                            if (
+                                pointerTypeRef.current !== "touch" &&
+                                !suppressParticipantFocusRef.current
+                            ) {
+                                void openParticipants(
+                                    group,
+                                    undefined,
+                                    event.target instanceof HTMLButtonElement
+                                        ? event.target
+                                        : undefined,
+                                );
+                            }
+                        }}
+                        onPointerCancel={pointerUp}
+                        onPointerDownCapture={(event) => {
+                            pointerDown(event.pointerType);
+                        }}
+                        onPointerEnter={(event) => {
+                            if (event.pointerType === "mouse") {
+                                hoverParticipants(group);
+                            }
+                        }}
+                        onPointerUpCapture={pointerUp}
                     >
                         <button
                             aria-label={`${group.viewer_reacted ? "Remove" : "Add"} ${group.emoji} reaction`}
@@ -261,7 +452,25 @@ export function ReactionBar({
                         <button
                             aria-label={`View ${String(group.count)} participant${group.count === 1 ? "" : "s"} for ${group.emoji}`}
                             disabled={busy}
-                            onClick={() => void openParticipants(group)}
+                            onClick={(event) =>
+                                void openParticipants(
+                                    group,
+                                    undefined,
+                                    event.currentTarget,
+                                )
+                            }
+                            ref={(node) => {
+                                if (node) {
+                                    participantButtonRefs.current.set(
+                                        group.emoji,
+                                        node,
+                                    );
+                                } else {
+                                    participantButtonRefs.current.delete(
+                                        group.emoji,
+                                    );
+                                }
+                            }}
                             type="button"
                         >
                             {group.count}
@@ -329,7 +538,7 @@ export function ReactionBar({
                     )}
                     <button
                         onClick={() => {
-                            clearPendingReaction(target, pendingEmoji);
+                            clearPendingReaction(target);
                             setPendingEmoji(null);
                         }}
                         type="button"
@@ -390,7 +599,7 @@ export function ReactionBar({
                             aria-label="Close reaction participants"
                             className="comment-action"
                             onClick={() => {
-                                setParticipantGroup(null);
+                                closeParticipants(true);
                             }}
                             type="button"
                         >
@@ -427,6 +636,7 @@ export function ReactionBar({
                                 void openParticipants(
                                     participantGroup,
                                     participantsNext,
+                                    participantTriggerRef.current,
                                 )
                             }
                             type="button"

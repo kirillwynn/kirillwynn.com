@@ -9,7 +9,12 @@ import {
     loadCommentDraft,
     saveCommentDraft,
 } from "@/lib/comment-drafts";
-import { reconcileReplies } from "@/lib/comment-reconciliation";
+import {
+    applyCommentReactionChange,
+    applyCommentReactionChangeToList,
+    reconcileComment,
+    reconcileReplies,
+} from "@/lib/comment-reconciliation";
 import {
     COMMENT_BODY_CODE_POINT_LIMIT,
     codePointLength,
@@ -21,6 +26,7 @@ import {
     getThread,
     type PublicComment,
 } from "@/lib/comments";
+import type { ReactionChange } from "@/lib/reactions";
 
 function returnTo(slug: string, threadId: number): string {
     return `/posts/${slug}?thread=${String(threadId)}`;
@@ -41,11 +47,13 @@ export function ThreadPanel({
     slug,
     onClose,
     onRootChange,
+    onRootReactionChange,
 }: {
     initialRoot: PublicComment;
     slug: string;
     onClose: () => void;
     onRootChange: (root: PublicComment) => void;
+    onRootReactionChange: (commentId: number, change: ReactionChange) => void;
 }) {
     const { me, refresh, status: authStatus } = useAuth();
     const [root, setRoot] = useState(initialRoot);
@@ -75,7 +83,7 @@ export function ThreadPanel({
                 if (!active) {
                     return;
                 }
-                setRoot(page.root);
+                setRoot((current) => reconcileComment(current, page.root));
                 setReplies(reconcileReplies([], page.results));
                 setNext(page.next);
                 setStatus("ready");
@@ -146,7 +154,7 @@ export function ThreadPanel({
         if (!changed) {
             return;
         }
-        setRoot(changed);
+        setRoot((current) => reconcileComment(current, changed));
         onRootChange(changed);
     }
 
@@ -157,6 +165,27 @@ export function ThreadPanel({
         setReplies((current) => reconcileReplies(current, [changed]));
     }
 
+    function changeRootReaction(
+        commentId: number,
+        change: ReactionChange,
+    ): void {
+        setRoot((current) =>
+            current.id === commentId
+                ? applyCommentReactionChange(current, change)
+                : current,
+        );
+        onRootReactionChange(commentId, change);
+    }
+
+    function changeReplyReaction(
+        commentId: number,
+        change: ReactionChange,
+    ): void {
+        setReplies((current) =>
+            applyCommentReactionChangeToList(current, commentId, change),
+        );
+    }
+
     async function loadMore(): Promise<void> {
         if (!next) {
             return;
@@ -164,7 +193,7 @@ export function ThreadPanel({
         try {
             const page = await getThread(root.id, next);
             setReplies((current) => reconcileReplies(current, page.results));
-            setRoot(page.root);
+            setRoot((current) => reconcileComment(current, page.root));
             onRootChange(page.root);
             setNext(page.next);
         } catch (caught) {
@@ -193,7 +222,15 @@ export function ThreadPanel({
                       last_reply_at: reply.created_at,
                   }
                 : root;
-            setRoot(changedRoot);
+            setRoot((current) =>
+                isNew
+                    ? {
+                          ...current,
+                          reply_count: current.reply_count + 1,
+                          last_reply_at: reply.created_at,
+                      }
+                    : current,
+            );
             onRootChange(changedRoot);
             setBody("");
             setTarget(root);
@@ -279,6 +316,7 @@ export function ThreadPanel({
                         compact
                         csrfToken={me?.csrf_token ?? null}
                         onChange={changeRoot}
+                        onReactionChange={changeRootReaction}
                         onReply={(comment) => {
                             setTarget(comment);
                             textareaRef.current?.focus();
@@ -313,6 +351,7 @@ export function ThreadPanel({
                             csrfToken={me?.csrf_token ?? null}
                             key={reply.id}
                             onChange={changeReply}
+                            onReactionChange={changeReplyReaction}
                             onReply={(selected) => {
                                 setTarget(selected);
                                 textareaRef.current?.focus();

@@ -35,6 +35,12 @@ export type ReactionConfig = {
     quick_reactions: [string, string, string];
 };
 
+export type ReactionChange = {
+    reactions: ReactionGroup[];
+    revision: number;
+    source: "optimistic" | "authoritative" | "rollback";
+};
+
 type ReactionResponse = {
     action?: "added" | "removed";
     reactions: ReactionGroup[];
@@ -153,11 +159,13 @@ export function getReactionParticipants(
     emoji: string,
     endpoint: string,
     cursor?: string,
+    signal?: AbortSignal,
 ): Promise<ReactionParticipantPage> {
     const expected = reactionParticipantPath(target, emoji);
     const initial = checkedRelativePath(endpoint, expected);
     return request<ReactionParticipantPage>(
         cursor ? checkedRelativePath(cursor, expected) : initial,
+        { signal },
     );
 }
 

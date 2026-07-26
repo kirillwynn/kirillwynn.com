@@ -15,7 +15,12 @@ import {
     loadCommentDraft,
     saveCommentDraft,
 } from "@/lib/comment-drafts";
-import { reconcileReplies, reconcileRoots } from "@/lib/comment-reconciliation";
+import {
+    applyCommentReactionChange,
+    reconcileComment,
+    reconcileReplies,
+    reconcileRoots,
+} from "@/lib/comment-reconciliation";
 import { codePointLength, truncateCodePoints } from "@/lib/comment-text";
 import {
     createComment,
@@ -82,6 +87,15 @@ function comment(overrides: Partial<PublicComment> = {}): PublicComment {
             can_react: false,
         },
         ...overrides,
+    };
+}
+
+function reaction(count: number, viewerReacted = false) {
+    return {
+        emoji: "🔥",
+        count,
+        viewer_reacted: viewerReacted,
+        participants: "/api/v1/comments/7/reactions/%F0%9F%94%A5/participants/",
     };
 }
 
@@ -464,25 +478,91 @@ describe("comment reconciliation", () => {
         expect(merged.at(-1)?.body).toBe("Fresh root");
     });
 
-    it("preserves authoritative local reaction state across cursor reconciliation", () => {
-        const locallyReacted = comment({
-            reactions: [
-                {
-                    emoji: "👩‍💻",
-                    count: 2,
-                    viewer_reacted: true,
-                    participants:
-                        "/api/v1/comments/7/reactions/%F0%9F%91%A9%E2%80%8D%F0%9F%92%BB/participants/",
-                },
-            ],
-            reactions_updated_locally: true,
+    it("preserves optimistic reactions across stale cursor, thread, and edit responses", () => {
+        const optimistic = applyCommentReactionChange(
+            comment({ reactions: [reaction(1)] }),
+            {
+                reactions: [reaction(2, true)],
+                revision: 7,
+                source: "optimistic",
+            },
+        );
+        const staleCursorCopy = comment({
+            body: "Fresh edited body",
+            reactions: [reaction(1)],
         });
-        const staleCursorCopy = comment({ reactions: [] });
 
-        const [merged] = reconcileRoots([locallyReacted], [staleCursorCopy]);
+        const [merged] = reconcileRoots([optimistic], [staleCursorCopy]);
+        const threadMerged = reconcileComment(merged, {
+            ...staleCursorCopy,
+            body: "Fresh thread body",
+        });
 
-        expect(merged.reactions).toEqual(locallyReacted.reactions);
-        expect(merged.reactions_updated_locally).toBe(true);
+        expect(merged.body).toBe("Fresh edited body");
+        expect(merged.reactions).toEqual([reaction(2, true)]);
+        expect(merged.reaction_pending_revision).toBe(7);
+        expect(threadMerged.body).toBe("Fresh thread body");
+        expect(threadMerged.reactions).toEqual([reaction(2, true)]);
+        expect(threadMerged.reaction_pending_revision).toBe(7);
+    });
+
+    it("settles authoritative and rollback states and accepts later server aggregates", () => {
+        const initial = comment({ reactions: [reaction(1)] });
+        const optimistic = applyCommentReactionChange(initial, {
+            reactions: [reaction(2, true)],
+            revision: 8,
+            source: "optimistic",
+        });
+        const authoritative = applyCommentReactionChange(optimistic, {
+            reactions: [reaction(3, true)],
+            revision: 8,
+            source: "authoritative",
+        });
+        const fresh = reconcileComment(authoritative, {
+            ...initial,
+            reactions: [reaction(5, true)],
+        });
+
+        expect(authoritative.reaction_pending_revision).toBeUndefined();
+        expect(authoritative.reactions).toEqual([reaction(3, true)]);
+        expect(fresh.reactions).toEqual([reaction(5, true)]);
+
+        const rolledBack = applyCommentReactionChange(optimistic, {
+            reactions: initial.reactions,
+            revision: 8,
+            source: "rollback",
+        });
+        expect(rolledBack.reaction_pending_revision).toBeUndefined();
+        expect(rolledBack.reactions).toEqual(initial.reactions);
+    });
+
+    it("ignores an older mutation response and lets tombstones win", () => {
+        const first = applyCommentReactionChange(comment(), {
+            reactions: [reaction(1, true)],
+            revision: 10,
+            source: "optimistic",
+        });
+        const second = applyCommentReactionChange(first, {
+            reactions: [reaction(2, true)],
+            revision: 11,
+            source: "optimistic",
+        });
+        const staleSuccess = applyCommentReactionChange(second, {
+            reactions: [reaction(9, true)],
+            revision: 10,
+            source: "authoritative",
+        });
+        const tombstone = reconcileComment(staleSuccess, {
+            ...comment(),
+            body: null,
+            status: "deleted",
+            reactions: [reaction(99, true)],
+        });
+
+        expect(staleSuccess.reactions).toEqual([reaction(2, true)]);
+        expect(staleSuccess.reaction_pending_revision).toBe(11);
+        expect(tombstone.reactions).toEqual([]);
+        expect(tombstone.reaction_pending_revision).toBeUndefined();
     });
 });
 

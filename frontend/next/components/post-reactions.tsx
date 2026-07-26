@@ -68,7 +68,9 @@ export function PostReactions({ id, slug }: { id: number; slug: string }) {
                 <div className="mt-2">
                     <ReactionBar
                         initialReactions={reactions}
-                        onChange={setReactions}
+                        onChange={(change) => {
+                            setReactions(change.reactions);
+                        }}
                         target={target}
                     />
                 </div>

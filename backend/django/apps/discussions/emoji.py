@@ -33,8 +33,6 @@ def normalize_emoji(value):
         raise ValidationError(
             {"emoji": f"Emoji cannot exceed {MAX_EMOJI_CODE_POINTS} Unicode code points."}
         )
-    if len(value.encode("utf-8")) > MAX_EMOJI_UTF8_BYTES:
-        raise ValidationError({"emoji": f"Emoji cannot exceed {MAX_EMOJI_UTF8_BYTES} UTF-8 bytes."})
     for character in value:
         category = unicodedata.category(character)
         if (
@@ -47,6 +45,12 @@ def normalize_emoji(value):
             )
 
     normalized = unicodedata.normalize("NFC", value)
+    try:
+        encoded = normalized.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise ValidationError({"emoji": "Emoji contains an invalid Unicode code point."}) from error
+    if len(encoded) > MAX_EMOJI_UTF8_BYTES:
+        raise ValidationError({"emoji": f"Emoji cannot exceed {MAX_EMOJI_UTF8_BYTES} UTF-8 bytes."})
     data = emoji.EMOJI_DATA.get(normalized)
     if (
         not emoji.is_emoji(normalized)

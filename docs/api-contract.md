@@ -399,7 +399,11 @@ standard RGI Unicode emoji sequence through `emoji` 2.15.0. ZWJ sequences,
 skin-tone modifiers, flags, keycaps, gender variants, and meaningful variation
 selectors are preserved. Text, multiple emoji, shortcode/custom emoji,
 whitespace, controls/bidi formatting, lone components, and malformed sequences
-are rejected.
+are rejected. Surrogate code points are rejected before UTF-8 encoding, with a
+defensive encoding-error conversion at the same boundary. Raw JSON such as
+`{"emoji":"\ud800"}` therefore receives the normal JSON 400 validation
+response rather than an HTML or Unicode encoding 500. Model saves and Wagtail
+quick-reaction saves use the same boundary.
 
 Groups are ordered by canonical emoji key and have:
 
@@ -450,9 +454,12 @@ viewer state, loaded in bounded grouped queries for the whole cursor page.
 
 Deleted or hidden tombstones return an empty aggregate, never expose
 participants, and reject new toggles with 403. Existing rows remain for
-moderation history. Client cursor reconciliation preserves a newer locally
-confirmed reaction aggregate by stable comment ID while still refreshing the
-rest of the comment.
+moderation history. Client reconciliation preserves reactions only while a
+specific optimistic mutation revision is pending. The matching authoritative
+or rollback result clears that marker, after which later comment, thread, edit,
+or cursor responses may replace the aggregate. An older mutation result cannot
+settle a newer revision, and a tombstone always clears both reactions and the
+pending marker.
 
 ### Participants
 
@@ -480,6 +487,14 @@ target/emoji endpoint.
 Email, OAuth/provider identity, tokens, session information, and moderation
 metadata are never present.
 
+The client gives each participant request an identity and abort signal.
+Switching target or emoji, closing the surface, or unmounting invalidates the
+previous request; stale successes and failures cannot update the current group.
+Cursor pages are accepted only for the current group and are deduplicated by
+participant ID. Escape closes the participant surface and returns focus to its
+trigger. Hover opens participants only for a fine, hover-capable mouse pointer;
+focus and the explicit count button remain the keyboard/touch paths.
+
 ### Quick reaction config
 
 `GET /api/v1/reactions/config/`
@@ -491,6 +506,20 @@ metadata are never present.
 The three distinct canonical values come from the Wagtail
 `ReactionSettings` Site Setting. No Wagtail model IDs or internal metadata are
 returned.
+
+The browser uses the compact deterministic `emoji-regex` 10.6.0 sequence data
+for storage hygiene, plus NFC/control/limit checks and rejection of redundant
+variation selector 16 after a default emoji-presentation code point. The full
+Emoji Mart dataset remains behind the lazy picker import. Recent and pending
+storage therefore reject incomplete ZWJ/flag sequences and overqualified
+values such as `🔥️` and `☕️` without adding the picker dataset to the initial
+post bundle. Django remains authoritative.
+
+At most one pending reaction intent exists for one
+`(slug, target kind, target ID)`. Saving another emoji removes older intents
+for that target. Legacy duplicates are selected by greatest `createdAt` and
+compacted to one entry; confirm and discard clear the whole target namespace.
+Other targets remain isolated and the ten-minute TTL is unchanged.
 
 ### Concurrency and rate limit
 

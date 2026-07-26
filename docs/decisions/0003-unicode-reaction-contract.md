@@ -42,11 +42,13 @@ Django is authoritative. It:
 1. requires a string;
 2. rejects empty input, whitespace, controls, surrogate code points, and
    dangerous bidirectional formatting controls;
-3. enforces 32 Unicode code points and 128 UTF-8 bytes;
-4. normalizes to NFC;
-5. uses `emoji` 2.15.0 `is_emoji` / `EMOJI_DATA` to require exactly one
+3. rejects surrogate categories before any UTF-8 encoding and converts a
+   defensive `UnicodeEncodeError` into `ValidationError`;
+4. enforces 32 Unicode code points and 128 UTF-8 bytes;
+5. normalizes to NFC;
+6. uses `emoji` 2.15.0 `is_emoji` / `EMOJI_DATA` to require exactly one
    recommended-for-general-interchange Unicode emoji sequence;
-6. rejects standalone Unicode emoji components such as skin-tone modifiers.
+7. rejects standalone Unicode emoji components such as skin-tone modifiers.
 
 Meaningful ZWJ, modifier, keycap, flag, gender, and variation code points are
 preserved. The normalized value is stored and returned as the canonical key.
@@ -93,15 +95,33 @@ uniqueness. The public config endpoint emits only the three values.
 The client uses accessible pills with `aria-pressed`, separate participant
 triggers, touch-sized controls, quick reactions, a lazy local picker with search
 and keyboard navigation, and a bounded emoji-only recent list in
-`localStorage`. A synchronous in-flight guard prevents double-click and
-out-of-order toggles; optimistic state rolls back on failure and is replaced by
-the complete server aggregate on success.
+`localStorage`. Storage validation uses deterministic `emoji-regex` 10.6.0
+sequence data with local NFC/control/size checks and rejects redundant VS16
+after default emoji-presentation characters. This compact validator is part of
+the reaction client, while the full Emoji Mart dataset remains behind the lazy
+picker import.
+
+A synchronous in-flight guard prevents double-click toggles. Each mutation also
+has a target-bound revision: comment reconciliation preserves an optimistic
+aggregate only while that revision is pending, accepts only its matching
+authoritative or rollback result, and then allows later server comment/thread
+responses to refresh the aggregate. Tombstones clear reactions and the pending
+revision unconditionally.
+
+Participant reads carry an `AbortController` and monotonically increasing
+request identity. Target/group changes, close, and unmount invalidate the
+active request. Stale success/error and cursor pages are ignored, while accepted
+pages deduplicate public participants by ID. Escape closes and restores trigger
+focus. Pointer hover is limited to fine hover-capable mouse devices and is
+suppressed after touch; focus and explicit count taps remain available.
 
 Anonymous intent is stored for ten minutes in `sessionStorage`, scoped by
-Unicode slug, target type, target ID, and emoji. OAuth return restores a
-confirmation prompt. It never automatically replays a toggle; if authoritative
-state already shows the reaction, confirmation clears the intent without
-removing it.
+Unicode slug, target type, target ID, and emoji. Only one current intent is kept
+per `(slug, target type, target ID)`: a new emoji removes the old target keys,
+legacy duplicates are selected by `createdAt`, and confirm/discard clear the
+whole target namespace. OAuth return restores a confirmation prompt. It never
+automatically replays a toggle; if authoritative state already shows the
+reaction, confirmation clears the intent without removing it.
 
 ## Consequences
 

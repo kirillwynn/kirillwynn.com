@@ -29,7 +29,7 @@ export type PublicComment = {
     reply_count: number;
     last_reply_at: string | null;
     reactions: ReactionGroup[];
-    reactions_updated_locally?: boolean;
+    reaction_pending_revision?: number;
     viewer: CommentViewer;
 };
 

@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from urllib.parse import quote
 
@@ -85,12 +86,59 @@ def test_unicode_sequences_are_accepted_and_nfc(value):
         "🏽",
         "👩‍",
         "\ufe0f",
+        "\ud800",
+        "\udfff",
+        "🔥\ud800",
         "👩" * 33,
     ],
 )
 def test_invalid_or_malformed_reaction_keys_are_rejected(value):
     with pytest.raises(ValidationError):
         normalize_emoji(value)
+
+
+@pytest.mark.parametrize("value", ["\ud800", "\udfff", "🔥\ud800"])
+def test_surrogates_are_safe_across_models_and_wagtail_settings(
+    value,
+    public_post,
+    user,
+):
+    reaction = PostReaction(post=public_post, user=user, emoji=value)
+    with pytest.raises(ValidationError):
+        reaction.full_clean()
+    with pytest.raises(ValidationError):
+        reaction.save()
+
+    site = Site.objects.get(is_default_site=True)
+    configured = ReactionSettings.for_site(site)
+    configured.quick_reaction_one = value
+    with pytest.raises(ValidationError):
+        configured.full_clean()
+    with pytest.raises(ValidationError):
+        configured.save()
+
+
+@pytest.mark.parametrize("value", ["\ud800", "\udfff", "🔥\ud800"])
+def test_toggle_rejects_raw_json_surrogates_without_html_500(
+    value,
+    public_post,
+    user,
+):
+    client = authenticated(user)
+    payload = json.dumps({"emoji": value})
+
+    response = client.post(
+        post_toggle_url(public_post),
+        data=payload,
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert response["Content-Type"].startswith("application/json")
+    assert response.data == {
+        "emoji": ["Emoji contains whitespace or a forbidden control character."]
+    }
+    assert not PostReaction.objects.filter(post=public_post, user=user).exists()
 
 
 def test_concrete_reaction_uniqueness_normalization_and_protected_relations(

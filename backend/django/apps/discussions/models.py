@@ -257,3 +257,7 @@ class ReactionSettings(BaseSiteSetting):
             self.quick_reaction_two,
             self.quick_reaction_three,
         ) = normalized
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)

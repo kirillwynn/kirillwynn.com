@@ -118,4 +118,18 @@ describe("server-only security boundary", () => {
             expect(contents).not.toContain("Authorization");
         }
     });
+
+    it("keeps the full picker dataset behind the lazy picker boundary", () => {
+        const bar = source("components/reaction-bar.tsx");
+        const picker = source("components/emoji-picker.tsx");
+        const storage = source("lib/reaction-storage.ts");
+
+        expect(bar).toContain(
+            'lazy(() => import("@/components/emoji-picker"))',
+        );
+        expect(picker).toContain('await import("@emoji-mart/data")');
+        expect(storage).toContain('from "emoji-regex"');
+        expect(storage).not.toContain("@emoji-mart/data");
+        expect(bar).not.toContain("@emoji-mart/data");
+    });
 });

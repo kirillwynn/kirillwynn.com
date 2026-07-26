@@ -1,4 +1,5 @@
 import type { PublicComment } from "@/lib/comments";
+import type { ReactionChange } from "@/lib/reactions";
 
 function timestamp(value: string): number {
     const parsed = Date.parse(value);
@@ -28,29 +29,82 @@ function reconcile(
     }
     for (const comment of incoming) {
         const existing = comments.get(comment.id);
-        if (
-            comment.status === "visible" &&
-            existing?.reactions_updated_locally &&
-            !comment.reactions_updated_locally
-        ) {
-            comments.set(comment.id, {
-                ...comment,
-                reactions: existing.reactions,
-                reactions_updated_locally: true,
-            });
-        } else {
-            comments.set(comment.id, {
-                ...comment,
-                reactions:
-                    comment.status === "visible" ? comment.reactions : [],
-                reactions_updated_locally:
-                    comment.status === "visible"
-                        ? comment.reactions_updated_locally
-                        : false,
-            });
-        }
+        comments.set(comment.id, reconcileComment(existing, comment));
     }
     return Array.from(comments.values()).sort(compare);
+}
+
+export function reconcileComment(
+    current: PublicComment | undefined,
+    incoming: PublicComment,
+): PublicComment {
+    if (incoming.status !== "visible") {
+        return {
+            ...incoming,
+            reactions: [],
+            reaction_pending_revision: undefined,
+        };
+    }
+    if (
+        current?.status === "visible" &&
+        current.reaction_pending_revision !== undefined
+    ) {
+        return {
+            ...incoming,
+            reactions: current.reactions,
+            reaction_pending_revision: current.reaction_pending_revision,
+        };
+    }
+    return {
+        ...incoming,
+        reaction_pending_revision: undefined,
+    };
+}
+
+export function applyCommentReactionChange(
+    comment: PublicComment,
+    change: ReactionChange,
+): PublicComment {
+    if (comment.status !== "visible") {
+        return {
+            ...comment,
+            reactions: [],
+            reaction_pending_revision: undefined,
+        };
+    }
+    if (change.source === "optimistic") {
+        if (
+            comment.reaction_pending_revision !== undefined &&
+            change.revision < comment.reaction_pending_revision
+        ) {
+            return comment;
+        }
+        return {
+            ...comment,
+            reactions: change.reactions,
+            reaction_pending_revision: change.revision,
+        };
+    }
+    if (comment.reaction_pending_revision !== change.revision) {
+        return comment;
+    }
+    return {
+        ...comment,
+        reactions: change.reactions,
+        reaction_pending_revision: undefined,
+    };
+}
+
+export function applyCommentReactionChangeToList(
+    comments: PublicComment[],
+    commentId: number,
+    change: ReactionChange,
+): PublicComment[] {
+    return comments.map((comment) =>
+        comment.id === commentId
+            ? applyCommentReactionChange(comment, change)
+            : comment,
+    );
 }
 
 export function reconcileRoots(

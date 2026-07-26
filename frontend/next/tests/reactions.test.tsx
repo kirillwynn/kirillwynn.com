@@ -12,6 +12,7 @@ import type { MeResponse } from "@/lib/auth";
 import type { PublicComment } from "@/lib/comments";
 import {
     clearPendingReaction,
+    isValidStoredEmoji,
     loadPendingReaction,
     loadRecentReactions,
     reactionStorageLimits,
@@ -200,8 +201,41 @@ function buttonByLabel(
     ).find((button) => button.getAttribute("aria-label") === label);
 }
 
+function deferred<T>(): {
+    promise: Promise<T>;
+    reject: (reason?: unknown) => void;
+    resolve: (value: T) => void;
+} {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, reject, resolve };
+}
+
+function pointerEvent(type: string, pointerType: string): Event {
+    const event = new MouseEvent(type, { bubbles: true });
+    Object.defineProperty(event, "pointerType", { value: pointerType });
+    return event;
+}
+
 beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal(
+        "matchMedia",
+        vi.fn().mockReturnValue({
+            matches: false,
+            media: "",
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        } satisfies MediaQueryList),
+    );
     window.sessionStorage.clear();
     window.localStorage.clear();
     resetReactionConfigForTests();
@@ -213,6 +247,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     document.body.replaceChildren();
 });
@@ -254,7 +289,7 @@ describe("reaction API and local storage boundaries", () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it("bounds recent emoji and expires malformed pending OAuth intent", () => {
+    it("strictly validates recent and pending emoji without the picker dataset", async () => {
         for (let index = 0; index < 20; index += 1) {
             rememberReaction(index % 2 ? "🔥" : `🎉`);
         }
@@ -262,19 +297,95 @@ describe("reaction API and local storage boundaries", () => {
 
         localStorage.setItem(
             "kw:reaction-recent:v1",
-            JSON.stringify(["🔥", "hello", ":custom:", 7, "🔥\u202e"]),
+            JSON.stringify([
+                "🔥",
+                "hello",
+                ":custom:",
+                7,
+                "🔥\u202e",
+                "👩‍",
+                "🔥‍",
+                "🔥️",
+                "☕️",
+                "🇺",
+                "🇺🇸🇨",
+                "🏳️‍",
+            ]),
         );
         expect(loadRecentReactions()).toEqual(["🔥"]);
 
-        savePendingReaction(postTarget, "👩‍💻", 100);
-        expect(loadPendingReaction(postTarget, 101)).toBe("👩‍💻");
+        for (const malformed of ["👩‍", "🔥‍", "🔥️", "☕️", "🇺", "🇺🇸🇨", "🏳️‍"]) {
+            expect(isValidStoredEmoji(malformed)).toBe(false);
+            savePendingReaction(postTarget, malformed, 90);
+            expect(loadPendingReaction(postTarget, 91)).toBeNull();
+        }
+
+        const pendingKey =
+            "kw:reaction-intent:v1:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:%F0%9F%94%A5";
+        for (const malformedJson of [
+            "null",
+            "[]",
+            "{}",
+            '{"emoji":"👩‍","createdAt":90}',
+            '{"emoji":"🔥","createdAt":"90"}',
+        ]) {
+            sessionStorage.setItem(pendingKey, malformedJson);
+            expect(loadPendingReaction(postTarget, 91)).toBeNull();
+            expect(sessionStorage.getItem(pendingKey)).toBeNull();
+        }
+
+        const data = (await import("@emoji-mart/data")).default as {
+            emojis: Record<string, { skins: Array<{ native: string }> }>;
+        };
+        for (const item of Object.values(data.emojis)) {
+            for (const skin of item.skins) {
+                expect(isValidStoredEmoji(skin.native)).toBe(true);
+            }
+        }
+    });
+
+    it("keeps one newest pending intent per target and clears the whole target", () => {
+        const otherTarget: ReactionTarget = {
+            ...postTarget,
+            id: 10,
+        };
+        savePendingReaction(otherTarget, "❤️", 50);
+        savePendingReaction(postTarget, "🔥", 100);
+        savePendingReaction(postTarget, "🎉", 200);
+
+        expect(loadPendingReaction(postTarget, 201)).toBe("🎉");
+        expect(loadPendingReaction(otherTarget, 201)).toBe("❤️");
+        expect(
+            Array.from({ length: sessionStorage.length }, (_, index) =>
+                sessionStorage.key(index),
+            ).filter((key) => key?.includes(":post:9:")),
+        ).toHaveLength(1);
+
+        clearPendingReaction(postTarget);
+        expect(loadPendingReaction(postTarget, 202)).toBeNull();
+        expect(loadPendingReaction(otherTarget, 202)).toBe("❤️");
+    });
+
+    it("chooses legacy duplicate intents by createdAt and preserves TTL", () => {
+        const prefix =
+            "kw:reaction-intent:v1:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:";
+        sessionStorage.setItem(
+            `${prefix}${encodeURIComponent("🎉")}`,
+            JSON.stringify({ emoji: "🎉", createdAt: 200 }),
+        );
+        sessionStorage.setItem(
+            `${prefix}${encodeURIComponent("🔥")}`,
+            JSON.stringify({ emoji: "🔥", createdAt: 100 }),
+        );
+
+        expect(loadPendingReaction(postTarget, 201)).toBe("🎉");
+        expect(sessionStorage.length).toBe(1);
         expect(
             loadPendingReaction(
                 postTarget,
-                100 + reactionStorageLimits.intentTtlMs + 1,
+                200 + reactionStorageLimits.intentTtlMs + 1,
             ),
         ).toBeNull();
-        clearPendingReaction(postTarget, "👩‍💻");
     });
 });
 
@@ -368,6 +479,10 @@ describe("post, comment, and reply reaction UI", () => {
 describe("reaction mutation state", () => {
     it("updates optimistically, blocks double-click, and accepts authoritative state", async () => {
         let resolveToggle: ((value: Response) => void) | null = null;
+        const changes: Array<{
+            revision: number;
+            source: string;
+        }> = [];
         const pending = new Promise<Response>((resolve) => {
             resolveToggle = resolve;
         });
@@ -377,7 +492,16 @@ describe("reaction mutation state", () => {
                 : null,
         );
         const { container, root } = await render(
-            <ReactionBar initialReactions={[group()]} target={postTarget} />,
+            <ReactionBar
+                initialReactions={[group()]}
+                onChange={(change) => {
+                    changes.push({
+                        revision: change.revision,
+                        source: change.source,
+                    });
+                }}
+                target={postTarget}
+            />,
         );
         const add = buttonByLabel(container, "Add 🔥 reaction");
         act(() => {
@@ -406,12 +530,18 @@ describe("reaction mutation state", () => {
         expect(
             buttonByLabel(container, "View 3 participants for 🔥"),
         ).toBeDefined();
+        expect(changes.map((change) => change.source)).toEqual([
+            "optimistic",
+            "authoritative",
+        ]);
+        expect(changes[0]?.revision).toBe(changes[1]?.revision);
         act(() => {
             root.unmount();
         });
     });
 
     it("rolls back network errors and reports 429 Retry-After", async () => {
+        const sources: string[] = [];
         defaultFetch(signedIn, (url, options) => {
             if (options?.method !== "POST" || !url.includes("/toggle/")) {
                 return null;
@@ -428,7 +558,13 @@ describe("reaction mutation state", () => {
                   );
         });
         const { container, root } = await render(
-            <ReactionBar initialReactions={[group()]} target={postTarget} />,
+            <ReactionBar
+                initialReactions={[group()]}
+                onChange={(change) => {
+                    sources.push(change.source);
+                }}
+                target={postTarget}
+            />,
         );
         act(() => {
             buttonByLabel(container, "Add 🔥 reaction")?.click();
@@ -436,6 +572,7 @@ describe("reaction mutation state", () => {
         await flush();
         expect(buttonByLabel(container, "Add 🔥 reaction")).toBeDefined();
         expect(container.textContent).toContain("previous state was restored");
+        expect(sources.slice(0, 2)).toEqual(["optimistic", "rollback"]);
 
         act(() => {
             buttonByLabel(container, "Add 🔥 reaction")?.click();
@@ -509,8 +646,12 @@ describe("participants, picker, and OAuth continuation", () => {
                 ?.click();
         });
         await flush();
+        const countTrigger = buttonByLabel(
+            container,
+            "View 1 participant for 🔥",
+        );
         act(() => {
-            buttonByLabel(container, "View 1 participant for 🔥")?.click();
+            countTrigger?.click();
         });
         await waitFor(() =>
             Array.from(container.querySelectorAll('[role="dialog"]')).some(
@@ -526,6 +667,425 @@ describe("participants, picker, and OAuth continuation", () => {
                     "🔥 reaction participants",
             ),
         ).toBeDefined();
+        act(() => {
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "Escape",
+                    bubbles: true,
+                }),
+            );
+        });
+        expect(
+            container.querySelector('[aria-label="🔥 reaction participants"]'),
+        ).toBeNull();
+        expect(document.activeElement).toBe(countTrigger);
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("ignores stale participant success and error responses after switching emoji", async () => {
+        const fire = deferred<Response>();
+        const party = deferred<Response>();
+        defaultFetch(signedIn, (url) => {
+            if (url.includes("%F0%9F%94%A5/participants/")) {
+                return fire.promise;
+            }
+            if (url.includes("%F0%9F%8E%89/participants/")) {
+                return party.promise;
+            }
+            return null;
+        });
+        const partyGroup = group({
+            emoji: "🎉",
+            participants:
+                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%8E%89/participants/",
+        });
+        const { container, root } = await render(
+            <ReactionBar
+                initialReactions={[group(), partyGroup]}
+                target={postTarget}
+            />,
+        );
+
+        act(() => {
+            buttonByLabel(container, "Add 🔥 reaction")?.focus();
+        });
+        await flush();
+        act(() => {
+            buttonByLabel(container, "Add 🎉 reaction")?.focus();
+        });
+        await flush();
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.map((call) => urlOf(call[0]))
+                .filter((url) => url.includes("/participants/")),
+        ).toEqual([group().participants, partyGroup.participants]);
+        await act(async () => {
+            party.resolve(
+                response({
+                    next: null,
+                    previous: null,
+                    results: [
+                        {
+                            id: 2,
+                            display_name: "Party participant",
+                            is_site_author: false,
+                        },
+                    ],
+                }),
+            );
+            await party.promise;
+        });
+        await flush();
+        expect(container.textContent).toContain("Party participant");
+        expect(
+            Array.from(
+                container.querySelectorAll(".reaction-participants"),
+            ).map((dialog) => dialog.getAttribute("aria-label")),
+        ).toEqual(["🎉 reaction participants"]);
+        expect(container.textContent).toContain("Party participant");
+
+        await act(async () => {
+            fire.resolve(
+                response({
+                    next: null,
+                    previous: null,
+                    results: [
+                        {
+                            id: 1,
+                            display_name: "Stale fire participant",
+                            is_site_author: false,
+                        },
+                    ],
+                }),
+            );
+            await fire.promise;
+        });
+        await flush();
+        expect(
+            Array.from(
+                container.querySelectorAll(".reaction-participants"),
+            ).map((dialog) => dialog.getAttribute("aria-label")),
+        ).toEqual(["🎉 reaction participants"]);
+        expect(container.textContent).toContain("Party participant");
+        expect(container.textContent).not.toContain("Stale fire participant");
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("ignores a stale participant error after a newer group succeeds", async () => {
+        const fire = deferred<Response>();
+        defaultFetch(signedIn, (url) => {
+            if (url.includes("%F0%9F%94%A5/participants/")) {
+                return fire.promise;
+            }
+            if (url.includes("%F0%9F%8E%89/participants/")) {
+                return Promise.resolve(
+                    response({
+                        next: null,
+                        previous: null,
+                        results: [
+                            {
+                                id: 2,
+                                display_name: "Current party participant",
+                                is_site_author: false,
+                            },
+                        ],
+                    }),
+                );
+            }
+            return null;
+        });
+        const partyGroup = group({
+            emoji: "🎉",
+            participants:
+                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%8E%89/participants/",
+        });
+        const { container, root } = await render(
+            <ReactionBar
+                initialReactions={[group(), partyGroup]}
+                target={postTarget}
+            />,
+        );
+        act(() => {
+            buttonByLabel(container, "Add 🔥 reaction")?.focus();
+        });
+        await flush();
+        act(() => {
+            buttonByLabel(container, "Add 🎉 reaction")?.focus();
+        });
+        await flush();
+        await act(async () => {
+            fire.reject(new Error("stale"));
+            await fire.promise.catch(() => undefined);
+        });
+
+        expect(container.textContent).toContain("Current party participant");
+        expect(container.textContent).not.toContain(
+            "Participants could not be loaded.",
+        );
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("invalidates an active participant request when Escape closes the surface", async () => {
+        const pending = deferred<unknown>();
+        let participantCalls = 0;
+        const waitingResponse = {
+            headers: new Headers(),
+            json: () => pending.promise,
+            ok: true,
+            status: 200,
+        } as Response;
+        defaultFetch(signedIn, (url) => {
+            if (!url.includes("/participants/")) {
+                return null;
+            }
+            participantCalls += 1;
+            return participantCalls === 1
+                ? Promise.resolve(
+                      response({
+                          next: `${group().participants}?cursor=next`,
+                          previous: null,
+                          results: [
+                              {
+                                  id: 1,
+                                  display_name: "Initial",
+                                  is_site_author: false,
+                              },
+                          ],
+                      }),
+                  )
+                : Promise.resolve(waitingResponse);
+        });
+        const { container, root } = await render(
+            <ReactionBar initialReactions={[group()]} target={postTarget} />,
+        );
+        await flush();
+        const trigger = buttonByLabel(container, "View 1 participant for 🔥");
+        expect(trigger).toBeDefined();
+        act(() => {
+            trigger?.click();
+        });
+        await flush();
+        expect(container.textContent).toContain("Initial");
+        expect(
+            container.querySelector(".reaction-participants"),
+        ).not.toBeNull();
+        act(() => {
+            Array.from(container.querySelectorAll("button"))
+                .find((button) => button.textContent === "Load more")
+                ?.click();
+        });
+        await flush();
+        expect(participantCalls).toBe(2);
+        const escape = new KeyboardEvent("keydown", {
+            key: "Escape",
+            bubbles: true,
+            cancelable: true,
+        });
+        act(() => {
+            document.dispatchEvent(escape);
+        });
+        await flush();
+        expect(escape.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(trigger);
+        expect(container.querySelector(".reaction-participants")).toBeNull();
+
+        await act(async () => {
+            pending.resolve({
+                next: null,
+                previous: null,
+                results: [
+                    {
+                        id: 1,
+                        display_name: "Too late",
+                        is_site_author: false,
+                    },
+                ],
+            });
+            await pending.promise;
+        });
+        await flush();
+        expect(container.textContent).not.toContain("Too late");
+        expect(container.querySelector(".reaction-participants")).toBeNull();
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("clears participant state when the reaction target changes or unmounts", async () => {
+        const pending = deferred<Response>();
+        defaultFetch(signedIn, (url) =>
+            url.includes("/participants/") ? pending.promise : null,
+        );
+        const rendered = await render(
+            <ReactionBar initialReactions={[group()]} target={postTarget} />,
+        );
+        act(() => {
+            buttonByLabel(
+                rendered.container,
+                "View 1 participant for 🔥",
+            )?.click();
+        });
+        const otherTarget: ReactionTarget = {
+            kind: "comment",
+            id: 77,
+            slug: "другой",
+            returnTo: "/posts/другой?thread=77",
+        };
+        act(() => {
+            rendered.root.render(
+                <AuthProvider>
+                    <ReactionBar initialReactions={[]} target={otherTarget} />
+                </AuthProvider>,
+            );
+        });
+        await flush();
+        expect(
+            rendered.container.querySelector(".reaction-participants"),
+        ).toBeNull();
+
+        act(() => {
+            rendered.root.unmount();
+        });
+        await act(async () => {
+            pending.resolve(
+                response({
+                    next: null,
+                    previous: null,
+                    results: [
+                        {
+                            id: 1,
+                            display_name: "Old target",
+                            is_site_author: false,
+                        },
+                    ],
+                }),
+            );
+            await pending.promise;
+        });
+    });
+
+    it("deduplicates participant cursor pages by public user ID", async () => {
+        let calls = 0;
+        defaultFetch(signedIn, (url) => {
+            if (!url.includes("/participants/")) {
+                return null;
+            }
+            calls += 1;
+            return Promise.resolve(
+                calls === 1
+                    ? response({
+                          next: `${group().participants}?cursor=next`,
+                          previous: null,
+                          results: [
+                              {
+                                  id: 1,
+                                  display_name: "One",
+                                  is_site_author: false,
+                              },
+                          ],
+                      })
+                    : response({
+                          next: null,
+                          previous: null,
+                          results: [
+                              {
+                                  id: 1,
+                                  display_name: "One refreshed",
+                                  is_site_author: false,
+                              },
+                              {
+                                  id: 2,
+                                  display_name: "Two",
+                                  is_site_author: false,
+                              },
+                          ],
+                      }),
+            );
+        });
+        const { container, root } = await render(
+            <ReactionBar initialReactions={[group()]} target={postTarget} />,
+        );
+        act(() => {
+            buttonByLabel(container, "View 1 participant for 🔥")?.click();
+        });
+        await flush();
+        act(() => {
+            Array.from(container.querySelectorAll("button"))
+                .find((button) => button.textContent === "Load more")
+                ?.click();
+        });
+        await flush();
+
+        expect(
+            container.querySelectorAll(".reaction-participants li"),
+        ).toHaveLength(2);
+        expect(container.textContent).toContain("One refreshed");
+        expect(container.textContent).toContain("Two");
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("limits hover to fine mouse pointers and suppresses touch-triggered focus", async () => {
+        let participantCalls = 0;
+        let toggleCalls = 0;
+        defaultFetch(signedIn, (url, options) => {
+            if (url.includes("/participants/")) {
+                participantCalls += 1;
+                return Promise.resolve(
+                    response({ next: null, previous: null, results: [] }),
+                );
+            }
+            if (options?.method === "POST" && url.includes("/toggle/")) {
+                toggleCalls += 1;
+                return Promise.resolve(
+                    response({
+                        action: "added",
+                        reactions: [group({ viewer_reacted: true })],
+                    }),
+                );
+            }
+            return null;
+        });
+        const { container, root } = await render(
+            <ReactionBar initialReactions={[group()]} target={postTarget} />,
+        );
+        const pill = container.querySelector(".reaction-pill");
+        const toggle = buttonByLabel(container, "Add 🔥 reaction");
+        const now = vi.spyOn(Date, "now").mockReturnValue(1000);
+
+        act(() => {
+            pill?.dispatchEvent(pointerEvent("pointerover", "mouse"));
+        });
+        expect(participantCalls).toBe(0);
+
+        act(() => {
+            toggle?.dispatchEvent(pointerEvent("pointerdown", "touch"));
+            toggle?.focus();
+            toggle?.click();
+            toggle?.dispatchEvent(pointerEvent("pointerup", "touch"));
+        });
+        await flush();
+        expect(toggleCalls).toBe(1);
+        expect(participantCalls).toBe(0);
+
+        vi.mocked(matchMedia).mockReturnValue({
+            matches: true,
+        } as MediaQueryList);
+        now.mockReturnValue(3001);
+        act(() => {
+            pill?.dispatchEvent(pointerEvent("pointerover", "mouse"));
+        });
+        await flush();
+        expect(participantCalls).toBe(1);
         act(() => {
             root.unmount();
         });
@@ -659,6 +1219,41 @@ describe("participants, picker, and OAuth continuation", () => {
         expect(loadPendingReaction(postTarget)).toBeNull();
         act(() => {
             authenticatedRender.root.unmount();
+        });
+    });
+
+    it("discards the entire latest target intent without reviving an older emoji", async () => {
+        const now = Date.now();
+        savePendingReaction(postTarget, "🔥", now - 1);
+        savePendingReaction(postTarget, "🎉", now);
+        defaultFetch(signedIn);
+        const first = await render(
+            <ReactionBar initialReactions={[]} target={postTarget} />,
+        );
+        expect(first.container.textContent).toContain(
+            "Add your saved 🎉 reaction?",
+        );
+        act(() => {
+            Array.from(first.container.querySelectorAll("button"))
+                .find((button) => button.textContent === "Discard")
+                ?.click();
+        });
+        expect(loadPendingReaction(postTarget, now + 1)).toBeNull();
+        act(() => {
+            first.root.unmount();
+        });
+
+        document.body.replaceChildren();
+        vi.mocked(fetch).mockReset();
+        resetReactionConfigForTests();
+        defaultFetch(signedIn);
+        const reloaded = await render(
+            <ReactionBar initialReactions={[]} target={postTarget} />,
+        );
+        expect(reloaded.container.textContent).not.toContain("saved");
+        expect(loadPendingReaction(postTarget, now + 2)).toBeNull();
+        act(() => {
+            reloaded.root.unmount();
         });
     });
 });

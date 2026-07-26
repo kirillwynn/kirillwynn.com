@@ -14,6 +14,7 @@ import {
     codePointLength,
     truncateCodePoints,
 } from "@/lib/comment-text";
+import type { ReactionChange } from "@/lib/reactions";
 
 function timestamp(value: string): string {
     return new Intl.DateTimeFormat(undefined, {
@@ -36,6 +37,7 @@ export function CommentCard({
     comment,
     csrfToken,
     onChange,
+    onReactionChange,
     onReply,
     onSessionExpired,
     reactionReturnTo,
@@ -46,6 +48,7 @@ export function CommentCard({
     comment: PublicComment;
     csrfToken: string | null;
     onChange: (comment: PublicComment | null) => void;
+    onReactionChange?: (commentId: number, change: ReactionChange) => void;
     onReply:
         | ((comment: PublicComment, trigger: HTMLButtonElement) => void)
         | null;
@@ -99,7 +102,7 @@ export function CommentCard({
                 body: null,
                 status: "deleted",
                 reactions: [],
-                reactions_updated_locally: false,
+                reaction_pending_revision: undefined,
                 viewer: {
                     ...comment.viewer,
                     can_edit: false,
@@ -260,12 +263,8 @@ export function CommentCard({
                 <div className="mt-2">
                     <ReactionBar
                         initialReactions={comment.reactions}
-                        onChange={(reactions) => {
-                            onChange({
-                                ...comment,
-                                reactions,
-                                reactions_updated_locally: true,
-                            });
+                        onChange={(change) => {
+                            onReactionChange?.(comment.id, change);
                         }}
                         target={{
                             kind: "comment",
