@@ -22,5 +22,14 @@ dist/
 # Env / secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.key
+
+# Django backend
+.venv/
+db.sqlite3
+staticfiles/
+media/
+.pytest_cache/
+.ruff_cache/

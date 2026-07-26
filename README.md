@@ -2,8 +2,10 @@
 
 Personal publishing website for Kirill Wynn.
 
-The repository currently contains a legacy Flask implementation and is being
-rebuilt on the `rewrite/wagtail-next` branch.
+The repository contains a legacy Flask/Vite implementation and the new
+Django/Wagtail backend being built on `rewrite/wagtail-next`. The legacy
+application remains unchanged as reference material and is not part of the new
+local development stack.
 
 ## Target stack
 
@@ -46,10 +48,85 @@ Do not copy that note into the repository.
 
 ## Current state
 
-The existing `backend/`, `frontend/`, `docker/`, and `nginx/` directories belong
-to the legacy Flask/React implementation. They remain available as a reference
-until useful infrastructure, icons, and configuration have been intentionally
-migrated.
+The first backend foundation is available under `backend/django/`:
+
+- Python 3.12.13;
+- Django 5.2.15 LTS;
+- Wagtail 7.4.2 LTS at `/cms/`;
+- Django REST Framework 3.17.1;
+- PostgreSQL configuration through environment variables;
+- a custom `users.User` model in the initial project migration;
+- environment-specific local, test, and production settings;
+- `/api/health/`, Django Admin, and Wagtail Admin smoke coverage;
+- locked production and development dependencies.
+
+Existing files under `backend/app/`, `frontend/`, `docker/`, `nginx/`, and the
+legacy deployment workflows remain reference material. The legacy
+`docker-compose.yml` is separate from the new `compose.dev.yml`.
 
 Do not use legacy behavior as the product specification. Check
 `docs/implementation-status.md` before starting work.
+
+## Local backend with Docker
+
+Docker Compose is the primary local path because it provides PostgreSQL:
+
+```bash
+cp .env.example .env
+docker compose -f compose.dev.yml up --build
+```
+
+The Django container waits for PostgreSQL, applies migrations, and starts at
+`http://localhost:8000`. Useful routes:
+
+- `http://localhost:8000/api/health/`
+- `http://localhost:8000/cms/`
+- `http://localhost:8000/django-admin/`
+
+Create a local administrator after the services are running:
+
+```bash
+docker compose -f compose.dev.yml exec django python manage.py createsuperuser
+```
+
+Stop the stack without deleting its database volume:
+
+```bash
+docker compose -f compose.dev.yml down
+```
+
+## Local backend without Docker
+
+Install [uv](https://docs.astral.sh/uv/), provide a reachable PostgreSQL
+database through the variables documented in `.env.example`, then run:
+
+```bash
+cd backend/django
+uv python install
+uv sync --frozen
+uv run python manage.py migrate
+uv run python manage.py runserver
+```
+
+The test suite uses an isolated SQLite database so fast checks do not require a
+running PostgreSQL service:
+
+```bash
+cd backend/django
+uv run ruff format --check .
+uv run ruff check .
+uv run python manage.py check --settings=config.settings.test
+uv run python manage.py makemigrations --check --dry-run --settings=config.settings.test
+uv run pytest
+```
+
+`uv.lock` is the complete development lock. `requirements.lock` is an exported,
+fully pinned production dependency set used by the Django container. When
+dependencies change, regenerate both intentionally:
+
+```bash
+cd backend/django
+uv lock
+uv export --frozen --no-dev --no-editable --no-emit-project --no-hashes \
+  --output-file requirements.lock
+```

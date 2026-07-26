@@ -4,15 +4,19 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: foundation planning
+Overall state: backend foundation implemented
 
 ## Current repository state
 
-- The `main` branch contains the legacy Flask/React implementation.
+- The `main` branch contains the deployed legacy Flask/React implementation.
 - The legacy database and Alembic history are experimental.
-- The new Django/Wagtail and Next.js application has not been scaffolded yet.
+- The new Django/Wagtail backend is isolated under `backend/django/`.
+- The Next.js application has not been scaffolded yet.
 - Existing GitHub Actions, Nginx configuration, S3 utilities, social icons, and
   deployment secrets are reference material for the rebuild.
+- The root `docker-compose.yml` remains the legacy deployment stack.
+- `compose.dev.yml` is the new local Django/PostgreSQL stack and has no
+  hard-coded container or network names.
 - The private product specification remains in the local Obsidian vault and is
   not committed.
 
@@ -30,45 +34,52 @@ Overall state: foundation planning
 - [x] Initial architecture document added.
 - [x] Initial architecture ADR added.
 - [x] Cross-session development workflow added.
+- [x] Legacy application and infrastructure inventoried without deletion.
+- [x] Django 5.2.15 LTS and Wagtail 7.4.2 LTS scaffolded.
+- [x] Django REST Framework and PostgreSQL environment configuration added.
+- [x] Custom `users.User` created in the initial project migration.
+- [x] Local, test, and production settings separated.
+- [x] Wagtail Admin mounted at `/cms/`.
+- [x] Django Admin mounted at `/django-admin/`.
+- [x] Public health check mounted at `/api/health/`.
+- [x] Python 3.12.13 and all Python dependencies locked.
+- [x] Pytest, pytest-django, Ruff, system checks, and smoke tests added.
+- [x] Local PostgreSQL/Django Compose stack documented.
 
 ## Active milestone
 
-Milestone 1: repository foundation and clean application skeleton.
+Milestone 2: Wagtail content models and authoring foundation.
 
 ### Next recommended session
 
 Scope:
 
-1. Inventory reusable legacy assets and infrastructure.
-2. Define the final `backend/`, `frontend/`, and `infra/` layout.
-3. Scaffold Django 5.2 and Wagtail 7.4.
-4. Create the custom user model before the first migration.
-5. Add environment-based local settings.
-6. Add a minimal backend healthcheck.
-7. Add formatting, linting, and initial tests.
+1. Add `BlogIndexPage` and `BlogPostPage`.
+2. Define the first-version StreamField block library.
+3. Add normalized tags and publication/SEO metadata.
+4. Verify Wagtail revisions, preview, rollback, and scheduling behavior.
+5. Add model constraints, authoring behavior tests, and fresh migration checks.
 
 Out of scope for that session:
 
 - Next.js UI;
-- content models;
+- public content API and signed headless preview;
 - OAuth providers;
 - comments and reactions;
-- deployment changes;
-- deletion of legacy reference files that have not been inventoried.
+- S3 storage and production deployment;
+- deletion of legacy reference files.
 
 ### Exit criteria
 
-- Django starts locally with an explicit development configuration.
-- Wagtail Admin is mounted at `/cms/`.
-- The custom user model is included in the clean baseline migration.
-- Tests run from a documented command.
-- No secrets are committed.
-- Legacy production remains unaffected.
-- This status file and the local Obsidian checklist are updated.
+- Wagtail can author, revise, preview, publish, schedule, and roll back posts.
+- Content models enforce the agreed page hierarchy and publication fields.
+- Required StreamField blocks have stable backend definitions.
+- Model and authoring behavior tests pass.
+- The status file and local Obsidian checklist are updated.
 
 ## Milestone queue
 
-- [ ] Milestone 1 — repository foundation and Django/Wagtail skeleton.
+- [x] Milestone 1 — repository foundation and Django/Wagtail skeleton.
 - [ ] Milestone 2 — content pages, StreamField blocks, tags, media, revisions.
 - [ ] Milestone 3 — REST content API, preview, and cache revalidation.
 - [ ] Milestone 4 — Next.js shell, Feed, post renderer, and Bridge.
@@ -89,6 +100,11 @@ Out of scope for that session:
 - Current Docker Compose names collide if both environments run on one server.
 - The current deployment workflow rebuilds production rather than promoting an
   already-tested staging image.
+- The new backend currently coexists at `backend/django/` so the legacy Docker
+  build remains intact. A later infrastructure milestone must promote the new
+  backend to the final image layout deliberately.
+- The new Docker/PostgreSQL development stack was not executed in this session
+  because Docker and PostgreSQL server binaries were not available locally.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - Email DNS records and provider credentials do not exist in the current
@@ -110,5 +126,21 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 ## Last verification
 
-Documentation-only setup. No application tests were run because no new
-application code was introduced.
+2026-07-26:
+
+- `uv run ruff format --check .` — passed (24 files).
+- `uv run ruff check .` — passed.
+- `uv run python manage.py check --settings=config.settings.test` — passed.
+- `uv run python manage.py makemigrations --check --dry-run
+  --settings=config.settings.test` — passed; no changes detected.
+- `uv run pytest` — passed; 6 tests.
+- `python manage.py migrate --noinput` with test settings — passed from an
+  empty in-memory SQLite database, including the custom user baseline and all
+  Wagtail migrations.
+- `python manage.py check --deploy --settings=config.settings.production` with
+  non-secret verification values — passed; the Wagtail-required
+  `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally silenced.
+- Live development-server smoke requests — `/api/health/` returned 200;
+  `/django-admin/` and `/cms/` returned authentication redirects.
+- PostgreSQL migration and Docker image/Compose checks were not run because
+  neither Docker nor a PostgreSQL server is installed in the local environment.
