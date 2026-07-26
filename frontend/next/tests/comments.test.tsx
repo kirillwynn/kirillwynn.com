@@ -15,6 +15,8 @@ import {
     loadCommentDraft,
     saveCommentDraft,
 } from "@/lib/comment-drafts";
+import { reconcileReplies, reconcileRoots } from "@/lib/comment-reconciliation";
+import { codePointLength, truncateCodePoints } from "@/lib/comment-text";
 import {
     createComment,
     createThreadReply,
@@ -119,6 +121,19 @@ function typeInTextarea(
     )?.set;
     setter?.call(textarea, value);
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function clickWithoutNavigation(link: HTMLAnchorElement | null): void {
+    link?.addEventListener(
+        "click",
+        (event) => {
+            event.preventDefault();
+        },
+        { once: true },
+    );
+    act(() => {
+        link?.click();
+    });
 }
 
 async function renderComments(
@@ -228,6 +243,19 @@ describe("comment API client", () => {
             message: "Too many comment mutations.",
         });
     });
+
+    it("rejects external or cross-endpoint cursor URLs before fetch", () => {
+        expect(() =>
+            getComments("привет", "https://evil.example/comments/?cursor=x"),
+        ).toThrow("The comments cursor is invalid.");
+        expect(() =>
+            getComments(
+                "привет",
+                "/api/v1/comments/7/thread/?cursor=cross-endpoint",
+            ),
+        ).toThrow("The comments cursor is invalid.");
+        expect(fetch).not.toHaveBeenCalled();
+    });
 });
 
 describe("pending OAuth drafts", () => {
@@ -320,6 +348,112 @@ describe("pending OAuth drafts", () => {
             }),
         ).toBe("");
     });
+
+    it("counts and truncates Unicode code points without splitting astral characters", () => {
+        const emoji = "🧑";
+        const exactEmojiBoundary = emoji.repeat(COMMENT_DRAFT_MAX_LENGTH);
+        const truncatedEmoji = truncateCodePoints(
+            `${exactEmojiBoundary}${emoji}`,
+        );
+
+        expect(codePointLength("a".repeat(COMMENT_DRAFT_MAX_LENGTH))).toBe(
+            COMMENT_DRAFT_MAX_LENGTH,
+        );
+        expect(codePointLength(truncatedEmoji)).toBe(COMMENT_DRAFT_MAX_LENGTH);
+        expect(truncatedEmoji).toBe(exactEmojiBoundary);
+        expect(truncateCodePoints("A🧑B", 2)).toBe("A🧑");
+        expect(truncateCodePoints("A🧑B", 2)).not.toMatch(/[\uD800-\uDBFF]$/);
+    });
+
+    it("truncates pasted and stored drafts by code point", () => {
+        const oversized = `${"🧑".repeat(COMMENT_DRAFT_MAX_LENGTH)}tail`;
+        saveCommentDraft({
+            slug: "эмодзи",
+            kind: "reply",
+            threadId: 11,
+            userId: null,
+            body: oversized,
+            now: 100,
+        });
+
+        const restored = loadCommentDraft({
+            slug: "эмодзи",
+            kind: "reply",
+            threadId: 11,
+            userId: null,
+            now: 101,
+        });
+        expect(codePointLength(restored)).toBe(COMMENT_DRAFT_MAX_LENGTH);
+        expect(restored).toBe("🧑".repeat(COMMENT_DRAFT_MAX_LENGTH));
+    });
+});
+
+describe("comment reconciliation", () => {
+    it("deduplicates cursor pages, refreshes objects, and preserves thread chronology", () => {
+        const initial = Array.from({ length: 20 }, (_, index) =>
+            comment({
+                id: index + 1,
+                kind: "reply",
+                thread_root_id: 7,
+                body: `Reply ${String(index + 1)}`,
+                created_at: `2026-07-26T20:${String(index).padStart(2, "0")}:00Z`,
+            }),
+        );
+        const created = comment({
+            id: 30,
+            kind: "reply",
+            thread_root_id: 7,
+            body: "Locally created",
+            created_at: "2026-07-26T20:30:00Z",
+        });
+        const nextPage = [
+            ...Array.from({ length: 5 }, (_, index) =>
+                comment({
+                    id: index + 21,
+                    kind: "reply",
+                    thread_root_id: 7,
+                    body: `Reply ${String(index + 21)}`,
+                    created_at: `2026-07-26T20:${String(index + 20).padStart(2, "0")}:00Z`,
+                }),
+            ),
+            { ...created, body: "Fresh server copy" },
+        ];
+
+        const optimistic = reconcileReplies(initial, [created]);
+        const merged = reconcileReplies(optimistic, nextPage);
+        const repeated = reconcileReplies(merged, nextPage);
+
+        expect(repeated.map((reply) => reply.id)).toEqual([
+            ...Array.from({ length: 25 }, (_, index) => index + 1),
+            30,
+        ]);
+        expect(new Set(repeated.map((reply) => reply.id)).size).toBe(
+            repeated.length,
+        );
+        expect(repeated.at(-1)?.body).toBe("Fresh server copy");
+        expect(repeated).toEqual(merged);
+    });
+
+    it("keeps roots newest-first with a stable descending ID tie-breaker", () => {
+        const sameTime = "2026-07-26T20:00:00Z";
+        const merged = reconcileRoots(
+            [comment({ id: 1, created_at: sameTime })],
+            [
+                comment({ id: 2, created_at: sameTime }),
+                comment({
+                    id: 3,
+                    created_at: "2026-07-26T21:00:00Z",
+                }),
+                comment({
+                    id: 1,
+                    created_at: sameTime,
+                    body: "Fresh root",
+                }),
+            ],
+        );
+        expect(merged.map((root) => root.id)).toEqual([3, 2, 1]);
+        expect(merged.at(-1)?.body).toBe("Fresh root");
+    });
 });
 
 describe("comments and Slack-style thread UI", () => {
@@ -345,9 +479,97 @@ describe("comments and Slack-style thread UI", () => {
         expect(container.textContent).toContain("[deleted]");
         expect(container.textContent).toContain("[hidden]");
         expect(container.textContent).toContain("Login to comment");
-        expect(container.querySelector("textarea")).toBeNull();
+        expect(container.querySelector("#new-comment")).not.toBeNull();
         act(() => {
             root.unmount();
+        });
+    });
+
+    it("preserves an anonymous Unicode-post draft through OAuth without auto-submit", async () => {
+        const anonymousRender = await renderComments(anonymous, []);
+        const pendingBody = "Черновик 🧑 для входа";
+        act(() => {
+            typeInTextarea(
+                anonymousRender.container.querySelector("#new-comment"),
+                pendingBody,
+            );
+        });
+
+        const login = Array.from(
+            anonymousRender.container.querySelectorAll<HTMLAnchorElement>("a"),
+        ).find((link) => link.textContent === "Login to comment");
+        expect(login?.href).toContain(
+            "next=%2Fposts%2F%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80",
+        );
+        expect(
+            loadCommentDraft({
+                slug: "привет-мир",
+                kind: "comment",
+                userId: null,
+            }),
+        ).toBe(pendingBody);
+        clickWithoutNavigation(login ?? null);
+        act(() => {
+            anonymousRender.root.unmount();
+        });
+
+        document.body.replaceChildren();
+        vi.mocked(fetch).mockReset();
+        const authenticatedRender = await renderComments(authenticated, []);
+        const restored =
+            authenticatedRender.container.querySelector<HTMLTextAreaElement>(
+                "#new-comment",
+            );
+        expect(restored?.value).toBe(pendingBody);
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.filter((call) => call[1]?.method === "POST"),
+        ).toHaveLength(0);
+
+        const discard = Array.from(
+            authenticatedRender.container.querySelectorAll("button"),
+        ).find((button) => button.textContent === "Discard");
+        act(() => {
+            discard?.click();
+        });
+        expect(
+            loadCommentDraft({
+                slug: "привет-мир",
+                kind: "comment",
+                userId: 42,
+            }),
+        ).toBe("");
+
+        act(() => {
+            typeInTextarea(restored, "Publish after review");
+        });
+        vi.mocked(fetch).mockResolvedValueOnce(
+            response(
+                comment({
+                    id: 99,
+                    body: "Publish after review",
+                    reply_count: 0,
+                }),
+                201,
+            ),
+        );
+        const submit = Array.from(
+            authenticatedRender.container.querySelectorAll("button"),
+        ).find((button) => button.textContent === "Comment");
+        act(() => {
+            submit?.click();
+        });
+        await flush();
+        expect(
+            loadCommentDraft({
+                slug: "привет-мир",
+                kind: "comment",
+                userId: 42,
+            }),
+        ).toBe("");
+        act(() => {
+            authenticatedRender.root.unmount();
         });
     });
 
@@ -413,6 +635,102 @@ describe("comments and Slack-style thread UI", () => {
         });
     });
 
+    it("uses code-point limits for pasted root, reply, and edit text", async () => {
+        const editableRoot = comment({
+            viewer: {
+                can_edit: true,
+                can_delete: true,
+                can_reply: true,
+            },
+        });
+        const { container, root } = await renderComments(
+            authenticated,
+            [editableRoot],
+            { ...page([]), root: editableRoot },
+        );
+        const oversized = `${"🧑".repeat(COMMENT_DRAFT_MAX_LENGTH)}x`;
+        const rootComposer =
+            container.querySelector<HTMLTextAreaElement>("#new-comment");
+        act(() => {
+            typeInTextarea(rootComposer, oversized);
+        });
+        expect(codePointLength(rootComposer?.value ?? "")).toBe(
+            COMMENT_DRAFT_MAX_LENGTH,
+        );
+        expect(rootComposer?.hasAttribute("maxlength")).toBe(false);
+
+        const editButton = Array.from(
+            container.querySelectorAll("button"),
+        ).find((button) => button.textContent === "Edit");
+        act(() => {
+            editButton?.click();
+        });
+        const editTextarea =
+            container.querySelector<HTMLTextAreaElement>("#edit-comment-7");
+        act(() => {
+            typeInTextarea(editTextarea, `A${oversized}`);
+        });
+        expect(codePointLength(editTextarea?.value ?? "")).toBe(
+            COMMENT_DRAFT_MAX_LENGTH,
+        );
+        expect(editTextarea?.value.endsWith("\uD83E")).toBe(false);
+        vi.mocked(fetch).mockResolvedValueOnce(
+            response({
+                ...editableRoot,
+                body: editTextarea?.value ?? "",
+            }),
+        );
+        const saveEdit = Array.from(container.querySelectorAll("button")).find(
+            (button) => button.textContent === "Save",
+        );
+        act(() => {
+            saveEdit?.click();
+        });
+        await flush();
+        const patch = vi
+            .mocked(fetch)
+            .mock.calls.find((call) => call[1]?.method === "PATCH");
+        const requestBody = patch?.[1]?.body;
+        expect(typeof requestBody).toBe("string");
+        if (typeof requestBody !== "string") {
+            throw new TypeError("Expected a JSON string request body.");
+        }
+        const patchBody = JSON.parse(requestBody) as {
+            body: string;
+        };
+        expect(codePointLength(patchBody.body)).toBe(COMMENT_DRAFT_MAX_LENGTH);
+
+        const replyTrigger = Array.from(
+            container.querySelectorAll("button"),
+        ).find((button) => button.textContent === "Reply");
+        act(() => {
+            replyTrigger?.click();
+        });
+        await flush();
+        const replyTextarea =
+            container.querySelector<HTMLTextAreaElement>("#thread-reply-7");
+        act(() => {
+            typeInTextarea(replyTextarea, oversized);
+        });
+        expect(codePointLength(replyTextarea?.value ?? "")).toBe(
+            COMMENT_DRAFT_MAX_LENGTH,
+        );
+        expect(replyTextarea?.hasAttribute("maxlength")).toBe(false);
+        expect(
+            codePointLength(
+                loadCommentDraft({
+                    slug: "привет-мир",
+                    kind: "reply",
+                    threadId: 7,
+                    userId: 42,
+                }),
+            ),
+        ).toBe(COMMENT_DRAFT_MAX_LENGTH);
+        act(() => {
+            root.unmount();
+        });
+    });
+
     it("renders server validation and Retry-After errors in the live region", async () => {
         const { container, root } = await renderComments(authenticated, []);
         vi.mocked(fetch).mockResolvedValueOnce(
@@ -468,6 +786,237 @@ describe("comments and Slack-style thread UI", () => {
                 userId: 100,
             }),
         ).toBe("Keep after OAuth");
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("preserves an anonymous thread draft across OAuth and reopens the Unicode route", async () => {
+        const rootComment = comment({ reply_count: 1 });
+        const thread = {
+            ...page([
+                comment({
+                    id: 10,
+                    kind: "reply" as const,
+                    thread_root_id: 7,
+                    body: "Existing reply",
+                    reply_count: 0,
+                }),
+            ]),
+            root: rootComment,
+        };
+        const anonymousRender = await renderComments(
+            anonymous,
+            [rootComment],
+            thread,
+        );
+        const open = Array.from(
+            anonymousRender.container.querySelectorAll("button"),
+        ).find((button) => button.textContent === "Reply");
+        act(() => {
+            open?.click();
+        });
+        await flush();
+
+        const pendingBody = "Ответ 🧵 после OAuth";
+        const pendingTextarea =
+            anonymousRender.container.querySelector<HTMLTextAreaElement>(
+                "#thread-reply-7",
+            );
+        expect(pendingTextarea).not.toBeNull();
+        act(() => {
+            typeInTextarea(pendingTextarea, pendingBody);
+        });
+        const login = Array.from(
+            anonymousRender.container.querySelectorAll<HTMLAnchorElement>("a"),
+        ).find((link) => link.textContent === "Login to reply");
+        expect(login?.href).toContain(
+            "next=%2Fposts%2F%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80%3Fthread%3D7",
+        );
+        clickWithoutNavigation(login ?? null);
+        expect(
+            loadCommentDraft({
+                slug: "привет-мир",
+                kind: "reply",
+                threadId: 7,
+                userId: null,
+            }),
+        ).toBe(pendingBody);
+        act(() => {
+            anonymousRender.root.unmount();
+        });
+
+        document.body.replaceChildren();
+        vi.mocked(fetch).mockReset();
+        const authenticatedRoot = comment({
+            reply_count: 1,
+            viewer: {
+                can_edit: false,
+                can_delete: false,
+                can_reply: true,
+            },
+        });
+        const authenticatedRender = await renderComments(
+            authenticated,
+            [authenticatedRoot],
+            { ...thread, root: authenticatedRoot },
+        );
+        await flush();
+        const restored =
+            authenticatedRender.container.querySelector<HTMLTextAreaElement>(
+                "#thread-reply-7",
+            );
+        expect(window.location.search).toBe("?thread=7");
+        expect(restored?.value).toBe(pendingBody);
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.filter((call) => call[1]?.method === "POST"),
+        ).toHaveLength(0);
+
+        vi.mocked(fetch).mockResolvedValueOnce(
+            response(
+                comment({
+                    id: 11,
+                    kind: "reply",
+                    thread_root_id: 7,
+                    body: pendingBody,
+                    reply_count: 0,
+                    created_at: "2026-07-26T20:10:00Z",
+                }),
+                201,
+            ),
+        );
+        const submit = Array.from(
+            authenticatedRender.container.querySelectorAll("button"),
+        )
+            .filter((button) => button.textContent === "Reply")
+            .at(-1);
+        act(() => {
+            submit?.click();
+        });
+        await flush();
+        expect(
+            loadCommentDraft({
+                slug: "привет-мир",
+                kind: "reply",
+                threadId: 7,
+                userId: 42,
+            }),
+        ).toBe("");
+        act(() => {
+            authenticatedRender.root.unmount();
+        });
+    });
+
+    it("reconciles an optimistic reply with later cursor pages without duplicates", async () => {
+        const rootComment = comment({
+            reply_count: 25,
+            viewer: {
+                can_edit: false,
+                can_delete: false,
+                can_reply: true,
+            },
+        });
+        const initialReplies = Array.from({ length: 20 }, (_, index) =>
+            comment({
+                id: index + 100,
+                kind: "reply",
+                thread_root_id: 7,
+                body: `Reply ${String(index + 1)}`,
+                created_at: `2026-07-26T20:00:${String(index).padStart(2, "0")}Z`,
+                reply_count: 0,
+            }),
+        );
+        const initialThread: ThreadPage = {
+            ...page(initialReplies),
+            next: "/api/v1/comments/7/thread/?cursor=next",
+            root: rootComment,
+        };
+        const { container, root } = await renderComments(
+            authenticated,
+            [rootComment],
+            initialThread,
+        );
+        const open = Array.from(container.querySelectorAll("button")).find(
+            (button) => button.textContent === "Reply",
+        );
+        act(() => {
+            open?.click();
+        });
+        await flush();
+
+        const created = comment({
+            id: 130,
+            kind: "reply",
+            thread_root_id: 7,
+            body: "Optimistic latest",
+            created_at: "2026-07-26T20:00:30Z",
+            reply_count: 0,
+        });
+        vi.mocked(fetch).mockResolvedValueOnce(response(created, 201));
+        act(() => {
+            typeInTextarea(
+                container.querySelector("#thread-reply-7"),
+                created.body ?? "",
+            );
+        });
+        const send = Array.from(container.querySelectorAll("button"))
+            .filter((button) => button.textContent === "Reply")
+            .at(-1);
+        act(() => {
+            send?.click();
+        });
+        await flush();
+        expect(
+            container.querySelector('[role="dialog"] h2')?.textContent,
+        ).toContain("26 replies");
+
+        const laterReplies = [
+            ...Array.from({ length: 5 }, (_, index) =>
+                comment({
+                    id: index + 120,
+                    kind: "reply",
+                    thread_root_id: 7,
+                    body: `Reply ${String(index + 21)}`,
+                    created_at: `2026-07-26T20:00:${String(index + 20).padStart(2, "0")}Z`,
+                    reply_count: 0,
+                }),
+            ),
+            { ...created, body: "Fresh latest" },
+        ];
+        vi.mocked(fetch).mockResolvedValueOnce(
+            response({
+                ...page(laterReplies),
+                root: {
+                    ...rootComment,
+                    reply_count: 26,
+                    last_reply_at: created.created_at,
+                },
+            }),
+        );
+        const loadMore = Array.from(container.querySelectorAll("button")).find(
+            (button) => button.textContent === "Load more replies",
+        );
+        act(() => {
+            loadMore?.click();
+        });
+        await flush();
+
+        const replyIds = Array.from(
+            container.querySelectorAll<HTMLElement>(
+                ".thread-replies [data-comment-id]",
+            ),
+        ).map((element) => Number(element.dataset.commentId));
+        expect(replyIds).toEqual([
+            ...Array.from({ length: 25 }, (_, index) => index + 100),
+            130,
+        ]);
+        expect(new Set(replyIds).size).toBe(replyIds.length);
+        expect(container.textContent).toContain("Fresh latest");
+        expect(
+            container.querySelector('[role="dialog"] h2')?.textContent,
+        ).toContain("26 replies");
         act(() => {
             root.unmount();
         });

@@ -10,6 +10,12 @@ import {
     loadCommentDraft,
     saveCommentDraft,
 } from "@/lib/comment-drafts";
+import { reconcileRoots } from "@/lib/comment-reconciliation";
+import {
+    COMMENT_BODY_CODE_POINT_LIMIT,
+    codePointLength,
+    truncateCodePoints,
+} from "@/lib/comment-text";
 import {
     CommentApiError,
     createComment,
@@ -64,7 +70,7 @@ export function CommentsSection({ slug }: { slug: string }) {
             try {
                 const page = await getComments(slug, cursor);
                 setComments((current) =>
-                    append ? [...current, ...page.results] : page.results,
+                    reconcileRoots(append ? current : [], page.results),
                 );
                 setNext(page.next);
                 setStatus("ready");
@@ -81,27 +87,23 @@ export function CommentsSection({ slug }: { slug: string }) {
     }, [load]);
 
     useEffect(() => {
-        if (!user) {
+        if (authStatus === "loading") {
             return;
         }
         setBody(
             loadCommentDraft({
                 slug,
                 kind: "comment",
-                userId: user.id,
+                userId: user?.id ?? null,
             }),
         );
-    }, [slug, user]);
+    }, [authStatus, slug, user?.id]);
 
     const replaceComment = useCallback((changed: PublicComment | null) => {
         if (!changed) {
             return;
         }
-        setComments((current) =>
-            current.map((comment) =>
-                comment.id === changed.id ? changed : comment,
-            ),
-        );
+        setComments((current) => reconcileRoots(current, [changed]));
         setOpenRoot((current) =>
             current?.id === changed.id ? { ...current, ...changed } : current,
         );
@@ -185,15 +187,23 @@ export function CommentsSection({ slug }: { slug: string }) {
     }
 
     function updateBody(value: string): void {
-        setBody(value);
-        if (user) {
-            saveCommentDraft({
-                slug,
-                kind: "comment",
-                userId: user.id,
-                body: value,
-            });
-        }
+        const normalized = truncateCodePoints(value);
+        setBody(normalized);
+        saveCommentDraft({
+            slug,
+            kind: "comment",
+            userId: user?.id ?? null,
+            body: normalized,
+        });
+    }
+
+    function discardDraft(): void {
+        setBody("");
+        clearCommentDraft({
+            slug,
+            kind: "comment",
+            userId: user?.id ?? null,
+        });
     }
 
     async function submit(): Promise<void> {
@@ -204,7 +214,7 @@ export function CommentsSection({ slug }: { slug: string }) {
         setError(null);
         try {
             const comment = await createComment(slug, body, me.csrf_token);
-            setComments((current) => [comment, ...current]);
+            setComments((current) => reconcileRoots(current, [comment]));
             setBody("");
             clearCommentDraft({
                 slug,
@@ -252,7 +262,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                         This account is read-only. You can still read comments
                         and threads.
                     </p>
-                ) : user ? (
+                ) : (
                     <>
                         <label
                             className="text-sm font-semibold text-stone-800"
@@ -263,7 +273,6 @@ export function CommentsSection({ slug }: { slug: string }) {
                         <textarea
                             className="comment-textarea mt-2"
                             id="new-comment"
-                            maxLength={5000}
                             onChange={(event) => {
                                 updateBody(event.target.value);
                             }}
@@ -273,51 +282,47 @@ export function CommentsSection({ slug }: { slug: string }) {
                         />
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                             <span className="text-xs text-stone-500">
-                                {body.length}/5000
+                                {codePointLength(body)}/
+                                {COMMENT_BODY_CODE_POINT_LIMIT}
                             </span>
                             <div className="flex gap-2">
                                 {body ? (
                                     <button
                                         className="comment-action"
-                                        onClick={() => {
-                                            setBody("");
-                                            clearCommentDraft({
-                                                slug,
-                                                kind: "comment",
-                                                userId: user.id,
-                                            });
-                                        }}
+                                        onClick={discardDraft}
                                         type="button"
                                     >
                                         Discard
                                     </button>
                                 ) : null}
-                                <button
-                                    className="button-link"
-                                    disabled={submitting || !body.trim()}
-                                    onClick={() => void submit()}
-                                    type="button"
-                                >
-                                    {submitting ? "Posting…" : "Comment"}
-                                </button>
+                                {user ? (
+                                    <button
+                                        className="button-link"
+                                        disabled={submitting || !body.trim()}
+                                        onClick={() => void submit()}
+                                        type="button"
+                                    >
+                                        {submitting ? "Posting…" : "Comment"}
+                                    </button>
+                                ) : (
+                                    <a
+                                        className="button-link"
+                                        href={`/login?next=${encodeURIComponent(returnTo(slug))}`}
+                                        onClick={() => {
+                                            saveCommentDraft({
+                                                slug,
+                                                kind: "comment",
+                                                userId: null,
+                                                body,
+                                            });
+                                        }}
+                                    >
+                                        Login to comment
+                                    </a>
+                                )}
                             </div>
                         </div>
                     </>
-                ) : (
-                    <a
-                        className="button-link"
-                        href={`/login?next=${encodeURIComponent(returnTo(slug))}`}
-                        onClick={() => {
-                            saveCommentDraft({
-                                slug,
-                                kind: "comment",
-                                userId: null,
-                                body,
-                            });
-                        }}
-                    >
-                        Login to comment
-                    </a>
                 )}
             </div>
 
@@ -350,6 +355,9 @@ export function CommentsSection({ slug }: { slug: string }) {
             <div className="mt-6 space-y-4">
                 {comments.map((comment) => (
                     <CommentCard
+                        allowPendingReply={
+                            authStatus === "ready" && user === null
+                        }
                         comment={comment}
                         csrfToken={me?.csrf_token ?? null}
                         key={comment.id}

@@ -163,6 +163,15 @@ Overall state: Milestone 6 implemented and verified; awaiting owner review
   navigation, Escape/focus handling, safe-area padding, and scroll containment.
 - [x] Comment and reply drafts survive OAuth/session expiry through bounded,
   TTL-scoped `sessionStorage` namespaces and are never submitted automatically.
+- [x] Milestone 6 frontend remediation gives anonymous readers real root/reply
+  textareas, saves every change under `pending-auth`, migrates the newest draft
+  to the authenticated user after OAuth, and clears it only on submit/discard.
+- [x] Root, reply, edit, paste, counter, and draft paths share a 5000 Unicode
+  code-point limit without UTF-16 `maxlength` truncation or split surrogate
+  pairs.
+- [x] Stable-ID reconciliation deduplicates optimistic and cursor-loaded
+  comments, refreshes server objects, preserves root/reply ordering, and
+  replaces thread activity summaries without double increments.
 - [x] Exact comment rewrites added without a generic `/api/:path*` proxy or
   collision with auth, Draft Mode, or revalidation.
 
@@ -297,14 +306,20 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   verification values; one intentional Wagtail iframe warning remains silenced.
 - `npm ci` was not run because `package.json` and `package-lock.json` did not
   change.
-- Prettier, ESLint, TypeScript, and full Vitest — passed: 88 tests in 12 files.
+- Prettier, ESLint, TypeScript, and full Vitest — passed: 97 tests in 12 files.
+  Remediation coverage now types into anonymous root/reply composers, verifies
+  pending-auth migration and no auto-submit, clears drafts on submit/discard,
+  exercises Unicode slug/thread namespaces, enforces ASCII/astral/mixed
+  code-point boundaries across paste/edit/reply/draft paths, and reconciles a
+  20-reply optimistic/cursor overlap idempotently.
 - Production Next.js build — passed with safe public/verification configuration
   after running outside the sandbox so Turbopack could bind its local CSS
   worker port.
 - `npm audit` — passed against the registry with zero vulnerabilities.
 - Post-build `.next/static` scan found no internal Django origin, verification
   secret, provider credential name, session identifier, or `X-Session-Token`.
-  Comment sources contain no `dangerouslySetInnerHTML` or reaction model/UI.
+  Comment sources contain no `dangerouslySetInnerHTML`, UTF-16 `maxlength`
+  limiter, or reaction model/UI.
 - Browser runtime discovery returned no connected backends. Responsive
   screenshots and live Tab/Escape/scroll/touch-keyboard QA could not run.
 - Docker and PostgreSQL server binaries remain unavailable. PostgreSQL locking

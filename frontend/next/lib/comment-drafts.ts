@@ -1,6 +1,11 @@
+import {
+    COMMENT_BODY_CODE_POINT_LIMIT,
+    truncateCodePoints,
+} from "@/lib/comment-text";
+
 const PREFIX = "kw:comment-draft:v1";
 export const COMMENT_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
-export const COMMENT_DRAFT_MAX_LENGTH = 5000;
+export const COMMENT_DRAFT_MAX_LENGTH = COMMENT_BODY_CODE_POINT_LIMIT;
 
 type DraftKind = "comment" | "reply";
 type StoredDraft = {
@@ -45,7 +50,7 @@ export function saveCommentDraft({
     if (!target) {
         return;
     }
-    const normalized = body.slice(0, COMMENT_DRAFT_MAX_LENGTH);
+    const normalized = truncateCodePoints(body, COMMENT_BODY_CODE_POINT_LIMIT);
     const draftKey = key(
         slug,
         kind,
@@ -72,44 +77,71 @@ export function loadCommentDraft({
     slug: string;
     kind: DraftKind;
     threadId?: number | null;
-    userId: number;
+    userId: number | null;
     now?: number;
 }): string {
     const target = storage();
     if (!target) {
         return "";
     }
-    const userKey = key(slug, kind, threadId, `user-${String(userId)}`);
+    const draftStorage = target;
     const pendingKey = key(slug, kind, threadId, "pending-auth");
-    const candidateKey = target.getItem(userKey) ? userKey : pendingKey;
-    const raw = target.getItem(candidateKey);
-    if (!raw) {
+    const userKey =
+        userId === null
+            ? null
+            : key(slug, kind, threadId, `user-${String(userId)}`);
+
+    function validDraft(draftKey: string): StoredDraft | null {
+        const raw = draftStorage.getItem(draftKey);
+        if (!raw) {
+            return null;
+        }
+        try {
+            const draft = JSON.parse(raw) as Partial<StoredDraft>;
+            if (
+                typeof draft.body !== "string" ||
+                typeof draft.savedAt !== "number" ||
+                !Number.isFinite(draft.savedAt) ||
+                now - draft.savedAt > COMMENT_DRAFT_TTL_MS ||
+                now < draft.savedAt
+            ) {
+                draftStorage.removeItem(draftKey);
+                return null;
+            }
+            return {
+                body: truncateCodePoints(
+                    draft.body,
+                    COMMENT_BODY_CODE_POINT_LIMIT,
+                ),
+                savedAt: draft.savedAt,
+            };
+        } catch {
+            draftStorage.removeItem(draftKey);
+            return null;
+        }
+    }
+
+    const pending = validDraft(pendingKey);
+    if (!userKey) {
+        return pending?.body ?? "";
+    }
+    const userDraft = validDraft(userKey);
+    const selected =
+        pending && (!userDraft || pending.savedAt >= userDraft.savedAt)
+            ? pending
+            : userDraft;
+    if (!selected) {
         return "";
     }
-    try {
-        const draft = JSON.parse(raw) as Partial<StoredDraft>;
-        if (
-            typeof draft.body !== "string" ||
-            typeof draft.savedAt !== "number" ||
-            now - draft.savedAt > COMMENT_DRAFT_TTL_MS ||
-            now < draft.savedAt
-        ) {
-            target.removeItem(candidateKey);
-            return "";
-        }
-        const body = draft.body.slice(0, COMMENT_DRAFT_MAX_LENGTH);
-        if (candidateKey === pendingKey) {
-            target.setItem(
-                userKey,
-                JSON.stringify({ body, savedAt: draft.savedAt }),
-            );
-            target.removeItem(pendingKey);
-        }
-        return body;
-    } catch {
-        target.removeItem(candidateKey);
-        return "";
-    }
+    draftStorage.setItem(
+        userKey,
+        JSON.stringify({
+            body: selected.body,
+            savedAt: selected.savedAt,
+        }),
+    );
+    draftStorage.removeItem(pendingKey);
+    return selected.body;
 }
 
 export function clearCommentDraft({

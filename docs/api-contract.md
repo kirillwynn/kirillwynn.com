@@ -289,6 +289,15 @@ dangerous bidirectional controls, and limits text to 5000 Unicode code points.
 Line breaks and normal Unicode remain valid. HTML-like input is stored and
 returned as text, never as renderable markup.
 
+The browser uses the same Unicode code-point limit for root, reply, edit, paste,
+counter, and draft paths; HTML `maxlength` is not the authority because browsers
+count UTF-16 code units. Anonymous root and reply composers save each change in
+a 24-hour, 5000-code-point `sessionStorage` draft scoped by Unicode post slug,
+composer kind, thread ID, and `pending-auth`. On OAuth return the draft moves to
+the authenticated user namespace and is restored without automatic submission.
+Successful submission or explicit discard clears it. Draft storage contains no
+CSRF/session/OAuth/provider or user identity data.
+
 ### `GET /api/v1/comments/<id>/thread/`
 
 The selected ID may be a root or a reply; both resolve to the direct top-level
@@ -306,6 +315,13 @@ oldest-first cursor ordering:
 
 Replies stay at one level. A deleted or individually hidden comment does not
 destroy the thread.
+
+The client reconciles cursor results by numeric comment ID, replaces duplicates
+with the freshest server representation, and sorts the raw ISO timestamps plus
+numeric ID using the server ordering: roots newest-first and replies
+oldest-first. Thread load-more also replaces the root summary returned on that
+page, so an optimistic reply cannot double-increment `reply_count`. Cursor URLs
+must remain relative and match the exact expected list or thread endpoint.
 
 ### `POST /api/v1/comments/<id>/replies/`
 

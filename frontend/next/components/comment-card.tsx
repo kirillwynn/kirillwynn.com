@@ -8,6 +8,11 @@ import {
     editPublicComment,
     type PublicComment,
 } from "@/lib/comments";
+import {
+    COMMENT_BODY_CODE_POINT_LIMIT,
+    codePointLength,
+    truncateCodePoints,
+} from "@/lib/comment-text";
 
 function timestamp(value: string): string {
     return new Intl.DateTimeFormat(undefined, {
@@ -33,6 +38,7 @@ export function CommentCard({
     onReply,
     onSessionExpired,
     compact = false,
+    allowPendingReply = false,
 }: {
     comment: PublicComment;
     csrfToken: string | null;
@@ -42,11 +48,14 @@ export function CommentCard({
         | null;
     onSessionExpired: () => void;
     compact?: boolean;
+    allowPendingReply?: boolean;
 }) {
     const [editing, setEditing] = useState(false);
-    const [body, setBody] = useState(comment.body ?? "");
+    const [body, setBody] = useState(truncateCodePoints(comment.body ?? ""));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const canStartPendingReply =
+        allowPendingReply && comment.status !== "hidden";
 
     async function edit(): Promise<void> {
         if (!csrfToken || busy) {
@@ -103,6 +112,7 @@ export function CommentCard({
     return (
         <article
             className={`comment-card ${compact ? "comment-card-compact" : ""}`}
+            data-comment-id={comment.id}
             data-comment-kind={comment.kind}
         >
             <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -142,14 +152,17 @@ export function CommentCard({
                     <textarea
                         id={`edit-comment-${String(comment.id)}`}
                         className="comment-textarea"
-                        maxLength={5000}
                         onChange={(event) => {
-                            setBody(event.target.value);
+                            setBody(truncateCodePoints(event.target.value));
                         }}
                         rows={4}
                         value={body}
                     />
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="mr-auto text-xs text-stone-500">
+                            {codePointLength(body)}/
+                            {COMMENT_BODY_CODE_POINT_LIMIT}
+                        </span>
                         <button
                             className="comment-action"
                             disabled={busy}
@@ -162,7 +175,7 @@ export function CommentCard({
                             className="comment-action"
                             disabled={busy}
                             onClick={() => {
-                                setBody(comment.body ?? "");
+                                setBody(truncateCodePoints(comment.body ?? ""));
                                 setEditing(false);
                                 setError(null);
                             }}
@@ -186,7 +199,9 @@ export function CommentCard({
                 <div className="mt-3 flex flex-wrap items-center gap-1">
                     {onReply &&
                     (comment.viewer.can_reply ||
-                        (!compact && comment.reply_count > 0)) ? (
+                        (!compact &&
+                            (comment.reply_count > 0 ||
+                                canStartPendingReply))) ? (
                         <button
                             className="comment-action"
                             onClick={(event) => {
@@ -194,13 +209,16 @@ export function CommentCard({
                             }}
                             type="button"
                         >
-                            {comment.viewer.can_reply ? "Reply" : "View thread"}
+                            {comment.viewer.can_reply || canStartPendingReply
+                                ? "Reply"
+                                : "View thread"}
                         </button>
                     ) : null}
                     {comment.viewer.can_edit ? (
                         <button
                             className="comment-action"
                             onClick={() => {
+                                setBody(truncateCodePoints(comment.body ?? ""));
                                 setEditing(true);
                             }}
                             type="button"

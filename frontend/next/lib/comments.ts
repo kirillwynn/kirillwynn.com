@@ -64,6 +64,21 @@ function replyPath(id: number): string {
     return `/api/v1/comments/${String(id)}/replies/`;
 }
 
+function cursorPath(cursorUrl: string, expectedPath: string): string {
+    if (
+        !cursorUrl.startsWith("/") ||
+        cursorUrl.startsWith("//") ||
+        cursorUrl.includes("\\")
+    ) {
+        throw new CommentApiError("The comments cursor is invalid.", 400);
+    }
+    const cursor = new URL(cursorUrl, "https://comments.invalid");
+    if (cursor.pathname !== expectedPath || cursor.hash) {
+        throw new CommentApiError("The comments cursor is invalid.", 400);
+    }
+    return `${cursor.pathname}${cursor.search}`;
+}
+
 async function errorMessage(response: Response): Promise<string> {
     try {
         const payload: unknown = await response.json();
@@ -132,11 +147,13 @@ export function getComments(
     slug: string,
     cursorUrl?: string,
 ): Promise<CommentPage> {
-    return request<CommentPage>(cursorUrl ?? commentListPath(slug));
+    const path = commentListPath(slug);
+    return request<CommentPage>(cursorUrl ? cursorPath(cursorUrl, path) : path);
 }
 
 export function getThread(id: number, cursorUrl?: string): Promise<ThreadPage> {
-    return request<ThreadPage>(cursorUrl ?? threadPath(id));
+    const path = threadPath(id);
+    return request<ThreadPage>(cursorUrl ? cursorPath(cursorUrl, path) : path);
 }
 
 export function createComment(

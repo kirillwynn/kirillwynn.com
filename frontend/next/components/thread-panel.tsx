@@ -9,6 +9,12 @@ import {
     loadCommentDraft,
     saveCommentDraft,
 } from "@/lib/comment-drafts";
+import { reconcileReplies } from "@/lib/comment-reconciliation";
+import {
+    COMMENT_BODY_CODE_POINT_LIMIT,
+    codePointLength,
+    truncateCodePoints,
+} from "@/lib/comment-text";
 import {
     CommentApiError,
     createThreadReply,
@@ -41,7 +47,7 @@ export function ThreadPanel({
     onClose: () => void;
     onRootChange: (root: PublicComment) => void;
 }) {
-    const { me, refresh } = useAuth();
+    const { me, refresh, status: authStatus } = useAuth();
     const [root, setRoot] = useState(initialRoot);
     const [replies, setReplies] = useState<PublicComment[]>([]);
     const [next, setNext] = useState<string | null>(null);
@@ -58,6 +64,9 @@ export function ThreadPanel({
 
     const user = me?.authenticated ? me.user : null;
     const canInteract = Boolean(user?.can_interact);
+    const canReplyToThread = user
+        ? canInteract && root.viewer.can_reply
+        : root.status !== "hidden";
 
     useEffect(() => {
         let active = true;
@@ -67,7 +76,7 @@ export function ThreadPanel({
                     return;
                 }
                 setRoot(page.root);
-                setReplies(page.results);
+                setReplies(reconcileReplies([], page.results));
                 setNext(page.next);
                 setStatus("ready");
                 onRootChange(page.root);
@@ -84,17 +93,18 @@ export function ThreadPanel({
     }, [initialRoot.id, onRootChange]);
 
     useEffect(() => {
-        if (user) {
-            setBody(
-                loadCommentDraft({
-                    slug,
-                    kind: "reply",
-                    threadId: root.id,
-                    userId: user.id,
-                }),
-            );
+        if (authStatus === "loading") {
+            return;
         }
-    }, [root.id, slug, user]);
+        setBody(
+            loadCommentDraft({
+                slug,
+                kind: "reply",
+                threadId: root.id,
+                userId: user?.id ?? null,
+            }),
+        );
+    }, [authStatus, root.id, slug, user?.id]);
 
     useEffect(() => {
         closeRef.current?.focus();
@@ -144,9 +154,7 @@ export function ThreadPanel({
         if (!changed) {
             return;
         }
-        setReplies((current) =>
-            current.map((reply) => (reply.id === changed.id ? changed : reply)),
-        );
+        setReplies((current) => reconcileReplies(current, [changed]));
     }
 
     async function loadMore(): Promise<void> {
@@ -155,7 +163,9 @@ export function ThreadPanel({
         }
         try {
             const page = await getThread(root.id, next);
-            setReplies((current) => [...current, ...page.results]);
+            setReplies((current) => reconcileReplies(current, page.results));
+            setRoot(page.root);
+            onRootChange(page.root);
             setNext(page.next);
         } catch (caught) {
             setError(message(caught));
@@ -174,12 +184,15 @@ export function ThreadPanel({
                 body,
                 me.csrf_token,
             );
-            setReplies((current) => [...current, reply]);
-            const changedRoot = {
-                ...root,
-                reply_count: root.reply_count + 1,
-                last_reply_at: reply.created_at,
-            };
+            const isNew = !replies.some((current) => current.id === reply.id);
+            setReplies((current) => reconcileReplies(current, [reply]));
+            const changedRoot = isNew
+                ? {
+                      ...root,
+                      reply_count: root.reply_count + 1,
+                      last_reply_at: reply.created_at,
+                  }
+                : root;
             setRoot(changedRoot);
             onRootChange(changedRoot);
             setBody("");
@@ -208,16 +221,25 @@ export function ThreadPanel({
     }
 
     function updateBody(value: string): void {
-        setBody(value);
-        if (user) {
-            saveCommentDraft({
-                slug,
-                kind: "reply",
-                threadId: root.id,
-                userId: user.id,
-                body: value,
-            });
-        }
+        const normalized = truncateCodePoints(value);
+        setBody(normalized);
+        saveCommentDraft({
+            slug,
+            kind: "reply",
+            threadId: root.id,
+            userId: user?.id ?? null,
+            body: normalized,
+        });
+    }
+
+    function discardDraft(): void {
+        setBody("");
+        clearCommentDraft({
+            slug,
+            kind: "reply",
+            threadId: root.id,
+            userId: user?.id ?? null,
+        });
     }
 
     return (
@@ -313,12 +335,16 @@ export function ThreadPanel({
                             {error}
                         </p>
                     ) : null}
-                    {user && !canInteract ? (
+                    {authStatus === "loading" ? (
+                        <p className="text-sm text-stone-500">
+                            Loading account…
+                        </p>
+                    ) : !canReplyToThread ? (
                         <p className="text-sm text-stone-600">
-                            This account is read-only. Existing threads remain
+                            This thread is read-only. Existing replies remain
                             visible.
                         </p>
-                    ) : user ? (
+                    ) : (
                         <>
                             <div className="mb-2 flex items-center justify-between gap-2 text-xs text-stone-500">
                                 <span>
@@ -345,7 +371,6 @@ export function ThreadPanel({
                             <textarea
                                 className="comment-textarea"
                                 id={`thread-reply-${String(root.id)}`}
-                                maxLength={5000}
                                 onChange={(event) => {
                                     updateBody(event.target.value);
                                 }}
@@ -354,33 +379,50 @@ export function ThreadPanel({
                                 rows={3}
                                 value={body}
                             />
-                            <div className="mt-2 flex justify-end">
-                                <button
-                                    className="button-link"
-                                    disabled={sending || !body.trim()}
-                                    onClick={() => void sendReply()}
-                                    type="button"
-                                >
-                                    {sending ? "Sending…" : "Reply"}
-                                </button>
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                                <span className="text-xs text-stone-500">
+                                    {codePointLength(body)}/
+                                    {COMMENT_BODY_CODE_POINT_LIMIT}
+                                </span>
+                                <div className="flex gap-2">
+                                    {body ? (
+                                        <button
+                                            className="comment-action"
+                                            onClick={discardDraft}
+                                            type="button"
+                                        >
+                                            Discard
+                                        </button>
+                                    ) : null}
+                                    {user ? (
+                                        <button
+                                            className="button-link"
+                                            disabled={sending || !body.trim()}
+                                            onClick={() => void sendReply()}
+                                            type="button"
+                                        >
+                                            {sending ? "Sending…" : "Reply"}
+                                        </button>
+                                    ) : (
+                                        <a
+                                            className="button-link"
+                                            href={`/login?next=${encodeURIComponent(returnTo(slug, root.id))}`}
+                                            onClick={() => {
+                                                saveCommentDraft({
+                                                    slug,
+                                                    kind: "reply",
+                                                    threadId: root.id,
+                                                    userId: null,
+                                                    body,
+                                                });
+                                            }}
+                                        >
+                                            Login to reply
+                                        </a>
+                                    )}
+                                </div>
                             </div>
                         </>
-                    ) : (
-                        <a
-                            className="button-link"
-                            href={`/login?next=${encodeURIComponent(returnTo(slug, root.id))}`}
-                            onClick={() => {
-                                saveCommentDraft({
-                                    slug,
-                                    kind: "reply",
-                                    threadId: root.id,
-                                    userId: null,
-                                    body,
-                                });
-                            }}
-                        >
-                            Login to reply
-                        </a>
                     )}
                 </footer>
             </div>
