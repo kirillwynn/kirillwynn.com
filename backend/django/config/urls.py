@@ -8,6 +8,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 django_admin_url = os.environ.get("DJANGO_ADMIN_URL", "django-admin/").strip("/")
 
 urlpatterns = [
+    path("api/v1/", include("apps.blog.api.urls")),
     path("api/", include("apps.core.urls")),
     path(f"{django_admin_url}/", admin.site.urls),
     path("cms/", include(wagtailadmin_urls)),

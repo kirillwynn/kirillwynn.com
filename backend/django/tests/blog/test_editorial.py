@@ -14,7 +14,7 @@ def test_draft_revision_renders_in_backend_preview(blog_post):
     revision = blog_post.save_revision()
     draft = revision.as_object()
 
-    response = draft.make_preview_request()
+    response = draft.make_preview_request(preview_mode="backend")
     rendered = response.rendered_content
 
     assert response.status_code == 200
@@ -37,7 +37,7 @@ def test_draft_image_preview_uses_wagtail_rendition_and_contextual_alt(blog_post
     ]
     revision = blog_post.save_revision()
 
-    rendered = revision.as_object().make_preview_request().rendered_content
+    rendered = revision.as_object().make_preview_request(preview_mode="backend").rendered_content
 
     assert 'alt="Preview-specific alt text"' in rendered
     assert wagtail_image.renditions.filter(filter_spec="max-1200x1200").exists()

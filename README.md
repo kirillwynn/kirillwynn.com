@@ -43,12 +43,14 @@ Do not copy that note into the repository.
 - [Architecture](docs/architecture.md)
 - [Implementation status](docs/implementation-status.md)
 - [Development workflow](docs/development-workflow.md)
+- [Content API contract](docs/api-contract.md)
 - [ADR 0001: Django/Wagtail and Next.js](docs/decisions/0001-django-wagtail-nextjs.md)
+- [ADR 0002: Content API, preview, and revalidation](docs/decisions/0002-content-api-preview-revalidation.md)
 - [Codex project instructions](AGENTS.md)
 
 ## Current state
 
-The first backend foundation is available under `backend/django/`:
+Milestones 1–3 are available under `backend/django/` and `frontend/next/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -62,6 +64,15 @@ The first backend foundation is available under `backend/django/`:
 - SEO/Open Graph metadata and all 13 first-version StreamField block types;
 - backend draft preview with image renditions, revisions, rollback, and
   publication scheduling coverage;
+- anonymous live-only `/api/v1/posts/` list and slug detail endpoints;
+- a stable version 1.0 serializer for all 13 body blocks, tags, metadata, and
+  fixed 480/960/1440 image renditions;
+- immutable, ten-minute headless preview snapshots integrated through
+  `wagtail-headless-preview` 0.9.0;
+- signed cache revalidation backed by a durable database outbox and retry
+  command;
+- a minimal Next.js 16.2.11 App Router application for Draft Mode diagnostics
+  and HMAC revalidation;
 - locked production and development dependencies.
 
 Existing files under `backend/app/`, `frontend/`, `docker/`, `nginx/`, and the
@@ -112,6 +123,20 @@ uv run python manage.py migrate
 uv run python manage.py runserver
 ```
 
+Public content routes:
+
+- `http://localhost:8000/api/v1/posts/`;
+- `http://localhost:8000/api/v1/posts/<slug>/`;
+- `http://localhost:8000/api/v1/preview/resolve/` (server-to-server preview
+  resolution only).
+
+Retry pending cache events:
+
+```bash
+cd backend/django
+uv run python manage.py process_revalidation_outbox --limit 100
+```
+
 The test suite uses an isolated SQLite database so fast checks do not require a
 running PostgreSQL service:
 
@@ -123,6 +148,26 @@ uv run python manage.py check --settings=config.settings.test
 uv run python manage.py makemigrations --check --dry-run --settings=config.settings.test
 uv run pytest
 ```
+
+## Minimal Next.js preview frontend
+
+Node.js 24 LTS and npm are required. The legacy Vite frontend remains unchanged.
+
+```bash
+cd frontend/next
+cp .env.example .env.local
+npm ci
+npm run dev
+```
+
+The Milestone 3 frontend contains only:
+
+- `/api/draft` and `/api/draft/disable`;
+- signed `POST /api/revalidate`;
+- a diagnostic server-rendered `/posts/[slug]`.
+
+It is not the final public UI. Tailwind, Feed, Bridge, metadata rendering, and
+the full body-block renderer belong to Milestone 4.
 
 `uv.lock` is the complete development lock. `requirements.lock` is an exported,
 fully pinned production dependency set used by the Django container. When

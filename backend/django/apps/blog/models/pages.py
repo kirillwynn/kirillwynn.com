@@ -1,11 +1,13 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
-from django.db import models
+from django.db import models, transaction
 from modelcluster.contrib.taggit import ClusterTaggableManager
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import StreamField
 from wagtail.models import Page
 from wagtail.search import index
+from wagtail_headless_preview.models import HeadlessPreviewMixin
 
 from apps.blog.blocks import BlogBodyBlock
 
@@ -24,9 +26,13 @@ class BlogIndexPage(Page):
         verbose_name = "Blog index"
 
 
-class BlogPostPage(Page):
+class BlogPostPage(HeadlessPreviewMixin, Page):
     parent_page_types = ["blog.BlogIndexPage"]
     subpage_types = []
+    preview_modes = [
+        ("headless", "Headless frontend"),
+        ("backend", "Backend fallback"),
+    ]
 
     excerpt = models.CharField(
         max_length=320,
@@ -109,6 +115,40 @@ class BlogPostPage(Page):
 
     def get_preview_template(self, request, mode_name):
         return "blog/blog_post_page_preview.html"
+
+    @transaction.atomic
+    def publish(self, *args, **kwargs):
+        return super().publish(*args, **kwargs)
+
+    @transaction.atomic
+    def unpublish(self, *args, **kwargs):
+        return super().unpublish(*args, **kwargs)
+
+    def get_preview_url(self, request, token):
+        from apps.blog.services.preview import issue_preview_credential
+
+        self._issued_preview_credential = issue_preview_credential(
+            package_token=token,
+            expected_page=self,
+        )
+        return self.get_client_root_url(request)
+
+    def serve_preview(self, request, preview_mode):
+        if preview_mode == "backend":
+            return Page.serve_preview(self, request, preview_mode)
+
+        response = super().serve_preview(request, preview_mode)
+        response.set_cookie(
+            settings.PREVIEW_ENTRY_COOKIE_NAME,
+            self._issued_preview_credential,
+            max_age=settings.PREVIEW_TOKEN_TTL_SECONDS,
+            httponly=True,
+            secure=request.is_secure(),
+            samesite="Lax",
+            path="/api/draft",
+        )
+        response["Cache-Control"] = "private, no-store"
+        return response
 
     def clean(self):
         super().clean()

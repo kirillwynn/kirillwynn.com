@@ -97,6 +97,10 @@ tzdata==2026.3 ; sys_platform == 'win32'
 urllib3==2.7.0
     # via requests
 wagtail==7.4.2
+    # via
+    #   kirillwynn-backend
+    #   wagtail-headless-preview
+wagtail-headless-preview==0.9.0
     # via kirillwynn-backend
 willow==1.12.0
     # via wagtail

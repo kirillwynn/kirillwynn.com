@@ -271,6 +271,32 @@ Preview endpoints must:
 Publishing and unpublishing trigger signed on-demand revalidation in Next.js.
 At the initial single-instance scale, no distributed cache is required.
 
+### Milestone 3 content boundary
+
+The application-owned DRF contract is versioned at `/api/v1/`. Public posts use
+one visibility service that requires live, public, published, due, and
+not-expired content. StreamField data is a typed discriminated union rather
+than Wagtail's internal representation. Responsive image filters are fixed at
+widths 480, 960, and 1440.
+
+`wagtail-headless-preview` 0.9.0 integrates the Wagtail editor, but the
+application does not use its token as authorization. Django copies the package
+snapshot into an immutable project record and issues an opaque
+`TimestampSigner` credential with a default 600-second TTL. Wagtail transfers
+it to Next.js through a short-lived HttpOnly cookie. The Next.js snapshot cookie
+is scoped to `/posts`, so it is not sent to Django's public content API.
+
+Publication lifecycle signals write cache events to a database outbox in the
+same transaction as the Wagtail state change. Delivery happens after commit and
+can be retried by management command. Requests use HMAC-SHA256 over the Unix
+timestamp and exact raw JSON body. Next.js derives all tags and paths from a
+strict semantic payload.
+
+The exact Next.js routes `/api/draft`, `/api/draft/disable`, and
+`/api/revalidate` are frontend-owned exceptions that future Nginx configuration
+must match before the generic `/api/*` Django route. This exception does not
+move application data ownership out of Django.
+
 ## Media
 
 Wagtail manages image metadata and renditions. Original objects live in

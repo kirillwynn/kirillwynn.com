@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.users",
     "apps.blog",
+    "wagtail_headless_preview",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.contrib.table_block",
@@ -119,6 +120,27 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 WAGTAIL_SITE_NAME = "kirillwynn.com"
 WAGTAILADMIN_BASE_URL = os.environ.get("WAGTAIL_ADMIN_BASE_URL", "http://localhost:8000")
+FRONTEND_PREVIEW_URL = os.environ.get(
+    "FRONTEND_PREVIEW_URL",
+    "http://localhost:3000/api/draft",
+)
+PREVIEW_TOKEN_TTL_SECONDS = int(os.environ.get("PREVIEW_TOKEN_TTL_SECONDS", "600"))
+PREVIEW_ENTRY_COOKIE_NAME = "kw_preview_credential"
+WAGTAIL_HEADLESS_PREVIEW = {
+    "CLIENT_URLS": {"default": FRONTEND_PREVIEW_URL},
+    "REDIRECT_ON_PREVIEW": True,
+    "ENFORCE_TRAILING_SLASH": False,
+}
+
+REVALIDATION_URL = os.environ.get("REVALIDATION_URL", "")
+REVALIDATION_SECRET = os.environ.get("REVALIDATION_SECRET", "")
+REVALIDATION_TIMEOUT_SECONDS = float(os.environ.get("REVALIDATION_TIMEOUT_SECONDS", "5"))
+REVALIDATION_TIMESTAMP_WINDOW_SECONDS = int(
+    os.environ.get("REVALIDATION_TIMESTAMP_WINDOW_SECONDS", "300")
+)
+REVALIDATION_PROCESSING_TIMEOUT_SECONDS = int(
+    os.environ.get("REVALIDATION_PROCESSING_TIMEOUT_SECONDS", "300")
+)
 
 # Tags are matched case-insensitively while preserving the first-entered display name.
 TAGGIT_CASE_INSENSITIVE = True

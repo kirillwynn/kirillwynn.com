@@ -2,6 +2,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 
 def test_local_settings_defaults_wagtail_admin_base_url_to_localhost():
     environment = os.environ.copy()
@@ -34,6 +36,9 @@ def test_production_settings_require_wagtail_admin_base_url():
             "POSTGRES_DB": "app",
             "POSTGRES_USER": "app",
             "POSTGRES_PASSWORD": "production-check-only",
+            "FRONTEND_PREVIEW_URL": "https://example.com/api/draft",
+            "REVALIDATION_URL": "https://example.com/api/revalidate",
+            "REVALIDATION_SECRET": "production-check-only",
         }
     )
     environment.pop("WAGTAIL_ADMIN_BASE_URL", None)
@@ -50,3 +55,51 @@ def test_production_settings_require_wagtail_admin_base_url():
     assert (
         "Missing required production environment variables: WAGTAIL_ADMIN_BASE_URL" in result.stderr
     )
+
+
+@pytest.mark.parametrize(
+    "missing_name",
+    [
+        "FRONTEND_PREVIEW_URL",
+        "REVALIDATION_URL",
+        "REVALIDATION_SECRET",
+    ],
+)
+def test_production_settings_require_preview_and_revalidation_configuration(missing_name):
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "DJANGO_SETTINGS_MODULE": "config.settings.production",
+            "DJANGO_SECRET_KEY": "production-check-only",
+            "DJANGO_ALLOWED_HOSTS": "example.com",
+            "POSTGRES_HOST": "db",
+            "POSTGRES_DB": "app",
+            "POSTGRES_USER": "app",
+            "POSTGRES_PASSWORD": "production-check-only",
+            "WAGTAIL_ADMIN_BASE_URL": "https://example.com/cms",
+            "FRONTEND_PREVIEW_URL": "https://example.com/api/draft",
+            "REVALIDATION_URL": "https://example.com/api/revalidate",
+            "REVALIDATION_SECRET": "production-check-only",
+        }
+    )
+    environment.pop(missing_name, None)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert f"Missing required production environment variables: {missing_name}" in result.stderr
+
+
+def test_headless_preview_settings_use_redirect_and_short_ttl(settings):
+    assert settings.WAGTAIL_HEADLESS_PREVIEW == {
+        "CLIENT_URLS": {"default": "http://frontend.test/api/draft"},
+        "REDIRECT_ON_PREVIEW": True,
+        "ENFORCE_TRAILING_SLASH": False,
+    }
+    assert settings.PREVIEW_TOKEN_TTL_SECONDS == 600

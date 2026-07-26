@@ -4,14 +4,15 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 2 complete; awaiting owner review
+Overall state: Milestone 3 complete; awaiting owner review
 
 ## Current repository state
 
 - The `main` branch contains the deployed legacy Flask/React implementation.
 - The legacy database and Alembic history are experimental.
 - The new Django/Wagtail backend is isolated under `backend/django/`.
-- The Next.js application has not been scaffolded yet.
+- The minimal Next.js Draft Mode and revalidation application is isolated under
+  `frontend/next/`; the legacy Vite frontend remains unchanged.
 - Existing GitHub Actions, Nginx configuration, S3 utilities, social icons, and
   deployment secrets are reference material for the rebuild.
 - The root `docker-compose.yml` remains the legacy deployment stack.
@@ -58,55 +59,70 @@ Overall state: Milestone 2 complete; awaiting owner review
   scheduled publication, and scheduled unpublication verified.
 - [x] Blog migration, model constraints, page hierarchy, admin form, and block
   validation coverage added.
+- [x] Versioned anonymous live-only post list and slug detail API added.
+- [x] One reusable public visibility policy excludes draft, unpublished,
+  future, expired, and restricted pages.
+- [x] Stable version 1.0 serialization covers metadata, deterministic tags,
+  fixed image renditions, and all 13 StreamField blocks.
+- [x] `wagtail-headless-preview` 0.9.0 integrated with Wagtail 7.4 redirect
+  previews while retaining the backend-template fallback mode.
+- [x] Opaque ten-minute credentials bind one immutable preview snapshot and
+  resolve with private/no-store responses.
+- [x] Wagtail publish, update, slug change, unpublish, and expiry events create
+  signed revalidation records in a durable database outbox.
+- [x] Retryable revalidation delivery and the
+  `process_revalidation_outbox` management command added.
+- [x] Minimal Next.js 16.2.11 / React 19.2.8 App Router scaffold added with
+  strict TypeScript, Draft Mode entry/exit, diagnostic post preview, and HMAC
+  revalidation.
+- [x] API contract and ADR 0002 documented.
 
 ## Milestone transition
 
-Milestone 2 is complete. Its exit criteria pass with the local/test
-filesystem-storage and SQLite configuration. S3 and PostgreSQL-backed
-verification remain deliberately separate infrastructure work.
+Milestone 3 is complete. Its exit criteria pass with the local/test
+filesystem-storage and SQLite configuration. S3, PostgreSQL-backed
+verification, Nginx routing, and production scheduler invocation remain
+deliberately separate infrastructure work.
 
 ### Next recommended session
 
-Milestone 3: live content REST contract, signed headless preview, and cache
-revalidation contract.
+Milestone 4: public Next.js shell, Feed, post renderer, and Bridge.
 
 Scope:
 
-1. Add paginated live-only post list and slug detail endpoints through DRF and
-   Wagtail REST facilities.
-2. Define stable API serialization for every StreamField block, tags, SEO/Open
-   Graph fallbacks, and responsive Wagtail image rendition metadata.
-3. Prove that drafts, future scheduled posts, expired posts, and non-requested
-   revisions cannot enter the public API.
-4. Implement a short-lived, tamper-resistant preview token bound to one Wagtail
-   revision and the minimal Next.js Draft Mode endpoint needed to render it,
-   without building the public UI.
-5. Define signed publish/unpublish revalidation requests and test their
-   authentication, idempotency, and failure behavior.
-6. Add API contract, preview expiry/tampering, authorization, and cache
-   revalidation tests.
+1. Build the mobile-first Next.js layout and navigation without changing the
+   content contract.
+2. Implement the paginated Feed and post cards from `/api/v1/posts/`.
+3. Replace the diagnostic page with renderers for all 13 typed body blocks.
+4. Add public metadata, canonical, and Open Graph rendering.
+5. Implement Bridge from configuration or Wagtail Site Settings.
+6. Add component/Playwright coverage at 375x812 and 1440x900, including
+   keyboard focus and non-hover behavior.
 
 Out of scope for that session:
 
 - public Feed/post visual implementation beyond the minimal preview endpoint;
-- OAuth providers;
-- comments and reactions;
+- OAuth, comments, and reactions;
+- search and tag filtering;
 - S3 storage and production deployment;
+- Nginx or production infrastructure changes;
 - deletion of legacy reference files.
 
 ### Exit criteria
 
-- Wagtail can author, revise, preview, publish, schedule, and roll back posts.
-- Content models enforce the agreed page hierarchy and publication fields.
-- Required StreamField blocks have stable backend definitions.
-- Model and authoring behavior tests pass.
+- Anonymous clients receive only currently public posts.
+- Every content field and StreamField block has a stable versioned contract.
+- Draft Mode renders one short-lived immutable snapshot without a browser URL
+  token or public cache entry.
+- Publish/unpublish cache events survive frontend failure and retry safely.
+- Backend and minimal frontend verification pass.
 - The status file and local Obsidian checklist are updated.
 
 ## Milestone queue
 
 - [x] Milestone 1 — repository foundation and Django/Wagtail skeleton.
 - [x] Milestone 2 — content pages, StreamField blocks, tags, media, revisions.
-- [ ] Milestone 3 — REST content API, preview, and cache revalidation.
+- [x] Milestone 3 — REST content API, preview, and cache revalidation.
 - [ ] Milestone 4 — Next.js shell, Feed, post renderer, and Bridge.
 - [ ] Milestone 5 — Google/GitHub OAuth and session integration.
 - [ ] Milestone 6 — comments and Slack-style threads.
@@ -119,11 +135,18 @@ Out of scope for that session:
 
 ## Known risks
 
-- Wagtail headless preview requires deliberate integration with Next.js Draft
-  Mode.
+- Exact Nginx exceptions for Next.js `/api/draft`, `/api/draft/disable`, and
+  `/api/revalidate` are documented but deliberately not wired in this
+  milestone.
+- The Next.js duplicate-event registry is process-local. Duplicate invalidation
+  remains safe across processes because tag/path invalidation is idempotent.
+- Preview snapshot and delivered revalidation event retention are currently
+  bounded only by opportunistic preview cleanup and database operations; a
+  formal operations retention command belongs with worker infrastructure.
 - Scheduled publishing is modelled and verified through Wagtail's
   `publish_scheduled_pages` command, but the production worker/cron invocation
-  is deferred to the infrastructure milestone.
+  and `process_revalidation_outbox` schedule are deferred to the infrastructure
+  milestone.
 - Media uses local filesystem storage in local/test. S3-compatible production
   storage, upload policy, and lifecycle configuration remain required.
 - OAuth callbacks and credentials must be separate for staging and production.
@@ -160,29 +183,50 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-26:
 
-- `python3 -m uv lock --check` — passed; 45 packages resolved.
+- `python3 -m uv lock --check` — passed; 46 packages resolved.
 - Synced environment reports Python 3.12.13, Django 5.2.16, Wagtail 7.4.2,
-  Django REST Framework 3.17.1, and Ruff 0.12.12.
-- `python3 -m uv run --frozen ruff format --check .` — passed (38 files).
+  Django REST Framework 3.17.1, `wagtail-headless-preview` 0.9.0, and Ruff
+  0.12.12.
+- `python3 -m uv run --frozen ruff format --check .` — passed (58 files).
 - `python3 -m uv run --frozen ruff check .` — passed.
 - `python3 -m uv run --frozen python manage.py check
   --settings=config.settings.test` — passed.
 - `python3 -m uv run --frozen python manage.py makemigrations --check --dry-run
   --settings=config.settings.test` — passed; no changes detected.
-- `python3 -m uv run --frozen pytest` — passed; 36 tests, including Wagtail page
-  hierarchy, every StreamField block, tags, draft preview and image renditions,
-  revision restoration, immediate publish, and scheduled publish/unpublish.
-- `python3 -m uv run --frozen python manage.py migrate --noinput
-  --settings=config.settings.test` — passed from an empty in-memory SQLite
-  database, including `blog.0001_initial`.
-- An in-process `migrate` → `migrate blog zero` → `migrate blog` check passed,
-  verifying reasonable forward/reverse behavior on SQLite.
+- `python3 -m uv run --frozen pytest` — passed; 66 tests, including exact list,
+  detail, and 13-block contracts; visibility and query-count policy; preview
+  expiry/tampering/snapshot binding; outbox transactionality, signing, failure,
+  retry, and idempotency.
+- Empty-file SQLite migration passed through all Django, Wagtail,
+  `wagtail_headless_preview.0001_initial`, and
+  `blog.0002_revalidationevent_previewsnapshot` migrations.
+- `migrate blog 0001` followed by `migrate blog 0002` passed on that clean
+  SQLite database, verifying reverse/forward behavior for the new project
+  migration.
 - `python3 -m uv run --frozen python manage.py check --deploy` with production
   settings and safe non-secret verification values — passed; the
   Wagtail-required `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally
   silenced.
-- The production-settings regression test confirms that a missing
-  `WAGTAIL_ADMIN_BASE_URL` raises `ImproperlyConfigured`.
+- Production-settings regression tests confirm that Wagtail admin, frontend
+  preview, revalidation URL, and revalidation secret configuration are
+  mandatory.
+- Node.js 24.18.0 and npm 11.16.0 were installed through fnm.
+- `npm ci` — passed; 156 packages audited with zero known vulnerabilities.
+- `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
+- `npm test` — passed; 10 Vitest tests across HMAC, timestamp/tampering,
+  duplicate/allowlist behavior, Draft Mode entry/open-redirect handling, token
+  removal, and server-only boundaries.
+- `npm run build` — passed with Next.js 16.2.11 and React/React DOM 19.2.8;
+  `/api/draft`, `/api/draft/disable`, `/api/revalidate`, and `/posts/[slug]`
+  are dynamic server routes. Built browser assets contain no revalidation
+  secret name/value.
+- Live local Django/Next.js integration passed for public list/detail, signed
+  and duplicate revalidation, tampered revalidation rejection, immutable Draft
+  Mode snapshot entry, and Draft Mode exit. No preview credential appeared in
+  request URLs or Django logs.
 - Docker, PostgreSQL server binaries, and `pg_isready` are not installed, so
   Docker and PostgreSQL-backed migration/search checks were not run. SQLite
   results are not represented as PostgreSQL verification.
+- The in-app browser had no available browser backend, so visual checks at
+  375x812 and 1440x900 could not run. The diagnostic page's SSR/HTTP flow and
+  keyboard-visible focus CSS were verified non-visually.
