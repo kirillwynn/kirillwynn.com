@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 1 audit remediation complete; awaiting owner review
+Overall state: Milestone 2 complete; awaiting owner review
 
 ## Current repository state
 
@@ -47,28 +47,48 @@ Overall state: Milestone 1 audit remediation complete; awaiting owner review
 - [x] Local PostgreSQL/Django Compose stack documented.
 - [x] Milestone 1 audit remediated: Django security patch, production Wagtail
   URL validation, Docker context exclusions, and configuration coverage added.
+- [x] Singleton root-level `BlogIndexPage` and child-only `BlogPostPage` added.
+- [x] Required excerpt, structured body, normalized tags, SEO, canonical, and
+  Open Graph authoring fields added.
+- [x] All 13 first-version StreamField block types added with explicit rich-text
+  features and no raw HTML or embeds.
+- [x] Wagtail Images alt/decorative validation and local rendition-backed
+  backend preview added.
+- [x] Draft revisions, preview, immediate publication, revision restoration,
+  scheduled publication, and scheduled unpublication verified.
+- [x] Blog migration, model constraints, page hierarchy, admin form, and block
+  validation coverage added.
 
 ## Milestone transition
 
-Milestone 1 audit remediation is complete and pending owner review. Milestone 2
-has not started.
+Milestone 2 is complete. Its exit criteria pass with the local/test
+filesystem-storage and SQLite configuration. S3 and PostgreSQL-backed
+verification remain deliberately separate infrastructure work.
 
 ### Next recommended session
 
-Milestone 2: Wagtail content models and authoring foundation.
+Milestone 3: live content REST contract, signed headless preview, and cache
+revalidation contract.
 
 Scope:
 
-1. Add `BlogIndexPage` and `BlogPostPage`.
-2. Define the first-version StreamField block library.
-3. Add normalized tags and publication/SEO metadata.
-4. Verify Wagtail revisions, preview, rollback, and scheduling behavior.
-5. Add model constraints, authoring behavior tests, and fresh migration checks.
+1. Add paginated live-only post list and slug detail endpoints through DRF and
+   Wagtail REST facilities.
+2. Define stable API serialization for every StreamField block, tags, SEO/Open
+   Graph fallbacks, and responsive Wagtail image rendition metadata.
+3. Prove that drafts, future scheduled posts, expired posts, and non-requested
+   revisions cannot enter the public API.
+4. Implement a short-lived, tamper-resistant preview token bound to one Wagtail
+   revision and the minimal Next.js Draft Mode endpoint needed to render it,
+   without building the public UI.
+5. Define signed publish/unpublish revalidation requests and test their
+   authentication, idempotency, and failure behavior.
+6. Add API contract, preview expiry/tampering, authorization, and cache
+   revalidation tests.
 
 Out of scope for that session:
 
-- Next.js UI;
-- public content API and signed headless preview;
+- public Feed/post visual implementation beyond the minimal preview endpoint;
 - OAuth providers;
 - comments and reactions;
 - S3 storage and production deployment;
@@ -85,7 +105,7 @@ Out of scope for that session:
 ## Milestone queue
 
 - [x] Milestone 1 — repository foundation and Django/Wagtail skeleton.
-- [ ] Milestone 2 — content pages, StreamField blocks, tags, media, revisions.
+- [x] Milestone 2 — content pages, StreamField blocks, tags, media, revisions.
 - [ ] Milestone 3 — REST content API, preview, and cache revalidation.
 - [ ] Milestone 4 — Next.js shell, Feed, post renderer, and Bridge.
 - [ ] Milestone 5 — Google/GitHub OAuth and session integration.
@@ -101,6 +121,11 @@ Out of scope for that session:
 
 - Wagtail headless preview requires deliberate integration with Next.js Draft
   Mode.
+- Scheduled publishing is modelled and verified through Wagtail's
+  `publish_scheduled_pages` command, but the production worker/cron invocation
+  is deferred to the infrastructure milestone.
+- Media uses local filesystem storage in local/test. S3-compatible production
+  storage, upload policy, and lifecycle configuration remain required.
 - OAuth callbacks and credentials must be separate for staging and production.
 - Current Docker Compose names collide if both environments run on one server.
 - The current deployment workflow rebuilds production rather than promoting an
@@ -138,23 +163,26 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 - `python3 -m uv lock --check` — passed; 45 packages resolved.
 - Synced environment reports Python 3.12.13, Django 5.2.16, Wagtail 7.4.2,
   Django REST Framework 3.17.1, and Ruff 0.12.12.
-- `python3 -m uv run --frozen ruff format --check .` — passed (25 files).
+- `python3 -m uv run --frozen ruff format --check .` — passed (38 files).
 - `python3 -m uv run --frozen ruff check .` — passed.
 - `python3 -m uv run --frozen python manage.py check
   --settings=config.settings.test` — passed.
 - `python3 -m uv run --frozen python manage.py makemigrations --check --dry-run
   --settings=config.settings.test` — passed; no changes detected.
-- `python3 -m uv run --frozen pytest` — passed; 8 tests.
+- `python3 -m uv run --frozen pytest` — passed; 36 tests, including Wagtail page
+  hierarchy, every StreamField block, tags, draft preview and image renditions,
+  revision restoration, immediate publish, and scheduled publish/unpublish.
 - `python3 -m uv run --frozen python manage.py migrate --noinput
-  --settings=config.settings.test` — passed from an
-  empty in-memory SQLite database, including the custom user baseline and all
-  Wagtail migrations.
+  --settings=config.settings.test` — passed from an empty in-memory SQLite
+  database, including `blog.0001_initial`.
+- An in-process `migrate` → `migrate blog zero` → `migrate blog` check passed,
+  verifying reasonable forward/reverse behavior on SQLite.
 - `python3 -m uv run --frozen python manage.py check --deploy` with production
   settings and safe non-secret verification values — passed; the
-  Wagtail-required
-  `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally silenced.
+  Wagtail-required `X_FRAME_OPTIONS=SAMEORIGIN` warning is intentionally
+  silenced.
 - The production-settings regression test confirms that a missing
   `WAGTAIL_ADMIN_BASE_URL` raises `ImproperlyConfigured`.
-- Docker image build and `docker compose config` were not run because Docker is
-  not installed. Static checks confirmed valid Compose YAML, required Docker
-  context exclusions, and matching build-context paths.
+- Docker, PostgreSQL server binaries, and `pg_isready` are not installed, so
+  Docker and PostgreSQL-backed migration/search checks were not run. SQLite
+  results are not represented as PostgreSQL verification.

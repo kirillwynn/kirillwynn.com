@@ -1,0 +1,74 @@
+{% load wagtailcore_tags wagtailimages_tags %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Backend preview: {{ page.title }}</title>
+    <style>
+      body { font: 16px/1.6 system-ui, sans-serif; margin: 0 auto; max-width: 760px; padding: 2rem 1rem; }
+      img { height: auto; max-width: 100%; }
+      pre { overflow-x: auto; padding: 1rem; background: #f3f4f6; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #9ca3af; padding: .4rem; text-align: left; }
+      .gallery { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>{{ page.title }}</h1>
+        <p>{{ page.excerpt }}</p>
+
+        {% for block in page.body %}
+          {% if block.block_type == "rich_text" %}
+            {{ block.value|richtext }}
+          {% elif block.block_type == "heading" %}
+            {% if block.value.level == "h2" %}<h2>{{ block.value.text }}</h2>{% endif %}
+            {% if block.value.level == "h3" %}<h3>{{ block.value.text }}</h3>{% endif %}
+            {% if block.value.level == "h4" %}<h4>{{ block.value.text }}</h4>{% endif %}
+          {% elif block.block_type == "image" %}
+            {% image block.value max-1200x1200 as rendition %}
+            <img src="{{ rendition.url }}" width="{{ rendition.width }}" height="{{ rendition.height }}" alt="{{ block.value.contextual_alt_text }}">
+          {% elif block.block_type == "gallery" %}
+            <div class="gallery">
+              {% for gallery_image in block.value %}
+                {% image gallery_image max-800x800 as rendition %}
+                <img src="{{ rendition.url }}" width="{{ rendition.width }}" height="{{ rendition.height }}" alt="{{ gallery_image.contextual_alt_text }}">
+              {% endfor %}
+            </div>
+          {% elif block.block_type == "quote" %}
+            <blockquote>
+              <p>{{ block.value.text|linebreaksbr }}</p>
+              {% if block.value.attribution %}<cite>{{ block.value.attribution }}</cite>{% endif %}
+            </blockquote>
+          {% elif block.block_type == "bulleted_list" %}
+            <ul>{% for item in block.value %}<li>{{ item }}</li>{% endfor %}</ul>
+          {% elif block.block_type == "numbered_list" %}
+            <ol>{% for item in block.value %}<li>{{ item }}</li>{% endfor %}</ol>
+          {% elif block.block_type == "checklist" %}
+            <ul>
+              {% for item in block.value %}
+                <li>{% if item.checked %}☑{% else %}☐{% endif %} {{ item.text }}</li>
+              {% endfor %}
+            </ul>
+          {% elif block.block_type == "inline_code" %}
+            <p><code>{{ block.value }}</code></p>
+          {% elif block.block_type == "code_block" %}
+            <pre><code data-language="{{ block.value.language }}">{{ block.value.code }}</code></pre>
+          {% elif block.block_type == "table" %}
+            {{ block }}
+          {% elif block.block_type == "horizontal_divider" %}
+            <hr>
+          {% elif block.block_type == "link" %}
+            {% if block.value.internal_page %}
+              <p><a href="{{ block.value.internal_page.url }}">{{ block.value.text }}</a></p>
+            {% else %}
+              <p><a href="{{ block.value.external_url }}">{{ block.value.text }}</a></p>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </article>
+    </main>
+  </body>
+</html>

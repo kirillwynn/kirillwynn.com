@@ -58,6 +58,10 @@ The first backend foundation is available under `backend/django/`:
 - a custom `users.User` model in the initial project migration;
 - environment-specific local, test, and production settings;
 - `/api/health/`, Django Admin, and Wagtail Admin smoke coverage;
+- singleton blog index and structured post authoring with normalized tags;
+- SEO/Open Graph metadata and all 13 first-version StreamField block types;
+- backend draft preview with image renditions, revisions, rollback, and
+  publication scheduling coverage;
 - locked production and development dependencies.
 
 Existing files under `backend/app/`, `frontend/`, `docker/`, `nginx/`, and the

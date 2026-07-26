@@ -15,8 +15,10 @@ ALLOWED_HOSTS: list[str] = []
 INSTALLED_APPS = [
     "apps.core",
     "apps.users",
+    "apps.blog",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
+    "wagtail.contrib.table_block",
     "wagtail.embeds",
     "wagtail.sites",
     "wagtail.users",
@@ -117,6 +119,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 WAGTAIL_SITE_NAME = "kirillwynn.com"
 WAGTAILADMIN_BASE_URL = os.environ.get("WAGTAIL_ADMIN_BASE_URL", "http://localhost:8000")
+
+# Tags are matched case-insensitively while preserving the first-entered display name.
+TAGGIT_CASE_INSENSITIVE = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
