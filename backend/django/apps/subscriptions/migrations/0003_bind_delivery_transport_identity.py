@@ -3,6 +3,19 @@
 from django.db import migrations, models
 
 LEGACY_TRANSPORT_IDENTITY = "legacy.unknown"
+DOWNGRADE_AMBIGUITY_REASON = "payload_mismatch"
+DOWNGRADE_QUARANTINE_ERROR = (
+    "Delivery quarantined during downgrade because transport identity was removed"
+)
+DOWNGRADE_MISMATCH_ERROR = (
+    "Transport identity was removed during downgrade; delivery requires review"
+)
+NEW_TRANSPORT_AMBIGUITY_REASONS = (
+    "transport_identity_mismatch",
+    "serializer_version_mismatch",
+    "idempotency_namespace_mismatch",
+    "legacy_transport_identity",
+)
 
 
 def quarantine_legacy_retryable_deliveries(apps, schema_editor):
@@ -12,6 +25,20 @@ def quarantine_legacy_retryable_deliveries(apps, schema_editor):
         processing_at=None,
         ambiguity_reason="legacy_transport_identity",
         last_error="Legacy delivery has no verified provider transport identity",
+    )
+
+
+def prepare_deliveries_for_0002(apps, schema_editor):
+    EmailDelivery = apps.get_model("subscriptions", "EmailDelivery")
+    EmailDelivery.objects.filter(status__in=("pending", "processing")).update(
+        status="manual_review",
+        processing_at=None,
+        ambiguity_reason=DOWNGRADE_AMBIGUITY_REASON,
+        last_error=DOWNGRADE_QUARANTINE_ERROR,
+    )
+    EmailDelivery.objects.filter(ambiguity_reason__in=NEW_TRANSPORT_AMBIGUITY_REASONS).update(
+        ambiguity_reason=DOWNGRADE_AMBIGUITY_REASON,
+        last_error=DOWNGRADE_MISMATCH_ERROR,
     )
 
 
@@ -91,7 +118,7 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(
             quarantine_legacy_retryable_deliveries,
-            migrations.RunPython.noop,
+            prepare_deliveries_for_0002,
         ),
         migrations.AddConstraint(
             model_name="emaildelivery",

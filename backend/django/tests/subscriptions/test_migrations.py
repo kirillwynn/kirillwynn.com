@@ -1,3 +1,5 @@
+from importlib import import_module
+
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -93,7 +95,7 @@ def test_subscriptions_0003_reverses_and_reapplies_without_drift():
     executor.migrate([("subscriptions", "0003_bind_delivery_transport_identity")])
 
 
-def test_subscriptions_0003_quarantines_unknown_retryable_identity_and_keeps_history():
+def test_subscriptions_0003_populated_round_trip_quarantines_retryable_and_keeps_history():
     executor = MigrationExecutor(connection)
     executor.migrate([("subscriptions", "0002_harden_email_delivery")])
     old_apps = executor.loader.project_state([("subscriptions", "0002_harden_email_delivery")]).apps
@@ -134,6 +136,7 @@ def test_subscriptions_0003_quarantines_unknown_retryable_identity_and_keeps_his
             values.update(
                 {
                     "provider_message_id": "historical-message",
+                    "provider_created_at": now,
                     "sent_at": now,
                     "first_provider_attempt_at": now,
                     "last_provider_attempt_at": now,
@@ -161,6 +164,179 @@ def test_subscriptions_0003_quarantines_unknown_retryable_identity_and_keeps_his
     assert historical.provider_message_id == "historical-message"
     assert historical.provider_contract_id == "legacy.unknown"
     assert historical.provider_idempotency_namespace == "legacy.unknown"
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0002_harden_email_delivery")])
+    reversed_apps = executor.loader.project_state(
+        [("subscriptions", "0002_harden_email_delivery")]
+    ).apps
+    ReversedDelivery = reversed_apps.get_model("subscriptions", "EmailDelivery")
+    pending = ReversedDelivery.objects.get(pk=delivery_ids["pending"])
+    processing = ReversedDelivery.objects.get(pk=delivery_ids["processing"])
+    historical = ReversedDelivery.objects.get(pk=delivery_ids["sent"])
+
+    for delivery in (pending, processing):
+        assert delivery.status == "manual_review"
+        assert delivery.processing_at is None
+        assert delivery.ambiguity_reason == "payload_mismatch"
+        assert "transport identity was removed" in delivery.last_error.lower()
+        assert len(delivery.last_error) <= 500
+    assert historical.status == "sent"
+    assert historical.provider_message_id == "historical-message"
+    assert historical.provider_created_at == now
+    assert historical.sent_at == now
+    assert historical.first_provider_attempt_at == now
+    assert historical.last_provider_attempt_at == now
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0003_bind_delivery_transport_identity")])
+    reapplied_apps = executor.loader.project_state(
+        [("subscriptions", "0003_bind_delivery_transport_identity")]
+    ).apps
+    ReappliedDelivery = reapplied_apps.get_model("subscriptions", "EmailDelivery")
+    for status in ("pending", "processing"):
+        delivery = ReappliedDelivery.objects.get(pk=delivery_ids[status])
+        assert delivery.status == "manual_review"
+        assert delivery.ambiguity_reason == "payload_mismatch"
+        assert delivery.provider_contract_id == "legacy.unknown"
+        assert delivery.provider_idempotency_namespace == "legacy.unknown"
+    historical = ReappliedDelivery.objects.get(pk=delivery_ids["sent"])
+    assert historical.status == "sent"
+    assert historical.provider_message_id == "historical-message"
+    assert historical.provider_created_at == now
+    assert historical.sent_at == now
+    assert historical.first_provider_attempt_at == now
+    assert historical.last_provider_attempt_at == now
+
+
+def test_subscriptions_0003_reverse_normalizes_new_reasons_and_known_pending_identity():
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0003_bind_delivery_transport_identity")])
+    latest_apps = executor.loader.project_state(
+        [("subscriptions", "0003_bind_delivery_transport_identity")]
+    ).apps
+    Subscriber = latest_apps.get_model("subscriptions", "Subscriber")
+    EmailOutbox = latest_apps.get_model("subscriptions", "EmailOutbox")
+    EmailDelivery = latest_apps.get_model("subscriptions", "EmailDelivery")
+    now = timezone.now()
+    delivery_ids = {}
+    new_reasons = (
+        "transport_identity_mismatch",
+        "serializer_version_mismatch",
+        "idempotency_namespace_mismatch",
+        "legacy_transport_identity",
+    )
+    for index, reason in enumerate(new_reasons):
+        subscriber = Subscriber.objects.create(
+            email=f"reverse-reason-{index}@example.com",
+            canonical_email=f"reverse-reason-{index}@example.com",
+        )
+        outbox = EmailOutbox.objects.create(
+            message_type="confirmation",
+            subscriber=subscriber,
+            credential_version=1,
+            available_at=now,
+            idempotency_key=f"migration/reverse-reason/{index}",
+            message_schema_version=1,
+            snapshot_from_email="Posts <posts@example.com>",
+            snapshot_site_url="https://example.com",
+            snapshot_subject="Confirm",
+        )
+        delivery_ids[reason] = EmailDelivery.objects.create(
+            outbox=outbox,
+            subscriber=subscriber,
+            status="manual_review",
+            available_at=now,
+            snapshot_recipient_email=subscriber.email,
+            snapshot_credential_version=1,
+            credential_issued_at=now,
+            provider_payload_hash="0" * 64,
+            provider_contract_id="resend.emails",
+            provider_serializer_version=1,
+            provider_idempotency_namespace="resend/test",
+            ambiguity_reason=reason,
+            last_error=f"Latest reason: {reason}",
+        ).pk
+
+    pending_subscriber = Subscriber.objects.create(
+        email="known-pending@example.com",
+        canonical_email="known-pending@example.com",
+    )
+    pending_outbox = EmailOutbox.objects.create(
+        message_type="confirmation",
+        subscriber=pending_subscriber,
+        credential_version=1,
+        available_at=now,
+        idempotency_key="migration/known-pending",
+        message_schema_version=1,
+        snapshot_from_email="Posts <posts@example.com>",
+        snapshot_site_url="https://example.com",
+        snapshot_subject="Confirm",
+    )
+    pending_id = EmailDelivery.objects.create(
+        outbox=pending_outbox,
+        subscriber=pending_subscriber,
+        status="pending",
+        available_at=now,
+        snapshot_recipient_email=pending_subscriber.email,
+        snapshot_credential_version=1,
+        credential_issued_at=now,
+        provider_payload_hash="0" * 64,
+        provider_contract_id="resend.emails",
+        provider_serializer_version=1,
+        provider_idempotency_namespace="resend/test",
+    ).pk
+
+    reverse_data = import_module(
+        "apps.subscriptions.migrations.0003_bind_delivery_transport_identity"
+    ).prepare_deliveries_for_0002
+    reverse_data(latest_apps, None)
+    first_reverse_state = list(
+        EmailDelivery.objects.filter(pk__in=(*delivery_ids.values(), pending_id))
+        .order_by("pk")
+        .values_list(
+            "pk",
+            "status",
+            "processing_at",
+            "ambiguity_reason",
+            "last_error",
+        )
+    )
+    reverse_data(latest_apps, None)
+    assert (
+        list(
+            EmailDelivery.objects.filter(pk__in=(*delivery_ids.values(), pending_id))
+            .order_by("pk")
+            .values_list(
+                "pk",
+                "status",
+                "processing_at",
+                "ambiguity_reason",
+                "last_error",
+            )
+        )
+        == first_reverse_state
+    )
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0002_harden_email_delivery")])
+    reversed_apps = executor.loader.project_state(
+        [("subscriptions", "0002_harden_email_delivery")]
+    ).apps
+    ReversedDelivery = reversed_apps.get_model("subscriptions", "EmailDelivery")
+
+    for delivery_id in delivery_ids.values():
+        delivery = ReversedDelivery.objects.get(pk=delivery_id)
+        assert delivery.status == "manual_review"
+        assert delivery.ambiguity_reason == "payload_mismatch"
+        assert "during downgrade" in delivery.last_error
+        assert len(delivery.last_error) <= 500
+    pending = ReversedDelivery.objects.get(pk=pending_id)
+    assert pending.status == "manual_review"
+    assert pending.processing_at is None
+    assert pending.ambiguity_reason == "payload_mismatch"
+    assert "transport identity was removed" in pending.last_error.lower()
+    assert len(pending.last_error) <= 500
 
 
 def test_subscriptions_0002_safely_backfills_existing_ambiguous_and_webhook_rows():

@@ -290,6 +290,17 @@ and are quarantined as `manual_review` without provider I/O. Terminal
 historical rows retain their status and remain readable with the explicit
 `legacy.unknown` marker.
 
+Because `0003` also remained unpushed and undeployed, its reverse data operation
+was amended in place before deployment. Before the transport fields are removed
+and the `0002` constraints return, every remaining `pending` or `processing`
+delivery is quarantined as `manual_review`, `processing_at` is cleared, and its
+reason becomes the `0002`-compatible `payload_mismatch`. The four
+transport-specific ambiguity reasons are likewise reduced to
+`payload_mismatch` with a bounded downgrade explanation. Historical terminal
+statuses, provider message IDs, and provider timestamps are preserved. This
+prevents a downgrade from making transport-ambiguous work retryable after its
+identity and namespace have been removed.
+
 ## Revisit conditions
 
 Revisit this decision if the audience no longer fits bounded relational batch

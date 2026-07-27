@@ -319,8 +319,10 @@ infrastructure, and live-browser checks remain external or unavailable
   post URL as text before its existing-data backfill.
 - [x] Additive `subscriptions.0003_bind_delivery_transport_identity` preserves
   terminal legacy history under an explicit marker and quarantines legacy
-  `pending`/`processing` rows as `manual_review`; clean and reverse/forward
-  migration coverage protects the boundary.
+  `pending`/`processing` rows as `manual_review`; its reverse data operation
+  safely reduces retryable rows and transport-specific mismatch reasons to the
+  `0002`-compatible `manual_review`/`payload_mismatch` quarantine before
+  restoring old constraints.
 
 ## Milestone transition
 
@@ -457,17 +459,21 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   `send()`.
 - Additive `subscriptions.0003_bind_delivery_transport_identity` applied on a
   clean empty SQLite chain, reversed to `0002` and reapplied, and the complete
-  subscriptions chain reversed to zero and reapplied. Its legacy-data test
-  quarantines unknown pending/processing identity while retaining readable
-  terminal history; `0001_initial` and the widened `0002` snapshot/FROM/URL
-  remediation remain unchanged.
+  subscriptions chain reversed to zero and reapplied. Populated migration
+  coverage exercises `0002 -> 0003 -> 0002 -> 0003`, preserving sent provider
+  IDs/timestamps while reducing former pending/processing rows and all four new
+  mismatch reasons to the safe `manual_review`/`payload_mismatch` downgrade
+  shape. A latest-state delivery with valid known identity is also quarantined
+  rather than made retryable. `0001_initial`, the widened `0002`
+  snapshot/FROM/URL remediation, model state, and migration drift remain
+  unchanged.
 - `python3 -m uv lock --check` passed with 68 packages resolved. Ruff format
   check passed for 130 files, Ruff lint passed, Django system check and
   `makemigrations --check --dry-run` passed, and production
   `check --deploy` passed for both Resend and the memory adapter without Resend
   credentials.
-- The targeted provider/settings/subscriptions/migration suite passed 165
-  tests. Full `pytest` passed 451 tests; six PostgreSQL-only concurrency/search
+- The targeted provider/settings/subscriptions/migration suite passed 167
+  tests. Full `pytest` passed 452 tests; six PostgreSQL-only concurrency/search
   tests skipped on SQLite. Docker, PostgreSQL, `psql`, `postgres`, and
   `pg_isready` are unavailable, so no PostgreSQL concurrency result is claimed.
 - Prettier, ESLint, TypeScript, and full Vitest passed: 150 tests in 15 files.
