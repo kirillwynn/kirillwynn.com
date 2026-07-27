@@ -51,6 +51,14 @@ export type ContentTag = {
     slug: string;
 };
 
+export type AvailableTag = ContentTag & {
+    count: number;
+};
+
+export type AvailableTagResponse = {
+    results: AvailableTag[];
+};
+
 export type SeoMetadata = {
     title: string;
     description: string;

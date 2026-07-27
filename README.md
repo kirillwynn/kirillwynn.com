@@ -51,7 +51,7 @@ Do not copy that note into the repository.
 
 ## Current state
 
-Milestones 1–7 are available under `backend/django/` and `frontend/next/`:
+Milestones 1–8 are available under `backend/django/` and `frontend/next/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -66,6 +66,10 @@ Milestones 1–7 are available under `backend/django/` and `frontend/next/`:
 - backend draft preview with image renditions, revisions, rollback, and
   publication scheduling coverage;
 - anonymous live-only `/api/v1/posts/` list and slug detail endpoints;
+- PostgreSQL-backed Wagtail full-text search over weighted title, excerpt,
+  textual body content, and tag names;
+- combined `q` and exact Unicode `tag` post filtering plus live-only
+  `/api/v1/tags/` counts;
 - a stable version 1.0 serializer for all 13 body blocks, tags, metadata, and
   fixed 480/960/1440 image renditions;
 - immutable, ten-minute headless preview snapshots integrated through
@@ -76,8 +80,9 @@ Milestones 1–7 are available under `backend/django/` and `frontend/next/`:
 - public-origin canonical/media URLs through `PUBLIC_SITE_URL`, with
   origin-independent relative pagination links;
 - a public Next.js 16.2.11 App Router shell with Tailwind CSS 4.3.3;
-- a server-rendered paginated Feed and full post pages with all 13 typed
-  StreamField renderers;
+- a server-rendered URL-driven searchable/tag-filtered Feed with accessible
+  controls and pagination, plus full post pages with all 13 typed StreamField
+  renderers;
 - responsive 480/960/1440 rendition rendering, accessible content tables,
   read-only checklists, and server-rendered syntax highlighting with a safe
   plain-text fallback;
@@ -165,6 +170,8 @@ uv run python manage.py runserver
 Public content routes:
 
 - `http://localhost:8000/api/v1/posts/`;
+- `http://localhost:8000/api/v1/posts/?q=django&tag=python`;
+- `http://localhost:8000/api/v1/tags/`;
 - `http://localhost:8000/api/v1/posts/<slug>/`;
 - `http://localhost:8000/api/v1/preview/resolve/` (server-to-server preview
   resolution only).
@@ -199,7 +206,12 @@ private/no-store viewer boundary.
 HTTP(S) origin without a path, query, or fragment. The backend uses it for
 fallback canonical URLs and local media/rendition URLs even when Next.js calls
 Django through an internal host. Absolute S3/CDN URLs and authored canonical
-URLs are preserved. Pagination links are relative API URLs.
+URLs are preserved. Pagination links are relative API URLs. Production search
+uses Wagtail's `wagtail.search.backends.database` over PostgreSQL with the
+language-neutral `simple` configuration. SQLite FTS5 is only the
+local/unit-test fallback and does not verify PostgreSQL ranking. Run
+`uv run python manage.py update_index` after changing search fields or
+deploying this initial search configuration.
 
 Retry pending cache events:
 
@@ -233,7 +245,8 @@ npm run dev
 
 The public frontend includes:
 
-- `/` — the server-rendered public Feed with accessible pagination;
+- `/` — the server-rendered URL-driven public Feed with accessible search,
+  tag filters, and pagination;
 - `/posts/[slug]` — public and private Draft Mode post rendering;
 - `/bridge` — the eight approved profile links and team labels;
 - `/api/draft` and `/api/draft/disable`;
@@ -250,9 +263,9 @@ The public frontend includes:
 OAuth initiation is a normal CSRF-protected browser POST to django-allauth. The
 OAuth redirect is never sent through client-side fetch.
 
-The Feed fetch uses only the `posts` cache tag. Public post details use only
-`post-slug:<slug>`. Draft snapshots are resolved server-to-server with
-`cache: "no-store"` and never enter the public cache.
+Every Feed list/search/tag-count fetch uses only the `posts` cache tag. Public
+post details use only `post-slug:<slug>`. Draft snapshots are resolved
+server-to-server with `cache: "no-store"` and never enter the public cache.
 
 `REVALIDATION_SECRET` must contain at least 32 UTF-8 bytes. Django and Next.js
 reject a shorter runtime production value. Production preview cookies are

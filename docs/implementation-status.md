@@ -1,12 +1,12 @@
 # Implementation status
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 7 second remediation implemented and locally verified;
-PostgreSQL-only and live-browser checks remain skipped because those runtimes
-are unavailable
+Overall state: Milestone 8 search and tag filtering implemented and locally
+verified; PostgreSQL-only ranking and live-browser checks remain skipped
+because those runtimes are unavailable
 
 ## Current repository state
 
@@ -223,47 +223,60 @@ are unavailable
 - [x] A shared per-target frontend coordinator now gives duplicate list/thread
   reaction controls one single-flight request, one globally unique mutation
   revision, and lifecycle-independent authoritative/rollback settlement.
+- [x] Wagtail's current database search backend configured for PostgreSQL FTS
+  with the multilingual `simple` configuration and SQLite FTS5 test fallback.
+- [x] Blog search weights fixed at title 10, excerpt 7, body 4, and related tag
+  names 2, with meaningful StreamField text extraction and service values
+  excluded.
+- [x] `/api/v1/posts/` now combines bounded Unicode `q`, exact Unicode `tag`,
+  page, and page-size parameters under the canonical live-only policy.
+- [x] `/api/v1/tags/` returns stable live-only distinct post counts without
+  per-post/per-tag queries.
+- [x] Search/tag pagination stays relative, retains active parameters, uses
+  relevance plus `-pk` for search, and preserves publication ordering without
+  a query.
+- [x] The Feed is URL-driven for query, tag, and page; it includes accessible
+  submit/clear controls, semantic active tags, safe URL serialization,
+  noindex variants, and distinct invalid/empty/unknown/out-of-range/error
+  states.
+- [x] Every Feed list/search/filter/tag-count request keeps the existing
+  `posts` cache tag; publication reindexes tags after cluster relations commit
+  and uses the existing signed revalidation flow.
 
 ## Milestone transition
 
-Milestone 7 and its boundary remediation are complete. Django owns concrete
-post/comment reaction persistence, safe Unicode validation, aggregation,
-participant privacy, transactional toggles, and database-backed rate limiting.
-Next.js owns the lazy local picker, strict local storage hygiene, one pending
-intent per target, race-safe accessible participant surfaces, shared per-target
-mutation coordination, revisioned optimistic state, and explicit post-OAuth
-intent confirmation. The existing content, preview, OAuth, and comment
-contracts remain intact.
+Milestone 8 is complete. Django applies the existing public visibility policy
+before exact tag filtering and Wagtail database search, owns validated Unicode
+query shapes and live-only tag counts, and reindexes cluster tags at the
+publication boundary. Next.js owns URL parsing/serialization, accessible
+search/tag controls, relative filter-preserving pagination, explicit result
+states, and search/filter noindex metadata. Existing content, preview, cache
+revalidation, OAuth, comments, and reaction contracts remain intact.
 
 ### Next recommended session
 
-Milestone 8: PostgreSQL search and tag filtering.
+Milestone 9: email subscriptions and the durable outbox worker.
 
 Scope:
 
-1. Configure the Wagtail PostgreSQL search backend and the agreed field weights.
-2. Add explicit versioned search and tag-filter contracts under the existing
-   public visibility policy.
-3. Add server-rendered Feed search/filter controls with relative pagination.
-4. Cover Unicode queries, tag normalization, visibility, query bounds, and
-   keyboard/mobile interaction.
+1. Define subscriber, outbox, and delivery persistence with migrations.
+2. Implement double opt-in and unsubscribe boundaries.
+3. Add the replaceable provider adapter and idempotent worker behavior.
+4. Cover retries, delivery uniqueness, and safe public forms.
 
 Out of scope for that session:
 
-- email subscriptions;
 - S3 storage and production deployment;
 - live OAuth application creation, Nginx, or production infrastructure changes;
-- reaction redesign or custom emoji;
+- search/reaction redesign or custom emoji;
 - deletion of legacy reference files.
 
 ### Exit criteria
 
-- Search and tag-filter endpoints use the single public visibility policy.
-- PostgreSQL search weights and deterministic relative pagination are tested.
-- Feed controls remain server-rendered, keyboard accessible, and usable at the
-  required mobile and desktop viewports.
-- Existing content, preview, auth, comments, reactions, and security boundaries
-  remain operational.
+- Subscription state changes are transactional and token-bound.
+- Publication delivery is idempotent through a durable database outbox.
+- Provider failures retry without duplicate delivery.
+- Existing content/search/auth/discussion boundaries remain operational.
 
 ## Milestone queue
 
@@ -274,7 +287,7 @@ Out of scope for that session:
 - [x] Milestone 5 — Google/GitHub OAuth and session integration.
 - [x] Milestone 6 — comments and Slack-style threads.
 - [x] Milestone 7 — post and comment reactions.
-- [ ] Milestone 8 — PostgreSQL search and tag filtering.
+- [x] Milestone 8 — PostgreSQL search and tag filtering.
 - [ ] Milestone 9 — email subscriptions and durable outbox worker.
 - [ ] Milestone 10 — isolated staging/production infrastructure.
 - [ ] Milestone 11 — end-to-end hardening and functional launch.
@@ -315,11 +328,14 @@ Out of scope for that session:
   comment edit/delete and reaction toggle serialization exist but were skipped
   locally because the test database is SQLite. The production model was not
   weakened or imitated for SQLite.
-- No in-app Browser or Chrome backend was connected, so 375x812 and 1440x900
-  screenshots, real picker keyboard behavior, participant request switching,
-  hover/mobile tap, Escape/focus return, live close-during-root-reaction
-  settlement, thread reaction interaction, optimistic rollback, touch keyboard
-  avoidance, and visual scroll-containment checks remain unverified.
+- PostgreSQL search ranking/weight assertions exist but were skipped locally
+  with the other PostgreSQL-only tests because no PostgreSQL or container
+  runtime is installed. SQLite verifies fields, Unicode, visibility, filtering,
+  validation, and pagination but is not represented as PostgreSQL ranking.
+- Browser runtime setup and troubleshooting succeeded, but no in-app Browser or
+  Chrome backend was connected. Feed checks at 375x812 and 1440x900, real
+  keyboard focus order, Back/Forward restoration, and visual empty/pagination
+  states remain unverified rather than simulated.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - Email DNS records and provider credentials do not exist in the current
@@ -340,6 +356,48 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 - a deliberately deferred dependency.
 
 ## Last verification
+
+2026-07-27:
+
+- Official Wagtail 7.4.2 documentation confirmed
+  `wagtail.search.backends.database`, `django.contrib.postgres`, PostgreSQL's
+  four effective weights, RelatedFields behavior, auto-update signals, and the
+  need to run `update_index` after search configuration changes.
+- `python3 -m uv lock --check` passed: 53 packages resolved with no dependency
+  changes. `npm ci` was not rerun because neither Node manifest nor lockfile
+  changed.
+- Ruff format check and lint, Django test-settings system check, and
+  `makemigrations --check --dry-run` passed with no migration drift.
+- Full `pytest` passed: 340 tests; four PostgreSQL-only tests skipped on SQLite,
+  including the new weight/ranking assertion. Search coverage includes every
+  indexed field, English/Russian/mixed Unicode, combined filters, all hidden
+  lifecycle states, tag counts, query-count stability, reindex-on-retag,
+  relative pagination, malformed/repeated/bounded queries, and unknown tags.
+- A new empty SQLite database applied the complete migration chain through all
+  project and Wagtail 7.4 migrations. No project migration was added. The
+  Wagtail `update_index` command then rebuilt 15 seeded SQLite objects.
+- Production `manage.py check --deploy` passed with safe non-production
+  verification values; one intentional Wagtail iframe warning remains
+  silenced.
+- Prettier, ESLint, TypeScript, and full Vitest passed: 137 tests in 14 files.
+  Feed coverage includes URL parsing/serialization, Unicode single encoding,
+  search submit/clear, tag select/clear, filter-preserving pagination,
+  invalid/unknown/no-result/out-of-range distinctions, backend 404 versus
+  infrastructure failure, noindex/canonical behavior, and shared `posts`
+  cache tags.
+- Production Next.js 16.2.11 build passed after the sandbox allowed
+  Turbopack's local CSS worker port. `/` remains a dynamic server-rendered
+  route. `npm audit` reported zero vulnerabilities.
+- Post-build `.next/static` scan found no internal Django origin, verification
+  secret, credential names, session identifier, or `X-Session-Token`.
+- A temporary local SQLite-backed Django/Next production stack served `/`,
+  `/api/v1/posts/`, and `/api/v1/tags/`; it was stopped after the probe.
+- Browser runtime discovery and the required troubleshooting probe returned no
+  connected Browser or Chrome backends, so responsive/keyboard visual QA did
+  not run.
+- Docker, PostgreSQL, `psql`, `postgres`, and `pg_isready` are unavailable.
+  PostgreSQL search ranking and migration execution were not represented as
+  verified.
 
 2026-07-26:
 

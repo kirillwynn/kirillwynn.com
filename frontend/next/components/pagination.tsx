@@ -1,14 +1,16 @@
+import { feedHref, type FeedState } from "@/lib/feed-state";
+
 export function Pagination({
-    page,
+    state,
     hasPrevious,
     hasNext,
 }: {
-    page: number;
+    state: FeedState;
     hasPrevious: boolean;
     hasNext: boolean;
 }) {
-    const previousHref = page === 2 ? "/" : `/?page=${String(page - 1)}`;
-    const nextHref = `/?page=${String(page + 1)}`;
+    const previousHref = feedHref({ ...state, page: state.page - 1 });
+    const nextHref = feedHref({ ...state, page: state.page + 1 });
 
     return (
         <nav
@@ -22,7 +24,7 @@ export function Pagination({
             ) : (
                 <span aria-hidden="true" />
             )}
-            <span className="text-sm text-stone-500">Page {page}</span>
+            <span className="text-sm text-stone-500">Page {state.page}</span>
             {hasNext ? (
                 <a className="button-link" rel="next" href={nextHref}>
                     Next →

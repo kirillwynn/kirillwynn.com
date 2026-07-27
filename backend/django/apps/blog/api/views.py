@@ -1,3 +1,4 @@
+from django.db.models import Count, F
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -6,11 +7,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.blog.api.pagination import PostPagination
+from apps.blog.api.query import parse_post_filters
 from apps.blog.api.serializers import (
     PostDetailSerializer,
     PostListSerializer,
     prepare_list_lead_images,
 )
+from apps.blog.models import BlogPostTag
 from apps.blog.services.preview import InvalidPreviewCredential, resolve_preview_credential
 from apps.blog.services.visibility import public_blog_posts
 
@@ -26,7 +29,13 @@ class PostListAPIView(PublicAPIViewMixin, ListAPIView):
     pagination_class = PostPagination
 
     def get_queryset(self):
-        return public_blog_posts()
+        filters = parse_post_filters(self.request.query_params)
+        queryset = public_blog_posts()
+        if filters.tag:
+            queryset = queryset.filter(tags__slug=filters.tag).distinct()
+        if filters.query:
+            return queryset.search(filters.query)
+        return queryset
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -38,6 +47,18 @@ class PostListAPIView(PublicAPIViewMixin, ListAPIView):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+
+class TagListAPIView(PublicAPIViewMixin, APIView):
+    def get(self, request):
+        public_post_ids = public_blog_posts().order_by().values("pk")
+        tags = (
+            BlogPostTag.objects.filter(content_object_id__in=public_post_ids)
+            .values(name=F("tag__name"), slug=F("tag__slug"))
+            .annotate(count=Count("content_object_id", distinct=True))
+            .order_by("slug", "name")
+        )
+        return Response({"results": list(tags)})
 
 
 class PostDetailAPIView(PublicAPIViewMixin, RetrieveAPIView):

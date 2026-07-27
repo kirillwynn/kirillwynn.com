@@ -81,7 +81,7 @@ describe("feed presentation", () => {
     it("renders accessible previous and next controls", () => {
         const html = renderToStaticMarkup(
             createElement(Pagination, {
-                page: 2,
+                state: { page: 2 },
                 hasPrevious: true,
                 hasNext: true,
             }),
@@ -91,6 +91,25 @@ describe("feed presentation", () => {
         expect(html).toContain('href="/?page=3"');
         expect(html).toContain('rel="prev"');
         expect(html).toContain('rel="next"');
+    });
+
+    it("preserves search and tag filters in pagination links", () => {
+        const html = renderToStaticMarkup(
+            createElement(Pagination, {
+                state: { page: 2, q: "русский Django", tag: "питон" },
+                hasPrevious: true,
+                hasNext: true,
+            }),
+        );
+
+        expect(html).toContain(
+            'href="/?q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django&amp;tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD"',
+        );
+        expect(html).toContain(
+            "q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django&amp;tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD&amp;page=3",
+        );
+        expect(html).not.toContain("page=1");
+        expect(html).not.toContain("%25D1");
     });
 });
 

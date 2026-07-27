@@ -20,11 +20,28 @@ storage URLs, such as S3 or CDN URLs, pass through unchanged.
 
 Query parameters:
 
+- `q`: optional full-text query, trimmed, maximum 200 Unicode code points;
+- `tag`: optional exact case-sensitive Unicode tag slug;
 - `page`: positive page number;
 - `page_size`: default `10`, maximum `50`.
 
+`q` and `tag` combine with AND semantics. Empty `q` after trimming is absent.
+Every supported parameter may occur at most once. Queries containing Unicode
+control/unassigned/surrogate/private-use code points, queries over the limit,
+invalid tag slugs, and malformed page shapes return a field-specific 400
+without reflecting the input. Unknown valid tag slugs return a normal empty
+page.
+
+The canonical public visibility policy is applied before search and tag
+filtering. Draft, unpublished, scheduled-for-future, expired, and restricted
+pages cannot match. Without `q`, ordering remains
+`(-first_published_at, -pk)`. With `q`, the database backend orders by
+relevance and then `-pk`, the deterministic tie-break implemented by Wagtail
+7.4's PostgreSQL and SQLite database compilers.
+
 The list never contains `body`. `next` and `previous` are relative API URLs,
-such as `/api/v1/posts/?page=2`; they never include an origin.
+such as `/api/v1/posts/?q=django&tag=python&page=2`; they never include an
+origin and preserve every active supported parameter.
 
 ```json
 {
@@ -60,6 +77,63 @@ such as `/api/v1/posts/?page=2`; they never include an origin.
   ]
 }
 ```
+
+### Search index
+
+Production uses Wagtail 7.4's current
+`wagtail.search.backends.database` backend over PostgreSQL FTS, with
+`django.contrib.postgres` installed. The removed
+`wagtail.contrib.postgres_search` backend is not used. PostgreSQL uses the
+language-neutral `simple` configuration so Russian, English, and mixed
+lexemes share one exact token-matching contract; it deliberately does not
+perform language-specific stemming.
+
+`BlogPostPage` uses these explicit boosts:
+
+| Content | Boost |
+| --- | ---: |
+| title | 10 |
+| excerpt | 7 |
+| body text | 4 |
+| tag names | 2 |
+
+PostgreSQL maps all project boost values into its four A/B/C/D weight levels.
+Body indexing includes rich text with markup stripped, headings, image
+contextual alt text, quotes and attribution, list/checklist text, inline/code
+content, table cells, and link labels. It excludes heading levels, checklist
+booleans, code language identifiers, URLs/destinations, HTML markup, and
+divider/service values. Tag names are flattened from the related
+`ClusterTaggableManager` into their own boosted search field; the tag slug
+remains an indexed related filter field. A `page_published` reindex occurs
+after Wagtail has copied cluster child relations so changed tags are present
+immediately.
+
+SQLite FTS5 is the local/unit-test fallback. It supports functional field and
+Unicode coverage but has different tokenization and scoring; PostgreSQL
+weight/ranking assertions are skipped, not simulated, on SQLite. Run
+`python manage.py update_index` after deploying a search-field configuration
+change so existing rows receive the new document.
+
+### `GET /api/v1/tags/`
+
+This endpoint returns only tags attached to posts accepted by the same public
+visibility policy:
+
+```json
+{
+  "results": [
+    {
+      "name": "Django",
+      "slug": "django",
+      "count": 3
+    }
+  ]
+}
+```
+
+Results are ordered by `(slug, name)`. `count` is the distinct public post
+count. Hidden lifecycle states neither create entries nor increment counts;
+the aggregate query is bounded and does not issue one query per tag or post.
 
 ### `GET /api/v1/posts/<unicode-slug>/`
 
@@ -681,9 +755,12 @@ Next.js accepts the default 300-second window and derives only:
 - `post-slug:<previous_slug>` when a rename supplies a distinct previous slug;
 - paths `/`, `/posts/<slug>`, and the optional previous-slug post path.
 
-List fetches use `posts`; detail fetches use their `post-slug:<slug>` tag
-without the global list tag. Stable-ID tags remain available to caches keyed by
-page identity. This keeps one post update from evicting every cached detail.
+All list/search/filter variants and the available-tag fetch use `posts`;
+detail fetches use their `post-slug:<slug>` tag without the global list tag.
+Stable-ID tags remain available to caches keyed by page identity. Publication,
+update (including body or tags), unpublication, and expiry therefore invalidate
+Feed results without accepting tags or paths from a browser. This keeps one
+post update from evicting every cached detail.
 
 Current and previous slugs may use Unicode letters and numbers, `-`, and `_`,
 up to 255 Unicode code points. Slash, backslash, control characters, empty

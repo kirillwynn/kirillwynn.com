@@ -103,6 +103,49 @@ button:focus-visible {
     background: #fafaf9;
 }
 
+.feed-search-input {
+    min-height: 2.75rem;
+    min-width: 0;
+    flex: 1;
+    border: 1px solid #a8a29e;
+    border-radius: 0.625rem;
+    background: white;
+    padding-inline: 0.875rem;
+    color: #292524;
+    font: inherit;
+}
+
+.feed-search-input:focus-visible {
+    border-color: #d97706;
+    outline: 3px solid #fcd34d;
+    outline-offset: 1px;
+}
+
+.feed-tag {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    border: 1px solid #d6d3d1;
+    border-radius: 999px;
+    background: white;
+    padding-inline: 0.875rem;
+    color: #57534e;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.feed-tag:hover {
+    border-color: #a8a29e;
+    background: #fafaf9;
+}
+
+.feed-tag-active {
+    border-color: #d97706;
+    background: #fffbeb;
+    color: #92400e;
+}
+
 .content-link,
 .rich-text a {
     color: #9a3412;

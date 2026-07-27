@@ -42,6 +42,9 @@ class HeadingBlock(blocks.StructBlock):
     )
     text = blocks.CharBlock(max_length=200)
 
+    def get_searchable_content(self, value):
+        return [value["text"]]
+
     class Meta:
         icon = "title"
         label = "Heading"
@@ -50,6 +53,9 @@ class HeadingBlock(blocks.StructBlock):
 class QuoteBlock(blocks.StructBlock):
     text = blocks.TextBlock(rows=3, max_length=2_000)
     attribution = blocks.CharBlock(required=False, max_length=200)
+
+    def get_searchable_content(self, value):
+        return [text for text in (value["text"], value["attribution"]) if text]
 
     class Meta:
         icon = "openquote"
@@ -60,6 +66,9 @@ class ChecklistItemBlock(blocks.StructBlock):
     text = blocks.CharBlock(max_length=500)
     checked = blocks.BooleanBlock(required=False, default=False)
 
+    def get_searchable_content(self, value):
+        return [value["text"]]
+
     class Meta:
         label = "Checklist item"
 
@@ -69,6 +78,9 @@ class CodeBlock(blocks.StructBlock):
         help_text="Lowercase language identifier used by a future syntax highlighter."
     )
     code = blocks.TextBlock(rows=12)
+
+    def get_searchable_content(self, value):
+        return [value["code"]]
 
     class Meta:
         icon = "code"
@@ -83,6 +95,9 @@ class LinkBlock(blocks.StructBlock):
         max_length=2_048,
         validators=[URLValidator(schemes=["http", "https"])],
     )
+
+    def get_searchable_content(self, value):
+        return [value["text"]]
 
     def clean(self, value):
         cleaned_value = super().clean(value)

@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { FeedControls } from "@/components/feed-controls";
 import { Pagination } from "@/components/pagination";
 import { PostCard } from "@/components/post-card";
-import { parsePageParam } from "@/lib/pagination";
-import { getPublicPosts } from "@/lib/server/django";
+import { parseFeedState } from "@/lib/feed-state";
+import { getAvailableTags, getPublicPosts } from "@/lib/server/django";
 
-export const metadata: Metadata = {
+type HomeSearchParams = Record<string, string | string[] | undefined>;
+
+const FEED_METADATA = {
     title: "Feed",
     description: "The latest writing from Kirill Wynn.",
     alternates: { canonical: "/" },
@@ -15,25 +18,74 @@ export const metadata: Metadata = {
         description: "The latest writing from Kirill Wynn.",
         url: "/",
     },
-};
+} satisfies Metadata;
+
+export async function generateMetadata({
+    searchParams,
+}: {
+    searchParams: Promise<HomeSearchParams>;
+}): Promise<Metadata> {
+    const parsed = parseFeedState(await searchParams);
+    const variant =
+        !parsed.valid ||
+        parsed.state.page > 1 ||
+        Boolean(parsed.state.q || parsed.state.tag);
+    return {
+        ...FEED_METADATA,
+        ...(variant ? { robots: { index: false, follow: true } } : {}),
+    };
+}
+
+function EmptyState({ title, children }: { title: string; children: string }) {
+    return (
+        <section
+            className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center"
+            aria-labelledby="empty-feed-title"
+        >
+            <h2
+                id="empty-feed-title"
+                className="text-xl font-semibold text-stone-950"
+            >
+                {title}
+            </h2>
+            <p className="mt-2 text-stone-600">{children}</p>
+        </section>
+    );
+}
 
 export default async function HomePage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string | string[] }>;
+    searchParams: Promise<HomeSearchParams>;
 }) {
-    const page = parsePageParam((await searchParams).page);
-    if (!page) {
-        notFound();
+    const parsed = parseFeedState(await searchParams);
+    if (!parsed.valid) {
+        return (
+            <div className="mx-auto max-w-4xl">
+                <EmptyState title="Invalid Feed URL">
+                    Check the search, tag, and page parameters and try again.
+                </EmptyState>
+            </div>
+        );
     }
-    const feed = await getPublicPosts(page);
-    if (!feed || (page > 1 && feed.results.length === 0)) {
+
+    const state = parsed.state;
+    const [feed, tagResponse] = await Promise.all([
+        getPublicPosts(state),
+        getAvailableTags(),
+    ]);
+    if (!feed) {
         notFound();
     }
 
+    const unknownTag =
+        state.tag !== undefined &&
+        !tagResponse.results.some((tag) => tag.slug === state.tag);
+    const filtered = Boolean(state.q || state.tag);
+
     return (
         <div className="mx-auto max-w-4xl">
-            <header className="mb-12 max-w-2xl">
+            <header className="mb-10 max-w-2xl">
                 <p className="eyebrow">Personal publishing</p>
                 <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-stone-950 sm:text-5xl">
                     Notes from building software and systems.
@@ -43,21 +95,20 @@ export default async function HomePage({
                 </p>
             </header>
 
-            {feed.results.length === 0 ? (
-                <section
-                    className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center"
-                    aria-labelledby="empty-feed-title"
-                >
-                    <h2
-                        id="empty-feed-title"
-                        className="text-xl font-semibold text-stone-950"
-                    >
-                        No published posts yet
-                    </h2>
-                    <p className="mt-2 text-stone-600">
-                        New writing will appear here after it is published.
-                    </p>
-                </section>
+            <FeedControls state={state} tags={tagResponse.results} />
+
+            {unknownTag ? (
+                <EmptyState title="Unknown tag">
+                    This tag is not attached to any published post.
+                </EmptyState>
+            ) : feed.results.length === 0 && filtered ? (
+                <EmptyState title="No posts found">
+                    No published posts match the active search and tag filters.
+                </EmptyState>
+            ) : feed.results.length === 0 ? (
+                <EmptyState title="No published posts yet">
+                    New writing will appear here after it is published.
+                </EmptyState>
             ) : (
                 <div className="space-y-10">
                     {feed.results.map((post) => (
@@ -66,9 +117,9 @@ export default async function HomePage({
                 </div>
             )}
 
-            {feed.count > 0 ? (
+            {feed.count > 0 && feed.results.length > 0 ? (
                 <Pagination
-                    page={page}
+                    state={state}
                     hasPrevious={feed.previous !== null}
                     hasNext={feed.next !== null}
                 />

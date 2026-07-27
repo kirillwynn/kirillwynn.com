@@ -2,7 +2,7 @@
 
 Status: accepted
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 ## System context
 
@@ -127,10 +127,15 @@ Use Wagtail's PostgreSQL database search backend.
 
 Index:
 
-- title with the highest weight;
-- excerpt;
-- textual block content;
-- tags.
+- title with boost 10;
+- excerpt with boost 7;
+- textual block content with boost 4;
+- related tag names with boost 2.
+
+Use PostgreSQL's language-neutral `simple` search configuration for exact
+Russian, English, and mixed-language token matching. Search results use
+Wagtail relevance ordering plus its `-pk` tie-break. SQLite FTS5 is a
+local/test fallback whose ranking is not treated as PostgreSQL verification.
 
 Do not add Elasticsearch or OpenSearch for the first version.
 

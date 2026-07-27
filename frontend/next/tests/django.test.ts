@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
     ContentApiError,
+    getAvailableTags,
     getPublicPost,
     getPublicPosts,
     PreviewUnavailableError,
@@ -27,7 +28,7 @@ describe("Django content client", () => {
         );
         vi.stubGlobal("fetch", fetchMock);
 
-        await getPublicPosts(2);
+        await getPublicPosts({ page: 2 });
 
         expect(fetchMock).toHaveBeenCalledWith(
             "http://localhost:8000/api/v1/posts/?page=2",
@@ -41,12 +42,55 @@ describe("Django content client", () => {
             const fetchMock = vi.fn();
             vi.stubGlobal("fetch", fetchMock);
 
-            await expect(getPublicPosts(page)).rejects.toThrow(
+            await expect(getPublicPosts({ page })).rejects.toThrow(
                 "page must be a positive integer",
             );
             expect(fetchMock).not.toHaveBeenCalled();
         },
     );
+
+    it("passes Unicode filters once and keeps the posts cache tag", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    count: 0,
+                    next: null,
+                    previous: null,
+                    results: [],
+                }),
+                { status: 200 },
+            ),
+        );
+        vi.stubGlobal("fetch", fetchMock);
+
+        await getPublicPosts({
+            page: 2,
+            q: "русский Django",
+            tag: "питон",
+        });
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            "http://localhost:8000/api/v1/posts/?q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD&page=2",
+            { next: { tags: ["posts"] } },
+        );
+        expect(fetchMock.mock.calls[0]?.[0]).not.toContain("%25D1");
+    });
+
+    it("loads available tags with the shared posts cache tag", async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(
+                new Response(JSON.stringify({ results: [] }), { status: 200 }),
+            );
+        vi.stubGlobal("fetch", fetchMock);
+
+        await getAvailableTags();
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            "http://localhost:8000/api/v1/tags/",
+            { next: { tags: ["posts"] } },
+        );
+    });
 
     it("percent-encodes a Unicode slug and scopes the fetch cache", async () => {
         const fetchMock = vi.fn().mockResolvedValue(

@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { PostDetail, PostListResponse } from "@/lib/content-contract";
+import type {
+    AvailableTagResponse,
+    PostDetail,
+    PostListResponse,
+} from "@/lib/content-contract";
+import { feedHref, type FeedState } from "@/lib/feed-state";
 import { djangoApiUrl } from "@/lib/server/config";
 
 export class ContentApiError extends Error {
@@ -40,15 +45,14 @@ export async function resolvePreview(credential: string): Promise<PostDetail> {
 }
 
 export async function getPublicPosts(
-    page: number,
+    state: FeedState,
 ): Promise<PostListResponse | null> {
-    assertPositivePage(page);
-    const response = await fetch(
-        `${djangoApiUrl()}/api/v1/posts/?page=${String(page)}`,
-        {
-            next: { tags: ["posts"] },
-        },
-    );
+    assertPositivePage(state.page);
+    const query = feedHref(state).slice(2);
+    const suffix = query ? `?${query}` : "";
+    const response = await fetch(`${djangoApiUrl()}/api/v1/posts/${suffix}`, {
+        next: { tags: ["posts"] },
+    });
     if (response.status === 404) {
         return null;
     }
@@ -56,6 +60,16 @@ export async function getPublicPosts(
         throw new ContentApiError();
     }
     return (await response.json()) as PostListResponse;
+}
+
+export async function getAvailableTags(): Promise<AvailableTagResponse> {
+    const response = await fetch(`${djangoApiUrl()}/api/v1/tags/`, {
+        next: { tags: ["posts"] },
+    });
+    if (!response.ok) {
+        throw new ContentApiError("Public tag API request failed");
+    }
+    return (await response.json()) as AvailableTagResponse;
 }
 
 export async function getPublicPost(slug: string): Promise<PostDetail | null> {

@@ -12,6 +12,11 @@ from wagtail_headless_preview.models import HeadlessPreviewMixin
 
 from apps.blog.blocks import BlogBodyBlock
 
+SEARCH_BOOST_TITLE = 10
+SEARCH_BOOST_EXCERPT = 7
+SEARCH_BOOST_BODY = 4
+SEARCH_BOOST_TAGS = 2
+
 
 class BlogIndexPage(Page):
     max_count = 1
@@ -83,11 +88,26 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
         )
     ]
 
+    # ModelSearch de-duplicates fields by type and name, with the later
+    # definition winning. Keeping Page.search_fields intact also preserves all
+    # Wagtail core filter/autocomplete fields and its system-check contract.
     search_fields = Page.search_fields + [
-        index.SearchField("excerpt", boost=1.5),
-        index.SearchField("body"),
-        index.RelatedFields("tags", [index.SearchField("name")]),
+        index.SearchField("title", boost=SEARCH_BOOST_TITLE),
+        index.SearchField("excerpt", boost=SEARCH_BOOST_EXCERPT),
+        index.SearchField("body", boost=SEARCH_BOOST_BODY),
+        index.FilterField("go_live_at"),
+        index.FilterField("expire_at"),
+        index.RelatedFields(
+            "tags",
+            [index.FilterField("slug")],
+        ),
+        index.SearchField("searchable_tag_names", boost=SEARCH_BOOST_TAGS),
     ]
+
+    def searchable_tag_names(self):
+        """Flatten the related ClusterTaggableManager into one tag-only field."""
+
+        return "\n".join(self.tags.order_by("slug", "name").values_list("name", flat=True))
 
     @property
     def resolved_canonical_url(self):
