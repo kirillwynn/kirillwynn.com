@@ -5,6 +5,7 @@ from wagtail.signals import page_published, page_unpublished
 
 from apps.blog.models import BlogPostPage, RevalidationEvent
 from apps.blog.services.revalidation import create_revalidation_event, deliver_event_after_commit
+from apps.subscriptions.outbox import create_publication_outbox_event
 
 
 @receiver(page_published, sender=BlogPostPage, dispatch_uid="blog_post_revalidation_published")
@@ -15,6 +16,7 @@ def blog_post_published(sender, instance, **kwargs):
     insert_or_update_object(instance)
     with transaction.atomic():
         event = create_revalidation_event(instance)
+        create_publication_outbox_event(instance)
         deliver_event_after_commit(event.pk)
 
 

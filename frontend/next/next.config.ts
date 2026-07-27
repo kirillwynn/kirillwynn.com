@@ -42,6 +42,26 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/auth/logout/`,
             },
             {
+                source: "/api/v1/subscriptions/",
+                destination: `${django}/api/v1/subscriptions/`,
+            },
+            {
+                source: "/api/v1/subscriptions/confirm/",
+                destination: `${django}/api/v1/subscriptions/confirm/`,
+            },
+            {
+                source: "/api/v1/subscriptions/unsubscribe/",
+                destination: `${django}/api/v1/subscriptions/unsubscribe/`,
+            },
+            {
+                source: "/api/v1/subscriptions/unsubscribe/one-click/",
+                destination: `${django}/api/v1/subscriptions/unsubscribe/one-click/`,
+            },
+            {
+                source: "/api/v1/email/webhooks/resend/",
+                destination: `${django}/api/v1/email/webhooks/resend/`,
+            },
+            {
                 source: "/api/v1/posts/:slug/comments/",
                 destination: `${django}/api/v1/posts/:slug/comments/`,
             },

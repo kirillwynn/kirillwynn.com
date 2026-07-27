@@ -16,6 +16,7 @@ dependencies = [
     "emoji==2.15.0",
     "gunicorn==23.0.0",
     "psycopg[binary]==3.2.12",
+    "svix==1.99.1",
     "Wagtail==7.4.2",
     "wagtail-headless-preview==0.9.0",
 ]

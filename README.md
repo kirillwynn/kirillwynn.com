@@ -47,11 +47,13 @@ Do not copy that note into the repository.
 - [ADR 0001: Django/Wagtail and Next.js](docs/decisions/0001-django-wagtail-nextjs.md)
 - [ADR 0002: Content API, preview, and revalidation](docs/decisions/0002-content-api-preview-revalidation.md)
 - [ADR 0003: Concrete Unicode reaction contract](docs/decisions/0003-unicode-reaction-contract.md)
+- [ADR 0004: Email subscriptions, outbox, and Resend](docs/decisions/0004-email-subscriptions-outbox-resend.md)
+- [Email provider and DNS setup](docs/email-setup.md)
 - [Codex project instructions](AGENTS.md)
 
 ## Current state
 
-Milestones 1–8 are available under `backend/django/` and `frontend/next/`:
+Milestones 1–9 are available under `backend/django/` and `frontend/next/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -108,6 +110,18 @@ Milestones 1–8 are available under `backend/django/` and `frontend/next/`:
   sessionStorage-backed pending OAuth drafts;
 - verified-email provider linking without retained provider tokens, JWT,
   Auth.js, or browser-stored session tokens;
+- anonymous double-opt-in subscriptions with canonical case-insensitive email
+  identity, versioned 48-hour confirmation credentials, revocable unsubscribe,
+  and non-enumerating CSRF-protected APIs;
+- durable confirmation/publication outbox events, immutable publication
+  audience cutoffs, unique per-reader deliveries, bounded PostgreSQL claims,
+  stale reclaim, capped exponential retry, and terminal failure visibility;
+- replaceable deterministic/Resend provider adapters, multipart templates,
+  Resend idempotency keys, RFC 8058 one-click headers, and delivery,
+  bounce/complaint webhook handling through exact raw-body Svix verification;
+- accessible Feed/post subscription forms and explicit noindex/no-referrer
+  confirmation and unsubscribe pages with no Draft Mode requests or browser
+  credential persistence;
 - locked production and development dependencies.
 
 Existing files under `backend/app/`, `frontend/`, `docker/`, `nginx/`, and the
@@ -193,6 +207,14 @@ Reaction routes:
 - exact post/comment participant endpoints documented in
   [the API contract](docs/api-contract.md).
 
+Subscription routes:
+
+- `POST /api/v1/subscriptions/`;
+- `POST /api/v1/subscriptions/confirm/`;
+- `POST /api/v1/subscriptions/unsubscribe/`;
+- `POST /api/v1/subscriptions/unsubscribe/one-click/`;
+- `POST /api/v1/email/webhooks/resend/`.
+
 Comment mutations use Django sessions, normal CSRF, and the per-user fixed
 windows configured by the four `COMMENT_*_RATE_LIMIT_*` environment values.
 Defaults are 10 creates/replies and 30 edits/deletes per 60 seconds. Comment
@@ -219,6 +241,18 @@ Retry pending cache events:
 cd backend/django
 uv run python manage.py process_revalidation_outbox --limit 100
 ```
+
+Process a bounded email batch:
+
+```bash
+cd backend/django
+uv run python manage.py process_email_outbox --limit 25 --delivery-limit 100
+```
+
+The command is safe to rerun and prints counts without addresses or provider
+credentials. Production scheduler/service wiring is intentionally deferred.
+See [email setup](docs/email-setup.md) for Resend, SPF/DKIM/DMARC, webhook,
+rotation, and worker scheduling steps.
 
 The test suite uses an isolated SQLite database so fast checks do not require a
 running PostgreSQL service:

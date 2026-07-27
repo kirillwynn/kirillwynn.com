@@ -22,9 +22,10 @@ import {
     getPublicPosts,
 } from "@/lib/server/django";
 
-const { notFound, push } = vi.hoisted(() => {
+const { notFound, push, draftState } = vi.hoisted(() => {
     return {
         push: vi.fn(),
+        draftState: { isEnabled: false },
         notFound: vi.fn(() => {
             throw new Error("NEXT_NOT_FOUND");
         }),
@@ -34,6 +35,10 @@ const { notFound, push } = vi.hoisted(() => {
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push }),
     notFound,
+}));
+
+vi.mock("next/headers", () => ({
+    draftMode: () => Promise.resolve(draftState),
 }));
 
 vi.mock("@/lib/server/django", async (importOriginal) => {
@@ -82,6 +87,7 @@ function renderControls(): {
 }
 
 beforeEach(() => {
+    draftState.isEnabled = false;
     push.mockReset();
     notFound.mockClear();
     vi.mocked(getPublicPosts).mockReset();
@@ -235,6 +241,20 @@ describe("Feed response states and metadata", () => {
 
         expect(renderToStaticMarkup(unknown)).toContain("Unknown tag");
         expect(renderToStaticMarkup(noResults)).toContain("No posts found");
+    });
+
+    it("omits the subscription form while Draft Mode is active", async () => {
+        draftState.isEnabled = true;
+        vi.mocked(getAvailableTags).mockResolvedValue(availableTags);
+        vi.mocked(getPublicPosts).mockResolvedValue(feed());
+
+        const element = await HomePage({
+            searchParams: Promise.resolve({}),
+        });
+
+        expect(renderToStaticMarkup(element)).not.toContain(
+            "Get new posts by email",
+        );
     });
 
     it("keeps a backend 404 distinct from infrastructure failure", async () => {

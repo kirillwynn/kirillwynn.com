@@ -1,8 +1,11 @@
+import base64
 import os
+from email.utils import parseaddr
 from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.core.validators import URLValidator
+from django.core.validators import URLValidator, validate_email
+from svix.webhooks import Webhook
 
 from config.settings.base import *  # noqa: F403
 
@@ -19,8 +22,21 @@ required_environment = {
     "FRONTEND_PREVIEW_URL": os.environ.get("FRONTEND_PREVIEW_URL"),
     "REVALIDATION_URL": os.environ.get("REVALIDATION_URL"),
     "REVALIDATION_SECRET": os.environ.get("REVALIDATION_SECRET"),
+    "SUBSCRIPTION_SIGNING_SECRET": os.environ.get("SUBSCRIPTION_SIGNING_SECRET"),
     **OAUTH_CREDENTIALS,  # noqa: F405
 }
+EMAIL_PROVIDER_ADAPTER = os.environ.get(
+    "EMAIL_PROVIDER_ADAPTER",
+    "apps.subscriptions.providers.resend.ResendEmailProvider",
+).strip()
+if EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailProvider":
+    required_environment.update(
+        {
+            "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),
+            "RESEND_FROM_EMAIL": os.environ.get("RESEND_FROM_EMAIL"),
+            "RESEND_WEBHOOK_SECRET": os.environ.get("RESEND_WEBHOOK_SECRET"),
+        }
+    )
 missing_environment = [name for name, value in required_environment.items() if not value]
 if missing_environment:
     missing_names = ", ".join(sorted(missing_environment))
@@ -57,6 +73,33 @@ def public_origin(value):
 
 if len(os.environ["REVALIDATION_SECRET"].encode()) < 32:
     raise ImproperlyConfigured("REVALIDATION_SECRET must be at least 32 bytes")
+if len(os.environ["SUBSCRIPTION_SIGNING_SECRET"].encode()) < 32:
+    raise ImproperlyConfigured("SUBSCRIPTION_SIGNING_SECRET must be at least 32 bytes")
+if EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailProvider":
+    resend_from = os.environ["RESEND_FROM_EMAIL"].strip()
+    if "\r" in resend_from or "\n" in resend_from:
+        raise ImproperlyConfigured("RESEND_FROM_EMAIL must be a valid email address")
+    _, resend_from_address = parseaddr(resend_from)
+    try:
+        validate_email(resend_from_address)
+    except ValidationError as error:
+        raise ImproperlyConfigured("RESEND_FROM_EMAIL must be a valid email address") from error
+    try:
+        webhook_secret = os.environ["RESEND_WEBHOOK_SECRET"].strip()
+        if not webhook_secret.startswith("whsec_"):
+            raise ValueError
+        encoded_secret = webhook_secret.removeprefix("whsec_")
+        decoded_secret = base64.b64decode(
+            encoded_secret + ("=" * (-len(encoded_secret) % 4)),
+            validate=True,
+        )
+        if len(decoded_secret) < 16:
+            raise ValueError
+        Webhook(webhook_secret)
+    except Exception as error:
+        raise ImproperlyConfigured(
+            "RESEND_WEBHOOK_SECRET must be a valid Svix signing secret"
+        ) from error
 
 DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")  # noqa: F405
@@ -70,6 +113,10 @@ WAGTAIL_HEADLESS_PREVIEW = {
 }
 REVALIDATION_URL = os.environ["REVALIDATION_URL"]
 REVALIDATION_SECRET = os.environ["REVALIDATION_SECRET"]
+SUBSCRIPTION_SIGNING_SECRET = os.environ["SUBSCRIPTION_SIGNING_SECRET"]
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "").strip()
+RESEND_WEBHOOK_SECRET = os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()
 PREVIEW_COOKIE_SECURE = True
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

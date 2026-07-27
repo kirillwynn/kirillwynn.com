@@ -1,0 +1,9 @@
+{{ post_title }}
+
+{{ post_excerpt }}
+
+Read the post:
+{{ post_url }}
+
+Unsubscribe:
+{{ unsubscribe_url }}

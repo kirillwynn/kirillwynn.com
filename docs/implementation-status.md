@@ -4,9 +4,10 @@ Last updated: 2026-07-27
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 8 search and tag filtering implemented and locally
-verified; PostgreSQL-only ranking and live-browser checks remain skipped
-because those runtimes are unavailable
+Overall state: Milestone 9 production-ready email subscription application
+boundary implemented and locally verified; live Resend/DNS, PostgreSQL-only
+locking, scheduled worker infrastructure, and live-browser checks remain
+external or unavailable
 
 ## Current repository state
 
@@ -242,41 +243,70 @@ because those runtimes are unavailable
 - [x] Every Feed list/search/filter/tag-count request keeps the existing
   `posts` cache tag; publication reindexes tags after cluster relations commit
   and uses the existing signed revalidation flow.
+- [x] Separate `subscriptions` app added with constrained/protected Subscriber,
+  EmailOutbox, EmailDelivery, EmailWebhookEvent, and HMAC-keyed anonymous
+  rate-limit persistence.
+- [x] Trim/casefold/IDNA email normalization, case-insensitive database
+  uniqueness, 48-hour versioned purpose-bound confirmation, revocable
+  unsubscribe, cooldown, resubscribe, and non-bypassable suppression added.
+- [x] JSON-only same-origin CSRF APIs added for subscribe, confirm, and
+  unsubscribe with generic 202 enumeration resistance and `Retry-After`
+  database limits for anonymous email/IP scopes.
+- [x] First-public-publication outbox trigger added with one-event database
+  uniqueness, immutable audience cutoff, and draft/future/republish/restricted
+  exclusions including due Wagtail scheduled publication.
+- [x] Bounded email worker added with PostgreSQL skip-locked claims, stale
+  reclaim, unique delivery creation, capped exponential retry, terminal
+  failure, per-delivery UUID idempotency keys, and a 23-hour ambiguity guard
+  under Resend's 24-hour key retention.
+- [x] Replaceable memory/Resend adapters and escaped multipart confirmation and
+  publication templates added; publication mail contains title, excerpt,
+  canonical URL, normal unsubscribe, and RFC 8058 one-click headers.
+- [x] Bounded raw-body Svix webhook verification, replay window, durable event
+  ID deduplication, provider-message-only lookup, out-of-order-safe delivered /
+  bounce / complaint state, and subscriber suppression added without raw
+  provider payload retention.
+- [x] Read-only Django Admin history plus explicit unsubscribe/suppress/
+  unsuppress actions added with hard delete disabled.
+- [x] Accessible Feed/post forms and explicit fragment-credential confirmation
+  and unsubscribe pages added with generic states, CSRF, no browser
+  persistence, noindex/no-referrer, exact rewrites, and Draft Mode exclusion.
 
 ## Milestone transition
 
-Milestone 8 is complete. Django applies the existing public visibility policy
-before exact tag filtering and Wagtail database search, owns validated Unicode
-query shapes and live-only tag counts, and reindexes cluster tags at the
-publication boundary. Next.js owns URL parsing/serialization, accessible
-search/tag controls, relative filter-preserving pagination, explicit result
-states, and search/filter noindex metadata. Existing content, preview, cache
-revalidation, OAuth, comments, and reaction contracts remain intact.
+Milestone 9 is complete at the application boundary. Django owns anonymous
+subscriber lifecycle, credentials, CSRF/rate limits, durable publication and
+delivery work, provider adaptation, webhook authentication/idempotency, and
+administrative state. Next.js owns accessible forms and explicit human
+confirmation/unsubscribe presentation without receiving a secret or internal
+Django origin. Existing content/search/preview/revalidation/OAuth/discussion
+contracts remain intact.
 
 ### Next recommended session
 
-Milestone 9: email subscriptions and the durable outbox worker.
+Milestone 10: isolated staging/production infrastructure.
 
 Scope:
 
-1. Define subscriber, outbox, and delivery persistence with migrations.
-2. Implement double opt-in and unsubscribe boundaries.
-3. Add the replaceable provider adapter and idempotent worker behavior.
-4. Cover retries, delivery uniqueness, and safe public forms.
+1. Add the production Django, Next.js standalone, and email-worker services.
+2. Wire exact Nginx same-origin routes and environment isolation.
+3. Configure staging Resend/DNS/webhook values and a bounded worker schedule.
+4. Prove PostgreSQL locking and complete staging browser/provider smoke tests
+   before any production cutover.
 
 Out of scope for that session:
 
-- S3 storage and production deployment;
-- live OAuth application creation, Nginx, or production infrastructure changes;
+- production deployment or promotion;
+- production DNS, OAuth, Resend, GitHub Environment, or secret changes;
 - search/reaction redesign or custom emoji;
 - deletion of legacy reference files.
 
 ### Exit criteria
 
-- Subscription state changes are transactional and token-bound.
-- Publication delivery is idempotent through a durable database outbox.
-- Provider failures retry without duplicate delivery.
-- Existing content/search/auth/discussion boundaries remain operational.
+- Staging/production services and data are isolated.
+- Exact same-origin routing preserves CSRF/OAuth/webhook boundaries.
+- Worker scheduling and monitoring are operational in staging.
+- PostgreSQL/browser/provider behavior is verified without changing production.
 
 ## Milestone queue
 
@@ -288,7 +318,7 @@ Out of scope for that session:
 - [x] Milestone 6 — comments and Slack-style threads.
 - [x] Milestone 7 — post and comment reactions.
 - [x] Milestone 8 — PostgreSQL search and tag filtering.
-- [ ] Milestone 9 — email subscriptions and durable outbox worker.
+- [x] Milestone 9 — email subscriptions and durable outbox worker.
 - [ ] Milestone 10 — isolated staging/production infrastructure.
 - [ ] Milestone 11 — end-to-end hardening and functional launch.
 - [ ] Milestone 12 — visual design and polish.
@@ -338,8 +368,12 @@ Out of scope for that session:
   states remain unverified rather than simulated.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
-- Email DNS records and provider credentials do not exist in the current
-  workflow.
+- Email DNS records, verified Resend sender domains, webhook registrations,
+  provider credentials, GitHub Environment values, and an actual worker
+  schedule remain deliberately unconfigured. `docs/email-setup.md` is the
+  external checklist.
+- Email history and rate-limit buckets do not yet have an operational retention
+  command. This belongs with worker monitoring/retention infrastructure.
 
 ## Decisions pending
 
@@ -359,6 +393,39 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-27:
 
+- Milestone 9 official-source review covered Resend send/idempotency,
+  Svix-compatible raw-body webhook verification and replay handling,
+  delivered/bounced/complained events, transactional List-Unsubscribe, and
+  SPF/DKIM/DMARC guidance. No live provider or DNS state was changed.
+- `python3 -m uv lock --check` passed: 68 packages resolved. Ruff format check
+  passed for 124 files, Ruff lint passed, the Django test-settings system check
+  passed, and `makemigrations --check --dry-run` reported no drift.
+- Full `pytest` passed: 393 tests; six PostgreSQL-only concurrency/search tests
+  skipped honestly on SQLite. Subscription coverage includes normalization and
+  constraints, enumeration resistance, CSRF/rate limits, credential lifecycle,
+  publication exactly-once/cutoff exclusions, claim/reclaim/retry/idempotency,
+  adapter failures, webhook authentication/replay/body limits, suppression,
+  query counts, admin policy, migration state, and safe command output.
+- A new empty SQLite database applied the complete migration chain. The new
+  `subscriptions.0001_initial` migration then reversed to zero and applied
+  forward again. Production `manage.py check --deploy` passed with safe
+  non-production verification values; one intentional Wagtail iframe warning
+  remains silenced.
+- `npm ci` was not rerun because neither Node manifest nor lockfile changed.
+  Prettier, ESLint, TypeScript, and full Vitest passed: 150 tests in 15 files.
+  Production Next.js 16.2.11 build passed after the sandbox allowed
+  Turbopack's local CSS worker port; `npm audit` reported zero vulnerabilities.
+- Post-build `.next/static` scan found no internal Django origin, Resend or
+  subscription secret names/values, build-time verification value, test
+  credential, or email address.
+- Browser runtime setup and its required troubleshooting/list probe found no
+  connected Browser or Chrome backend, so 375x812/1440x900 visual, keyboard,
+  and screen-reader browser QA did not run.
+- Docker, PostgreSQL, `psql`, `postgres`, and `pg_isready` are unavailable.
+  PostgreSQL skip-locked/reclaim concurrency tests remain present but were
+  skipped; SQLite is not represented as PostgreSQL verification.
+- The local Obsidian Stage 10 application checklist was updated. Real Resend
+  credentials, SPF, DKIM, and DMARC remain open as external setup.
 - Official Wagtail 7.4.2 documentation confirmed
   `wagtail.search.backends.database`, `django.contrib.postgres`, PostgreSQL's
   four effective weights, RelatedFields behavior, auto-update signals, and the

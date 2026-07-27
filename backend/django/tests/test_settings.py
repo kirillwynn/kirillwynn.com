@@ -31,6 +31,11 @@ def production_environment():
             "FRONTEND_PREVIEW_URL": "https://example.com/api/draft",
             "REVALIDATION_URL": "https://example.com/api/revalidate",
             "REVALIDATION_SECRET": PRODUCTION_SECRET,
+            "EMAIL_PROVIDER_ADAPTER": "apps.subscriptions.providers.resend.ResendEmailProvider",
+            "RESEND_API_KEY": "resend-production-check",
+            "RESEND_FROM_EMAIL": "Kirill Wynn <posts@example.com>",
+            "RESEND_WEBHOOK_SECRET": "whsec_dGVzdC13ZWJob29rLXNlY3JldC0zMi1ieXRlcy0wMQ==",
+            "SUBSCRIPTION_SIGNING_SECRET": "subscription-production-secret-check",
             "GOOGLE_OAUTH_CLIENT_ID": "google-production-check",
             "GOOGLE_OAUTH_CLIENT_SECRET": "google-production-secret-check",
             "GITHUB_OAUTH_CLIENT_ID": "github-production-check",
@@ -197,6 +202,97 @@ def test_production_settings_reject_short_revalidation_secret():
 
     assert result.returncode != 0
     assert "REVALIDATION_SECRET must be at least 32 bytes" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "missing_name",
+    [
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "RESEND_WEBHOOK_SECRET",
+        "SUBSCRIPTION_SIGNING_SECRET",
+    ],
+)
+def test_production_resend_settings_fail_fast(missing_name):
+    environment = production_environment()
+    environment.pop(missing_name)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert f"Missing required production environment variables: {missing_name}" in result.stderr
+
+
+def test_production_rejects_short_subscription_signing_secret():
+    environment = production_environment()
+    environment["SUBSCRIPTION_SIGNING_SECRET"] = "short"
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "SUBSCRIPTION_SIGNING_SECRET must be at least 32 bytes" in result.stderr
+
+
+def test_non_resend_production_adapter_does_not_require_resend_credentials():
+    environment = production_environment()
+    environment["EMAIL_PROVIDER_ADAPTER"] = (
+        "apps.subscriptions.providers.memory.MemoryEmailProvider"
+    )
+    for name in ("RESEND_API_KEY", "RESEND_FROM_EMAIL", "RESEND_WEBHOOK_SECRET"):
+        environment.pop(name)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == 0
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    [
+        (
+            "RESEND_FROM_EMAIL",
+            "not-an-email",
+            "RESEND_FROM_EMAIL must be a valid email address",
+        ),
+        (
+            "RESEND_WEBHOOK_SECRET",
+            "not-a-svix-secret",
+            "RESEND_WEBHOOK_SECRET must be a valid Svix signing secret",
+        ),
+    ],
+)
+def test_production_rejects_malformed_resend_configuration(name, value, message):
+    environment = production_environment()
+    environment[name] = value
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert message in result.stderr
 
 
 def test_headless_preview_settings_use_redirect_and_short_ttl(settings):

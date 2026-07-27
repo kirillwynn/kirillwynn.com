@@ -26,6 +26,9 @@ WAGTAIL_HEADLESS_PREVIEW = {
 }
 REVALIDATION_URL = ""
 REVALIDATION_SECRET = "test-revalidation-secret"
+SUBSCRIPTION_SIGNING_SECRET = "test-subscription-signing-secret-32-bytes"
+EMAIL_PROVIDER_ADAPTER = "apps.subscriptions.providers.memory.MemoryEmailProvider"
+RESEND_WEBHOOK_SECRET = "whsec_dGVzdC13ZWJob29rLXNlY3JldC0zMi1ieXRlcy0wMQ=="
 
 SOCIALACCOUNT_PROVIDERS = {
     **SOCIALACCOUNT_PROVIDERS,  # noqa: F405

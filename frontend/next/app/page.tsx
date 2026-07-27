@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { draftMode } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { FeedControls } from "@/components/feed-controls";
 import { Pagination } from "@/components/pagination";
 import { PostCard } from "@/components/post-card";
+import { SubscriptionForm } from "@/components/subscription-form";
 import { parseFeedState } from "@/lib/feed-state";
 import { getAvailableTags, getPublicPosts } from "@/lib/server/django";
 
@@ -70,9 +72,10 @@ export default async function HomePage({
     }
 
     const state = parsed.state;
-    const [feed, tagResponse] = await Promise.all([
+    const [feed, tagResponse, draft] = await Promise.all([
         getPublicPosts(state),
         getAvailableTags(),
+        draftMode(),
     ]);
     if (!feed) {
         notFound();
@@ -94,6 +97,8 @@ export default async function HomePage({
                     Long-form writing by Kirill Wynn. Latest posts first.
                 </p>
             </header>
+
+            {!draft.isEnabled ? <SubscriptionForm /> : null}
 
             <FeedControls state={state} tags={tagResponse.results} />
 

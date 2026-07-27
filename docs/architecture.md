@@ -233,9 +233,32 @@ Use:
 - `EmailOutbox`;
 - `EmailDelivery`.
 
-The database outbox is durable. A separate worker claims and delivers pending
-messages. The provider is accessed through an adapter; Resend is the initial
-choice, not a permanent domain dependency.
+`EmailWebhookEvent` is the bounded idempotency ledger for provider webhooks,
+and HMAC-keyed database buckets rate-limit anonymous subscribe/confirm
+requests without retaining raw IPs.
+
+Email normalization trims the source, case-folds the complete local part, and
+converts the Unicode domain through IDNA to lowercase ASCII for one canonical
+case-insensitive database key. Lifecycle timestamps and states are protected by
+database constraints.
+
+Purpose-bound, versioned signed credentials provide 48-hour double opt-in and
+revocable unsubscribe. Human links use a fragment and an explicit
+CSRF-protected POST, so GET-only scanners cannot mutate state. RFC 8058
+one-click unsubscribe has a separate exact POST boundary.
+
+The database outbox is durable. First public publication creates one event
+with an immutable audience cutoff; drafts, future schedules, restricted pages,
+and republishes do not. A separate bounded worker claims with PostgreSQL row
+locks, reclaims stale work, creates unique per-subscriber deliveries, retries
+with capped exponential backoff, and performs provider HTTP only after commit.
+Resend's 24-hour provider idempotency window is guarded by a shorter local
+ambiguity window.
+
+The provider is accessed through an adapter; Resend is the initial choice, not
+a permanent domain dependency. Exact raw-body Svix verification, replay
+windows, and durable event-ID deduplication protect delivery, permanent-bounce,
+and complaint webhooks. Raw webhook payloads are not stored.
 
 Do not self-host SMTP.
 

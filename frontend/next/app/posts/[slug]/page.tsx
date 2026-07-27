@@ -7,6 +7,7 @@ import { PostBody } from "@/components/post-body";
 import { PostReactions } from "@/components/post-reactions";
 import { PreviewBanner } from "@/components/preview-banner";
 import { Tags } from "@/components/tags";
+import { SubscriptionForm } from "@/components/subscription-form";
 import { postMetadata } from "@/lib/metadata";
 import { loadPost } from "@/lib/server/post-loader";
 
@@ -69,6 +70,7 @@ export default async function PostPage({ params }: PostPageProps) {
 
             {!preview ? (
                 <>
+                    <SubscriptionForm compact />
                     <PostReactions id={post.id} slug={post.slug} />
                     <CommentsSection slug={post.slug} />
                 </>

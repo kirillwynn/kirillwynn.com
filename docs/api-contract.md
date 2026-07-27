@@ -619,6 +619,98 @@ toggle requests per 60 seconds, configured through
 `REACTION_TOGGLE_RATE_LIMIT_WINDOW_SECONDS`. Invalid/non-positive settings fail
 initialization. A limit response is 429 with integer `Retry-After`.
 
+## Email subscriptions
+
+Subscription responses are `private, no-store`, JSON-only, and never return an
+email, subscriber UUID, provider data, or internal lifecycle state.
+
+### `POST /api/v1/subscriptions/`
+
+This anonymous browser endpoint still requires the normal same-origin CSRF
+token. It accepts exactly:
+
+```json
+{"email": "reader@example.com"}
+```
+
+Email input is trimmed, limited to 320 Unicode code points, validated, and
+canonicalized by case-folding the complete local part plus IDNA/lowercase
+domain conversion. Valid new, pending, active, unsubscribed, and suppressed
+identities all receive the same 202:
+
+```json
+{
+  "detail": "If the address can be subscribed, a confirmation email will be sent."
+}
+```
+
+Pending resend requests have a cooldown. Active identities do not receive
+confirmation loops, unsubscribed identities begin a new double opt-in, and
+suppressed identities cannot self-reactivate.
+
+### `POST /api/v1/subscriptions/confirm/`
+
+Accepts exactly:
+
+```json
+{"credential": "<opaque confirmation credential>"}
+```
+
+The credential is purpose-bound, subscriber-bound, versioned, and expires
+after 48 hours by default. Success is `{"status":"confirmed"}`; repeating the
+same valid confirmation returns `{"status":"already_confirmed"}`. Invalid,
+expired, tampered, wrong-purpose, superseded, and unknown credentials share a
+400 response and message. GET returns 405 and never confirms.
+
+### `POST /api/v1/subscriptions/unsubscribe/`
+
+Accepts the same one-field shape with a purpose-bound unsubscribe credential.
+Success is `{"status":"unsubscribed"}` and a repeated current credential
+returns `{"status":"already_unsubscribed"}`. GET returns 405. The mutation
+immediately marks pending/claimed unsent deliveries skipped.
+
+Human confirmation and unsubscribe pages are
+`/subscriptions/confirm/` and `/subscriptions/unsubscribe/`. The credential is
+transported in `#credential=...`, removed from the address before interaction,
+and kept only in component memory. Both pages are `noindex` with
+`no-referrer`; only an explicit button POST mutates state. Draft Mode does not
+render a subscription form.
+
+### One-click unsubscribe
+
+`POST /api/v1/subscriptions/unsubscribe/one-click/?credential=<opaque>` is the
+CSRF-exempt RFC 8058 boundary for email clients. It accepts only:
+
+```text
+Content-Type: application/x-www-form-urlencoded
+
+List-Unsubscribe=One-Click
+```
+
+It returns a non-enumerating 200. GET and other bodies do not mutate state.
+
+### Anonymous rate limits
+
+Subscribe consumes separate fixed-window canonical-email and client-IP
+buckets. Confirm consumes an IP bucket. Keys are HMAC digests scoped by
+operation; raw IPs and rate-limit email values are not retained.
+`ALLAUTH_TRUSTED_PROXY_COUNT` selects the client from the right side of
+`X-Forwarded-For`. A 429 includes integer `Retry-After`.
+
+### `POST /api/v1/email/webhooks/resend/`
+
+This sessionless/CSRF-exempt provider route accepts only POST and a bounded raw
+body. It verifies the exact raw bytes with the configured Svix secret and
+`svix-id`, `svix-timestamp`, and `svix-signature` before JSON/business logic,
+then applies the configured timestamp replay window. `svix-id` is durably
+unique.
+
+Handled types are `email.delivered`, `email.bounced`, and
+`email.complained`. Lookup uses only the stored Resend message ID. Permanent
+bounce and complaint suppress the related subscriber. Unknown types/message
+IDs and exact replays return safe success without changing a subscriber. Raw
+provider payloads are never stored.
+
 ## StreamField discriminated union
 
 Every block has exactly `id`, `type`, and `value`. `id` is Wagtail's stable

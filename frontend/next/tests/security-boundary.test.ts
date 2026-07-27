@@ -52,6 +52,8 @@ describe("server-only security boundary", () => {
             "components/provider-form.tsx",
             "components/site-header.tsx",
             "components/site-footer.tsx",
+            "components/subscription-credential-action.tsx",
+            "components/subscription-form.tsx",
             "components/thread-panel.tsx",
             "components/post-card.tsx",
             "components/post-body.tsx",
@@ -72,6 +74,9 @@ describe("server-only security boundary", () => {
             expect(contents).not.toContain("http://localhost:8000");
             expect(contents).not.toContain("GOOGLE_OAUTH_CLIENT");
             expect(contents).not.toContain("GITHUB_OAUTH_CLIENT");
+            expect(contents).not.toContain("RESEND_API_KEY");
+            expect(contents).not.toContain("RESEND_WEBHOOK_SECRET");
+            expect(contents).not.toContain("SUBSCRIPTION_SIGNING_SECRET");
             expect(contents).not.toContain("sessionid");
         }
     });
@@ -83,6 +88,15 @@ describe("server-only security boundary", () => {
         expect(config).toContain('source: "/accounts/:path*/"');
         expect(config).toContain('source: "/api/me/"');
         expect(config).toContain('source: "/api/auth/logout/"');
+        expect(config).toContain('source: "/api/v1/subscriptions/"');
+        expect(config).toContain('source: "/api/v1/subscriptions/confirm/"');
+        expect(config).toContain(
+            'source: "/api/v1/subscriptions/unsubscribe/"',
+        );
+        expect(config).toContain(
+            'source: "/api/v1/subscriptions/unsubscribe/one-click/"',
+        );
+        expect(config).toContain('source: "/api/v1/email/webhooks/resend/"');
         expect(config).toContain('source: "/api/v1/posts/:slug/comments/"');
         expect(config).toContain('source: "/api/v1/reactions/config/"');
         expect(config).toContain(
