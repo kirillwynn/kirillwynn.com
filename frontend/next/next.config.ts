@@ -2,9 +2,13 @@ import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
 function djangoProxyOrigin(): string {
-    const value = (
-        process.env.DJANGO_API_URL ?? "http://localhost:8000"
-    ).replace(/\/$/, "");
+    // Rewrites are compiled into the standalone server. The Compose service
+    // alias is intentionally identical in staging and production; local
+    // non-Compose development overrides it through .env.local.
+    const value = (process.env.DJANGO_API_URL ?? "http://django:8000").replace(
+        /\/$/,
+        "",
+    );
     const url = new URL(value);
     if (
         !["http:", "https:"].includes(url.protocol) ||

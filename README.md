@@ -48,12 +48,19 @@ Do not copy that note into the repository.
 - [ADR 0002: Content API, preview, and revalidation](docs/decisions/0002-content-api-preview-revalidation.md)
 - [ADR 0003: Concrete Unicode reaction contract](docs/decisions/0003-unicode-reaction-contract.md)
 - [ADR 0004: Email subscriptions, outbox, and Resend](docs/decisions/0004-email-subscriptions-outbox-resend.md)
+- [ADR 0005: Isolated Compose deployment](docs/decisions/0005-isolated-compose-deployment.md)
 - [Email provider and DNS setup](docs/email-setup.md)
+- [Deployment and rollback](docs/deployment-runbook.md)
+- [Runtime environment matrix](docs/environment-matrix.md)
+- [Backup and restore](docs/backup-restore-runbook.md)
+- [Staging activation](docs/staging-activation-checklist.md)
+- [Production promotion](docs/production-promotion-checklist.md)
 - [Codex project instructions](AGENTS.md)
 
 ## Current state
 
-Milestones 1–9 are available under `backend/django/` and `frontend/next/`:
+Milestones 1–10 are available under `backend/django/`, `frontend/next/`, and
+`infra/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -124,11 +131,18 @@ Milestones 1–9 are available under `backend/django/` and `frontend/next/`:
 - accessible Feed/post subscription forms and explicit noindex/no-referrer
   confirmation and unsubscribe pages with no Draft Mode requests or browser
   credential persistence;
-- locked production and development dependencies.
+- locked production and development dependencies;
+- non-root Django/worker and Node 24 standalone images plus a shared Nginx
+  edge image;
+- isolated environment projects, databases, volumes, networks, aliases, S3
+  and provider namespaces, healthchecks, and log limits;
+- build-once manifests, gated staging, manual staging-attested production
+  promotion, backup gate, and digest rollback;
+- a graceful bounded worker and safe PostgreSQL backup/restore scripts.
 
-Existing files under `backend/app/`, `frontend/`, `docker/`, `nginx/`, and the
-legacy deployment workflows remain reference material. The legacy
-`docker-compose.yml` is separate from the new `compose.dev.yml`.
+Existing Flask/Vite source under `backend/app/`, legacy `frontend/`,
+`docker/Dockerfile.app`, and `nginx/` remains reference material. Active root
+Compose and GitHub workflows no longer build or deploy Flask/Vite.
 
 Do not use legacy behavior as the product specification. Check
 `docs/implementation-status.md` before starting work.
@@ -139,7 +153,7 @@ Docker Compose is the primary local path because it provides PostgreSQL:
 
 ```bash
 cp .env.example .env
-docker compose -f compose.dev.yml up --build
+docker compose up --build
 ```
 
 The Django container waits for PostgreSQL, applies migrations, and starts at
@@ -154,7 +168,7 @@ The Django container waits for PostgreSQL, applies migrations, and starts at
 Create a local administrator after the services are running:
 
 ```bash
-docker compose -f compose.dev.yml exec django python manage.py createsuperuser
+docker compose exec django python manage.py createsuperuser
 ```
 
 OAuth applications are optional for local content development. When configured,
@@ -167,7 +181,7 @@ callbacks, scopes, staging/production isolation, and owner promotion.
 Stop the stack without deleting its database volume:
 
 ```bash
-docker compose -f compose.dev.yml down
+docker compose down
 ```
 
 ## Local backend without Docker
@@ -259,7 +273,8 @@ uv run python manage.py reconcile_email_webhooks --limit 100
 ```
 
 The commands are safe to rerun and print counts without addresses, provider
-payloads, or credentials. Production scheduler/service wiring is intentionally deferred.
+payloads, or credentials. Production runs them through the one-instance
+bounded worker in `infra/compose/application.yml`.
 See [email setup](docs/email-setup.md) for Resend, SPF/DKIM/DMARC, webhook,
 rotation, and worker scheduling steps.
 

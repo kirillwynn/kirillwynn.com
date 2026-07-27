@@ -359,28 +359,27 @@ Requirements:
 
 ## Runtime and deployment
 
-Docker Compose services:
+ADR 0005 defines one shared edge Compose project and separate staging and
+production application projects. Only edge publishes 80/443. Each application
+project contains PostgreSQL, Django/Gunicorn, Next.js standalone, one bounded
+worker, a private network, an environment edge network, and unique volumes.
+No service uses `container_name`; databases, aliases, volumes, S3 namespaces,
+OAuth/Resend applications, and secrets are environment-specific.
 
-- `nginx`;
-- `next`;
-- `django`;
-- `worker`.
+CI builds Django, Next.js, and edge once for a full Git SHA and records
+registry digests in a release manifest. Staging deployment is gated until
+external setup is complete. Production manually consumes only a
+staging-attested manifest and never rebuilds. Migrations run once before
+service replacement; production requires a verified backup. Application
+rollback selects prior compatible digests and never automatically reverses the
+database.
 
-PostgreSQL and S3 may be external services.
-
-Staging and production use:
-
-- separate Compose projects;
-- separate databases;
-- separate media storage;
-- separate OAuth applications;
-- separate runtime secrets.
-
-Do not hard-code shared `container_name` or Docker network names.
-
-CI builds immutable Django and Next.js images for a git SHA. Staging deploys
-automatically. Production manually promotes the exact image SHAs already tested
-on staging.
+The Django image owns the worker executable and immutable collectstatic output.
+The Next.js image reads public/internal origins at dynamic server runtime,
+allowing one digest in both environments. Uploaded media uses isolated
+S3-compatible storage; local/test retain filesystem media. Redis and Celery
+remain excluded because PostgreSQL outboxes and bounded commands provide the
+required durability and current throughput.
 
 ## Security
 

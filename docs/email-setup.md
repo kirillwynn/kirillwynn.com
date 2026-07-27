@@ -166,7 +166,17 @@ before choosing this rotation.
 
 ## Worker scheduling
 
-Run a bounded invocation:
+The repository-owned `worker` service runs one scheduler per environment. Its
+defaults are:
+
+- `process_email_outbox` every 10 seconds with outbox/delivery limits 25/100;
+- `reconcile_email_webhooks` every 60 seconds with limit 100;
+- `process_revalidation_outbox` every 15 seconds with limit 100;
+- `publish_scheduled_pages` every 60 seconds.
+
+Every task fails and backs off independently, and Docker monitors the atomic
+heartbeat. The management commands remain available for controlled bounded
+invocations:
 
 ```bash
 cd backend/django
@@ -189,8 +199,8 @@ uv run python manage.py reconcile_email_webhooks --limit 100
 
 It applies pending events whose provider message ID has appeared, expires
 unmatched events, and deletes retained history only after the configured
-retention period. Adding the actual services/timers and alerts belongs to the
-infrastructure milestone.
+retention period. Enabling the service and external queue-age/manual-review
+alerts belongs to staging activation.
 
 Wagtail search indexing is separate work. Run:
 

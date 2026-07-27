@@ -37,6 +37,14 @@ def production_environment():
             "RESEND_API_KEY": "resend-production-check",
             "RESEND_WEBHOOK_SECRET": "whsec_dGVzdC13ZWJob29rLXNlY3JldC0zMi1ieXRlcy0wMQ==",
             "SUBSCRIPTION_SIGNING_SECRET": "subscription-production-secret-check",
+            "S3_MEDIA_ACCESS_KEY_ID": "staging-access-id",
+            "S3_MEDIA_SECRET_ACCESS_KEY": "staging-secret-key",
+            "S3_MEDIA_BUCKET": "kirillwynn-production-media",
+            "S3_MEDIA_PREFIX": "production/media",
+            "S3_MEDIA_ENDPOINT_URL": "https://s3.example.com",
+            "S3_MEDIA_REGION": "us-west-1",
+            "S3_MEDIA_ADDRESSING_STYLE": "virtual",
+            "S3_MEDIA_PUBLIC_ORIGIN": "https://media.example.com",
             "GOOGLE_OAUTH_CLIENT_ID": "google-production-check",
             "GOOGLE_OAUTH_CLIENT_SECRET": "google-production-secret-check",
             "GITHUB_OAUTH_CLIENT_ID": "github-production-check",
@@ -187,6 +195,122 @@ def test_production_settings_normalize_public_site_origin():
     )
 
     assert result.stdout.strip() == "https://example.com"
+
+
+@pytest.mark.parametrize(
+    "missing_name",
+    [
+        "S3_MEDIA_ACCESS_KEY_ID",
+        "S3_MEDIA_SECRET_ACCESS_KEY",
+        "S3_MEDIA_BUCKET",
+        "S3_MEDIA_PREFIX",
+        "S3_MEDIA_ENDPOINT_URL",
+        "S3_MEDIA_REGION",
+        "S3_MEDIA_ADDRESSING_STYLE",
+        "S3_MEDIA_PUBLIC_ORIGIN",
+    ],
+)
+def test_production_settings_require_isolated_s3_media_configuration(missing_name):
+    environment = production_environment()
+    environment.pop(missing_name)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert missing_name in result.stderr
+    assert "staging-secret-key" not in result.stderr
+
+
+@pytest.mark.parametrize("value", ["", ".", "..", "media/../shared", "media//shared"])
+def test_production_settings_reject_unsafe_s3_prefix(value):
+    environment = production_environment()
+    environment["S3_MEDIA_PREFIX"] = value
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "S3_MEDIA_PREFIX" in result.stderr
+
+
+def test_production_media_and_static_storage_contracts_are_separate():
+    environment = production_environment()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from config.settings import production as s;"
+                "d=s.STORAGES['default'];"
+                "print(d['BACKEND']);"
+                "print(d['OPTIONS']['bucket_name']);"
+                "print(d['OPTIONS']['location']);"
+                "print(d['OPTIONS']['custom_domain']);"
+                "print(d['OPTIONS']['querystring_auth']);"
+                "print(s.STORAGES['staticfiles']['BACKEND'])"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.stdout.splitlines() == [
+        "storages.backends.s3.S3Storage",
+        "kirillwynn-production-media",
+        "production/media",
+        "media.example.com",
+        "False",
+        "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    ]
+    assert "staging-secret-key" not in result.stdout
+
+
+def test_production_media_urls_are_absolute_and_do_not_expose_credentials():
+    environment = production_environment()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import django;"
+                "django.setup();"
+                "from django.core.files.storage import storages;"
+                "print(storages['default'].url('images/example.jpg'))"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "https://media.example.com/production/media/images/example.jpg"
+    assert "staging-access-id" not in result.stdout
+    assert "staging-secret-key" not in result.stdout
+
+
+def test_local_and_test_media_remain_filesystem_backed():
+    from config.settings import local, test
+
+    assert local.STORAGES["default"]["BACKEND"] == "django.core.files.storage.FileSystemStorage"
+    assert test.STORAGES["default"]["BACKEND"] == "django.core.files.storage.FileSystemStorage"
+    assert (
+        test.STORAGES["staticfiles"]["BACKEND"]
+        == "django.contrib.staticfiles.storage.StaticFilesStorage"
+    )
 
 
 def test_production_settings_reject_short_revalidation_secret():

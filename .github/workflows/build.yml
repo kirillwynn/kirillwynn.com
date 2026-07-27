@@ -1,0 +1,194 @@
+name: Build release
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-release-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  build-images:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: django
+            dockerfile: backend/django/Dockerfile
+          - name: next
+            dockerfile: frontend/next/Dockerfile
+          - name: edge
+            dockerfile: infra/docker/edge.Dockerfile
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          provenance: true
+          sbom: true
+          tags: ghcr.io/${{ github.repository_owner }}/kirillwynn-${{ matrix.name }}:sha-${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Record image
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_REPOSITORY: ghcr.io/${{ github.repository_owner }}/kirillwynn-${{ matrix.name }}
+        run: |
+          mkdir -p release-parts
+          printf '%s=%s@%s\n' "$IMAGE_NAME" "$IMAGE_REPOSITORY" "$IMAGE_DIGEST" > "release-parts/$IMAGE_NAME"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-part-${{ matrix.name }}-${{ github.event.workflow_run.head_sha }}
+          path: release-parts/${{ matrix.name }}
+          if-no-files-found: error
+          retention-days: 30
+
+  release-manifest:
+    needs: build-images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: release-part-*-${{ github.event.workflow_run.head_sha }}
+          path: release-parts
+          merge-multiple: true
+      - name: Create release manifest
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import datetime
+          import json
+          import os
+          from pathlib import Path
+
+          images = {}
+          for path in Path("release-parts").iterdir():
+              name, image = path.read_text().strip().split("=", 1)
+              images[name] = image
+          manifest = {
+              "schema_version": 1,
+              "release_sha": os.environ["RELEASE_SHA"],
+              "repository": os.environ["RELEASE_REPOSITORY"],
+              "built_at": datetime.datetime.now(datetime.UTC).isoformat(),
+              "images": images,
+          }
+          Path("release-manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+          )
+          PY
+          python infra/scripts/validate_release_manifest.py release-manifest.json --expect-sha "$RELEASE_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-${{ github.event.workflow_run.head_sha }}
+          path: release-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+  deploy-staging:
+    needs: release-manifest
+    if: vars.STAGING_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      POSTGRES_IMAGE: ${{ vars.POSTGRES_IMAGE }}
+      EDGE_NETWORK: kirillwynn-staging-edge
+      DJANGO_EDGE_ALIAS: staging-django
+      NEXT_EDGE_ALIAS: staging-next
+      RUNTIME_ENV_FILE: /srv/kirillwynn/runtime/staging.env
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      DJANGO_ALLOWED_HOSTS: staging.kirillwynn.com
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://staging.kirillwynn.com
+      WAGTAIL_ADMIN_BASE_URL: https://staging.kirillwynn.com/cms
+      PUBLIC_SITE_URL: https://staging.kirillwynn.com
+      FRONTEND_PREVIEW_URL: https://staging.kirillwynn.com/api/draft
+      REVALIDATION_URL: http://next:3000/api/revalidate
+      REVALIDATION_SECRET: ${{ secrets.REVALIDATION_SECRET }}
+      SUBSCRIPTION_SIGNING_SECRET: ${{ secrets.SUBSCRIPTION_SIGNING_SECRET }}
+      POSTGRES_DB: kirillwynn_staging
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_SSLMODE: disable
+      S3_MEDIA_ACCESS_KEY_ID: ${{ secrets.S3_MEDIA_ACCESS_KEY_ID }}
+      S3_MEDIA_SECRET_ACCESS_KEY: ${{ secrets.S3_MEDIA_SECRET_ACCESS_KEY }}
+      S3_MEDIA_BUCKET: ${{ vars.S3_MEDIA_BUCKET }}
+      S3_MEDIA_PREFIX: staging/media
+      S3_MEDIA_ENDPOINT_URL: ${{ vars.S3_MEDIA_ENDPOINT_URL }}
+      S3_MEDIA_REGION: ${{ vars.S3_MEDIA_REGION }}
+      S3_MEDIA_ADDRESSING_STYLE: ${{ vars.S3_MEDIA_ADDRESSING_STYLE }}
+      S3_MEDIA_PUBLIC_ORIGIN: ${{ vars.S3_MEDIA_PUBLIC_ORIGIN }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GITHUB_OAUTH_CLIENT_ID }}
+      GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.GITHUB_OAUTH_CLIENT_SECRET }}
+      EMAIL_PROVIDER_ADAPTER: apps.subscriptions.providers.resend.ResendEmailProvider
+      EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE: ${{ vars.EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE }}
+      EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+      STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-${{ github.event.workflow_run.head_sha }}
+      - name: Render bounded runtime environment
+        run: python infra/scripts/render_runtime_env.py --environment staging --output "$RUNNER_TEMP/staging.env"
+      - name: Deploy release digests
+        run: infra/scripts/ci_ssh_deploy.sh staging "$RUNNER_TEMP/staging.env" release-manifest.json
+      - name: Staging smoke
+        run: |
+          curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" https://staging.kirillwynn.com/api/health/
+          curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" https://staging.kirillwynn.com/api/readiness/
+          curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" https://staging.kirillwynn.com/ >/dev/null
+      - name: Record staging attestation
+        run: |
+          printf '{"schema_version":1,"release_sha":"%s","environment":"staging","status":"passed"}\n' \
+            "$RELEASE_SHA" > staging-attestation.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging-attestation-${{ github.event.workflow_run.head_sha }}
+          path: staging-attestation.json
+          if-no-files-found: error
+          retention-days: 90

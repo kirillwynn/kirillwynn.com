@@ -1,0 +1,93 @@
+name: Promote production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full 40-character SHA already verified on staging
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      POSTGRES_IMAGE: ${{ vars.POSTGRES_IMAGE }}
+      EDGE_NETWORK: kirillwynn-production-edge
+      DJANGO_EDGE_ALIAS: production-django
+      NEXT_EDGE_ALIAS: production-next
+      RUNTIME_ENV_FILE: /srv/kirillwynn/runtime/production.env
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      DJANGO_ALLOWED_HOSTS: kirillwynn.com
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://kirillwynn.com
+      WAGTAIL_ADMIN_BASE_URL: https://kirillwynn.com/cms
+      PUBLIC_SITE_URL: https://kirillwynn.com
+      FRONTEND_PREVIEW_URL: https://kirillwynn.com/api/draft
+      REVALIDATION_URL: http://next:3000/api/revalidate
+      REVALIDATION_SECRET: ${{ secrets.REVALIDATION_SECRET }}
+      SUBSCRIPTION_SIGNING_SECRET: ${{ secrets.SUBSCRIPTION_SIGNING_SECRET }}
+      POSTGRES_DB: kirillwynn_production
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_SSLMODE: disable
+      S3_MEDIA_ACCESS_KEY_ID: ${{ secrets.S3_MEDIA_ACCESS_KEY_ID }}
+      S3_MEDIA_SECRET_ACCESS_KEY: ${{ secrets.S3_MEDIA_SECRET_ACCESS_KEY }}
+      S3_MEDIA_BUCKET: ${{ vars.S3_MEDIA_BUCKET }}
+      S3_MEDIA_PREFIX: production/media
+      S3_MEDIA_ENDPOINT_URL: ${{ vars.S3_MEDIA_ENDPOINT_URL }}
+      S3_MEDIA_REGION: ${{ vars.S3_MEDIA_REGION }}
+      S3_MEDIA_ADDRESSING_STYLE: ${{ vars.S3_MEDIA_ADDRESSING_STYLE }}
+      S3_MEDIA_PUBLIC_ORIGIN: ${{ vars.S3_MEDIA_PUBLIC_ORIGIN }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GITHUB_OAUTH_CLIENT_ID }}
+      GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.GITHUB_OAUTH_CLIENT_SECRET }}
+      EMAIL_PROVIDER_ADAPTER: apps.subscriptions.providers.resend.ResendEmailProvider
+      EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE: ${{ vars.EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE }}
+      EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.release_sha }}
+      - name: Validate input and download attested release
+        run: |
+          case "$RELEASE_SHA" in
+            *[!0-9a-f]*|"") exit 2 ;;
+          esac
+          test "${#RELEASE_SHA}" -eq 40
+          run_id=$(gh run list --workflow build.yml --branch main --status success \
+            --json databaseId,headSha --jq ".[] | select(.headSha == \"$RELEASE_SHA\") | .databaseId" \
+            --limit 100 | head -n 1)
+          test -n "$run_id"
+          gh run download "$run_id" --name "release-$RELEASE_SHA" --dir release
+          gh run download "$run_id" --name "staging-attestation-$RELEASE_SHA" --dir attestation
+          python infra/scripts/validate_release_manifest.py release/release-manifest.json --expect-sha "$RELEASE_SHA"
+          python -c "import json; d=json.load(open('attestation/staging-attestation.json')); assert d == {'schema_version': 1, 'release_sha': '$RELEASE_SHA', 'environment': 'staging', 'status': 'passed'}"
+      - name: Render bounded runtime environment
+        run: python infra/scripts/render_runtime_env.py --environment production --output "$RUNNER_TEMP/production.env"
+      - name: Backup gate and promote without rebuild
+        run: infra/scripts/ci_ssh_deploy.sh production "$RUNNER_TEMP/production.env" release/release-manifest.json
+      - name: Production smoke
+        run: |
+          curl --fail --silent --show-error --max-time 15 https://kirillwynn.com/api/health/
+          curl --fail --silent --show-error --max-time 15 https://kirillwynn.com/api/readiness/
+          curl --fail --silent --show-error --max-time 15 https://kirillwynn.com/ >/dev/null

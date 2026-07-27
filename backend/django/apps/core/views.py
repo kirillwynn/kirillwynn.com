@@ -1,6 +1,7 @@
 from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
 from django.contrib.auth import logout
+from django.db import connection
 from django.middleware.csrf import get_token
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -33,6 +34,18 @@ def provider_states(user):
 @permission_classes([AllowAny])
 def health_check(request):
     return Response({"status": "ok"})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def readiness_check(request):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:
+        return Response({"status": "unavailable"}, status=503)
+    return Response({"status": "ready"})
 
 
 @ensure_csrf_cookie

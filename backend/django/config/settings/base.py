@@ -258,6 +258,15 @@ FRONTEND_PREVIEW_URL = os.environ.get(
     "FRONTEND_PREVIEW_URL",
     "http://localhost:3000/api/draft",
 )
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 PREVIEW_TOKEN_TTL_SECONDS = int(os.environ.get("PREVIEW_TOKEN_TTL_SECONDS", "600"))
 PREVIEW_ENTRY_COOKIE_NAME = "kw_preview_credential"
 PREVIEW_COOKIE_SECURE = False

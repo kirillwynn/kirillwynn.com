@@ -1,0 +1,143 @@
+name: kirillwynn-integration
+
+x-django-environment: &django-environment
+  DJANGO_SETTINGS_MODULE: config.settings.production
+  DJANGO_SECRET_KEY: integration-secret
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+  DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:18080
+  WAGTAIL_ADMIN_BASE_URL: http://localhost:18080/cms
+  PUBLIC_SITE_URL: http://localhost:18080
+  FRONTEND_PREVIEW_URL: http://localhost:18080/api/draft
+  REVALIDATION_URL: http://next:3000/api/revalidate
+  REVALIDATION_SECRET: integration-revalidation-secret-32-bytes
+  SUBSCRIPTION_SIGNING_SECRET: integration-subscription-secret-32-bytes
+  EMAIL_PROVIDER_ADAPTER: apps.subscriptions.providers.memory.MemoryEmailProvider
+  EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE: memory/integration
+  EMAIL_FROM_ADDRESS: Integration <integration@example.com>
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: kirillwynn_integration
+  POSTGRES_USER: kirillwynn_integration
+  POSTGRES_PASSWORD: integration-only
+  POSTGRES_SSLMODE: disable
+  S3_MEDIA_ACCESS_KEY_ID: integration
+  S3_MEDIA_SECRET_ACCESS_KEY: integration-only
+  S3_MEDIA_BUCKET: kirillwynn-integration-media
+  S3_MEDIA_PREFIX: integration/media
+  S3_MEDIA_ENDPOINT_URL: http://minio:9000
+  S3_MEDIA_REGION: us-east-1
+  S3_MEDIA_ADDRESSING_STYLE: path
+  S3_MEDIA_PUBLIC_ORIGIN: http://localhost:19000
+  GOOGLE_OAUTH_CLIENT_ID: google-integration
+  GOOGLE_OAUTH_CLIENT_SECRET: google-integration-secret
+  GITHUB_OAUTH_CLIENT_ID: github-integration
+  GITHUB_OAUTH_CLIENT_SECRET: github-integration-secret
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: kirillwynn_integration
+      POSTGRES_USER: kirillwynn_integration
+      POSTGRES_PASSWORD: integration-only
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U kirillwynn_integration -d kirillwynn_integration
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - integration_postgres:/var/lib/postgresql/data
+
+  minio:
+    profiles:
+      - integration
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command:
+      - server
+      - /data
+    environment:
+      MINIO_ROOT_USER: integration
+      MINIO_ROOT_PASSWORD: integration-only
+    volumes:
+      - integration_minio:/data
+
+  django:
+    image: kirillwynn-django:ci
+    environment: *django-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=3)"
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  next:
+    image: kirillwynn-next:ci
+    environment:
+      DJANGO_API_URL: http://django:8000
+      PUBLIC_SITE_URL: http://localhost:18080
+      REVALIDATION_SECRET: integration-revalidation-secret-32-bytes
+    depends_on:
+      django:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/internal/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  worker:
+    image: kirillwynn-django:ci
+    command:
+      - python
+      - manage.py
+      - run_worker
+      - --heartbeat-file
+      - /tmp/kirillwynn-worker/heartbeat.json
+    environment: *django-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,time,pathlib; d=json.loads(pathlib.Path('/tmp/kirillwynn-worker/heartbeat.json').read_text()); raise SystemExit(0 if time.time()-d['timestamp'] < 120 else 1)"
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  edge:
+    image: kirillwynn-edge:ci
+    command:
+      - nginx
+      - -c
+      - /etc/nginx/integration.conf
+      - -g
+      - daemon off;
+    depends_on:
+      django:
+        condition: service_healthy
+      next:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - ../nginx/integration.conf:/etc/nginx/integration.conf:ro
+
+volumes:
+  integration_postgres:
+  integration_minio:

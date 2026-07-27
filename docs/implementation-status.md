@@ -4,10 +4,10 @@ Last updated: 2026-07-27
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 9 email subscription application boundary and
-three delivery/webhook/provider-contract remediation audits implemented and
-locally verified; live Resend/DNS, PostgreSQL-only locking, scheduled worker
-infrastructure, and live-browser checks remain external or unavailable
+Overall state: Milestone 10 repository-owned staging/production infrastructure
+implemented and statically/unit verified; external activation and local
+Docker, Nginx, PostgreSQL, provider, and browser runtime verification remain
+deliberately pending
 
 ## Current repository state
 
@@ -16,11 +16,12 @@ infrastructure, and live-browser checks remain external or unavailable
 - The new Django/Wagtail backend is isolated under `backend/django/`.
 - The public Next.js application is isolated under `frontend/next/`; the legacy
   Vite frontend remains unchanged.
-- Existing GitHub Actions, Nginx configuration, S3 utilities, social icons, and
-  deployment secrets are reference material for the rebuild.
-- The root `docker-compose.yml` remains the legacy deployment stack.
-- `compose.dev.yml` is the new local Django/PostgreSQL stack and has no
-  hard-coded container or network names.
+- Legacy Flask/Vite source and Docker files remain reference material, but no
+  active Compose or GitHub Actions entrypoint builds or deploys Flask.
+- The root `docker-compose.yml` delegates to the Django/Next local development
+  stack in `compose.dev.yml`.
+- Production infrastructure lives under `infra/`; one edge Compose project
+  fronts isolated staging and production application projects.
 - The private product specification remains in the local Obsidian vault and is
   not committed.
 
@@ -323,43 +324,70 @@ infrastructure, and live-browser checks remain external or unavailable
   safely reduces retryable rows and transport-specific mismatch reasons to the
   `0002`-compatible `manual_review`/`payload_mismatch` quarantine before
   restoring old constraints.
+- [x] ADR 0005 fixes one host-port-owning edge project plus separate staging
+  and production application projects, networks, volumes, databases, aliases,
+  S3/provider namespaces, and secrets without `container_name`.
+- [x] Production non-root Django/worker, Node 24 Next standalone, and Nginx
+  edge images added with locked dependencies, exec-form commands, liveness
+  checks, immutable runtime filesystems, and no build-time production secrets.
+- [x] Runtime-dynamic Next metadata and routes allow one standalone artifact to
+  run with staging and production origins without embedding either origin or
+  the internal Django URL in browser assets.
+- [x] Exact edge routes preserve Next Draft Mode/revalidation exceptions,
+  Django session/CSRF/OAuth/API ownership, S3 media redirects, immutable
+  collectstatic assets, trusted forwarding headers, and narrow staging Basic
+  Auth exceptions.
+- [x] Production S3-compatible Wagtail media storage added with separate
+  static/media backends, fail-fast environment validation, absolute public
+  URLs, and filesystem storage retained for local/test.
+- [x] One bounded management-command scheduler per environment independently
+  runs scheduled publishing, revalidation, email delivery, and webhook
+  reconciliation with structured output, capped backoff, SIGTERM, and atomic
+  heartbeat.
+- [x] Immutable release manifests, build-once digest publication, gated staging
+  rollout, staging attestation, and manual no-rebuild production promotion
+  replace the active Flask and migration-generation workflows.
+- [x] CI retains a fast SQLite job and adds PostgreSQL concurrency/search plus
+  empty/reverse/forward migration checks, frontend/audit/build checks, image
+  builds, Compose isolation, Nginx validation, and container smoke.
+- [x] Repository scripts and runbooks cover bounded secret transfer, migration
+  order, custom-format PostgreSQL backup/integrity/retention, scratch-first
+  restore, staging drills, and image/database rollback separation.
 
 ## Milestone transition
 
-Milestone 9 and its delivery/idempotency/webhook remediation are complete at
-the application boundary. Django owns anonymous
-subscriber lifecycle, credentials, CSRF/rate limits, durable publication and
-delivery work, provider adaptation, webhook authentication/idempotency, and
-administrative state. Next.js owns accessible forms and explicit human
-confirmation/unsubscribe presentation without receiving a secret or internal
-Django origin. Existing content/search/preview/revalidation/OAuth/discussion
-contracts remain intact.
+Milestone 10 is complete at the repository boundary. The repository now defines
+isolated runtime topology, immutable production images, exact same-origin edge
+routing, S3 media, the bounded worker, CI/build/promotion gates, and safe
+backup/restore procedures. No server, registry, DNS, TLS, OAuth, Resend, GitHub
+Environment/secret, bucket, or production data state was changed.
 
 ### Next recommended session
 
-Milestone 10: isolated staging/production infrastructure.
+Milestone 11: end-to-end hardening and functional launch, only after the
+external staging activation checklist is completed.
 
 Scope:
 
-1. Add the production Django, Next.js standalone, and email-worker services.
-2. Wire exact Nginx same-origin routes and environment isolation.
-3. Configure staging Resend/DNS/webhook values and a bounded worker schedule.
-4. Prove PostgreSQL locking and complete staging browser/provider smoke tests
-   before any production cutover.
+1. Activate the protected staging environment and required external namespaces.
+2. Run the repository container/PostgreSQL/Nginx smoke checks on the target
+   runtime.
+3. Complete real staging OAuth, Resend, S3, browser, responsive, accessibility,
+   backup/restore-drill, and rollback rehearsal.
+4. Reconcile every failed or unavailable check before considering production.
 
 Out of scope for that session:
 
-- production deployment or promotion;
-- production DNS, OAuth, Resend, GitHub Environment, or secret changes;
+- production promotion or data migration;
 - search/reaction redesign or custom emoji;
 - deletion of legacy reference files.
 
 ### Exit criteria
 
-- Staging/production services and data are isolated.
-- Exact same-origin routing preserves CSRF/OAuth/webhook boundaries.
-- Worker scheduling and monitoring are operational in staging.
-- PostgreSQL/browser/provider behavior is verified without changing production.
+- Staging runtime passes all container and PostgreSQL checks.
+- OAuth, Resend, S3, media, Draft Mode, and signed revalidation pass on staging.
+- Backup/restore and compatible image rollback are rehearsed.
+- 375x812 and 1440x900 browser, keyboard, focus, and non-hover checks pass.
 
 ## Milestone queue
 
@@ -372,41 +400,32 @@ Out of scope for that session:
 - [x] Milestone 7 — post and comment reactions.
 - [x] Milestone 8 — PostgreSQL search and tag filtering.
 - [x] Milestone 9 — email subscriptions and durable outbox worker.
-- [ ] Milestone 10 — isolated staging/production infrastructure.
+- [x] Milestone 10 — isolated staging/production infrastructure.
 - [ ] Milestone 11 — end-to-end hardening and functional launch.
 - [ ] Milestone 12 — visual design and polish.
 
 ## Known risks
 
-- Exact Nginx exceptions for Next.js `/api/draft`, `/api/draft/disable`, and
-  `/api/revalidate` are documented but deliberately not wired in this
-  milestone.
 - The Next.js duplicate-event registry is process-local. Duplicate invalidation
   remains safe across processes because tag/path invalidation is idempotent.
 - Preview snapshot and delivered revalidation event retention are currently
   bounded only by opportunistic preview cleanup and database operations; a
   formal operations retention command belongs with worker infrastructure.
-- Scheduled publishing is modelled and verified through Wagtail's
-  `publish_scheduled_pages` command, but the production worker/cron invocation
-  and `process_revalidation_outbox` schedule are deferred to the infrastructure
-  milestone.
-- Media uses local filesystem storage in local/test. S3-compatible production
-  storage, upload policy, and lifecycle configuration remain required.
+- The bounded worker runtime is repository-owned but has not run under Docker
+  or against PostgreSQL locally; operational heartbeat/alerting still needs
+  staging verification.
+- S3-compatible media settings are implemented, but buckets, credentials,
+  public origins, versioning, lifecycle, CORS, and restore behavior remain
+  external activation work.
 - OAuth applications and credentials have not been created or installed.
   Mocked Google/GitHub callbacks are verified, but live provider consent,
   cancellation, provider-side configuration, and staging/production callback
   routing still require external setup and smoke tests. Staging and production
   must use separate applications.
-- Current Docker Compose names collide if both environments run on one server.
-- The current deployment workflow rebuilds production rather than promoting an
-  already-tested staging image.
-- The new backend currently coexists at `backend/django/` so the legacy Docker
-  build remains intact. A later infrastructure milestone must promote the new
-  backend to the final image layout deliberately.
 - Docker build, Docker Compose config, and PostgreSQL-backed migrations remain
-  unverified because Docker and PostgreSQL server binaries are not available
-  locally. The Compose file parses as valid YAML, and generated frontend output
-  remains excluded from Docker contexts.
+  unverified locally because Docker and PostgreSQL server binaries are not
+  available. YAML parsing and route-contract tests are not represented as
+  Docker Compose, image, Nginx, PostgreSQL, or integration-runtime verification.
 - PostgreSQL-only row-lock concurrency tests for rate-bucket creation and
   comment edit/delete and reaction toggle serialization exist but were skipped
   locally because the test database is SQLite. The production model was not
@@ -421,10 +440,13 @@ Out of scope for that session:
   states remain unverified rather than simulated.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
+- The shared edge cannot be replaced independently per application environment;
+  a changed edge digest requires a production-approved host-wide operation
+  compatible with both live application versions.
 - Email DNS records, verified Resend sender domains, webhook registrations,
-  provider credentials, GitHub Environment values, and an actual worker
-  schedule remain deliberately unconfigured. `docs/email-setup.md` is the
-  external checklist.
+  provider credentials, GitHub Environment values, and staging activation
+  remain deliberately unconfigured. `docs/email-setup.md` and
+  `docs/staging-activation-checklist.md` are the external checklists.
 - Email history and rate-limit buckets do not yet have an operational retention
   command. This belongs with worker monitoring/retention infrastructure.
 
@@ -446,6 +468,41 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-27:
 
+- Milestone 10 adds ADR 0005, isolated application/edge Compose definitions,
+  production Django/worker, Next standalone and edge images, exact same-origin
+  routing, S3 Wagtail media, a bounded four-task worker, immutable release
+  manifests, staging-attested manual promotion, PostgreSQL CI, and
+  backup/restore/deployment runbooks. Active Compose and workflows no longer
+  build or deploy Flask.
+- `python3 -m uv lock --check` passed with 74 packages resolved. Ruff format
+  check passed for 136 files, Ruff lint passed, Django test-settings system
+  check and migration-drift check passed, and production `check --deploy`
+  passed with safe non-production values and one intentional Wagtail iframe
+  check silenced. Credential-free build settings collected 943 static files
+  into a temporary immutable manifest tree.
+- Targeted infrastructure/backend tests passed 107 tests. Full SQLite `pytest`
+  passed 473 tests; six PostgreSQL-only locking/race/search tests skipped
+  honestly. A fresh SQLite database applied the entire migration chain;
+  `subscriptions.0003` and `discussions.0002` each reversed one migration and
+  reapplied.
+- Prettier, ESLint, TypeScript, and full Vitest passed: 152 tests in 16 files.
+  The production Next.js 16.2.11 build passed, and every public/internal route
+  is runtime-rendered. The same standalone artifact started successfully with
+  staging and production `PUBLIC_SITE_URL` values. Browser assets contained no
+  staging/production origin, internal Django URL, or secret-name markers.
+  `npm audit --audit-level=high` reported zero vulnerabilities.
+- Thirteen infrastructure contract/script tests, shell syntax, Python compilation,
+  workflow/Compose YAML parsing, full-SHA action pin scan, legacy active
+  entrypoint scan, release-manifest validation, and Nginx routing regression
+  tests passed.
+- Docker, Podman, Nginx, PostgreSQL, `psql`, and `pg_isready` are unavailable
+  locally. Therefore image builds, `docker compose config`, simultaneous
+  Compose runtime, `nginx -t`, PostgreSQL concurrency/migrations, container
+  smoke/restart behavior, and live browser/provider/S3 flows were not run and
+  are not inferred from YAML/unit results.
+- No push, deployment, DNS/TLS, OAuth/Resend, GitHub secret/Environment,
+  registry, S3 bucket, production backup/restore, or server-state action was
+  performed.
 - The third Milestone 9 remediation binds each delivery to a normalized
   adapter contract identifier, serializer contract version, and non-secret
   provider account/environment idempotency namespace. Provider/namespace/

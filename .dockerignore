@@ -6,6 +6,7 @@
 !docker/**
 !nginx/**
 !frontend/**
+!infra/**
 
 # Re-ignore common junk inside allowed dirs
 **/__pycache__/

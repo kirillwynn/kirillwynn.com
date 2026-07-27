@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { AuthProvider } from "@/components/auth-provider";
@@ -8,24 +9,29 @@ import { publicSiteUrl } from "@/lib/server/config";
 
 import "./globals.css";
 
-export const metadata: Metadata = {
-    metadataBase: new URL(publicSiteUrl()),
-    title: {
-        default: "Kirill Wynn",
-        template: "%s · Kirill Wynn",
-    },
-    description:
-        "Personal writing by Kirill Wynn about software, systems, and building things.",
-    alternates: { canonical: "/" },
-    openGraph: {
-        type: "website",
-        siteName: "Kirill Wynn",
-        title: "Kirill Wynn",
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+    await connection();
+    return {
+        metadataBase: new URL(publicSiteUrl()),
+        title: {
+            default: "Kirill Wynn",
+            template: "%s · Kirill Wynn",
+        },
         description:
-            "Personal writing about software, systems, and building things.",
-        url: "/",
-    },
-};
+            "Personal writing by Kirill Wynn about software, systems, and building things.",
+        alternates: { canonical: "/" },
+        openGraph: {
+            type: "website",
+            siteName: "Kirill Wynn",
+            title: "Kirill Wynn",
+            description:
+                "Personal writing about software, systems, and building things.",
+            url: "/",
+        },
+    };
+}
 
 export default function RootLayout({
     children,

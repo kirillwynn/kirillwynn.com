@@ -5,12 +5,18 @@ ALLOWED_HOSTS = ["testserver", "127.0.0.1", "localhost"]
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.environ.get("DJANGO_TEST_DATABASE", ":memory:"),  # noqa: F405
-    },
-}
+if os.environ.get("DJANGO_TEST_DATABASE_ENGINE") == "postgresql":  # noqa: F405
+    DATABASES["default"]["CONN_MAX_AGE"] = 0  # noqa: F405
+    DATABASES["default"]["TEST"] = {  # noqa: F405
+        "NAME": os.environ.get("DJANGO_TEST_DATABASE", "test_kirillwynn"),  # noqa: F405
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.environ.get("DJANGO_TEST_DATABASE", ":memory:"),  # noqa: F405
+        },
+    }
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",

@@ -25,6 +25,14 @@ required_environment = {
     "EMAIL_FROM_ADDRESS": os.environ.get("EMAIL_FROM_ADDRESS"),
     "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE": os.environ.get("EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"),
     "SUBSCRIPTION_SIGNING_SECRET": os.environ.get("SUBSCRIPTION_SIGNING_SECRET"),
+    "S3_MEDIA_ACCESS_KEY_ID": os.environ.get("S3_MEDIA_ACCESS_KEY_ID"),
+    "S3_MEDIA_SECRET_ACCESS_KEY": os.environ.get("S3_MEDIA_SECRET_ACCESS_KEY"),
+    "S3_MEDIA_BUCKET": os.environ.get("S3_MEDIA_BUCKET"),
+    "S3_MEDIA_PREFIX": os.environ.get("S3_MEDIA_PREFIX"),
+    "S3_MEDIA_ENDPOINT_URL": os.environ.get("S3_MEDIA_ENDPOINT_URL"),
+    "S3_MEDIA_REGION": os.environ.get("S3_MEDIA_REGION"),
+    "S3_MEDIA_ADDRESSING_STYLE": os.environ.get("S3_MEDIA_ADDRESSING_STYLE"),
+    "S3_MEDIA_PUBLIC_ORIGIN": os.environ.get("S3_MEDIA_PUBLIC_ORIGIN"),
     **OAUTH_CREDENTIALS,  # noqa: F405
 }
 EMAIL_PROVIDER_ADAPTER = os.environ.get(
@@ -76,6 +84,15 @@ def public_origin(value):
     return value.rstrip("/")
 
 
+def media_prefix(value):
+    normalized = value.strip().strip("/")
+    if not normalized or normalized in {".", ".."}:
+        raise ImproperlyConfigured("S3_MEDIA_PREFIX must be a non-empty object prefix")
+    if any(segment in {"", ".", ".."} for segment in normalized.split("/")):
+        raise ImproperlyConfigured("S3_MEDIA_PREFIX contains an unsafe path segment")
+    return normalized
+
+
 if len(os.environ["REVALIDATION_SECRET"].encode()) < 32:
     raise ImproperlyConfigured("REVALIDATION_SECRET must be at least 32 bytes")
 if len(os.environ["SUBSCRIPTION_SIGNING_SECRET"].encode()) < 32:
@@ -104,10 +121,21 @@ if EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailPro
         ) from error
 
 DEBUG = False
+MIDDLEWARE = [
+    MIDDLEWARE[0],  # noqa: F405
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    *MIDDLEWARE[1:],  # noqa: F405
+]
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")  # noqa: F405
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")  # noqa: F405
 WAGTAILADMIN_BASE_URL = os.environ["WAGTAIL_ADMIN_BASE_URL"]
 PUBLIC_SITE_URL = public_origin(os.environ["PUBLIC_SITE_URL"])
+S3_MEDIA_PUBLIC_ORIGIN = public_origin(os.environ["S3_MEDIA_PUBLIC_ORIGIN"])
+S3_MEDIA_ENDPOINT_URL = public_origin(os.environ["S3_MEDIA_ENDPOINT_URL"])
+S3_MEDIA_PREFIX = media_prefix(os.environ["S3_MEDIA_PREFIX"])
+S3_MEDIA_ADDRESSING_STYLE = os.environ["S3_MEDIA_ADDRESSING_STYLE"].strip().lower()
+if S3_MEDIA_ADDRESSING_STYLE not in {"path", "virtual"}:
+    raise ImproperlyConfigured("S3_MEDIA_ADDRESSING_STYLE must be 'path' or 'virtual'")
 FRONTEND_PREVIEW_URL = os.environ["FRONTEND_PREVIEW_URL"]
 WAGTAIL_HEADLESS_PREVIEW = {
     **WAGTAIL_HEADLESS_PREVIEW,  # noqa: F405
@@ -146,11 +174,32 @@ SILENCED_SYSTEM_CHECKS = ["security.W019"]
 
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": os.environ["S3_MEDIA_ACCESS_KEY_ID"].strip(),
+            "secret_key": os.environ["S3_MEDIA_SECRET_ACCESS_KEY"].strip(),
+            "bucket_name": os.environ["S3_MEDIA_BUCKET"].strip(),
+            "location": S3_MEDIA_PREFIX,
+            "endpoint_url": S3_MEDIA_ENDPOINT_URL,
+            "region_name": os.environ["S3_MEDIA_REGION"].strip(),
+            "addressing_style": S3_MEDIA_ADDRESSING_STYLE,
+            "custom_domain": S3_MEDIA_PUBLIC_ORIGIN.removeprefix("https://").removeprefix(
+                "http://"
+            ),
+            "url_protocol": f"{urlsplit(S3_MEDIA_PUBLIC_ORIGIN).scheme}:",
+            "querystring_auth": False,
+            "default_acl": None,
+            "file_overwrite": False,
+            "object_parameters": {
+                "CacheControl": "public, max-age=31536000, immutable",
+            },
+        },
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
 WAGTAIL_ENABLE_UPDATE_CHECK = False
+WAGTAILDOCS_SERVE_METHOD = "redirect"
+STATIC_ROOT = "/opt/kirillwynn/staticfiles"
