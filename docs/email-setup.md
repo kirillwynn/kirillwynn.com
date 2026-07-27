@@ -21,9 +21,15 @@ Required secret names:
 Required non-secret runtime values:
 
 - `EMAIL_PROVIDER_ADAPTER=apps.subscriptions.providers.resend.ResendEmailProvider`;
-- `RESEND_FROM_EMAIL` using an address on the verified environment-specific
+- `EMAIL_FROM_ADDRESS` using an address on the verified environment-specific
   sending domain;
 - `PUBLIC_SITE_URL` for the corresponding public origin.
+
+`EMAIL_FROM_ADDRESS` is required for every production adapter, not just
+Resend. It is normalized by trimming outer whitespace and rejected before
+Django starts if it is empty, contains CR/LF, exceeds 512 code points, or does
+not contain a valid mailbox; a display name is allowed. `RESEND_API_KEY` and
+`RESEND_WEBHOOK_SECRET` remain conditional on the Resend adapter.
 
 Optional tuning values are documented in `.env.example`. In particular,
 `EMAIL_PROVIDER_IDEMPOTENCY_WINDOW_SECONDS` defaults to 82,800 seconds, below
@@ -85,10 +91,13 @@ per-delivery `Idempotency-Key`. Publication messages include
 `List-Unsubscribe` and RFC 8058 `List-Unsubscribe-Post` headers and an in-body
 unsubscribe link. One immutable outbox snapshot pins schema version, sender,
 public origin, subject, and publication inputs. A delivery pins recipient,
-credential version/issue time, and the SHA-256 fingerprint of the exact
-serialized Resend body. A retry is sent only while that fingerprint still
+credential version/issue time, and the SHA-256 fingerprint of the exact bytes
+selected by the adapter serializer. The Resend adapter uses those same compact
+JSON bytes as its HTTP body. A retry is sent only while that fingerprint still
 matches and before the absolute local safety deadline from the first possible
-provider call.
+provider call. The bundled external production adapter is Resend; a replacement
+adapter must implement and test `serialize_request()` against its own exact
+request body. The memory adapter is local/test-only.
 
 Official references:
 

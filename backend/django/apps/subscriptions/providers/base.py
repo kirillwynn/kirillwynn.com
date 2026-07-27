@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, field
 
 
@@ -25,6 +26,26 @@ class EmailProviderError(Exception):
         super().__init__(self.safe_message)
 
 
+def serialize_email_request(message):
+    return json.dumps(
+        {
+            "from": message.from_email,
+            "to": [message.to],
+            "subject": message.subject,
+            "text": message.text,
+            "html": message.html,
+            "headers": message.headers,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode()
+
+
 class EmailProvider:
+    def serialize_request(self, message):
+        """Return the exact deterministic body bytes that send() will use."""
+
+        return serialize_email_request(message)
+
     def send(self, message, idempotency_key):
         raise NotImplementedError

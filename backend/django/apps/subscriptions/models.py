@@ -6,6 +6,9 @@ from django.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Lower
 
+from apps.subscriptions.message_limits import MAX_EMAIL_SUBJECT_LENGTH
+from config.email_settings import MAX_EMAIL_FROM_ADDRESS_LENGTH
+
 MAX_EMAIL_LENGTH = 320
 
 
@@ -144,12 +147,15 @@ class EmailOutbox(models.Model):
     audience_cutoff = models.DateTimeField(null=True, blank=True, editable=False)
     credential_version = models.PositiveIntegerField(null=True, blank=True, editable=False)
     message_schema_version = models.PositiveSmallIntegerField(default=1, editable=False)
-    snapshot_from_email = models.CharField(max_length=320, editable=False)
+    snapshot_from_email = models.CharField(
+        max_length=MAX_EMAIL_FROM_ADDRESS_LENGTH,
+        editable=False,
+    )
     snapshot_site_url = models.CharField(max_length=2_048, editable=False)
-    snapshot_subject = models.CharField(max_length=255, editable=False)
+    snapshot_subject = models.CharField(max_length=MAX_EMAIL_SUBJECT_LENGTH, editable=False)
     snapshot_post_title = models.CharField(max_length=255, blank=True, editable=False)
     snapshot_post_excerpt = models.TextField(blank=True, editable=False)
-    snapshot_post_url = models.CharField(max_length=2_048, blank=True, editable=False)
+    snapshot_post_url = models.TextField(blank=True, editable=False)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     attempt_count = models.PositiveIntegerField(default=0)
     available_at = models.DateTimeField()

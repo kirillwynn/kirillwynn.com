@@ -5,9 +5,9 @@ Last updated: 2026-07-27
 Integration branch: `rewrite/wagtail-next`
 
 Overall state: Milestone 9 email subscription application boundary and
-delivery/webhook race remediation implemented and locally verified; live
-Resend/DNS, PostgreSQL-only locking, scheduled worker infrastructure, and
-live-browser checks remain external or unavailable
+two delivery/webhook/provider-contract remediation audits implemented and
+locally verified; live Resend/DNS, PostgreSQL-only locking, scheduled worker
+infrastructure, and live-browser checks remain external or unavailable
 
 ## Current repository state
 
@@ -294,9 +294,21 @@ live-browser checks remain external or unavailable
   before its first provider call and skips unpublished, expired, restricted,
   future-scheduled, or no-longer-public posts without mutating the immutable
   email snapshot.
+- [x] The second Milestone 9 remediation makes `EMAIL_FROM_ADDRESS` a
+  provider-independent, normalized, mandatory production message input while
+  keeping Resend API/webhook credentials conditional on the Resend adapter.
+- [x] Provider adapters now fingerprint their own exact deterministic request
+  bytes before I/O; Resend uses those bytes as its HTTP body, memory remains
+  local/test-only, and a replacement adapter must implement the same explicit
+  serialization boundary.
+- [x] Snapshot boundaries now store the full 265-character maximum publication
+  subject and long Unicode-slug fallback URLs without truncation, with
+  deterministic fail-fast limits independent of SQLite varchar behavior.
 - [x] `subscriptions.0002_harden_email_delivery` adds the snapshot,
   fingerprint, ambiguity, manual-review, webhook-correlation, constraint, and
-  reconciliation indexes without modifying `0001_initial`.
+  reconciliation indexes without modifying `0001_initial`; before any
+  push/deployment it was amended to create sender/subject at 512 characters and
+  post URL as text before its existing-data backfill.
 
 ## Milestone transition
 
@@ -420,6 +432,46 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-27:
 
+- The second Milestone 9 remediation removed the Resend-specific FROM setting,
+  made every successfully imported production adapter configuration carry a
+  valid `EMAIL_FROM_ADDRESS`, and moved request fingerprints behind the
+  adapter's exact-byte `serialize_request()` contract. Official Resend send,
+  24-hour idempotency, and both documented 409 contracts were rechecked; no
+  provider or external state changed.
+- Boundary coverage proves a maximum 255-character Wagtail title yields the
+  complete 265-character immutable subject, a maximum Unicode fallback URL can
+  exceed 2,048 safely in text storage, invalid FROM values fail before the
+  confirmation transaction commits, and a custom adapter hash matches its
+  exact selected bytes. The production-like memory adapter test creates and
+  processes a confirmation with no Resend credentials.
+- `subscriptions.0002_harden_email_delivery` was amended because it remains
+  unpushed/undeployed: its fields are widened before the data operation that
+  could otherwise fail. A migration regression starts with an existing
+  maximum-title publication event at `0001`, then verifies the full subject and
+  long URL after `0002`. An empty SQLite database applied the clean chain;
+  `0002` reversed to `0001_initial` and reapplied; drift remained empty.
+- `python3 -m uv lock --check` passed with 68 packages resolved. Ruff format
+  check passed for 129 files, Ruff lint passed, Django system check and
+  `makemigrations --check --dry-run` passed, and production
+  `check --deploy` passed with a non-Resend adapter and safe verification
+  values.
+- The targeted settings/outbox/migration suite passed 104 tests. Full `pytest`
+  passed 428 tests; six PostgreSQL-only concurrency/search tests skipped on
+  SQLite. Docker, PostgreSQL, `psql`, `postgres`, and `pg_isready` are
+  unavailable, so SQLite is not represented as PostgreSQL verification.
+- Prettier, ESLint, TypeScript, and full Vitest passed: 150 tests in 15 files.
+  The production Next.js 16.2.11 build passed outside the sandbox because
+  Turbopack's CSS worker needs a local port. `npm audit` reported zero
+  vulnerabilities.
+- The post-build `.next/static` scan found no internal Django build origin,
+  build verification secret, Resend/subscription secret names or values,
+  webhook/API-key shapes, provider payload fingerprint fields, or server-side
+  credential/attempt fields. No live browser/provider flow ran because this
+  audit changes no public API or UI and no Browser/provider environment was in
+  scope.
+- The local Obsidian Milestone 9 checklist was updated outside Git. No push,
+  deployment, DNS, Resend, OAuth, GitHub secret/Environment, or production
+  infrastructure change was performed; Milestone 10 was not started.
 - Milestone 9 remediation now pins byte-stable provider inputs/fingerprint,
   separates provider ambiguity from worker leases, classifies both official
   Resend 409 variants, durably reconciles early webhooks, preserves honest

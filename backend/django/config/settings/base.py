@@ -4,6 +4,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from config.email_settings import normalize_email_from_address
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 
@@ -277,12 +279,14 @@ REVALIDATION_PROCESSING_TIMEOUT_SECONDS = int(
 
 EMAIL_PROVIDER_ADAPTER = os.environ.get(
     "EMAIL_PROVIDER_ADAPTER", "apps.subscriptions.providers.memory.MemoryEmailProvider"
+).strip()
+EMAIL_FROM_ADDRESS = normalize_email_from_address(
+    os.environ.get(
+        "EMAIL_FROM_ADDRESS",
+        "Kirill Wynn <posts@kirillwynn.com>",
+    )
 )
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
-RESEND_FROM_EMAIL = os.environ.get(
-    "RESEND_FROM_EMAIL",
-    "Kirill Wynn <posts@kirillwynn.com>",
-).strip()
 RESEND_WEBHOOK_SECRET = os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()
 SUBSCRIPTION_SIGNING_SECRET = os.environ.get(
     "SUBSCRIPTION_SIGNING_SECRET",

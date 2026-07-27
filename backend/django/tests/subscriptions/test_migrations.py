@@ -2,6 +2,9 @@ import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
+from wagtail.models import Locale, Page
+
+from apps.blog.models import BlogIndexPage, BlogPostPage
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -109,3 +112,47 @@ def test_subscriptions_0002_safely_backfills_existing_ambiguous_and_webhook_rows
     assert migrated_webhook.processing_state == "applied"
     assert migrated_webhook.provider_message_id == "migration-provider-message"
     assert migrated_webhook.delivery_id == delivery.pk
+
+
+def test_subscriptions_0002_backfills_maximum_publication_title_without_truncation():
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0001_initial")])
+    Locale.objects.get_or_create(language_code="en")
+    root = Page.get_first_root_node()
+    if root is None:
+        root = Page.add_root(instance=Page(title="Root", slug="root"))
+    blog_index = BlogIndexPage(title="Migration blog", slug="migration-blog", live=False)
+    root.add_child(instance=blog_index)
+    blog_post = BlogPostPage(
+        title="T" * 255,
+        slug="界" * 255,
+        excerpt="Migration excerpt",
+        body=[],
+        live=False,
+    )
+    blog_index.add_child(instance=blog_post)
+    old_apps = executor.loader.project_state([("subscriptions", "0001_initial")]).apps
+    EmailOutbox = old_apps.get_model("subscriptions", "EmailOutbox")
+    HistoricalBlogPost = old_apps.get_model("blog", "BlogPostPage")
+    historical_post = HistoricalBlogPost.objects.get(pk=blog_post.pk)
+    now = timezone.now()
+    old_event = EmailOutbox.objects.create(
+        message_type="publication",
+        post_id=historical_post.pk,
+        audience_cutoff=now,
+        available_at=now,
+        idempotency_key="migration/publication/max-title",
+    )
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0002_harden_email_delivery")])
+    new_apps = executor.loader.project_state([("subscriptions", "0002_harden_email_delivery")]).apps
+    MigratedOutbox = new_apps.get_model("subscriptions", "EmailOutbox")
+    migrated = MigratedOutbox.objects.get(pk=old_event.pk)
+
+    assert migrated.snapshot_post_title == "T" * 255
+    assert migrated.snapshot_subject == f"New post: {'T' * 255}"
+    assert len(migrated.snapshot_subject) == 265
+    assert len(migrated.snapshot_post_url) > 2_048
+    assert MigratedOutbox._meta.get_field("snapshot_subject").max_length == 512
+    assert MigratedOutbox._meta.get_field("snapshot_post_url").get_internal_type() == "TextField"

@@ -32,8 +32,8 @@ def production_environment():
             "REVALIDATION_URL": "https://example.com/api/revalidate",
             "REVALIDATION_SECRET": PRODUCTION_SECRET,
             "EMAIL_PROVIDER_ADAPTER": "apps.subscriptions.providers.resend.ResendEmailProvider",
+            "EMAIL_FROM_ADDRESS": "Kirill Wynn <posts@example.com>",
             "RESEND_API_KEY": "resend-production-check",
-            "RESEND_FROM_EMAIL": "Kirill Wynn <posts@example.com>",
             "RESEND_WEBHOOK_SECRET": "whsec_dGVzdC13ZWJob29rLXNlY3JldC0zMi1ieXRlcy0wMQ==",
             "SUBSCRIPTION_SIGNING_SECRET": "subscription-production-secret-check",
             "GOOGLE_OAUTH_CLIENT_ID": "google-production-check",
@@ -208,7 +208,6 @@ def test_production_settings_reject_short_revalidation_secret():
     "missing_name",
     [
         "RESEND_API_KEY",
-        "RESEND_FROM_EMAIL",
         "RESEND_WEBHOOK_SECRET",
         "SUBSCRIPTION_SIGNING_SECRET",
     ],
@@ -250,8 +249,32 @@ def test_non_resend_production_adapter_does_not_require_resend_credentials():
     environment["EMAIL_PROVIDER_ADAPTER"] = (
         "apps.subscriptions.providers.memory.MemoryEmailProvider"
     )
-    for name in ("RESEND_API_KEY", "RESEND_FROM_EMAIL", "RESEND_WEBHOOK_SECRET"):
+    environment["EMAIL_FROM_ADDRESS"] = "  Memory Sender <memory@example.com>  "
+    for name in ("RESEND_API_KEY", "RESEND_WEBHOOK_SECRET"):
         environment.pop(name)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from config.settings import production; print(production.EMAIL_FROM_ADDRESS)",
+        ],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == "Memory Sender <memory@example.com>"
+
+
+def test_every_production_adapter_requires_provider_independent_from_address():
+    environment = production_environment()
+    environment["EMAIL_PROVIDER_ADAPTER"] = (
+        "apps.subscriptions.providers.memory.MemoryEmailProvider"
+    )
+    environment.pop("EMAIL_FROM_ADDRESS")
 
     result = subprocess.run(
         [sys.executable, "-c", "from config.settings import production"],
@@ -261,16 +284,43 @@ def test_non_resend_production_adapter_does_not_require_resend_credentials():
         text=True,
     )
 
-    assert result.returncode == 0
+    assert result.returncode != 0
+    assert "Missing required production environment variables: EMAIL_FROM_ADDRESS" in result.stderr
+
+
+def test_production_rejects_whitespace_only_from_address():
+    environment = production_environment()
+    environment["EMAIL_FROM_ADDRESS"] = " \t "
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "EMAIL_FROM_ADDRESS must be a valid mailbox" in result.stderr
 
 
 @pytest.mark.parametrize(
     ("name", "value", "message"),
     [
         (
-            "RESEND_FROM_EMAIL",
+            "EMAIL_FROM_ADDRESS",
             "not-an-email",
-            "RESEND_FROM_EMAIL must be a valid email address",
+            "EMAIL_FROM_ADDRESS must be a valid mailbox",
+        ),
+        (
+            "EMAIL_FROM_ADDRESS",
+            "Posts <posts@example.com>\r\nBcc: target@example.com",
+            "EMAIL_FROM_ADDRESS must be a valid mailbox",
+        ),
+        (
+            "EMAIL_FROM_ADDRESS",
+            f"{'x' * 500} <posts@example.com>",
+            "EMAIL_FROM_ADDRESS must be a valid mailbox",
         ),
         (
             "RESEND_WEBHOOK_SECRET",

@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import urllib.error
@@ -6,21 +7,30 @@ from datetime import timedelta
 
 import pytest
 from django.core import signing
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
-from django.db import connection
+from django.db import connection, models
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
-from wagtail.models import PageViewRestriction
+from wagtail.models import Page, PageViewRestriction
 
 from apps.blog.models import BlogPostPage
+from apps.subscriptions.message_limits import (
+    MAX_EMAIL_SUBJECT_LENGTH,
+    MAX_PUBLICATION_EXCERPT_LENGTH,
+    MAX_PUBLICATION_TITLE_LENGTH,
+    MAX_SNAPSHOT_URL_LENGTH,
+)
 from apps.subscriptions.messages import message_for_delivery
 from apps.subscriptions.models import EmailDelivery, EmailOutbox, Subscriber
 from apps.subscriptions.outbox import (
     build_delivery_batch,
     claim_outbox_batch,
     process_outbox_event,
+    publication_outbox_snapshot,
 )
+from apps.subscriptions.providers import configured_email_provider
 from apps.subscriptions.providers.base import (
     EmailProvider,
     EmailProviderError,
@@ -184,6 +194,109 @@ def test_confirmation_is_sent_only_by_worker_with_multipart_body():
     assert idempotency_key == f"email/{event.deliveries.get().pk}"
 
 
+@override_settings(
+    EMAIL_PROVIDER_ADAPTER="apps.subscriptions.providers.memory.MemoryEmailProvider",
+    EMAIL_FROM_ADDRESS="Memory Sender <memory@example.com>",
+    RESEND_API_KEY="",
+    RESEND_WEBHOOK_SECRET="",
+)
+def test_non_resend_production_like_configuration_creates_and_processes_confirmation():
+    MemoryEmailProvider.reset()
+    subscriber = request_subscription("runtime@example.com")
+    event = subscriber.outbox_events.get()
+
+    assert event.snapshot_from_email == "Memory Sender <memory@example.com>"
+    assert claim_outbox_batch(limit=1) == [event.pk]
+    sent, status = process_outbox_event(event.pk, provider=configured_email_provider())
+
+    delivery = event.deliveries.get()
+    assert sent == 1
+    assert status == EmailOutbox.Status.DELIVERED
+    assert delivery.status == EmailDelivery.Status.SENT
+    assert MemoryEmailProvider.sent[0][0].from_email == event.snapshot_from_email
+
+
+@override_settings(EMAIL_FROM_ADDRESS=" \r\n ")
+def test_invalid_from_address_fails_before_confirmation_transaction():
+    with pytest.raises(ImproperlyConfigured, match="EMAIL_FROM_ADDRESS must be a valid mailbox"):
+        request_subscription("runtime@example.com")
+
+    assert Subscriber.objects.count() == 0
+    assert EmailOutbox.objects.count() == 0
+
+
+def test_provider_fingerprint_uses_exact_bytes_selected_by_adapter():
+    class CustomBodyProvider(EmailProvider):
+        def __init__(self):
+            self.sent_bodies = []
+
+        def serialize_request(self, message):
+            return f"custom-body:{message.to}:{message.subject}".encode()
+
+        def send(self, message, idempotency_key):
+            self.sent_bodies.append(self.serialize_request(message))
+            return ProviderSendResult(message_id="custom-body-provider-id")
+
+    subscriber = request_subscription("custom-provider@example.com")
+    event = subscriber.outbox_events.get()
+    provider = CustomBodyProvider()
+    assert claim_outbox_batch(limit=1) == [event.pk]
+
+    sent, status = process_outbox_event(event.pk, provider=provider)
+
+    delivery = event.deliveries.get()
+    assert sent == 1
+    assert status == EmailOutbox.Status.DELIVERED
+    assert delivery.provider_payload_hash == hashlib.sha256(provider.sent_bodies[0]).hexdigest()
+
+
+def test_publication_snapshot_boundaries_cover_maximum_wagtail_inputs(blog_post):
+    wagtail_title_length = Page._meta.get_field("title").max_length
+    subject_field = EmailOutbox._meta.get_field("snapshot_subject")
+    from_field = EmailOutbox._meta.get_field("snapshot_from_email")
+    site_url_field = EmailOutbox._meta.get_field("snapshot_site_url")
+    post_title_field = EmailOutbox._meta.get_field("snapshot_post_title")
+    post_excerpt_field = EmailOutbox._meta.get_field("snapshot_post_excerpt")
+    post_url_field = EmailOutbox._meta.get_field("snapshot_post_url")
+    recipient_field = EmailDelivery._meta.get_field("snapshot_recipient_email")
+
+    assert wagtail_title_length == MAX_PUBLICATION_TITLE_LENGTH
+    assert subject_field.max_length == MAX_EMAIL_SUBJECT_LENGTH
+    assert subject_field.max_length >= len("New post: ") + wagtail_title_length
+    assert from_field.max_length == 512
+    assert site_url_field.max_length == 2_048
+    assert post_title_field.max_length == MAX_PUBLICATION_TITLE_LENGTH
+    assert isinstance(post_excerpt_field, models.TextField)
+    assert isinstance(post_url_field, models.TextField)
+    assert recipient_field.max_length == 320
+
+    blog_post.title = "T" * MAX_PUBLICATION_TITLE_LENGTH
+    blog_post.excerpt = "E" * MAX_PUBLICATION_EXCERPT_LENGTH
+    blog_post.slug = "界" * MAX_PUBLICATION_TITLE_LENGTH
+    snapshot = publication_outbox_snapshot(blog_post)
+
+    assert snapshot["snapshot_subject"] == f"New post: {'T' * 255}"
+    assert len(snapshot["snapshot_subject"]) == 265
+    assert snapshot["snapshot_post_title"] == "T" * MAX_PUBLICATION_TITLE_LENGTH
+    assert snapshot["snapshot_post_excerpt"] == "E" * MAX_PUBLICATION_EXCERPT_LENGTH
+    assert len(snapshot["snapshot_post_url"]) > 2_048
+    assert len(snapshot["snapshot_post_url"]) <= MAX_SNAPSHOT_URL_LENGTH
+
+    canonical_prefix = "https://canonical.example/"
+    blog_post.canonical_url = canonical_prefix + ("a" * (2_048 - len(canonical_prefix)))
+    assert len(publication_outbox_snapshot(blog_post)["snapshot_post_url"]) == 2_048
+
+
+def test_maximum_wagtail_title_publishes_without_subject_truncation(blog_post):
+    blog_post.title = "T" * MAX_PUBLICATION_TITLE_LENGTH
+    published = publish(blog_post)
+
+    event = publication_event(published)
+    assert event.snapshot_post_title == blog_post.title
+    assert event.snapshot_subject == f"New post: {blog_post.title}"
+    assert len(event.snapshot_subject) == 265
+
+
 def test_publication_template_escapes_values_omits_body_and_has_unsubscribe_headers(
     blog_post,
 ):
@@ -204,7 +317,7 @@ def test_publication_template_escapes_values_omits_body_and_has_unsubscribe_head
 
 
 @override_settings(
-    RESEND_FROM_EMAIL="Original <posts@example.com>",
+    EMAIL_FROM_ADDRESS="Original <posts@example.com>",
     PUBLIC_SITE_URL="https://example.com",
 )
 def test_delivery_renders_byte_identical_resend_body_after_time_post_and_config_changes(
@@ -225,7 +338,7 @@ def test_delivery_renders_byte_identical_resend_body_after_time_post_and_config_
         lambda: (timezone.now() + timedelta(days=30)).timestamp(),
     )
     with override_settings(
-        RESEND_FROM_EMAIL="Changed <changed@example.com>",
+        EMAIL_FROM_ADDRESS="Changed <changed@example.com>",
         PUBLIC_SITE_URL="https://changed.example",
     ):
         delivery.refresh_from_db()
@@ -587,7 +700,6 @@ class Response:
 
 @override_settings(
     RESEND_API_KEY="test-api-key",
-    RESEND_FROM_EMAIL="Posts <posts@example.com>",
 )
 def test_resend_adapter_sends_exact_api_contract_without_leaking_errors():
     captured = {}
@@ -647,7 +759,7 @@ def test_resend_adapter_sends_exact_api_contract_without_leaking_errors():
         ),
     ],
 )
-@override_settings(RESEND_API_KEY="test-api-key", RESEND_FROM_EMAIL="posts@example.com")
+@override_settings(RESEND_API_KEY="test-api-key")
 def test_resend_adapter_classifies_timeout_4xx_and_5xx(error, retryable):
     provider = ResendEmailProvider(opener=lambda request, timeout: (_ for _ in ()).throw(error))
     message = type(

@@ -112,10 +112,24 @@ the absolute window.
 
 ### Provider and messages
 
-The provider interface is `send(message, idempotency_key)`. Production uses
-the Resend `POST /emails` adapter; tests use a deterministic in-memory adapter
-or explicit fakes and perform no network I/O. Safe error classifications, not
-provider response bodies, are persisted.
+The provider interface is
+`serialize_request(message) -> bytes` plus
+`send(message, idempotency_key)`. The serializer must return the exact,
+deterministic request-body bytes that the matching `send` implementation uses.
+Production currently ships one external adapter, Resend `POST /emails`; the
+memory adapter is for local/test use and performs no network I/O. Replacing
+Resend is therefore an explicit adapter implementation task, not an unchecked
+settings-only substitution: a new adapter must define and test its exact-byte
+serializer and safe error classifications.
+
+`EMAIL_FROM_ADDRESS` is a provider-independent immutable message input and is
+required for every production adapter. It is trimmed and rejected at settings
+import when empty/whitespace-only, longer than 512 code points, containing
+CR/LF, or not parseable as a valid mailbox (an optional display name is
+allowed). `RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET` are required only when
+the Resend adapter is selected. Thus any production settings configuration
+that imports successfully has a usable FROM snapshot without depending on a
+Resend credential.
 
 Every outbox event captures message schema version, FROM address, public
 origin, subject, and—when applicable—publication title, excerpt, and canonical
@@ -124,15 +138,27 @@ one immutable credential issue time. Confirmation and unsubscribe credentials
 are regenerated deterministically from those inputs and the signing secret;
 the raw signed value is never stored.
 
-The delivery also stores SHA-256 of the exact compact UTF-8 JSON body sent to
-Resend. This fingerprint is created with the delivery and checked before every
-provider call. Thus the same `email/<delivery UUID>` key can reach Resend only
-with a byte-equivalent body. A post edit/republish, template deployment,
-`RESEND_FROM_EMAIL` change, or public-origin change does not silently mutate an
-existing request. Unsupported schema or fingerprint mismatch becomes terminal
-`manual_review` without provider I/O. A new template shape requires a new
-message schema version while older renderers remain available until their
+The delivery also stores SHA-256 of the exact body bytes returned by the
+selected adapter serializer. The fingerprint is created with the delivery
+using the same provider instance chosen for processing and checked through
+that provider immediately before every `send`. For Resend these are the exact
+compact UTF-8 JSON bytes used as the HTTP body. Thus the same
+`email/<delivery UUID>` key can reach Resend only with a byte-equivalent body.
+A post edit/republish, template deployment, `EMAIL_FROM_ADDRESS` change, or
+public-origin change does not silently mutate an existing request. Unsupported
+schema, provider swap, serializer drift, or fingerprint mismatch becomes
+terminal `manual_review` without provider I/O. A new template shape requires a
+new message schema version while older renderers remain available until their
 deliveries are terminal.
+
+Snapshot storage has explicit non-truncating boundaries. The sender and
+subject fields allow 512 code points; the publication title remains the
+Wagtail 255-code-point title; excerpt is snapshotted to text after enforcing
+its authored 320-code-point limit; and public origin is bounded to 2,048.
+Canonical/fallback post URLs use text storage plus an 8,192-code-point
+application boundary, which covers a maximum Unicode slug after IRI encoding
+and a maximum accepted origin. `New post: ` plus a maximum Wagtail title is
+stored in full (265 code points); no immutable subject is silently truncated.
 
 Templates render explicit HTML and plain text parts. Publication messages
 contain only the snapshotted title, excerpt, canonical public URL, and
@@ -219,6 +245,21 @@ Negative:
   delivery, and rate-limit retention remains future policy;
 - actual periodic scheduling, alerting, DNS, and provider configuration remain
   infrastructure work.
+- a replacement external provider must implement the exact request-byte
+  serialization contract; the bundled memory adapter is not production email
+  delivery.
+
+### Migration amendment before deployment
+
+`subscriptions.0002_harden_email_delivery` had not been pushed or applied to
+staging/production when the second remediation audit found that its
+`snapshot_subject varchar(255)` could fail while backfilling
+`New post: ` plus an existing 255-character title. The migration itself is
+amended rather than adding `0003`: it now creates the subject as
+`varchar(512)`, sender as `varchar(512)`, and post URL as text before its data
+backfill runs. `0001_initial` remains unchanged. This makes both a fresh chain
+and the direct `0001 -> latest` upgrade safe; a later migration could not have
+repaired a failure occurring inside the earlier data migration.
 
 ## Revisit conditions
 

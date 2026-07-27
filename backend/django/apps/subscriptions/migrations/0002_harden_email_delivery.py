@@ -14,7 +14,11 @@ def backfill_immutable_delivery_state(apps, schema_editor):
     EmailWebhookEvent = apps.get_model("subscriptions", "EmailWebhookEvent")
 
     site_url = settings.PUBLIC_SITE_URL.rstrip("/")
-    from_email = settings.RESEND_FROM_EMAIL
+    from_email = settings.EMAIL_FROM_ADDRESS
+    if len(site_url) > 2_048:
+        raise RuntimeError("PUBLIC_SITE_URL exceeds the immutable snapshot boundary")
+    if len(from_email) > 512:
+        raise RuntimeError("EMAIL_FROM_ADDRESS exceeds the immutable snapshot boundary")
     for event in EmailOutbox.objects.select_related("post").iterator():
         event.message_schema_version = 1
         event.snapshot_from_email = from_email
@@ -168,7 +172,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="emailoutbox",
             name="snapshot_from_email",
-            field=models.CharField(default="migration-pending", editable=False, max_length=320),
+            field=models.CharField(default="migration-pending", editable=False, max_length=512),
             preserve_default=False,
         ),
         migrations.AddField(
@@ -184,7 +188,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="emailoutbox",
             name="snapshot_post_url",
-            field=models.CharField(blank=True, editable=False, max_length=2048),
+            field=models.TextField(blank=True, editable=False),
         ),
         migrations.AddField(
             model_name="emailoutbox",
@@ -195,7 +199,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="emailoutbox",
             name="snapshot_subject",
-            field=models.CharField(default="migration-pending", editable=False, max_length=255),
+            field=models.CharField(default="migration-pending", editable=False, max_length=512),
             preserve_default=False,
         ),
         migrations.AddField(

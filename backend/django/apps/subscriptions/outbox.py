@@ -7,24 +7,41 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.blog.services.visibility import public_blog_posts
+from apps.subscriptions.message_limits import (
+    MAX_EMAIL_SUBJECT_LENGTH,
+    MAX_PUBLIC_ORIGIN_LENGTH,
+    MAX_PUBLICATION_EXCERPT_LENGTH,
+    MAX_PUBLICATION_TITLE_LENGTH,
+    MAX_SNAPSHOT_URL_LENGTH,
+    bounded_snapshot_value,
+)
 from apps.subscriptions.messages import MESSAGE_SCHEMA_VERSION, message_for_delivery
 from apps.subscriptions.models import EmailDelivery, EmailOutbox, Subscriber
 from apps.subscriptions.providers.base import EmailProviderError
-from apps.subscriptions.providers.resend import serialize_resend_request
+from config.email_settings import normalize_email_from_address
 
 
 def _common_snapshot():
     return {
         "message_schema_version": MESSAGE_SCHEMA_VERSION,
-        "snapshot_from_email": settings.RESEND_FROM_EMAIL,
-        "snapshot_site_url": settings.PUBLIC_SITE_URL.rstrip("/"),
+        "snapshot_from_email": normalize_email_from_address(settings.EMAIL_FROM_ADDRESS),
+        "snapshot_site_url": bounded_snapshot_value(
+            settings.PUBLIC_SITE_URL.rstrip("/"),
+            name="PUBLIC_SITE_URL",
+            max_length=MAX_PUBLIC_ORIGIN_LENGTH,
+        ),
     }
 
 
 def confirmation_outbox_snapshot():
+    subject = "Confirm your subscription to Kirill Wynn"
     return {
         **_common_snapshot(),
-        "snapshot_subject": "Confirm your subscription to Kirill Wynn",
+        "snapshot_subject": bounded_snapshot_value(
+            subject,
+            name="confirmation subject",
+            max_length=MAX_EMAIL_SUBJECT_LENGTH,
+        ),
         "snapshot_post_title": "",
         "snapshot_post_excerpt": "",
         "snapshot_post_url": "",
@@ -32,12 +49,30 @@ def confirmation_outbox_snapshot():
 
 
 def publication_outbox_snapshot(post):
+    title = bounded_snapshot_value(
+        post.title,
+        name="publication title",
+        max_length=MAX_PUBLICATION_TITLE_LENGTH,
+    )
+    excerpt = bounded_snapshot_value(
+        post.excerpt,
+        name="publication excerpt",
+        max_length=MAX_PUBLICATION_EXCERPT_LENGTH,
+    )
     return {
         **_common_snapshot(),
-        "snapshot_subject": f"New post: {post.title}",
-        "snapshot_post_title": post.title,
-        "snapshot_post_excerpt": post.excerpt,
-        "snapshot_post_url": post.resolved_canonical_url,
+        "snapshot_subject": bounded_snapshot_value(
+            f"New post: {title}",
+            name="publication subject",
+            max_length=MAX_EMAIL_SUBJECT_LENGTH,
+        ),
+        "snapshot_post_title": title,
+        "snapshot_post_excerpt": excerpt,
+        "snapshot_post_url": bounded_snapshot_value(
+            post.resolved_canonical_url,
+            name="publication URL",
+            max_length=MAX_SNAPSHOT_URL_LENGTH,
+        ),
     }
 
 
@@ -107,11 +142,11 @@ def _delivery_status_for_subscriber(event, subscriber):
     return EmailDelivery.Status.PENDING if eligible else EmailDelivery.Status.SKIPPED
 
 
-def _create_delivery(event, subscriber, now):
+def _create_delivery(event, subscriber, now, provider):
     existing = EmailDelivery.objects.filter(outbox=event, subscriber=subscriber).first()
     if existing is not None:
         return existing, False
-    delivery = _new_delivery(event, subscriber, now)
+    delivery = _new_delivery(event, subscriber, now, provider)
     try:
         with transaction.atomic():
             delivery.save(force_insert=True)
@@ -120,7 +155,7 @@ def _create_delivery(event, subscriber, now):
     return delivery, True
 
 
-def _new_delivery(event, subscriber, now):
+def _new_delivery(event, subscriber, now, provider):
     credential_version = (
         event.credential_version
         if event.message_type == EmailOutbox.MessageType.CONFIRMATION
@@ -135,16 +170,22 @@ def _new_delivery(event, subscriber, now):
         snapshot_credential_version=credential_version,
         credential_issued_at=now,
     )
-    delivery.provider_payload_hash = _provider_payload_hash(delivery)
+    delivery.provider_payload_hash = _provider_payload_hash(delivery, provider)
     return delivery
 
 
-def _provider_payload_hash(delivery):
-    body = serialize_resend_request(message_for_delivery(delivery))
+def _provider_payload_hash(delivery, provider):
+    body = provider.serialize_request(message_for_delivery(delivery))
+    if not isinstance(body, bytes):
+        raise TypeError("Email provider serialize_request() must return bytes")
     return hashlib.sha256(body).hexdigest()
 
 
-def build_delivery_batch(event_id, *, limit, at=None):
+def build_delivery_batch(event_id, *, limit, at=None, provider=None):
+    if provider is None:
+        from apps.subscriptions.providers import configured_email_provider
+
+        provider = configured_email_provider()
     now = at or timezone.now()
     with transaction.atomic():
         event = (
@@ -153,7 +194,7 @@ def build_delivery_batch(event_id, *, limit, at=None):
         if event.status != EmailOutbox.Status.PROCESSING:
             return []
         if event.message_type == EmailOutbox.MessageType.CONFIRMATION:
-            delivery, _ = _create_delivery(event, event.subscriber, now)
+            delivery, _ = _create_delivery(event, event.subscriber, now, provider)
             return [delivery.pk]
 
         delivered_subscribers = EmailDelivery.objects.filter(outbox=event).values("subscriber_id")
@@ -166,7 +207,7 @@ def build_delivery_batch(event_id, *, limit, at=None):
             .order_by("confirmed_at", "id")[:limit]
         )
         EmailDelivery.objects.bulk_create(
-            [_new_delivery(event, subscriber, now) for subscriber in subscribers],
+            [_new_delivery(event, subscriber, now, provider) for subscriber in subscribers],
             ignore_conflicts=True,
         )
         return list(
@@ -340,7 +381,7 @@ def _mark_delivery_failure(delivery, error, *, at=None):
         current.save(update_fields=update_fields)
 
 
-def _prepare_provider_attempt(delivery_id, *, at=None):
+def _prepare_provider_attempt(delivery_id, *, provider, at=None):
     now = at or timezone.now()
     with transaction.atomic():
         delivery = (
@@ -377,7 +418,10 @@ def _prepare_provider_attempt(delivery_id, *, at=None):
             return None
         try:
             message = message_for_delivery(delivery)
-            payload_hash = hashlib.sha256(serialize_resend_request(message)).hexdigest()
+            body = provider.serialize_request(message)
+            if not isinstance(body, bytes):
+                raise TypeError
+            payload_hash = hashlib.sha256(body).hexdigest()
         except (TypeError, ValueError):
             _mark_manual_review(
                 delivery,
@@ -420,7 +464,7 @@ def process_delivery(delivery_id, *, provider, at=None):
 
     # The claim transaction has committed. No provider I/O occurs while a
     # database transaction or a Wagtail publication transaction is open.
-    prepared = _prepare_provider_attempt(delivery.pk, at=at)
+    prepared = _prepare_provider_attempt(delivery.pk, provider=provider, at=at)
     if prepared is None:
         return False
     current, message = prepared
@@ -551,7 +595,7 @@ def finalize_outbox_event(event_id, *, at=None):
 
 def process_outbox_event(event_id, *, provider, delivery_limit=None, at=None):
     limit = delivery_limit or settings.EMAIL_DELIVERY_BATCH_SIZE
-    build_delivery_batch(event_id, limit=limit, at=at)
+    build_delivery_batch(event_id, limit=limit, at=at, provider=provider)
     stale_before = (at or timezone.now()) - timedelta(
         seconds=settings.EMAIL_OUTBOX_PROCESSING_TIMEOUT_SECONDS
     )

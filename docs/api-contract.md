@@ -624,6 +624,14 @@ initialization. A limit response is 429 with integer `Retry-After`.
 Subscription responses are `private, no-store`, JSON-only, and never return an
 email, subscriber UUID, provider data, or internal lifecycle state.
 
+This remediation does not change any public route or response shape.
+Production email configuration uses provider-independent
+`EMAIL_FROM_ADDRESS`; it is snapshotted before outbox creation and validated
+before a transaction can reach a database constraint. Maximum authored titles
+produce the full immutable `New post: <title>` subject without truncation.
+Provider request fingerprints are internal and come from the exact bytes
+selected by the configured adapter.
+
 ### `POST /api/v1/subscriptions/`
 
 This anonymous browser endpoint still requires the normal same-origin CSRF

@@ -8,24 +8,14 @@ from apps.subscriptions.providers.base import (
     EmailProvider,
     EmailProviderError,
     ProviderSendResult,
+    serialize_email_request,
 )
 
 RESEND_SEND_URL = "https://api.resend.com/emails"
 
 
 def serialize_resend_request(message):
-    return json.dumps(
-        {
-            "from": message.from_email,
-            "to": [message.to],
-            "subject": message.subject,
-            "text": message.text,
-            "html": message.html,
-            "headers": message.headers,
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-    ).encode()
+    return serialize_email_request(message)
 
 
 def _read_bounded(response, limit):
@@ -78,7 +68,7 @@ class ResendEmailProvider(EmailProvider):
         self.opener = opener or urllib.request.urlopen
 
     def send(self, message, idempotency_key):
-        body = serialize_resend_request(message)
+        body = self.serialize_request(message)
         request = urllib.request.Request(
             RESEND_SEND_URL,
             data=body,
