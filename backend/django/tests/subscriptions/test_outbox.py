@@ -32,6 +32,7 @@ from apps.subscriptions.outbox import (
 )
 from apps.subscriptions.providers import configured_email_provider
 from apps.subscriptions.providers.base import (
+    MAX_PROVIDER_REQUEST_BODY_BYTES,
     EmailProvider,
     EmailProviderError,
     ProviderSendResult,
@@ -67,7 +68,7 @@ def publication_event(post):
     )
 
 
-def build_pending_publication_delivery(blog_post, *, at=None):
+def build_pending_publication_delivery(blog_post, *, at=None, provider=None):
     now = at or timezone.now()
     subscriber = active_subscriber(
         f"reader-{blog_post.pk}@example.com",
@@ -78,7 +79,7 @@ def build_pending_publication_delivery(blog_post, *, at=None):
         EmailOutbox.objects.filter(pk=event.pk).update(available_at=now)
         event.available_at = now
     claim_outbox_batch(limit=1, at=now)
-    delivery_id = build_delivery_batch(event.pk, limit=1, at=now)[0]
+    delivery_id = build_delivery_batch(event.pk, limit=1, at=now, provider=provider)[0]
     return subscriber, event, EmailDelivery.objects.get(pk=delivery_id)
 
 
@@ -185,12 +186,13 @@ def test_confirmation_is_sent_only_by_worker_with_multipart_body():
     call_command("process_email_outbox", limit=10, verbosity=0)
 
     assert len(MemoryEmailProvider.sent) == 1
-    message, idempotency_key = MemoryEmailProvider.sent[0]
-    assert message.to == "reader@example.com"
-    assert "Confirm your subscription" in message.subject
-    assert "Confirm your subscription" in message.text
-    assert "<h1>Confirm your subscription</h1>" in message.html
-    assert "#credential=" in message.html
+    prepared_request, idempotency_key = MemoryEmailProvider.sent[0]
+    payload = json.loads(prepared_request.body)
+    assert payload["to"] == ["reader@example.com"]
+    assert "Confirm your subscription" in payload["subject"]
+    assert "Confirm your subscription" in payload["text"]
+    assert "<h1>Confirm your subscription</h1>" in payload["html"]
+    assert "#credential=" in payload["html"]
     assert idempotency_key == f"email/{event.deliveries.get().pk}"
 
 
@@ -213,7 +215,7 @@ def test_non_resend_production_like_configuration_creates_and_processes_confirma
     assert sent == 1
     assert status == EmailOutbox.Status.DELIVERED
     assert delivery.status == EmailDelivery.Status.SENT
-    assert MemoryEmailProvider.sent[0][0].from_email == event.snapshot_from_email
+    assert json.loads(MemoryEmailProvider.sent[0][0].body)["from"] == event.snapshot_from_email
 
 
 @override_settings(EMAIL_FROM_ADDRESS=" \r\n ")
@@ -227,14 +229,17 @@ def test_invalid_from_address_fails_before_confirmation_transaction():
 
 def test_provider_fingerprint_uses_exact_bytes_selected_by_adapter():
     class CustomBodyProvider(EmailProvider):
+        transport_contract_id = "test.custom-body"
+        serializer_contract_version = 1
+
         def __init__(self):
             self.sent_bodies = []
 
         def serialize_request(self, message):
             return f"custom-body:{message.to}:{message.subject}".encode()
 
-        def send(self, message, idempotency_key):
-            self.sent_bodies.append(self.serialize_request(message))
+        def send(self, prepared_request, idempotency_key):
+            self.sent_bodies.append(prepared_request.body)
             return ProviderSendResult(message_id="custom-body-provider-id")
 
     subscriber = request_subscription("custom-provider@example.com")
@@ -248,6 +253,192 @@ def test_provider_fingerprint_uses_exact_bytes_selected_by_adapter():
     assert sent == 1
     assert status == EmailOutbox.Status.DELIVERED
     assert delivery.provider_payload_hash == hashlib.sha256(provider.sent_bodies[0]).hexdigest()
+
+
+class RecordingProvider(EmailProvider):
+    transport_contract_id = "test.recording"
+    serializer_contract_version = 1
+
+    def __init__(self, *, failures=0):
+        self.failures = failures
+        self.calls = []
+        self.serialize_calls = 0
+
+    def serialize_request(self, message):
+        self.serialize_calls += 1
+        return super().serialize_request(message)
+
+    def send(self, prepared_request, idempotency_key):
+        self.calls.append((prepared_request, idempotency_key))
+        if len(self.calls) <= self.failures:
+            raise EmailProviderError(
+                "Ambiguous provider timeout",
+                retryable=True,
+                ambiguity_reason=EmailDelivery.AmbiguityReason.TRANSPORT_FAILURE,
+            )
+        return ProviderSendResult(message_id=f"recording-{len(self.calls)}")
+
+
+class OtherRecordingProvider(RecordingProvider):
+    transport_contract_id = "test.other-recording"
+
+
+@override_settings(
+    EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE="provider-a/production/account-main",
+    EMAIL_OUTBOX_RETRY_BASE_SECONDS=1,
+    EMAIL_OUTBOX_RETRY_MAX_SECONDS=1,
+)
+def test_ambiguous_provider_swap_with_identical_bytes_requires_manual_review(blog_post):
+    first_at = timezone.now()
+    provider_a = RecordingProvider(failures=1)
+    _, event, delivery = build_pending_publication_delivery(
+        blog_post,
+        at=first_at,
+        provider=provider_a,
+    )
+    process_outbox_event(event.pk, provider=provider_a, at=first_at)
+    delivery.refresh_from_db()
+    assert delivery.status == EmailDelivery.Status.PENDING
+
+    retry_at = first_at + timedelta(seconds=2)
+    provider_b = OtherRecordingProvider()
+    claim_outbox_batch(limit=1, at=retry_at)
+    sent, _ = process_outbox_event(event.pk, provider=provider_b, at=retry_at)
+
+    delivery.refresh_from_db()
+    assert sent == 0
+    assert delivery.status == EmailDelivery.Status.MANUAL_REVIEW
+    assert delivery.ambiguity_reason == EmailDelivery.AmbiguityReason.TRANSPORT_IDENTITY_MISMATCH
+    assert provider_b.calls == []
+    assert provider_a.calls[0][0].body == provider_b.serialize_request(
+        message_for_delivery(delivery)
+    )
+
+
+def test_same_adapter_with_different_idempotency_namespace_never_calls_provider(blog_post):
+    provider = RecordingProvider()
+    with override_settings(EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE="resend/production/account-a"):
+        _, event, delivery = build_pending_publication_delivery(
+            blog_post,
+            provider=provider,
+        )
+
+    with override_settings(EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE="resend/production/account-b"):
+        sent, _ = process_outbox_event(event.pk, provider=provider)
+
+    delivery.refresh_from_db()
+    assert sent == 0
+    assert delivery.status == EmailDelivery.Status.MANUAL_REVIEW
+    assert delivery.ambiguity_reason == EmailDelivery.AmbiguityReason.IDEMPOTENCY_NAMESPACE_MISMATCH
+    assert provider.calls == []
+
+
+def test_serializer_contract_version_drift_never_calls_provider(blog_post):
+    class VersionTwoProvider(RecordingProvider):
+        serializer_contract_version = 2
+
+    provider_v1 = RecordingProvider()
+    _, event, delivery = build_pending_publication_delivery(
+        blog_post,
+        provider=provider_v1,
+    )
+    provider_v2 = VersionTwoProvider()
+
+    sent, _ = process_outbox_event(event.pk, provider=provider_v2)
+
+    delivery.refresh_from_db()
+    assert sent == 0
+    assert delivery.status == EmailDelivery.Status.MANUAL_REVIEW
+    assert delivery.ambiguity_reason == EmailDelivery.AmbiguityReason.SERIALIZER_VERSION_MISMATCH
+    assert provider_v2.calls == []
+
+
+@override_settings(
+    EMAIL_OUTBOX_RETRY_BASE_SECONDS=1,
+    EMAIL_OUTBOX_RETRY_MAX_SECONDS=1,
+)
+def test_same_transport_identity_namespace_and_bytes_allows_normal_retry(blog_post):
+    first_at = timezone.now()
+    provider = RecordingProvider(failures=1)
+    _, event, delivery = build_pending_publication_delivery(
+        blog_post,
+        at=first_at,
+        provider=provider,
+    )
+    process_outbox_event(event.pk, provider=provider, at=first_at)
+
+    retry_at = first_at + timedelta(seconds=2)
+    claim_outbox_batch(limit=1, at=retry_at)
+    sent, _ = process_outbox_event(event.pk, provider=provider, at=retry_at)
+
+    delivery.refresh_from_db()
+    first_request, first_key = provider.calls[0]
+    second_request, second_key = provider.calls[1]
+    assert sent == 1
+    assert delivery.status == EmailDelivery.Status.SENT
+    assert first_request.body == second_request.body
+    assert first_request.transport == second_request.transport
+    assert first_key == second_key == delivery.provider_idempotency_key
+    assert provider.serialize_calls == 3
+
+
+def test_drifting_serializer_cannot_replace_verified_body_inside_send(blog_post):
+    class ThirdCallDriftsProvider(RecordingProvider):
+        def serialize_request(self, message):
+            self.serialize_calls += 1
+            body = serialize_resend_request(message)
+            return body if self.serialize_calls <= 2 else body + b" "
+
+    provider = ThirdCallDriftsProvider()
+    _, event, delivery = build_pending_publication_delivery(
+        blog_post,
+        provider=provider,
+    )
+
+    sent, _ = process_outbox_event(event.pk, provider=provider)
+
+    delivery.refresh_from_db()
+    prepared_request, _ = provider.calls[0]
+    assert sent == 1
+    assert provider.serialize_calls == 2
+    assert hashlib.sha256(prepared_request.body).hexdigest() == delivery.provider_payload_hash
+
+
+def test_prepared_provider_body_is_bounded_before_delivery_creation(blog_post):
+    class OversizedProvider(RecordingProvider):
+        def serialize_request(self, message):
+            return b"x" * (MAX_PROVIDER_REQUEST_BODY_BYTES + 1)
+
+    provider = OversizedProvider()
+
+    with pytest.raises(ValueError, match="bounded non-empty bytes"):
+        build_pending_publication_delivery(blog_post, provider=provider)
+
+    assert provider.calls == []
+    assert EmailDelivery.objects.count() == 0
+
+
+def test_different_deliveries_and_targets_keep_independent_transport_keys_and_hashes(
+    blog_post,
+):
+    base = timezone.now() - timedelta(days=1)
+    active_subscriber("first-target@example.com", base)
+    active_subscriber("second-target@example.com", base)
+    event = publication_event(publish(blog_post))
+    provider = RecordingProvider()
+    claim_outbox_batch(limit=1)
+
+    sent, _ = process_outbox_event(event.pk, provider=provider)
+
+    deliveries = list(event.deliveries.order_by("snapshot_recipient_email"))
+    assert sent == 2
+    assert len(provider.calls) == 2
+    assert len({delivery.provider_payload_hash for delivery in deliveries}) == 2
+    assert len({delivery.provider_idempotency_key for delivery in deliveries}) == 2
+    assert {delivery.provider_contract_id for delivery in deliveries} == {
+        provider.transport_contract_id
+    }
+    assert {delivery.provider_idempotency_namespace for delivery in deliveries} == {"local/test"}
 
 
 def test_publication_snapshot_boundaries_cover_maximum_wagtail_inputs(blog_post):
@@ -307,13 +498,13 @@ def test_publication_template_escapes_values_omits_body_and_has_unsubscribe_head
     claim_outbox_batch(limit=1)
     process_outbox_event(event.pk, provider=MemoryEmailProvider())
 
-    message, _ = MemoryEmailProvider.sent[0]
-    assert "A new &lt;safe&gt; post" in message.html
-    assert "&lt;script&gt;" in message.html
-    assert "Body that must not enter email" not in message.html
-    assert message.headers["List-Unsubscribe"].startswith("<http://localhost:3000/")
-    assert message.headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
-    assert "/subscriptions/unsubscribe/" in message.text
+    payload = json.loads(MemoryEmailProvider.sent[0][0].body)
+    assert "A new &lt;safe&gt; post" in payload["html"]
+    assert "&lt;script&gt;" in payload["html"]
+    assert "Body that must not enter email" not in payload["html"]
+    assert payload["headers"]["List-Unsubscribe"].startswith("<http://localhost:3000/")
+    assert payload["headers"]["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+    assert "/subscriptions/unsubscribe/" in payload["text"]
 
 
 @override_settings(
@@ -374,23 +565,30 @@ def test_payload_fingerprint_mismatch_requires_manual_review_without_provider_ca
 
 
 class SelectiveProvider(EmailProvider):
+    transport_contract_id = "memory.email"
+    serializer_contract_version = 1
+
     def __init__(self, failures):
         self.failures = failures
         self.calls = []
 
-    def send(self, message, idempotency_key):
-        self.calls.append((message.to, idempotency_key))
-        if message.to in self.failures:
+    def send(self, prepared_request, idempotency_key):
+        recipient = json.loads(prepared_request.body)["to"][0]
+        self.calls.append((recipient, idempotency_key))
+        if recipient in self.failures:
             raise EmailProviderError("Sanitized provider failure", retryable=True)
         return ProviderSendResult(message_id=f"provider-{len(self.calls)}")
 
 
 class AlwaysTimeoutProvider(EmailProvider):
+    transport_contract_id = "memory.email"
+    serializer_contract_version = 1
+
     def __init__(self):
         self.calls = []
 
-    def send(self, message, idempotency_key):
-        self.calls.append((message, idempotency_key))
+    def send(self, prepared_request, idempotency_key):
+        self.calls.append((prepared_request, idempotency_key))
         raise EmailProviderError(
             "Sanitized timeout",
             retryable=True,
@@ -422,6 +620,14 @@ def test_timeout_pending_and_retries_keep_one_absolute_provider_window(blog_post
         assert delivery.processing_at is None
 
     assert len(provider.calls) == 3
+    assert len({request.body for request, _ in provider.calls}) == 1
+    assert len({request.transport for request, _ in provider.calls}) == 1
+    assert {key for _, key in provider.calls} == {delivery.provider_idempotency_key}
+    assert provider.calls[0][0].transport.contract_id == delivery.provider_contract_id
+    assert (
+        provider.calls[0][0].transport.idempotency_namespace
+        == delivery.provider_idempotency_namespace
+    )
 
 
 @override_settings(
@@ -500,9 +706,11 @@ def test_provider_acceptance_wins_in_flight_unsubscribe_but_subscriber_stays_uns
     )
 
     class UnsubscribingProvider(EmailProvider):
+        transport_contract_id = "memory.email"
+        serializer_contract_version = 1
         calls = 0
 
-        def send(self, message, idempotency_key):
+        def send(self, prepared_request, idempotency_key):
             self.calls += 1
             unsubscribe_with_credential(credential)
             delivery.refresh_from_db()
@@ -643,6 +851,9 @@ def test_ambiguous_processing_past_provider_window_fails_without_resend(blog_pos
         snapshot_recipient_email=subscriber.email,
         snapshot_credential_version=subscriber.unsubscribe_token_version,
         credential_issued_at=old,
+        provider_contract_id="memory.email",
+        provider_serializer_version=1,
+        provider_idempotency_namespace="local/test",
         provider_payload_hash="0" * 64,
         first_provider_attempt_at=old,
         last_provider_attempt_at=old,
@@ -722,15 +933,60 @@ def test_resend_adapter_sends_exact_api_contract_without_leaking_errors():
             "headers": {"List-Unsubscribe": "<https://example.com>"},
         },
     )()
-    result = provider.send(message, "email/immutable-id")
+    prepared_request = provider.prepare_request(message)
+    result = provider.send(prepared_request, "email/immutable-id")
 
     assert result.message_id == "resend-message-id"
     assert captured["request"].full_url == "https://api.resend.com/emails"
     assert captured["request"].headers["Idempotency-key"] == "email/immutable-id"
     assert captured["request"].headers["Authorization"] == "Bearer test-api-key"
+    assert captured["request"].data is prepared_request.body
     payload = json.loads(captured["request"].data)
     assert payload["text"] == "Text"
     assert payload["html"] == "<p>HTML</p>"
+
+
+@override_settings(
+    RESEND_API_KEY="super-secret-api-key",
+    EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE=" Resend/Staging/Account-Test ",
+)
+def test_worker_sends_the_exact_verified_resend_body_once_per_attempt(blog_post):
+    captured = {}
+
+    class CountingResendProvider(ResendEmailProvider):
+        def __init__(self):
+            super().__init__(opener=self.capture)
+            self.serialize_calls = 0
+
+        def serialize_request(self, message):
+            self.serialize_calls += 1
+            return super().serialize_request(message)
+
+        def capture(self, request, timeout):
+            captured["body"] = request.data
+            captured["key"] = request.headers["Idempotency-key"]
+            captured["timeout"] = timeout
+            return Response()
+
+    provider = CountingResendProvider()
+    _, event, delivery = build_pending_publication_delivery(
+        blog_post,
+        provider=provider,
+    )
+
+    sent, _ = process_outbox_event(event.pk, provider=provider)
+
+    delivery.refresh_from_db()
+    assert sent == 1
+    assert provider.serialize_calls == 2
+    assert hashlib.sha256(captured["body"]).hexdigest() == delivery.provider_payload_hash
+    assert captured["key"] == delivery.provider_idempotency_key
+    assert delivery.provider_contract_id == "resend.emails"
+    assert delivery.provider_serializer_version == 1
+    assert delivery.provider_idempotency_namespace == "resend/staging/account-test"
+    assert "super-secret-api-key" not in (
+        delivery.provider_contract_id + delivery.provider_idempotency_namespace
+    )
 
 
 @pytest.mark.parametrize(
@@ -776,7 +1032,7 @@ def test_resend_adapter_classifies_timeout_4xx_and_5xx(error, retryable):
     )()
 
     with pytest.raises(EmailProviderError) as captured:
-        provider.send(message, "email/immutable-id")
+        provider.send(provider.prepare_request(message), "email/immutable-id")
 
     assert captured.value.retryable is retryable
     assert "secret provider body" not in captured.value.safe_message
@@ -832,7 +1088,7 @@ def test_resend_adapter_classifies_official_and_unknown_409_variants(
     )()
 
     with pytest.raises(EmailProviderError) as captured:
-        provider.send(message, "email/immutable-id")
+        provider.send(provider.prepare_request(message), "email/immutable-id")
 
     assert captured.value.retryable is retryable
     assert captured.value.ambiguity_reason == ambiguity_reason
@@ -870,9 +1126,9 @@ def test_resend_adapter_bounds_success_and_error_response_bodies():
     )
 
     with pytest.raises(EmailProviderError) as success:
-        success_provider.send(message, "email/success")
+        success_provider.send(success_provider.prepare_request(message), "email/success")
     with pytest.raises(EmailProviderError) as failure:
-        error_provider.send(message, "email/error")
+        error_provider.send(error_provider.prepare_request(message), "email/error")
 
     assert success.value.safe_message == "Resend returned an oversized response"
     assert failure.value.safe_message == "Resend HTTP 503 (oversized error response)"

@@ -64,14 +64,16 @@ def _http_error(status, response_body=b""):
 
 
 class ResendEmailProvider(EmailProvider):
+    transport_contract_id = "resend.emails"
+    serializer_contract_version = 1
+
     def __init__(self, *, opener=None):
         self.opener = opener or urllib.request.urlopen
 
-    def send(self, message, idempotency_key):
-        body = self.serialize_request(message)
+    def send(self, prepared_request, idempotency_key):
         request = urllib.request.Request(
             RESEND_SEND_URL,
-            data=body,
+            data=prepared_request.body,
             method="POST",
             headers={
                 "Authorization": f"Bearer {settings.RESEND_API_KEY}",

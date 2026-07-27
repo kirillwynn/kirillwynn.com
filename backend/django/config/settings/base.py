@@ -280,6 +280,10 @@ REVALIDATION_PROCESSING_TIMEOUT_SECONDS = int(
 EMAIL_PROVIDER_ADAPTER = os.environ.get(
     "EMAIL_PROVIDER_ADAPTER", "apps.subscriptions.providers.memory.MemoryEmailProvider"
 ).strip()
+EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE = os.environ.get(
+    "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
+    "local/test",
+)
 EMAIL_FROM_ADDRESS = normalize_email_from_address(
     os.environ.get(
         "EMAIL_FROM_ADDRESS",

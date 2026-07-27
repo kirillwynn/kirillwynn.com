@@ -6,7 +6,7 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import URLValidator
 from svix.webhooks import Webhook
 
-from config.email_settings import normalize_email_from_address
+from config.email_settings import normalize_email_from_address, normalize_transport_identity
 from config.settings.base import *  # noqa: F403
 
 required_environment = {
@@ -23,6 +23,7 @@ required_environment = {
     "REVALIDATION_URL": os.environ.get("REVALIDATION_URL"),
     "REVALIDATION_SECRET": os.environ.get("REVALIDATION_SECRET"),
     "EMAIL_FROM_ADDRESS": os.environ.get("EMAIL_FROM_ADDRESS"),
+    "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE": os.environ.get("EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"),
     "SUBSCRIPTION_SIGNING_SECRET": os.environ.get("SUBSCRIPTION_SIGNING_SECRET"),
     **OAUTH_CREDENTIALS,  # noqa: F405
 }
@@ -80,6 +81,10 @@ if len(os.environ["REVALIDATION_SECRET"].encode()) < 32:
 if len(os.environ["SUBSCRIPTION_SIGNING_SECRET"].encode()) < 32:
     raise ImproperlyConfigured("SUBSCRIPTION_SIGNING_SECRET must be at least 32 bytes")
 EMAIL_FROM_ADDRESS = normalize_email_from_address(os.environ["EMAIL_FROM_ADDRESS"])
+EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE = normalize_transport_identity(
+    os.environ["EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"],
+    name="EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
+)
 if EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailProvider":
     try:
         webhook_secret = os.environ["RESEND_WEBHOOK_SECRET"].strip()

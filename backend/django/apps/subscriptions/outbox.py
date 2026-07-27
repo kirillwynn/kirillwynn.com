@@ -2,6 +2,7 @@ import hashlib
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -170,14 +171,15 @@ def _new_delivery(event, subscriber, now, provider):
         snapshot_credential_version=credential_version,
         credential_issued_at=now,
     )
-    delivery.provider_payload_hash = _provider_payload_hash(delivery, provider)
+    prepared_request = provider.prepare_request(message_for_delivery(delivery))
+    delivery.provider_contract_id = prepared_request.transport.contract_id
+    delivery.provider_serializer_version = prepared_request.transport.serializer_version
+    delivery.provider_idempotency_namespace = prepared_request.transport.idempotency_namespace
+    delivery.provider_payload_hash = _provider_payload_hash(prepared_request.body)
     return delivery
 
 
-def _provider_payload_hash(delivery, provider):
-    body = provider.serialize_request(message_for_delivery(delivery))
-    if not isinstance(body, bytes):
-        raise TypeError("Email provider serialize_request() must return bytes")
+def _provider_payload_hash(body):
     return hashlib.sha256(body).hexdigest()
 
 
@@ -418,17 +420,39 @@ def _prepare_provider_attempt(delivery_id, *, provider, at=None):
             return None
         try:
             message = message_for_delivery(delivery)
-            body = provider.serialize_request(message)
-            if not isinstance(body, bytes):
-                raise TypeError
-            payload_hash = hashlib.sha256(body).hexdigest()
-        except (TypeError, ValueError):
+            prepared_request = provider.prepare_request(message)
+        except (ImproperlyConfigured, TypeError, ValueError):
             _mark_manual_review(
                 delivery,
                 EmailDelivery.AmbiguityReason.PAYLOAD_MISMATCH,
                 "Immutable email message schema cannot be rendered",
             )
             return None
+        if prepared_request.transport.contract_id != delivery.provider_contract_id:
+            _mark_manual_review(
+                delivery,
+                EmailDelivery.AmbiguityReason.TRANSPORT_IDENTITY_MISMATCH,
+                "Provider transport contract identifier mismatch",
+            )
+            return None
+        if prepared_request.transport.serializer_version != delivery.provider_serializer_version:
+            _mark_manual_review(
+                delivery,
+                EmailDelivery.AmbiguityReason.SERIALIZER_VERSION_MISMATCH,
+                "Provider serializer contract version mismatch",
+            )
+            return None
+        if (
+            prepared_request.transport.idempotency_namespace
+            != delivery.provider_idempotency_namespace
+        ):
+            _mark_manual_review(
+                delivery,
+                EmailDelivery.AmbiguityReason.IDEMPOTENCY_NAMESPACE_MISMATCH,
+                "Provider idempotency namespace mismatch",
+            )
+            return None
+        payload_hash = _provider_payload_hash(prepared_request.body)
         if payload_hash != delivery.provider_payload_hash:
             _mark_manual_review(
                 delivery,
@@ -454,7 +478,7 @@ def _prepare_provider_attempt(delivery_id, *, provider, at=None):
                 "updated_at",
             )
         )
-        return delivery, message
+        return delivery, prepared_request
 
 
 def process_delivery(delivery_id, *, provider, at=None):
@@ -467,11 +491,11 @@ def process_delivery(delivery_id, *, provider, at=None):
     prepared = _prepare_provider_attempt(delivery.pk, provider=provider, at=at)
     if prepared is None:
         return False
-    current, message = prepared
+    current, prepared_request = prepared
 
     try:
         result = provider.send(
-            message,
+            prepared_request,
             current.provider_idempotency_key,
         )
     except EmailProviderError as error:

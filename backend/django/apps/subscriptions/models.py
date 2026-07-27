@@ -249,6 +249,22 @@ class EmailDelivery(models.Model):
         PROVIDER_FAILURE = "provider_failure", "Retryable provider failure"
         WINDOW_EXPIRED = "window_expired", "Idempotency window expired"
         PAYLOAD_MISMATCH = "payload_mismatch", "Provider payload mismatch"
+        TRANSPORT_IDENTITY_MISMATCH = (
+            "transport_identity_mismatch",
+            "Transport contract mismatch",
+        )
+        SERIALIZER_VERSION_MISMATCH = (
+            "serializer_version_mismatch",
+            "Serializer contract version mismatch",
+        )
+        IDEMPOTENCY_NAMESPACE_MISMATCH = (
+            "idempotency_namespace_mismatch",
+            "Provider idempotency namespace mismatch",
+        )
+        LEGACY_TRANSPORT_IDENTITY = (
+            "legacy_transport_identity",
+            "Unknown legacy transport identity",
+        )
         IN_FLIGHT_CANCELLED = "in_flight_cancelled", "Subscriber changed while in flight"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -269,6 +285,9 @@ class EmailDelivery(models.Model):
     snapshot_recipient_email = models.CharField(max_length=320, editable=False)
     snapshot_credential_version = models.PositiveIntegerField(editable=False)
     credential_issued_at = models.DateTimeField(editable=False)
+    provider_contract_id = models.CharField(max_length=128, editable=False)
+    provider_serializer_version = models.PositiveSmallIntegerField(editable=False)
+    provider_idempotency_namespace = models.CharField(max_length=128, editable=False)
     provider_payload_hash = models.CharField(max_length=64, editable=False)
     first_provider_attempt_at = models.DateTimeField(null=True, blank=True, editable=False)
     last_provider_attempt_at = models.DateTimeField(null=True, blank=True, editable=False)
@@ -309,7 +328,14 @@ class EmailDelivery(models.Model):
                     Q(
                         first_provider_attempt_at__isnull=True,
                         last_provider_attempt_at__isnull=True,
-                        ambiguity_reason__in=("", "payload_mismatch"),
+                        ambiguity_reason__in=(
+                            "",
+                            "payload_mismatch",
+                            "transport_identity_mismatch",
+                            "serializer_version_mismatch",
+                            "idempotency_namespace_mismatch",
+                            "legacy_transport_identity",
+                        ),
                     )
                     | Q(
                         first_provider_attempt_at__isnull=False,
@@ -326,7 +352,15 @@ class EmailDelivery(models.Model):
                         ~Q(ambiguity_reason="")
                         & (
                             Q(first_provider_attempt_at__isnull=False)
-                            | Q(ambiguity_reason="payload_mismatch")
+                            | Q(
+                                ambiguity_reason__in=(
+                                    "payload_mismatch",
+                                    "transport_identity_mismatch",
+                                    "serializer_version_mismatch",
+                                    "idempotency_namespace_mismatch",
+                                    "legacy_transport_identity",
+                                )
+                            )
                         )
                     )
                 ),
@@ -339,6 +373,25 @@ class EmailDelivery(models.Model):
                     & Q(snapshot_credential_version__gte=1)
                 ),
                 name="subscriptions_delivery_snapshot_shape",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(provider_contract_id__regex=r"^[a-z0-9][a-z0-9._:/-]{0,127}$")
+                    & Q(provider_serializer_version__gte=1)
+                    & Q(provider_serializer_version__lte=32767)
+                    & Q(provider_idempotency_namespace__regex=(r"^[a-z0-9][a-z0-9._:/-]{0,127}$"))
+                ),
+                name="subs_delivery_transport_shape",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~Q(status__in=("pending", "processing"))
+                    | (
+                        ~Q(provider_contract_id="legacy.unknown")
+                        & ~Q(provider_idempotency_namespace="legacy.unknown")
+                    )
+                ),
+                name="subs_delivery_retry_identity",
             ),
         ]
         indexes = [

@@ -60,6 +60,109 @@ def test_subscriptions_0002_reverses_and_reapplies_without_drift():
     executor.migrate([("subscriptions", "0002_harden_email_delivery")])
 
 
+def test_subscriptions_0003_reverses_and_reapplies_without_drift():
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0002_harden_email_delivery")])
+    columns = {
+        column.name
+        for column in connection.introspection.get_table_description(
+            connection.cursor(),
+            "subscriptions_emaildelivery",
+        )
+    }
+    assert "provider_contract_id" not in columns
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0003_bind_delivery_transport_identity")])
+    columns = {
+        column.name
+        for column in connection.introspection.get_table_description(
+            connection.cursor(),
+            "subscriptions_emaildelivery",
+        )
+    }
+    assert {
+        "provider_contract_id",
+        "provider_serializer_version",
+        "provider_idempotency_namespace",
+    } <= columns
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0002_harden_email_delivery")])
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0003_bind_delivery_transport_identity")])
+
+
+def test_subscriptions_0003_quarantines_unknown_retryable_identity_and_keeps_history():
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0002_harden_email_delivery")])
+    old_apps = executor.loader.project_state([("subscriptions", "0002_harden_email_delivery")]).apps
+    Subscriber = old_apps.get_model("subscriptions", "Subscriber")
+    EmailOutbox = old_apps.get_model("subscriptions", "EmailOutbox")
+    EmailDelivery = old_apps.get_model("subscriptions", "EmailDelivery")
+    now = timezone.now()
+    delivery_ids = {}
+    for index, status in enumerate(("pending", "processing", "sent")):
+        subscriber = Subscriber.objects.create(
+            email=f"transport-migration-{index}@example.com",
+            canonical_email=f"transport-migration-{index}@example.com",
+        )
+        outbox = EmailOutbox.objects.create(
+            message_type="confirmation",
+            subscriber=subscriber,
+            credential_version=1,
+            available_at=now,
+            idempotency_key=f"migration/transport/{index}",
+            message_schema_version=1,
+            snapshot_from_email="Posts <posts@example.com>",
+            snapshot_site_url="https://example.com",
+            snapshot_subject="Confirm",
+        )
+        values = {
+            "outbox": outbox,
+            "subscriber": subscriber,
+            "status": status,
+            "available_at": now,
+            "snapshot_recipient_email": subscriber.email,
+            "snapshot_credential_version": 1,
+            "credential_issued_at": now,
+            "provider_payload_hash": "0" * 64,
+        }
+        if status == "processing":
+            values["processing_at"] = now
+        if status == "sent":
+            values.update(
+                {
+                    "provider_message_id": "historical-message",
+                    "sent_at": now,
+                    "first_provider_attempt_at": now,
+                    "last_provider_attempt_at": now,
+                }
+            )
+        delivery_ids[status] = EmailDelivery.objects.create(**values).pk
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("subscriptions", "0003_bind_delivery_transport_identity")])
+    new_apps = executor.loader.project_state(
+        [("subscriptions", "0003_bind_delivery_transport_identity")]
+    ).apps
+    MigratedDelivery = new_apps.get_model("subscriptions", "EmailDelivery")
+    pending = MigratedDelivery.objects.get(pk=delivery_ids["pending"])
+    processing = MigratedDelivery.objects.get(pk=delivery_ids["processing"])
+    historical = MigratedDelivery.objects.get(pk=delivery_ids["sent"])
+
+    for delivery in (pending, processing):
+        assert delivery.status == "manual_review"
+        assert delivery.processing_at is None
+        assert delivery.ambiguity_reason == "legacy_transport_identity"
+        assert delivery.provider_contract_id == "legacy.unknown"
+        assert delivery.provider_idempotency_namespace == "legacy.unknown"
+    assert historical.status == "sent"
+    assert historical.provider_message_id == "historical-message"
+    assert historical.provider_contract_id == "legacy.unknown"
+    assert historical.provider_idempotency_namespace == "legacy.unknown"
+
+
 def test_subscriptions_0002_safely_backfills_existing_ambiguous_and_webhook_rows():
     executor = MigrationExecutor(connection)
     executor.migrate([("subscriptions", "0001_initial")])

@@ -21,6 +21,9 @@ Required secret names:
 Required non-secret runtime values:
 
 - `EMAIL_PROVIDER_ADAPTER=apps.subscriptions.providers.resend.ResendEmailProvider`;
+- `EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE`, a stable non-secret label for the
+  exact provider account and environment, for example
+  `resend/production/account-main`;
 - `EMAIL_FROM_ADDRESS` using an address on the verified environment-specific
   sending domain;
 - `PUBLIC_SITE_URL` for the corresponding public origin.
@@ -30,6 +33,9 @@ Resend. It is normalized by trimming outer whitespace and rejected before
 Django starts if it is empty, contains CR/LF, exceeds 512 code points, or does
 not contain a valid mailbox; a display name is allowed. `RESEND_API_KEY` and
 `RESEND_WEBHOOK_SECRET` remain conditional on the Resend adapter.
+The namespace is trimmed and lowercased, limited to 128 ASCII characters, and
+accepts only letters, digits, `.`, `_`, `:`, `/`, and `-`. Never put an API key,
+webhook secret, credential, or raw account token in it.
 
 Optional tuning values are documented in `.env.example`. In particular,
 `EMAIL_PROVIDER_IDEMPOTENCY_WINDOW_SECONDS` defaults to 82,800 seconds, below
@@ -92,12 +98,16 @@ per-delivery `Idempotency-Key`. Publication messages include
 unsubscribe link. One immutable outbox snapshot pins schema version, sender,
 public origin, subject, and publication inputs. A delivery pins recipient,
 credential version/issue time, and the SHA-256 fingerprint of the exact bytes
-selected by the adapter serializer. The Resend adapter uses those same compact
-JSON bytes as its HTTP body. A retry is sent only while that fingerprint still
-matches and before the absolute local safety deadline from the first possible
-provider call. The bundled external production adapter is Resend; a replacement
-adapter must implement and test `serialize_request()` against its own exact
-request body. The memory adapter is local/test-only.
+selected during one adapter preparation call. It also pins the adapter contract
+identifier, serializer contract version, and idempotency namespace. The worker
+checks all four values and passes the already verified immutable bytes directly
+to transport; the Resend adapter does not serialize again. A retry is sent only
+while every value still matches and before the absolute local safety deadline
+from the first possible provider call. The bundled external production adapter
+is Resend contract `resend.emails`, serializer version `1`; a replacement
+adapter must define and test its own stable contract/version, namespace, exact
+request bytes, and safe error classifications. The memory adapter is
+local/test-only.
 
 Official references:
 
@@ -107,13 +117,32 @@ Official references:
 
 ## Rotation
 
-API key:
+API key rotation inside the same Resend account/environment:
 
 1. create a replacement key in the correct Resend environment;
-2. update only that GitHub Environment secret;
-3. restart the email worker/runtime;
+2. keep `EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE` unchanged;
+3. update only the `RESEND_API_KEY` GitHub Environment secret and restart the
+   email worker/runtime;
 4. verify a controlled send and webhook;
 5. revoke the old key.
+
+This is safe because credential rotation does not change the provider's
+idempotency ledger. Never derive the namespace from either key.
+
+Provider, account, environment, or idempotency-scope change:
+
+1. pause worker scheduling and allow active provider calls to settle;
+2. finish retryable deliveries with the old adapter/namespace where safe, or
+   explicitly leave them for manual review;
+3. configure the new adapter/account and a new non-secret
+   `EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE`;
+4. restart the runtime and verify a new controlled delivery;
+5. resume scheduling. Existing deliveries created under the old identity do
+   not cross the boundary: a mismatch becomes `manual_review` before I/O.
+
+Changing request serialization also requires an explicit serializer contract
+version bump. Keep the old adapter/version available to finish old deliveries,
+or review them manually; do not claim a version change is a safe retry.
 
 Webhook signing secret:
 

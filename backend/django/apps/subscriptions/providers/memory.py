@@ -4,10 +4,12 @@ from apps.subscriptions.providers.base import EmailProvider, ProviderSendResult
 
 
 class MemoryEmailProvider(EmailProvider):
+    transport_contract_id = "memory.email"
+    serializer_contract_version = 1
     sent = []
 
-    def send(self, message, idempotency_key):
-        self.__class__.sent.append((message, idempotency_key))
+    def send(self, prepared_request, idempotency_key):
+        self.__class__.sent.append((prepared_request, idempotency_key))
         digest = hashlib.sha256(idempotency_key.encode()).hexdigest()[:32]
         return ProviderSendResult(message_id=f"memory-{digest}")
 

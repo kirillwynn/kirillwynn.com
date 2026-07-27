@@ -93,6 +93,9 @@ def test_delivery_history_protects_subscriber_outbox_and_post(blog_post):
         snapshot_recipient_email=subscriber.email,
         snapshot_credential_version=subscriber.unsubscribe_token_version,
         credential_issued_at=now,
+        provider_contract_id="test.fixture",
+        provider_serializer_version=1,
+        provider_idempotency_namespace="test/models",
         provider_payload_hash="0" * 64,
     )
 
@@ -126,6 +129,9 @@ def test_delivery_attempt_and_manual_review_constraints(blog_post):
         "snapshot_recipient_email": subscriber.email,
         "snapshot_credential_version": subscriber.unsubscribe_token_version,
         "credential_issued_at": now,
+        "provider_contract_id": "test.fixture",
+        "provider_serializer_version": 1,
+        "provider_idempotency_namespace": "test/models",
         "provider_payload_hash": "0" * 64,
     }
 
@@ -140,6 +146,87 @@ def test_delivery_attempt_and_manual_review_constraints(blog_post):
             EmailDelivery.objects.create(
                 **common,
                 status=EmailDelivery.Status.MANUAL_REVIEW,
+            )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("provider_contract_id", ""),
+        ("provider_contract_id", "UPPERCASE"),
+        ("provider_contract_id", "x" * 129),
+        ("provider_serializer_version", 0),
+        ("provider_idempotency_namespace", "contains whitespace"),
+        ("provider_idempotency_namespace", "x" * 129),
+    ],
+)
+def test_delivery_transport_identity_has_bounded_database_constraints(
+    blog_post,
+    field,
+    value,
+):
+    now = timezone.now()
+    subscriber = Subscriber.objects.create(
+        email=f"{field}-{len(str(value))}@example.com",
+        status=Subscriber.Status.ACTIVE,
+        confirmed_at=now - timedelta(minutes=1),
+    )
+    outbox = EmailOutbox.objects.create(
+        message_type=EmailOutbox.MessageType.PUBLICATION,
+        post=blog_post,
+        audience_cutoff=now,
+        available_at=now,
+        idempotency_key=f"transport-constraint/{subscriber.pk}",
+        **publication_outbox_snapshot(blog_post),
+    )
+    values = {
+        "outbox": outbox,
+        "subscriber": subscriber,
+        "available_at": now,
+        "snapshot_recipient_email": subscriber.email,
+        "snapshot_credential_version": subscriber.unsubscribe_token_version,
+        "credential_issued_at": now,
+        "provider_contract_id": "test.fixture",
+        "provider_serializer_version": 1,
+        "provider_idempotency_namespace": "test/models",
+        "provider_payload_hash": "0" * 64,
+    }
+    values[field] = value
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            EmailDelivery.objects.create(**values)
+
+
+def test_legacy_transport_marker_cannot_be_retryable(blog_post):
+    now = timezone.now()
+    subscriber = Subscriber.objects.create(
+        email="legacy-constraint@example.com",
+        status=Subscriber.Status.ACTIVE,
+        confirmed_at=now - timedelta(minutes=1),
+    )
+    outbox = EmailOutbox.objects.create(
+        message_type=EmailOutbox.MessageType.PUBLICATION,
+        post=blog_post,
+        audience_cutoff=now,
+        available_at=now,
+        idempotency_key=f"legacy-constraint/{subscriber.pk}",
+        **publication_outbox_snapshot(blog_post),
+    )
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            EmailDelivery.objects.create(
+                outbox=outbox,
+                subscriber=subscriber,
+                available_at=now,
+                snapshot_recipient_email=subscriber.email,
+                snapshot_credential_version=subscriber.unsubscribe_token_version,
+                credential_issued_at=now,
+                provider_contract_id="legacy.unknown",
+                provider_serializer_version=1,
+                provider_idempotency_namespace="legacy.unknown",
+                provider_payload_hash="0" * 64,
             )
 
 

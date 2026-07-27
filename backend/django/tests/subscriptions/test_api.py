@@ -291,6 +291,9 @@ def test_one_click_requires_exact_post_body_and_skips_unsent_delivery():
         snapshot_recipient_email=subscriber.email,
         snapshot_credential_version=subscriber.confirmation_token_version,
         credential_issued_at=now,
+        provider_contract_id="test.fixture",
+        provider_serializer_version=1,
+        provider_idempotency_namespace="test/api",
         provider_payload_hash="0" * 64,
     )
     credential = unsubscribe_credential(subscriber)

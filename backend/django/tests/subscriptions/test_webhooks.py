@@ -54,6 +54,9 @@ def sent_delivery(blog_post, email="reader@example.com", message_id=None):
         snapshot_recipient_email=subscriber.email,
         snapshot_credential_version=subscriber.unsubscribe_token_version,
         credential_issued_at=now,
+        provider_contract_id="test.fixture",
+        provider_serializer_version=1,
+        provider_idempotency_namespace="test/webhooks",
         provider_payload_hash="0" * 64,
         first_provider_attempt_at=now,
         last_provider_attempt_at=now,
@@ -101,11 +104,14 @@ def event_payload(event_type, message_id, *, occurred_at=None):
 
 
 class FixedProvider(EmailProvider):
+    transport_contract_id = "memory.email"
+    serializer_contract_version = 1
+
     def __init__(self, message_id):
         self.message_id = message_id
         self.calls = 0
 
-    def send(self, message, idempotency_key):
+    def send(self, prepared_request, idempotency_key):
         self.calls += 1
         return ProviderSendResult(message_id=self.message_id)
 

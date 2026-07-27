@@ -32,6 +32,7 @@ def production_environment():
             "REVALIDATION_URL": "https://example.com/api/revalidate",
             "REVALIDATION_SECRET": PRODUCTION_SECRET,
             "EMAIL_PROVIDER_ADAPTER": "apps.subscriptions.providers.resend.ResendEmailProvider",
+            "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE": "resend/production/account-main",
             "EMAIL_FROM_ADDRESS": "Kirill Wynn <posts@example.com>",
             "RESEND_API_KEY": "resend-production-check",
             "RESEND_WEBHOOK_SECRET": "whsec_dGVzdC13ZWJob29rLXNlY3JldC0zMi1ieXRlcy0wMQ==",
@@ -209,6 +210,7 @@ def test_production_settings_reject_short_revalidation_secret():
     [
         "RESEND_API_KEY",
         "RESEND_WEBHOOK_SECRET",
+        "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
         "SUBSCRIPTION_SIGNING_SECRET",
     ],
 )
@@ -288,6 +290,30 @@ def test_every_production_adapter_requires_provider_independent_from_address():
     assert "Missing required production environment variables: EMAIL_FROM_ADDRESS" in result.stderr
 
 
+def test_every_production_adapter_requires_idempotency_namespace():
+    environment = production_environment()
+    environment["EMAIL_PROVIDER_ADAPTER"] = (
+        "apps.subscriptions.providers.memory.MemoryEmailProvider"
+    )
+    environment.pop("EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE")
+    for name in ("RESEND_API_KEY", "RESEND_WEBHOOK_SECRET"):
+        environment.pop(name)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "Missing required production environment variables: "
+        "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE" in result.stderr
+    )
+
+
 def test_production_rejects_whitespace_only_from_address():
     environment = production_environment()
     environment["EMAIL_FROM_ADDRESS"] = " \t "
@@ -302,6 +328,55 @@ def test_production_rejects_whitespace_only_from_address():
 
     assert result.returncode != 0
     assert "EMAIL_FROM_ADDRESS must be a valid mailbox" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "contains whitespace",
+        "contains@symbol",
+        "x" * 129,
+    ],
+)
+def test_production_rejects_invalid_provider_idempotency_namespace(value):
+    environment = production_environment()
+    environment["EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"] = value
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE must be a normalized transport identifier"
+        in result.stderr
+    )
+
+
+def test_production_normalizes_provider_idempotency_namespace():
+    environment = production_environment()
+    environment["EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"] = " Resend/Production/Account-Main "
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from config.settings import production; "
+                "print(production.EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE)"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "resend/production/account-main"
 
 
 @pytest.mark.parametrize(

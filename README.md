@@ -116,7 +116,8 @@ Milestones 1–9 are available under `backend/django/` and `frontend/next/`:
 - durable confirmation/publication outbox events, immutable publication
   audience cutoffs, unique per-reader deliveries, bounded PostgreSQL claims,
   stale reclaim, capped exponential retry, and terminal failure visibility;
-- exact-byte deterministic/Resend provider adapters, provider-independent
+- exact-byte deterministic/Resend provider adapters, immutable adapter
+  contract/version and idempotency namespace, provider-independent
   `EMAIL_FROM_ADDRESS`, multipart templates, Resend idempotency keys, RFC 8058
   one-click headers, and delivery, bounce/complaint webhook handling through
   exact raw-body Svix verification;
@@ -263,9 +264,13 @@ See [email setup](docs/email-setup.md) for Resend, SPF/DKIM/DMARC, webhook,
 rotation, and worker scheduling steps.
 
 Every production email adapter requires a normalized `EMAIL_FROM_ADDRESS`.
+Every environment also requires a normalized, non-secret
+`EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE` that changes with provider account or
+environment, but stays fixed during API-key rotation inside that account.
 Resend additionally requires only its API key and webhook secret. The bundled
-memory adapter is for local/test use; another external adapter must implement
-an exact deterministic `serialize_request()` body contract before selection.
+memory adapter is for local/test use; another external adapter must declare a
+stable contract identifier/serializer version and accept only the immutable
+prepared bytes selected by its deterministic serializer.
 
 The test suite uses an isolated SQLite database so fast checks do not require a
 running PostgreSQL service:
