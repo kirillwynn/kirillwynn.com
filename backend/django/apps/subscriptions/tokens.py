@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from django.conf import settings
 from django.core import signing
@@ -26,16 +27,32 @@ def _signing_secret():
     return secret
 
 
-def issue_credential(*, subscriber, purpose, token_version):
-    return signing.dumps(
+class ImmutableTimestampSigner(signing.TimestampSigner):
+    def __init__(self, *, issued_at, **kwargs):
+        super().__init__(**kwargs)
+        self.issued_at = issued_at
+
+    def timestamp(self):
+        return signing.b62_encode(int(self.issued_at.timestamp()))
+
+
+def issue_credential(*, subscriber, purpose, token_version, issued_at=None):
+    signer = (
+        ImmutableTimestampSigner(
+            issued_at=issued_at,
+            key=_signing_secret(),
+            salt=TOKEN_SALT,
+        )
+        if isinstance(issued_at, datetime)
+        else signing.TimestampSigner(key=_signing_secret(), salt=TOKEN_SALT)
+    )
+    return signer.sign_object(
         {
             "v": TOKEN_SCHEMA_VERSION,
             "purpose": purpose,
             "subscriber_id": str(subscriber.pk),
             "token_version": token_version,
         },
-        key=_signing_secret(),
-        salt=TOKEN_SALT,
         compress=False,
     )
 

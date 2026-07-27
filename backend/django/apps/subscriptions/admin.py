@@ -94,6 +94,13 @@ class EmailOutboxAdmin(ReadOnlyHistoryAdmin):
         "subscriber",
         "post",
         "audience_cutoff",
+        "message_schema_version",
+        "snapshot_from_email",
+        "snapshot_site_url",
+        "snapshot_subject",
+        "snapshot_post_title",
+        "snapshot_post_excerpt",
+        "snapshot_post_url",
         "status",
         "attempt_count",
         "available_at",
@@ -126,6 +133,13 @@ class EmailDeliveryAdmin(ReadOnlyHistoryAdmin):
         "attempt_count",
         "available_at",
         "processing_at",
+        "snapshot_recipient_email",
+        "snapshot_credential_version",
+        "credential_issued_at",
+        "provider_payload_hash",
+        "first_provider_attempt_at",
+        "last_provider_attempt_at",
+        "ambiguity_reason",
         "provider_message_id",
         "provider_created_at",
         "sent_at",
@@ -141,16 +155,28 @@ class EmailDeliveryAdmin(ReadOnlyHistoryAdmin):
 
 @admin.register(EmailWebhookEvent)
 class EmailWebhookEventAdmin(ReadOnlyHistoryAdmin):
-    list_display = ("event_id", "event_type", "delivery", "provider_occurred_at", "processed_at")
-    list_filter = ("event_type", "processed_at")
-    search_fields = ("event_id", "delivery__provider_message_id")
+    list_display = (
+        "event_id",
+        "event_type",
+        "processing_state",
+        "delivery",
+        "provider_occurred_at",
+        "processed_at",
+    )
+    list_filter = ("processing_state", "event_type", "processed_at")
+    search_fields = ("event_id", "provider_message_id", "delivery__provider_message_id")
     readonly_fields = (
         "provider",
         "event_id",
         "event_type",
+        "provider_message_id",
+        "bounce_type",
+        "processing_state",
         "delivery",
         "provider_occurred_at",
         "processed_at",
+        "expires_at",
+        "applied_at",
     )
 
 

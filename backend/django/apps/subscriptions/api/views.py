@@ -18,7 +18,6 @@ from rest_framework.views import APIView
 from svix.webhooks import Webhook, WebhookVerificationError
 
 from apps.subscriptions.models import (
-    EmailDelivery,
     EmailWebhookEvent,
     SubscriptionRateLimitBucket,
     normalize_email_address,
@@ -31,10 +30,15 @@ from apps.subscriptions.rate_limits import (
 from apps.subscriptions.services import (
     confirm_subscription,
     request_subscription,
-    suppress_subscriber,
     unsubscribe_with_credential,
 )
 from apps.subscriptions.tokens import InvalidSubscriptionCredential
+from apps.subscriptions.webhooks import (
+    RECOGNIZED_DELIVERY_EVENTS,
+    normalized_bounce_type,
+    reconcile_pending_webhooks,
+    webhook_event_defaults,
+)
 
 GENERIC_SUBSCRIBE_DETAIL = "If the address can be subscribed, a confirmation email will be sent."
 INVALID_CREDENTIAL_DETAIL = "This link is invalid or expired."
@@ -212,31 +216,6 @@ def _provider_timestamp(value):
     return parsed
 
 
-def _apply_delivery_event(delivery, event_type, payload, occurred_at):
-    if event_type == "email.delivered":
-        if delivery.status not in {
-            EmailDelivery.Status.BOUNCED,
-            EmailDelivery.Status.COMPLAINED,
-        }:
-            delivery.status = EmailDelivery.Status.DELIVERED
-            delivery.delivered_at = occurred_at or timezone.now()
-            delivery.save(update_fields=("status", "delivered_at", "updated_at"))
-        return
-    if event_type == "email.bounced":
-        bounce = payload.get("bounce") if isinstance(payload.get("bounce"), dict) else {}
-        delivery.status = EmailDelivery.Status.BOUNCED
-        delivery.bounced_at = occurred_at or timezone.now()
-        delivery.bounce_type = str(bounce.get("type") or bounce.get("subType") or "permanent")[:64]
-        delivery.save(update_fields=("status", "bounced_at", "bounce_type", "updated_at"))
-        suppress_subscriber(delivery.subscriber_id, reason="hard_bounce")
-        return
-    if event_type == "email.complained":
-        delivery.status = EmailDelivery.Status.COMPLAINED
-        delivery.complained_at = occurred_at or timezone.now()
-        delivery.save(update_fields=("status", "complained_at", "updated_at"))
-        suppress_subscriber(delivery.subscriber_id, reason="complaint")
-
-
 @csrf_exempt
 @require_POST
 def resend_webhook(request):
@@ -263,35 +242,36 @@ def resend_webhook(request):
     if not isinstance(event_type, str) or not isinstance(data, dict):
         return HttpResponse(status=400)
     occurred_at = _provider_timestamp(payload.get("created_at"))
+    now = timezone.now()
+    provider_message_id = data.get("email_id")
+    if (
+        not isinstance(provider_message_id, str)
+        or not provider_message_id
+        or len(provider_message_id) > 255
+    ):
+        provider_message_id = None
+    bounce_type = (
+        normalized_bounce_type(data)
+        if event_type == "email.bounced" and provider_message_id is not None
+        else ""
+    )
 
     with transaction.atomic():
         webhook_event, created = EmailWebhookEvent.objects.get_or_create(
             provider="resend",
             event_id=event_id,
-            defaults={
-                "event_type": event_type[:80],
-                "provider_occurred_at": occurred_at,
-            },
+            defaults=webhook_event_defaults(
+                event_type=event_type[:80],
+                provider_message_id=provider_message_id,
+                occurred_at=occurred_at,
+                bounce_type=bounce_type,
+                at=now,
+            ),
         )
-        if not created:
-            return HttpResponse(status=200)
-        if event_type not in {
-            "email.delivered",
-            "email.bounced",
-            "email.complained",
-        }:
-            return HttpResponse(status=200)
-        provider_message_id = data.get("email_id")
-        if not isinstance(provider_message_id, str) or not provider_message_id:
-            return HttpResponse(status=200)
-        delivery = (
-            EmailDelivery.objects.select_for_update()
-            .filter(provider_message_id=provider_message_id)
-            .first()
-        )
-        if delivery is None:
-            return HttpResponse(status=200)
-        webhook_event.delivery = delivery
-        webhook_event.save(update_fields=("delivery",))
-        _apply_delivery_event(delivery, event_type, data, occurred_at)
+    if (
+        webhook_event.processing_state == EmailWebhookEvent.ProcessingState.PENDING
+        and webhook_event.provider_message_id is not None
+        and (created or event_type in RECOGNIZED_DELIVERY_EVENTS)
+    ):
+        reconcile_pending_webhooks(provider_message_id=webhook_event.provider_message_id)
     return HttpResponse(status=200)

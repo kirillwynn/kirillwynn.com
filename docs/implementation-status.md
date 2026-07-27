@@ -4,10 +4,10 @@ Last updated: 2026-07-27
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 9 production-ready email subscription application
-boundary implemented and locally verified; live Resend/DNS, PostgreSQL-only
-locking, scheduled worker infrastructure, and live-browser checks remain
-external or unavailable
+Overall state: Milestone 9 email subscription application boundary and
+delivery/webhook race remediation implemented and locally verified; live
+Resend/DNS, PostgreSQL-only locking, scheduled worker infrastructure, and
+live-browser checks remain external or unavailable
 
 ## Current repository state
 
@@ -271,10 +271,37 @@ external or unavailable
 - [x] Accessible Feed/post forms and explicit fragment-credential confirmation
   and unsubscribe pages added with generic states, CSRF, no browser
   persistence, noindex/no-referrer, exact rewrites, and Draft Mode exclusion.
+- [x] Milestone 9 remediation snapshots message schema/FROM/origin/subject and
+  publication inputs on the outbox plus recipient/credential issue inputs on
+  each delivery; the exact compact Resend JSON fingerprint gates every retry
+  without persisting a raw signed credential.
+- [x] Provider ambiguity now starts at immutable
+  `first_provider_attempt_at`, remains independent of mutable reclaim leases,
+  and enters explicit `manual_review` without provider I/O at the absolute
+  23-hour safety deadline or on payload mismatch.
+- [x] Resend response reads are bounded and official 409 variants are split:
+  `invalid_idempotent_request` is terminal,
+  `concurrent_idempotent_requests` is retryable, and unknown conflicts are
+  conservatively terminal without persisting provider bodies.
+- [x] Authenticated recognized webhooks can wait durably for provider-ID
+  correlation, apply deterministically after worker settlement, suppress on
+  early bounce/complaint, and expire through a bounded seven-day
+  correlation/30-day retention command without storing raw payloads.
+- [x] Unsubscribe skips only unclaimed delivery work; row-locked settlement
+  records an accepted in-flight call honestly while the subscriber remains
+  unsubscribed and excluded from every later claim/publication.
+- [x] Publication delivery rechecks the canonical visibility policy immediately
+  before its first provider call and skips unpublished, expired, restricted,
+  future-scheduled, or no-longer-public posts without mutating the immutable
+  email snapshot.
+- [x] `subscriptions.0002_harden_email_delivery` adds the snapshot,
+  fingerprint, ambiguity, manual-review, webhook-correlation, constraint, and
+  reconciliation indexes without modifying `0001_initial`.
 
 ## Milestone transition
 
-Milestone 9 is complete at the application boundary. Django owns anonymous
+Milestone 9 and its delivery/idempotency/webhook remediation are complete at
+the application boundary. Django owns anonymous
 subscriber lifecycle, credentials, CSRF/rate limits, durable publication and
 delivery work, provider adaptation, webhook authentication/idempotency, and
 administrative state. Next.js owns accessible forms and explicit human
@@ -393,6 +420,44 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-27:
 
+- Milestone 9 remediation now pins byte-stable provider inputs/fingerprint,
+  separates provider ambiguity from worker leases, classifies both official
+  Resend 409 variants, durably reconciles early webhooks, preserves honest
+  in-flight unsubscribe state, and revalidates publication visibility before
+  the first provider call. Official Resend idempotency, error, webhook
+  delivery, ordering, and retry documentation was rechecked; no provider or
+  external state changed.
+- `python3 -m uv lock --check` passed with 68 packages resolved. Ruff format
+  check passed for 127 files, Ruff lint passed, the Django test-settings system
+  check passed, and `makemigrations --check --dry-run` reported no drift.
+- Full `pytest` passed: 419 tests; six PostgreSQL-only concurrency/search tests
+  skipped honestly on SQLite. The 71 subscription tests cover immutable
+  rendering across time/post/config changes, fingerprint mismatch,
+  official/unknown 409 classification, bounded responses, timeout/retry at
+  hour 22, absolute deadline, sparse worker/crash reclaim, early
+  delivered/bounce/complaint ordering and reconciliation, foreign retention,
+  in-flight unsubscribe, visibility cancellation, model constraints, and
+  migration reversal.
+- A new empty SQLite database applied the complete migration chain through
+  `subscriptions.0002_harden_email_delivery`; that migration reversed to
+  `0001_initial` and reapplied. Production `manage.py check --deploy` passed
+  with safe non-production verification values and one intentional Wagtail
+  iframe check silenced.
+- Prettier, ESLint, TypeScript, and full Vitest passed: 150 tests in 15 files.
+  Production Next.js 16.2.11 build passed outside the sandbox because
+  Turbopack's CSS worker requires a local port. `npm audit` reported zero
+  vulnerabilities.
+- The post-build `.next/static` scan found no internal Django build origin,
+  Resend/subscription secret names or values, webhook secret shape, provider
+  payload fingerprint fields, or server-side credential-version fields.
+- Docker, PostgreSQL, `psql`, `postgres`, and `pg_isready` are unavailable.
+  PostgreSQL skip-locked/concurrency tests remain present but were not run;
+  SQLite is not represented as PostgreSQL verification. No live browser or
+  provider flow was run because this remediation changes no public UI and no
+  Browser/provider environment was placed in scope.
+- The local Obsidian Milestone 9 checklist was updated outside Git. No push,
+  deployment, DNS, Resend dashboard, GitHub secret/Environment, or production
+  infrastructure change was performed.
 - Milestone 9 official-source review covered Resend send/idempotency,
   Svix-compatible raw-body webhook verification and replay handling,
   delivered/bounced/complained events, transactional List-Unsubscribe, and

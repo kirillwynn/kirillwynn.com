@@ -13,6 +13,7 @@ from apps.subscriptions.models import (
     Subscriber,
     SubscriptionRateLimitBucket,
 )
+from apps.subscriptions.outbox import confirmation_outbox_snapshot
 from apps.subscriptions.rate_limits import client_ip
 from apps.subscriptions.services import (
     confirm_subscription,
@@ -281,11 +282,16 @@ def test_one_click_requires_exact_post_body_and_skips_unsent_delivery():
         credential_version=subscriber.confirmation_token_version,
         available_at=now,
         idempotency_key="temporary-confirmation-shape",
+        **confirmation_outbox_snapshot(),
     )
     delivery = EmailDelivery.objects.create(
         outbox=outbox,
         subscriber=subscriber,
         available_at=now,
+        snapshot_recipient_email=subscriber.email,
+        snapshot_credential_version=subscriber.confirmation_token_version,
+        credential_issued_at=now,
+        provider_payload_hash="0" * 64,
     )
     credential = unsubscribe_credential(subscriber)
     url = f"{reverse('subscriptions_api:unsubscribe-one-click')}?credential={credential}"

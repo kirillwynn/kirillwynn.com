@@ -27,7 +27,9 @@ Required non-secret runtime values:
 
 Optional tuning values are documented in `.env.example`. In particular,
 `EMAIL_PROVIDER_IDEMPOTENCY_WINDOW_SECONDS` defaults to 82,800 seconds, below
-Resend's 24-hour idempotency retention.
+Resend's 24-hour idempotency retention. Provider success/error bodies are read
+only up to their separate 65,536-byte limits. Webhook correlation defaults to
+seven days and applied/ignored event retention to 30 days.
 
 ## Resend domain and DNS checklist
 
@@ -66,7 +68,9 @@ Copy that endpoint's Svix signing secret to its matching
 `RESEND_WEBHOOK_SECRET`. The application verifies the exact raw body plus
 `svix-id`, `svix-timestamp`, and `svix-signature`, enforces a replay window,
 and deduplicates `svix-id`. Do not place a proxy in front of it that rewrites
-the body.
+the body. Recognized events that beat provider-ID persistence are durably
+pending rather than rejected; genuinely foreign IDs therefore still receive
+200 and age out instead of creating a retry storm.
 
 Official references:
 
@@ -79,7 +83,12 @@ Official references:
 Resend sends multipart HTML/plain-text content through `POST /emails` with a
 per-delivery `Idempotency-Key`. Publication messages include
 `List-Unsubscribe` and RFC 8058 `List-Unsubscribe-Post` headers and an in-body
-unsubscribe link.
+unsubscribe link. One immutable outbox snapshot pins schema version, sender,
+public origin, subject, and publication inputs. A delivery pins recipient,
+credential version/issue time, and the SHA-256 fingerprint of the exact
+serialized Resend body. A retry is sent only while that fingerprint still
+matches and before the absolute local safety deadline from the first possible
+provider call.
 
 Official references:
 
@@ -128,8 +137,22 @@ uv run python manage.py process_email_outbox --limit 25 --delivery-limit 100
 
 Schedule it independently and much more frequently than the 23-hour
 idempotency safety window. Monitor terminal `failed` outbox/delivery rows,
-bounce/complaint volume, queue age, and command exit status. Adding the actual
-service/timer and alerts belongs to the infrastructure milestone.
+`manual_review` deliveries, bounce/complaint volume, queue age, and command
+exit status. Lease reclaim never moves the first-provider-attempt timestamp.
+Once the absolute deadline is reached, neither pending nor stale-processing
+work can call Resend.
+
+Also run the bounded correlation/retention backstop:
+
+```bash
+cd backend/django
+uv run python manage.py reconcile_email_webhooks --limit 100
+```
+
+It applies pending events whose provider message ID has appeared, expires
+unmatched events, and deletes retained history only after the configured
+retention period. Adding the actual services/timers and alerts belongs to the
+infrastructure milestone.
 
 Wagtail search indexing is separate work. Run:
 

@@ -1,14 +1,44 @@
+import hashlib
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from apps.blog.services.visibility import public_blog_posts
-from apps.subscriptions.messages import message_for_delivery
+from apps.subscriptions.messages import MESSAGE_SCHEMA_VERSION, message_for_delivery
 from apps.subscriptions.models import EmailDelivery, EmailOutbox, Subscriber
 from apps.subscriptions.providers.base import EmailProviderError
+from apps.subscriptions.providers.resend import serialize_resend_request
+
+
+def _common_snapshot():
+    return {
+        "message_schema_version": MESSAGE_SCHEMA_VERSION,
+        "snapshot_from_email": settings.RESEND_FROM_EMAIL,
+        "snapshot_site_url": settings.PUBLIC_SITE_URL.rstrip("/"),
+    }
+
+
+def confirmation_outbox_snapshot():
+    return {
+        **_common_snapshot(),
+        "snapshot_subject": "Confirm your subscription to Kirill Wynn",
+        "snapshot_post_title": "",
+        "snapshot_post_excerpt": "",
+        "snapshot_post_url": "",
+    }
+
+
+def publication_outbox_snapshot(post):
+    return {
+        **_common_snapshot(),
+        "snapshot_subject": f"New post: {post.title}",
+        "snapshot_post_title": post.title,
+        "snapshot_post_excerpt": post.excerpt,
+        "snapshot_post_url": post.resolved_canonical_url,
+    }
 
 
 def create_publication_outbox_event(post, *, at=None):
@@ -22,6 +52,7 @@ def create_publication_outbox_event(post, *, at=None):
             "audience_cutoff": cutoff,
             "available_at": cutoff,
             "idempotency_key": f"publication/{post.pk}",
+            **publication_outbox_snapshot(post),
         },
     )
     return event
@@ -77,14 +108,40 @@ def _delivery_status_for_subscriber(event, subscriber):
 
 
 def _create_delivery(event, subscriber, now):
-    return EmailDelivery.objects.get_or_create(
+    existing = EmailDelivery.objects.filter(outbox=event, subscriber=subscriber).first()
+    if existing is not None:
+        return existing, False
+    delivery = _new_delivery(event, subscriber, now)
+    try:
+        with transaction.atomic():
+            delivery.save(force_insert=True)
+    except IntegrityError:
+        return EmailDelivery.objects.get(outbox=event, subscriber=subscriber), False
+    return delivery, True
+
+
+def _new_delivery(event, subscriber, now):
+    credential_version = (
+        event.credential_version
+        if event.message_type == EmailOutbox.MessageType.CONFIRMATION
+        else subscriber.unsubscribe_token_version
+    )
+    delivery = EmailDelivery(
         outbox=event,
         subscriber=subscriber,
-        defaults={
-            "status": _delivery_status_for_subscriber(event, subscriber),
-            "available_at": now,
-        },
+        status=_delivery_status_for_subscriber(event, subscriber),
+        available_at=now,
+        snapshot_recipient_email=subscriber.email,
+        snapshot_credential_version=credential_version,
+        credential_issued_at=now,
     )
+    delivery.provider_payload_hash = _provider_payload_hash(delivery)
+    return delivery
+
+
+def _provider_payload_hash(delivery):
+    body = serialize_resend_request(message_for_delivery(delivery))
+    return hashlib.sha256(body).hexdigest()
 
 
 def build_delivery_batch(event_id, *, limit, at=None):
@@ -109,15 +166,7 @@ def build_delivery_batch(event_id, *, limit, at=None):
             .order_by("confirmed_at", "id")[:limit]
         )
         EmailDelivery.objects.bulk_create(
-            [
-                EmailDelivery(
-                    outbox=event,
-                    subscriber=subscriber,
-                    status=_delivery_status_for_subscriber(event, subscriber),
-                    available_at=now,
-                )
-                for subscriber in subscribers
-            ],
+            [_new_delivery(event, subscriber, now) for subscriber in subscribers],
             ignore_conflicts=True,
         )
         return list(
@@ -143,6 +192,30 @@ def _delivery_is_current(delivery):
     )
 
 
+def _publication_is_public(delivery, now):
+    if delivery.outbox.message_type != EmailOutbox.MessageType.PUBLICATION:
+        return True
+    return public_blog_posts(at=now).filter(pk=delivery.outbox.post_id).exists()
+
+
+def _safety_deadline(delivery):
+    if delivery.first_provider_attempt_at is None:
+        return None
+    return delivery.first_provider_attempt_at + timedelta(
+        seconds=settings.EMAIL_PROVIDER_IDEMPOTENCY_WINDOW_SECONDS
+    )
+
+
+def _mark_manual_review(delivery, reason, message):
+    EmailDelivery.objects.filter(pk=delivery.pk).update(
+        status=EmailDelivery.Status.MANUAL_REVIEW,
+        processing_at=None,
+        ambiguity_reason=reason,
+        last_error=message[:500],
+        updated_at=timezone.now(),
+    )
+
+
 def _claim_delivery(delivery_id, *, at=None):
     now = at or timezone.now()
     stale_before = now - timedelta(seconds=settings.EMAIL_OUTBOX_PROCESSING_TIMEOUT_SECONDS)
@@ -161,31 +234,46 @@ def _claim_delivery(delivery_id, *, at=None):
         )
         if not claimable:
             return None
-        if (
-            delivery.status == EmailDelivery.Status.PROCESSING
-            and delivery.processing_at is not None
-            and delivery.processing_at
-            <= now - timedelta(seconds=settings.EMAIL_PROVIDER_IDEMPOTENCY_WINDOW_SECONDS)
-        ):
-            delivery.status = EmailDelivery.Status.FAILED
+        deadline = _safety_deadline(delivery)
+        if deadline is not None and now >= deadline:
+            delivery.status = EmailDelivery.Status.MANUAL_REVIEW
             delivery.processing_at = None
-            delivery.last_error = (
-                "Ambiguous provider attempt exceeded the idempotency safety window"
-            )
+            delivery.ambiguity_reason = EmailDelivery.AmbiguityReason.WINDOW_EXPIRED
+            delivery.last_error = "Provider ambiguity exceeded the idempotency safety window"
             delivery.save(
                 update_fields=(
                     "status",
                     "processing_at",
+                    "ambiguity_reason",
                     "last_error",
                     "updated_at",
                 )
             )
             return None
-        if not _delivery_is_current(delivery):
+        if delivery.first_provider_attempt_at is None and not _publication_is_public(delivery, now):
             delivery.status = EmailDelivery.Status.SKIPPED
             delivery.processing_at = None
-            delivery.last_error = ""
+            delivery.last_error = "Publication is no longer publicly deliverable"
             delivery.save(update_fields=("status", "processing_at", "last_error", "updated_at"))
+            return None
+        if not _delivery_is_current(delivery):
+            if delivery.first_provider_attempt_at is not None:
+                delivery.status = EmailDelivery.Status.MANUAL_REVIEW
+                delivery.ambiguity_reason = EmailDelivery.AmbiguityReason.IN_FLIGHT_CANCELLED
+                delivery.last_error = "Subscriber changed after a possible provider acceptance"
+            else:
+                delivery.status = EmailDelivery.Status.SKIPPED
+                delivery.last_error = ""
+            delivery.processing_at = None
+            delivery.save(
+                update_fields=(
+                    "status",
+                    "processing_at",
+                    "ambiguity_reason",
+                    "last_error",
+                    "updated_at",
+                )
+            )
             return None
         delivery.status = EmailDelivery.Status.PROCESSING
         delivery.processing_at = now
@@ -213,15 +301,116 @@ def _retry_delay(attempt_count):
 
 def _mark_delivery_failure(delivery, error, *, at=None):
     now = at or timezone.now()
-    terminal = not error.retryable or delivery.attempt_count >= settings.EMAIL_OUTBOX_MAX_ATTEMPTS
-    updates = {
-        "status": (EmailDelivery.Status.FAILED if terminal else EmailDelivery.Status.PENDING),
-        "processing_at": None,
-        "last_error": error.safe_message[:500],
-    }
-    if not terminal:
-        updates["available_at"] = now + timedelta(seconds=_retry_delay(delivery.attempt_count))
-    EmailDelivery.objects.filter(pk=delivery.pk).update(**updates)
+    with transaction.atomic():
+        current = (
+            EmailDelivery.objects.select_for_update()
+            .select_related("subscriber")
+            .get(pk=delivery.pk)
+        )
+        if current.status != EmailDelivery.Status.PROCESSING:
+            return
+        inactive_in_flight = current.subscriber.status != Subscriber.Status.ACTIVE and (
+            current.outbox.message_type == EmailOutbox.MessageType.PUBLICATION
+        )
+        terminal = (
+            not error.retryable or current.attempt_count >= settings.EMAIL_OUTBOX_MAX_ATTEMPTS
+        )
+        if error.ambiguity_reason == EmailDelivery.AmbiguityReason.PAYLOAD_MISMATCH:
+            current.status = EmailDelivery.Status.MANUAL_REVIEW
+        elif error.retryable and inactive_in_flight:
+            current.status = EmailDelivery.Status.MANUAL_REVIEW
+            error.ambiguity_reason = EmailDelivery.AmbiguityReason.IN_FLIGHT_CANCELLED
+        else:
+            current.status = (
+                EmailDelivery.Status.FAILED if terminal else EmailDelivery.Status.PENDING
+            )
+        current.processing_at = None
+        current.last_error = error.safe_message[:500]
+        current.ambiguity_reason = error.ambiguity_reason
+        update_fields = [
+            "status",
+            "processing_at",
+            "last_error",
+            "ambiguity_reason",
+            "updated_at",
+        ]
+        if current.status == EmailDelivery.Status.PENDING:
+            current.available_at = now + timedelta(seconds=_retry_delay(current.attempt_count))
+            update_fields.append("available_at")
+        current.save(update_fields=update_fields)
+
+
+def _prepare_provider_attempt(delivery_id, *, at=None):
+    now = at or timezone.now()
+    with transaction.atomic():
+        delivery = (
+            EmailDelivery.objects.select_for_update()
+            .select_related("subscriber", "outbox", "outbox__post")
+            .get(pk=delivery_id)
+        )
+        if delivery.status != EmailDelivery.Status.PROCESSING:
+            return None
+        if not _delivery_is_current(delivery):
+            if delivery.first_provider_attempt_at is not None:
+                delivery.status = EmailDelivery.Status.MANUAL_REVIEW
+                delivery.ambiguity_reason = EmailDelivery.AmbiguityReason.IN_FLIGHT_CANCELLED
+                delivery.last_error = "Subscriber changed after a possible provider acceptance"
+            else:
+                delivery.status = EmailDelivery.Status.SKIPPED
+                delivery.last_error = ""
+            delivery.processing_at = None
+            delivery.save(
+                update_fields=(
+                    "status",
+                    "processing_at",
+                    "ambiguity_reason",
+                    "last_error",
+                    "updated_at",
+                )
+            )
+            return None
+        if delivery.first_provider_attempt_at is None and not _publication_is_public(delivery, now):
+            delivery.status = EmailDelivery.Status.SKIPPED
+            delivery.processing_at = None
+            delivery.last_error = "Publication is no longer publicly deliverable"
+            delivery.save(update_fields=("status", "processing_at", "last_error", "updated_at"))
+            return None
+        try:
+            message = message_for_delivery(delivery)
+            payload_hash = hashlib.sha256(serialize_resend_request(message)).hexdigest()
+        except (TypeError, ValueError):
+            _mark_manual_review(
+                delivery,
+                EmailDelivery.AmbiguityReason.PAYLOAD_MISMATCH,
+                "Immutable email message schema cannot be rendered",
+            )
+            return None
+        if payload_hash != delivery.provider_payload_hash:
+            _mark_manual_review(
+                delivery,
+                EmailDelivery.AmbiguityReason.PAYLOAD_MISMATCH,
+                "Provider payload fingerprint mismatch",
+            )
+            return None
+        deadline = _safety_deadline(delivery)
+        if deadline is not None and now >= deadline:
+            _mark_manual_review(
+                delivery,
+                EmailDelivery.AmbiguityReason.WINDOW_EXPIRED,
+                "Provider ambiguity exceeded the idempotency safety window",
+            )
+            return None
+        if delivery.first_provider_attempt_at is None:
+            delivery.first_provider_attempt_at = now
+        delivery.last_provider_attempt_at = now
+        delivery.save(
+            update_fields=(
+                "first_provider_attempt_at",
+                "last_provider_attempt_at",
+                "updated_at",
+            )
+        )
+        return delivery, message
 
 
 def process_delivery(delivery_id, *, provider, at=None):
@@ -231,23 +420,14 @@ def process_delivery(delivery_id, *, provider, at=None):
 
     # The claim transaction has committed. No provider I/O occurs while a
     # database transaction or a Wagtail publication transaction is open.
-    current = EmailDelivery.objects.select_related("subscriber", "outbox", "outbox__post").get(
-        pk=delivery.pk
-    )
-    if current.status != EmailDelivery.Status.PROCESSING or not _delivery_is_current(current):
-        EmailDelivery.objects.filter(
-            pk=current.pk,
-            status=EmailDelivery.Status.PROCESSING,
-        ).update(
-            status=EmailDelivery.Status.SKIPPED,
-            processing_at=None,
-            last_error="",
-        )
+    prepared = _prepare_provider_attempt(delivery.pk, at=at)
+    if prepared is None:
         return False
+    current, message = prepared
 
     try:
         result = provider.send(
-            message_for_delivery(current),
+            message,
             current.provider_idempotency_key,
         )
     except EmailProviderError as error:
@@ -265,14 +445,32 @@ def process_delivery(delivery_id, *, provider, at=None):
         return False
 
     now = at or timezone.now()
-    EmailDelivery.objects.filter(pk=current.pk).update(
-        status=EmailDelivery.Status.SENT,
-        processing_at=None,
-        provider_message_id=result.message_id,
-        provider_created_at=result.created_at,
-        sent_at=now,
-        last_error="",
-    )
+    with transaction.atomic():
+        settling = EmailDelivery.objects.select_for_update().get(pk=current.pk)
+        if settling.status != EmailDelivery.Status.PROCESSING:
+            return False
+        settling.status = EmailDelivery.Status.SENT
+        settling.processing_at = None
+        settling.provider_message_id = result.message_id
+        settling.provider_created_at = result.created_at
+        settling.sent_at = now
+        settling.last_error = ""
+        settling.ambiguity_reason = ""
+        settling.save(
+            update_fields=(
+                "status",
+                "processing_at",
+                "provider_message_id",
+                "provider_created_at",
+                "sent_at",
+                "last_error",
+                "ambiguity_reason",
+                "updated_at",
+            )
+        )
+    from apps.subscriptions.webhooks import reconcile_pending_webhooks
+
+    reconcile_pending_webhooks(provider_message_id=result.message_id)
     return True
 
 
@@ -324,10 +522,15 @@ def finalize_outbox_event(event_id, *, at=None):
             event.available_at = next_available
             event.save(update_fields=("status", "processing_at", "available_at"))
             return event.status
-        if deliveries.filter(status=EmailDelivery.Status.FAILED).exists():
+        if deliveries.filter(
+            status__in=(
+                EmailDelivery.Status.FAILED,
+                EmailDelivery.Status.MANUAL_REVIEW,
+            )
+        ).exists():
             event.status = EmailOutbox.Status.FAILED
             event.processing_at = None
-            event.last_error = "One or more deliveries reached the retry limit"
+            event.last_error = "One or more deliveries require terminal review"
             event.save(update_fields=("status", "processing_at", "last_error"))
             return event.status
 

@@ -11,6 +11,7 @@ from apps.subscriptions.models import (
     Subscriber,
     normalize_email_address,
 )
+from apps.subscriptions.outbox import confirmation_outbox_snapshot
 from apps.subscriptions.tokens import (
     InvalidSubscriptionCredential,
     read_credential,
@@ -24,6 +25,7 @@ def _confirmation_event(subscriber, now):
         credential_version=subscriber.confirmation_token_version,
         available_at=now,
         idempotency_key=(f"confirmation/{subscriber.pk}/{subscriber.confirmation_token_version}"),
+        **confirmation_outbox_snapshot(),
     )
 
 
@@ -120,14 +122,20 @@ def confirm_subscription(credential, *, at=None):
 def _skip_unsent_deliveries(subscriber):
     EmailDelivery.objects.filter(
         subscriber=subscriber,
-        status__in=(
-            EmailDelivery.Status.PENDING,
-            EmailDelivery.Status.PROCESSING,
-        ),
+        status=EmailDelivery.Status.PENDING,
+        first_provider_attempt_at__isnull=True,
     ).update(
         status=EmailDelivery.Status.SKIPPED,
-        processing_at=None,
         last_error="",
+    )
+    EmailDelivery.objects.filter(
+        subscriber=subscriber,
+        status=EmailDelivery.Status.PENDING,
+        first_provider_attempt_at__isnull=False,
+    ).update(
+        status=EmailDelivery.Status.MANUAL_REVIEW,
+        ambiguity_reason=EmailDelivery.AmbiguityReason.IN_FLIGHT_CANCELLED,
+        last_error="Subscriber changed after a possible provider acceptance",
     )
 
 

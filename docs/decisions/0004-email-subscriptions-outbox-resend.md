@@ -13,9 +13,18 @@ bounces or complaints must stop later sends. The first provider is Resend, but
 provider state must not become the domain model.
 
 Resend accepts an `Idempotency-Key` on `POST /emails` and retains it for 24
-hours. Its webhooks use the Svix `svix-id`, `svix-timestamp`, and
+hours. A retry is safe only with the same request payload. Reusing the key with
+a different payload returns terminal `409 invalid_idempotent_request`; a
+simultaneous matching request returns retryable
+`409 concurrent_idempotent_requests`. These contracts are documented in
+[Resend idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys)
+and the [Resend error reference](https://resend.com/docs/api-reference/errors).
+
+Resend webhooks use the Svix `svix-id`, `svix-timestamp`, and
 `svix-signature` contract over the exact raw body, provide at-least-once
-delivery, and do not guarantee event ordering.
+delivery, may arrive out of order, and retry after an unsuccessful HTTP
+response. See [Managing Webhooks](https://resend.com/docs/webhooks/introduction)
+and [Retries and Replays](https://resend.com/docs/webhooks/retries-and-replays).
 
 ## Decision
 
@@ -86,11 +95,20 @@ Delivery failures use capped exponential backoff and become terminal after the
 configured attempt limit. One delivery failure does not stop the rest of a
 batch. Provider idempotency keys are `email/<immutable delivery UUID>`.
 
+The processing lease and provider ambiguity clock are separate. The lease uses
+mutable `processing_at`; `first_provider_attempt_at` is written once immediately
+before the first possible network call, and `last_provider_attempt_at` records
+later calls. Timeout, connection reset, retryable provider failure, or a
+concurrent-idempotency response preserves that metadata when the delivery
+returns to pending.
+
 Because Resend retains idempotency keys for only 24 hours, the default local
-safety window is 23 hours. An ambiguous processing attempt older than that is
-failed without another provider call, preferring a visible terminal failure
-over a possible duplicate. The worker must therefore run much more frequently
-than this window.
+safety window is 23 hours measured absolutely from
+`first_provider_attempt_at`. Pending work and reclaimed stale processing work
+both become terminal `manual_review` at the deadline without calling the
+provider. Reclaim, backoff, worker downtime, or a sparse schedule cannot move
+the deadline. The attempt cap is an additional limit, not a replacement for
+the absolute window.
 
 ### Provider and messages
 
@@ -99,11 +117,42 @@ the Resend `POST /emails` adapter; tests use a deterministic in-memory adapter
 or explicit fakes and perform no network I/O. Safe error classifications, not
 provider response bodies, are persisted.
 
+Every outbox event captures message schema version, FROM address, public
+origin, subject, and—when applicable—publication title, excerpt, and canonical
+URL. Every delivery captures recipient address, credential token version, and
+one immutable credential issue time. Confirmation and unsubscribe credentials
+are regenerated deterministically from those inputs and the signing secret;
+the raw signed value is never stored.
+
+The delivery also stores SHA-256 of the exact compact UTF-8 JSON body sent to
+Resend. This fingerprint is created with the delivery and checked before every
+provider call. Thus the same `email/<delivery UUID>` key can reach Resend only
+with a byte-equivalent body. A post edit/republish, template deployment,
+`RESEND_FROM_EMAIL` change, or public-origin change does not silently mutate an
+existing request. Unsupported schema or fingerprint mismatch becomes terminal
+`manual_review` without provider I/O. A new template shape requires a new
+message schema version while older renderers remain available until their
+deliveries are terminal.
+
 Templates render explicit HTML and plain text parts. Publication messages
-contain only title, excerpt, canonical public URL, and unsubscribe links; the
-StreamField body is not included. Django template autoescaping protects HTML
-values. All application-owned URLs start from the validated
-`PUBLIC_SITE_URL`.
+contain only the snapshotted title, excerpt, canonical public URL, and
+unsubscribe links; the StreamField body is not included. Django template
+autoescaping protects HTML values.
+
+The Resend adapter bounds both success and error response reads before parsing.
+It stores only safe classifications. `invalid_idempotent_request` is terminal,
+`concurrent_idempotent_requests` is retryable, and an unknown 409 is
+conservatively terminal because its idempotency semantics are not known.
+Provider bodies, API keys, and authorization headers never enter
+`last_error`.
+
+Immediately before a publication delivery's first provider call, the worker
+reapplies the canonical public visibility policy. Unpublished, expired,
+restricted, future-scheduled, or no-longer-public-section posts become
+`skipped` without provider I/O. Normal edit/republish leaves the immutable
+snapshot unchanged. After the first possible call, visibility changes do not
+rewrite or cancel an ambiguous retry because the provider may already have
+accepted the snapshotted request.
 
 ### Webhooks and abuse boundary
 
@@ -114,11 +163,35 @@ event ID under a unique constraint, event type, timestamps, and optional
 delivery relation. It does not store a raw payload or an unbounded JSON ID
 list.
 
-Only the stored provider message ID can select a delivery. Delivered, permanent
-bounce, and complaint events update delivery state. Bounces and complaints
-suppress the subscriber. Terminal bounce/complaint state wins over a late
-delivered event. Unknown types and message IDs are authenticated, deduplicated,
-and safely ignored.
+Only the stored provider message ID can select a delivery. Recognized delivery,
+permanent-bounce, and complaint events store only bounded provider message ID,
+event type, occurrence time, normalized bounce classification, and processing
+state. If the webhook arrives before the worker commits the message ID, the
+event remains durably `pending` and still returns 200. Provider settlement
+immediately reconciles matching pending events; the bounded
+`reconcile_email_webhooks` command is the crash/restart backstop.
+
+Pending events apply deterministically by provider occurrence time, receipt
+time, and local ID. Bounces and complaints suppress the subscriber, and
+complaint/bounce terminal state wins over a late delivered event. Duplicate
+`svix-id` remains idempotent. Unknown event types are immediately ignored.
+Authenticated recognized events with genuinely foreign IDs remain pending for
+seven days and then become ignored; applied/ignored ledger rows are retained
+for 30 days and deleted only by the bounded reconciliation command. This
+durable-200 approach avoids a retry storm while bounding unmatched history.
+Raw webhook payloads are not stored.
+
+### Concurrent unsubscribe
+
+Unsubscribe locks the subscriber and skips only deliveries that have not been
+claimed. It immediately prevents future claims and causes later publication
+deliveries to be created as skipped. A processing delivery is left processing
+because an already-started provider call cannot be cancelled reliably.
+Settlement uses a row lock and state comparison: accepted provider mail becomes
+`sent` even if unsubscribe happened in flight, while the subscriber remains
+unsubscribed. Retryable ambiguous failure after that concurrent unsubscribe
+becomes `manual_review`, not a misleading guaranteed cancellation. Webhook and
+other terminal states are never overwritten unconditionally.
 
 Anonymous subscribe and confirm use database-backed fixed windows. Keys are
 HMAC digests scoped to canonical email or client IP; raw IPs and rate-limit
@@ -140,10 +213,10 @@ Positive:
 
 Negative:
 
-- a crashed ambiguous send beyond Resend's 24-hour key retention is failed for
-  manual review rather than retried;
-- outbox, delivery, webhook-event, and rate-limit rows need a future retention
-  policy;
+- a crashed ambiguous send beyond the local safety deadline requires manual
+  review rather than retry;
+- applied/ignored webhook rows require the bounded retention command; outbox,
+  delivery, and rate-limit retention remains future policy;
 - actual periodic scheduling, alerting, DNS, and provider configuration remain
   infrastructure work.
 

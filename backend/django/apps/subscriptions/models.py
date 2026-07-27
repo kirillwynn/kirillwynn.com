@@ -3,7 +3,7 @@ import uuid
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 from django.db.models.functions import Lower
 
 MAX_EMAIL_LENGTH = 320
@@ -143,6 +143,13 @@ class EmailOutbox(models.Model):
     )
     audience_cutoff = models.DateTimeField(null=True, blank=True, editable=False)
     credential_version = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    message_schema_version = models.PositiveSmallIntegerField(default=1, editable=False)
+    snapshot_from_email = models.CharField(max_length=320, editable=False)
+    snapshot_site_url = models.CharField(max_length=2_048, editable=False)
+    snapshot_subject = models.CharField(max_length=255, editable=False)
+    snapshot_post_title = models.CharField(max_length=255, blank=True, editable=False)
+    snapshot_post_excerpt = models.TextField(blank=True, editable=False)
+    snapshot_post_url = models.CharField(max_length=2_048, blank=True, editable=False)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     attempt_count = models.PositiveIntegerField(default=0)
     available_at = models.DateTimeField()
@@ -163,6 +170,9 @@ class EmailOutbox(models.Model):
                         post__isnull=True,
                         audience_cutoff__isnull=True,
                         credential_version__isnull=False,
+                        snapshot_post_title="",
+                        snapshot_post_excerpt="",
+                        snapshot_post_url="",
                     )
                     | Q(
                         message_type="publication",
@@ -171,7 +181,13 @@ class EmailOutbox(models.Model):
                         audience_cutoff__isnull=False,
                         credential_version__isnull=True,
                     )
-                ),
+                    & ~Q(snapshot_post_title="")
+                    & ~Q(snapshot_post_excerpt="")
+                    & ~Q(snapshot_post_url="")
+                )
+                & ~Q(snapshot_from_email="")
+                & ~Q(snapshot_site_url="")
+                & ~Q(snapshot_subject=""),
                 name="subscriptions_outbox_message_shape",
             ),
             models.CheckConstraint(
@@ -218,6 +234,16 @@ class EmailDelivery(models.Model):
         COMPLAINED = "complained", "Complained"
         FAILED = "failed", "Terminal failure"
         SKIPPED = "skipped", "Skipped"
+        MANUAL_REVIEW = "manual_review", "Manual review required"
+
+    class AmbiguityReason(models.TextChoices):
+        NONE = "", "None"
+        TRANSPORT_FAILURE = "transport_failure", "Transport failure"
+        CONCURRENT_REQUEST = "concurrent_request", "Concurrent idempotent request"
+        PROVIDER_FAILURE = "provider_failure", "Retryable provider failure"
+        WINDOW_EXPIRED = "window_expired", "Idempotency window expired"
+        PAYLOAD_MISMATCH = "payload_mismatch", "Provider payload mismatch"
+        IN_FLIGHT_CANCELLED = "in_flight_cancelled", "Subscriber changed while in flight"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     outbox = models.ForeignKey(
@@ -234,6 +260,18 @@ class EmailDelivery(models.Model):
     attempt_count = models.PositiveIntegerField(default=0)
     available_at = models.DateTimeField()
     processing_at = models.DateTimeField(null=True, blank=True)
+    snapshot_recipient_email = models.CharField(max_length=320, editable=False)
+    snapshot_credential_version = models.PositiveIntegerField(editable=False)
+    credential_issued_at = models.DateTimeField(editable=False)
+    provider_payload_hash = models.CharField(max_length=64, editable=False)
+    first_provider_attempt_at = models.DateTimeField(null=True, blank=True, editable=False)
+    last_provider_attempt_at = models.DateTimeField(null=True, blank=True, editable=False)
+    ambiguity_reason = models.CharField(
+        max_length=32,
+        choices=AmbiguityReason.choices,
+        blank=True,
+        default=AmbiguityReason.NONE,
+    )
     provider_message_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
     provider_created_at = models.DateTimeField(null=True, blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
@@ -260,6 +298,42 @@ class EmailDelivery(models.Model):
                 ),
                 name="subscriptions_delivery_processing_shape",
             ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        first_provider_attempt_at__isnull=True,
+                        last_provider_attempt_at__isnull=True,
+                        ambiguity_reason__in=("", "payload_mismatch"),
+                    )
+                    | Q(
+                        first_provider_attempt_at__isnull=False,
+                        last_provider_attempt_at__isnull=False,
+                        last_provider_attempt_at__gte=F("first_provider_attempt_at"),
+                    )
+                ),
+                name="subscriptions_delivery_attempt_shape",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~Q(status="manual_review")
+                    | (
+                        ~Q(ambiguity_reason="")
+                        & (
+                            Q(first_provider_attempt_at__isnull=False)
+                            | Q(ambiguity_reason="payload_mismatch")
+                        )
+                    )
+                ),
+                name="subscriptions_delivery_review_shape",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~Q(snapshot_recipient_email="")
+                    & ~Q(provider_payload_hash="")
+                    & Q(snapshot_credential_version__gte=1)
+                ),
+                name="subscriptions_delivery_snapshot_shape",
+            ),
         ]
         indexes = [
             models.Index(
@@ -269,6 +343,10 @@ class EmailDelivery(models.Model):
             models.Index(
                 fields=("outbox", "status", "available_at"),
                 name="subs_delivery_outbox_idx",
+            ),
+            models.Index(
+                fields=("status", "first_provider_attempt_at", "id"),
+                name="subs_delivery_safety_idx",
             ),
         ]
 
@@ -281,10 +359,22 @@ class EmailDelivery(models.Model):
 
 
 class EmailWebhookEvent(models.Model):
+    class ProcessingState(models.TextChoices):
+        PENDING = "pending", "Pending correlation"
+        APPLIED = "applied", "Applied"
+        IGNORED = "ignored", "Ignored"
+
     id = models.BigAutoField(primary_key=True)
     provider = models.CharField(max_length=32, default="resend", editable=False)
     event_id = models.CharField(max_length=255)
     event_type = models.CharField(max_length=80)
+    provider_message_id = models.CharField(max_length=255, null=True, blank=True)
+    bounce_type = models.CharField(max_length=64, blank=True)
+    processing_state = models.CharField(
+        max_length=16,
+        choices=ProcessingState.choices,
+        default=ProcessingState.PENDING,
+    )
     delivery = models.ForeignKey(
         EmailDelivery,
         null=True,
@@ -294,19 +384,47 @@ class EmailWebhookEvent(models.Model):
     )
     provider_occurred_at = models.DateTimeField(null=True, blank=True)
     processed_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    applied_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=("provider", "event_id"),
                 name="subscriptions_unique_provider_event",
-            )
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        processing_state="pending",
+                        provider_message_id__isnull=False,
+                        delivery__isnull=True,
+                        applied_at__isnull=True,
+                    )
+                    | Q(
+                        processing_state="applied",
+                        provider_message_id__isnull=False,
+                        delivery__isnull=False,
+                        applied_at__isnull=False,
+                    )
+                    | Q(
+                        processing_state="ignored",
+                        delivery__isnull=True,
+                        applied_at__isnull=False,
+                    )
+                ),
+                name="subscriptions_webhook_processing_shape",
+            ),
         ]
         indexes = [
             models.Index(
                 fields=("provider", "event_type", "processed_at"),
                 name="subscriptions_webhook_type_idx",
-            )
+            ),
+            models.Index(
+                fields=("processing_state", "expires_at", "provider_message_id", "id"),
+                name="subs_webhook_pending_idx",
+            ),
         ]
 
 

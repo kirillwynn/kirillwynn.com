@@ -657,17 +657,23 @@ Accepts exactly:
 ```
 
 The credential is purpose-bound, subscriber-bound, versioned, and expires
-after 48 hours by default. Success is `{"status":"confirmed"}`; repeating the
-same valid confirmation returns `{"status":"already_confirmed"}`. Invalid,
-expired, tampered, wrong-purpose, superseded, and unknown credentials share a
-400 response and message. GET returns 405 and never confirms.
+after 48 hours by default. Its signed timestamp is the delivery's one immutable
+credential issue time, so a provider retry cannot restart the TTL. Success is
+`{"status":"confirmed"}`; repeating the same valid confirmation returns
+`{"status":"already_confirmed"}`. Invalid, expired, tampered, wrong-purpose,
+superseded, and unknown credentials share a 400 response and message. GET
+returns 405 and never confirms.
 
 ### `POST /api/v1/subscriptions/unsubscribe/`
 
 Accepts the same one-field shape with a purpose-bound unsubscribe credential.
 Success is `{"status":"unsubscribed"}` and a repeated current credential
-returns `{"status":"already_unsubscribed"}`. GET returns 405. The mutation
-immediately marks pending/claimed unsent deliveries skipped.
+returns `{"status":"already_unsubscribed"}`. GET returns 405.
+
+The mutation immediately skips deliveries that have not been claimed. A
+delivery whose provider call has started is not presented as cancelled: the
+worker records provider acceptance if it occurs, while the subscriber remains
+unsubscribed and cannot be claimed for later sends.
 
 Human confirmation and unsubscribe pages are
 `/subscriptions/confirm/` and `/subscriptions/unsubscribe/`. The credential is
@@ -707,9 +713,22 @@ unique.
 
 Handled types are `email.delivered`, `email.bounced`, and
 `email.complained`. Lookup uses only the stored Resend message ID. Permanent
-bounce and complaint suppress the related subscriber. Unknown types/message
-IDs and exact replays return safe success without changing a subscriber. Raw
-provider payloads are never stored.
+bounce and complaint suppress the related subscriber. A recognized event that
+arrives before the worker commits its Resend message ID is stored as a bounded
+`pending` correlation record and returns 200. The worker reconciles it after
+provider acceptance; `reconcile_email_webhooks` is the bounded crash/restart
+backstop. Exact `svix-id` replays remain idempotent, terminal bounce/complaint
+wins over late delivered, and multiple pending events apply in
+`(occurred_at, received_at, id)` order.
+
+Unknown event types are immediately ignored. A recognized but foreign message
+ID remains pending for seven days, then becomes ignored; applied/ignored
+idempotency rows are retained for 30 days and the reconciliation command
+deletes expired history in bounded batches. This avoids webhook retry storms
+while bounding unmatched growth. Stored fields are only event type, bounded
+provider message ID, provider occurrence time, normalized bounce
+classification, processing state, and correlation timestamps. Raw provider
+payloads are never stored.
 
 ## StreamField discriminated union
 

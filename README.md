@@ -249,8 +249,15 @@ cd backend/django
 uv run python manage.py process_email_outbox --limit 25 --delivery-limit 100
 ```
 
-The command is safe to rerun and prints counts without addresses or provider
-credentials. Production scheduler/service wiring is intentionally deferred.
+Reconcile bounded early-arriving webhook state and retention:
+
+```bash
+cd backend/django
+uv run python manage.py reconcile_email_webhooks --limit 100
+```
+
+The commands are safe to rerun and print counts without addresses, provider
+payloads, or credentials. Production scheduler/service wiring is intentionally deferred.
 See [email setup](docs/email-setup.md) for Resend, SPF/DKIM/DMARC, webhook,
 rotation, and worker scheduling steps.
 
