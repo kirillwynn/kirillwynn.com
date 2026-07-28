@@ -4,7 +4,7 @@ import ipaddress
 import math
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.utils import timezone
 
 from apps.subscriptions.models import SubscriptionRateLimitBucket
@@ -61,11 +61,26 @@ def _policy(scope):
     )
 
 
+def _lock_bucket_key(key_hash):
+    if connection.vendor != "postgresql":
+        return
+    lock_key = int.from_bytes(
+        bytes.fromhex(key_hash[:16]),
+        byteorder="big",
+        signed=True,
+    )
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_key])
+
+
 def consume_rate_limit(*, scope, value, at=None):
     limit, window_seconds = _policy(scope)
     now = at or timezone.now()
     key_hash = _hashed_key(scope, value)
     with transaction.atomic():
+        # Anonymous buckets have no durable parent row to lock before the
+        # first insert. Serialize the HMAC-keyed bucket for this transaction.
+        _lock_bucket_key(key_hash)
         try:
             bucket = SubscriptionRateLimitBucket.objects.select_for_update().get(
                 scope=scope,
