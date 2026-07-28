@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 Integration branch: `rewrite/wagtail-next`
 
@@ -395,6 +395,12 @@ Docker/Nginx/PostgreSQL/provider/browser runtime verification remain pending
   without replacing the original exit status; active-A internal recovery and
   first-deploy retry/fix-forward repeat application, edge, health, and public
   gates before idempotent finalize.
+- [x] The final two Milestone 10 resolution defects are closed: retry and
+  fix-forward accept a reviewed deployment sequence outside immutable runtime,
+  bind it to their operation ID, and preserve runtime bytes; schema-3 attempts
+  carry deep-validated activation policy so recovery retry lineages preserve
+  previous while deploy/rollback/fix-forward lineages rotate active to
+  previous.
 
 ## Milestone transition
 
@@ -516,6 +522,38 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 - a deliberately deferred dependency.
 
 ## Last verification
+
+2026-07-28:
+
+- Exact-candidate retry now receives a positive reviewed sequence explicitly
+  through `resolve_failed_rollout.sh`; ordinary CI still reads rendered
+  `DEPLOY_SEQUENCE`. Shell regression invokes the real resolution entrypoint
+  with failed runtime sequence N, accepts N+1, preserves every runtime byte,
+  rejects N and conflicting N+2, and proves the identical operation/sequence
+  begin is byte-preserving.
+- Schema-3 attempts now record `activation_policy`. Recovery and recursive
+  recovery retries preserve previous; deploy, rollback, fix-forward, and their
+  retries rotate active to previous. Deep validation rejects policy/lineage
+  tears and identical active/previous component snapshots. Coverage includes
+  one and two failed recovery retries, a new recovery, recovery fix-forward,
+  failed rollback retry, and duplicate finalize.
+- `backend/django/.venv/bin/python -m pytest -q infra/tests` passed 131
+  regressions. Shell syntax, Python compilation, Ruff format/lint, and
+  `git diff --check` passed.
+- Full backend SQLite `pytest` passed 474 tests with six PostgreSQL-only
+  concurrency/search skips. `uv lock --check` resolved 74 packages; Django
+  test and production deploy checks, migration drift, and a complete empty
+  SQLite migration chain passed.
+- Node.js 24.18.0/npm 11.16.0 frontend format, ESLint, TypeScript, 152 Vitest
+  tests in 16 files, production Next.js 16.2.11 build, and standalone
+  staging/production runtime-origin probes passed. Build and standalone probes
+  required the approved local loopback-port exception after the sandbox
+  rejected their binds.
+- Browser-asset and tracked-diff credential-pattern scans passed; gitleaks and
+  TruffleHog are unavailable locally. Docker, Compose, Nginx, PostgreSQL,
+  `psql`, and `pg_isready` are unavailable, so container/Compose/Nginx/
+  PostgreSQL runtime tests were not run and are not inferred from deterministic
+  tests. No push, deployment, or external state change was performed.
 
 2026-07-27:
 

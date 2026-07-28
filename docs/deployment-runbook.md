@@ -81,10 +81,10 @@ The attempt is durable before any PostgreSQL/application/edge mutation.
 Repeating the same operation and phase is a no-op; a reused operation ID with
 different input, another in-progress operation, a stale sequence, or a second
 operation for an already-active release is rejected. Finalize performs one
-atomic A → B switch that preserves A as rollback target. Repeating finalize B
-does not write state. Staging owns only application state because it does not
-replace shared edge; production state records both application and exact live
-edge digest.
+atomic activation according to the attempt's validated `activation_policy`.
+Repeating finalize does not write state. Staging owns only application state
+because it does not replace shared edge; production state records both
+application and exact live edge digest.
 
 Staging and production GitHub jobs share
 `kirillwynn-server-release-operations`; the server also uses
@@ -179,17 +179,23 @@ is rejected, and the original remote exit status remains the job result.
 
 ## Failure and reviewed resolution matrix
 
-| Failed state | Reviewed owner | Required database evidence | Runtime/public gates | Final result |
+| Failed state | Reviewed owner | Activation policy | Required database evidence | Final result |
 | --- | --- | --- | --- | --- |
-| Active A, candidate B, any internal/public failure | `recovery` | `recovery` backup | Restore A application and production edge, then health/digests/Nginx/public smoke | Active A; previous unchanged |
-| First candidate B, `active=null`, transient failure | exact-candidate `retry` | Finish original initial backup only if still pre-migration; otherwise `recovery` backup | Migration plan, application, edge, health, public smoke | Active B |
-| First candidate B, `active=null`, reviewed replacement C | `fix-forward` | `recovery` backup of the existing owned database | Migrate C, application, edge, health, public smoke | Active C |
-| Failure before any runtime checkpoint | `retry` or `fix-forward` | Database remains `absent`; resolution authorizes bootstrap | Full first-deploy gates | Selected candidate active |
+| Active A, previous Z, candidate B, any internal/public failure | new `recovery` | `preserve-previous` | `recovery` backup plus all runtime/public gates | Active A; previous Z |
+| Failed recovery chain | exact-candidate `retry` | Recursively inherit `preserve-previous` | Resume/repeat required recovery gates | Active A; previous Z |
+| Failed deploy or rollback | exact-candidate `retry` | Recursively inherit `rotate-active-to-previous` | Resume/repeat required rollout gates | Candidate active; prior active becomes previous |
+| Any authoritative failure, reviewed replacement C | `fix-forward` | `rotate-active-to-previous` | `recovery` backup of an existing owned database plus all gates | Active C; prior active becomes previous |
+| Failure before any runtime checkpoint | `retry` or `fix-forward` | Inherited retry policy or rotate fix-forward policy | Database remains `absent`; resolution authorizes bootstrap | Selected candidate active |
 
 Every resolution has a new immutable operation ID and greater deployment
-sequence. Repeating begin, identical failure, or finalize is a no-op. Another
-owner, reason/category, manifest, or operation binding conflicts and fails
-closed.
+sequence. Retry and fix-forward receive that reviewed sequence as an explicit
+shell argument; they never rewrite or copy the immutable candidate runtime to
+change `DEPLOY_SEQUENCE`. The operation ID is permanently bound to the explicit
+sequence, so repeating the same binding is a no-op while a different sequence
+for that ID fails closed. Ordinary CI deployment continues to read its sequence
+from the rendered `control.env`. Repeating begin, identical failure, or
+finalize is a no-op. Another owner, reason/category, manifest, activation
+policy, or operation binding conflicts and fails closed.
 
 ## Reviewed abort and active-release recovery
 
@@ -240,7 +246,7 @@ ordinary deployment. Transfer the authoritative failure under the lock:
 flock -w 900 /srv/kirillwynn/locks/release.lock \
   /srv/kirillwynn/releases/<resolution-sha>/infra/scripts/resolve_failed_rollout.sh \
   production <failed-operation-id> <resolution-operation-id> \
-  retry \
+  <reviewed-next-sequence> retry \
   /srv/kirillwynn/runtime/releases/<failed-sha>/production \
   /srv/kirillwynn/releases/<failed-sha>/release-manifest.json \
   /srv/kirillwynn/runtime/edge.env
@@ -251,7 +257,9 @@ reviewed new release, use `fix-forward` with C's runtime and manifest. When the
 database already exists, fix-forward takes a `recovery` backup before migration
 and never writes another `initial-empty` backup. Both paths stop at pending
 public smoke and use `finalize_rollout.sh` after the same external gates.
-Neither path removes or recreates a confirmed-ready volume.
+Neither path removes or recreates a confirmed-ready volume. The explicit
+sequence must be positive and greater than the failed operation's sequence;
+reusing the resolution operation ID with another sequence is rejected.
 
 ## Reproducible application rollback
 

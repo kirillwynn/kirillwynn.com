@@ -36,6 +36,7 @@ SNAPSHOT_FIELDS = {
 ATTEMPT_FIELDS = {
     "operation_id",
     "kind",
+    "activation_policy",
     "environment",
     "status",
     "phase",
@@ -113,6 +114,10 @@ FAILURE_CATEGORIES = {
     "public-smoke",
     "pre-finalize-attestation",
     "operator",
+}
+ACTIVATION_POLICIES = {
+    "preserve-previous",
+    "rotate-active-to-previous",
 }
 
 
@@ -365,6 +370,7 @@ def validate_attempt_shape(operation_id, attempt, environment):
         or attempt["environment"] != environment
         or attempt["kind"]
         not in {"deploy", "rollback", "recovery", "retry", "fix-forward"}
+        or attempt["activation_policy"] not in ACTIVATION_POLICIES
         or attempt["status"] not in {"in-progress", "completed", "failed", "aborted"}
         or not isinstance(attempt["deployment_sequence"], int)
         or attempt["deployment_sequence"] < 1
@@ -440,6 +446,59 @@ def validate_state_shape(state, environment):
         validate_attempt_shape(operation_id, attempt, environment)
 
 
+def validate_activation_policy_lineage(state):
+    attempts = state["attempts"]
+    visiting = set()
+    validated = {}
+
+    def inherited_policy(operation_id):
+        if operation_id in validated:
+            return validated[operation_id]
+        if operation_id in visiting:
+            raise ValueError("authoritative activation policy lineage contains a cycle")
+        visiting.add(operation_id)
+        attempt = attempts[operation_id]
+        kind = attempt["kind"]
+        if kind == "retry":
+            failed_operation_id = attempt["recovers_operation_id"]
+            failed = attempts.get(failed_operation_id)
+            if failed is None:
+                raise ValueError(
+                    "authoritative activation policy lineage has no failed operation"
+                )
+            expected = inherited_policy(failed_operation_id)
+            if (
+                attempt["candidate"]["application"]
+                != failed["candidate"]["application"]
+            ):
+                raise ValueError(
+                    "authoritative retry activation lineage changed exact candidate"
+                )
+        elif kind == "recovery":
+            expected = "preserve-previous"
+        else:
+            expected = "rotate-active-to-previous"
+        visiting.remove(operation_id)
+        if attempt["activation_policy"] != expected:
+            raise ValueError(
+                "authoritative activation policy conflicts with operation lineage"
+            )
+        validated[operation_id] = expected
+        return expected
+
+    for operation_id in attempts:
+        inherited_policy(operation_id)
+
+
+def same_component_snapshot(first, second):
+    return (
+        first is not None
+        and second is not None
+        and first["application"] == second["application"]
+        and first["edge"] == second["edge"]
+    )
+
+
 def load_state(state_directory, environment):
     path = state_path(state_directory, environment)
     if not path.exists():
@@ -453,6 +512,11 @@ def load_state(state_directory, environment):
         return empty_state(environment)
     state = json.loads(path.read_text())
     validate_state_shape(state, environment)
+    validate_activation_policy_lineage(state)
+    if same_component_snapshot(state["active"], state["previous"]):
+        raise ValueError(
+            "authoritative active and previous component snapshots are identical"
+        )
     current = state["in_progress_operation_id"]
     if current is not None:
         attempt = state["attempts"].get(current)
@@ -728,6 +792,7 @@ def begin(args):
     expected = {
         "operation_id": args.operation_id,
         "kind": args.operation,
+        "activation_policy": "rotate-active-to-previous",
         "environment": args.environment,
         "status": "in-progress",
         "phase": "attempt-recorded",
@@ -817,6 +882,7 @@ def begin_recovery(args):
     expected = {
         "operation_id": args.operation_id,
         "kind": "recovery",
+        "activation_policy": "preserve-previous",
         "environment": args.environment,
         "status": "in-progress",
         "phase": "attempt-recorded",
@@ -891,6 +957,11 @@ def begin_resolution(args):
     expected = {
         "operation_id": args.operation_id,
         "kind": args.resolution,
+        "activation_policy": (
+            failed["activation_policy"]
+            if args.resolution == "retry"
+            else "rotate-active-to-previous"
+        ),
         "environment": args.environment,
         "status": "in-progress",
         "phase": "attempt-recorded",
@@ -1154,17 +1225,18 @@ def finalize(args):
             or resolution["kind"] != attempt["resolution_kind"]
         ):
             raise ValueError("failure resolution ownership changed")
-        if attempt["kind"] == "recovery":
-            state["active"] = attempt["candidate"]
-        else:
-            state["previous"] = state["active"]
-            state["active"] = attempt["candidate"]
         resolution["status"] = "completed"
         resolution["completed_at"] = now()
         state["recovery_required_for"] = None
-    else:
+    if attempt["activation_policy"] == "preserve-previous":
+        state["active"] = attempt["candidate"]
+    elif attempt["activation_policy"] == "rotate-active-to-previous":
         state["previous"] = state["active"]
         state["active"] = attempt["candidate"]
+    else:
+        raise ValueError("operation has an unsupported activation policy")
+    if same_component_snapshot(state["active"], state["previous"]):
+        raise ValueError("activation would make active and previous identical")
     attempt["status"] = "completed"
     attempt["phase"] = "complete"
     attempt["phase_history"].append("complete")

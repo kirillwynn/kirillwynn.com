@@ -112,6 +112,14 @@ finalize B is a byte-for-byte no-op and cannot turn B into its own rollback
 target. Stale, duplicate, parallel, or operation-ID-conflicting attempts fail
 closed.
 
+Each attempt carries a validated activation policy. Deploy, rollback,
+fix-forward, and their retry lineages use `rotate-active-to-previous`.
+Recovery and every recursive retry of a recovery lineage use
+`preserve-previous`. A new recovery always preserves previous; fix-forward is a
+new release activation and always rotates. Finalize follows this policy rather
+than operation kind, rejects torn/conflicting lineage, and cannot make active
+and previous identify the same exact component snapshot.
+
 Application and edge truth are explicit components. Production activation and
 rollback record and verify both; staging owns only its application snapshot and
 validates an edge candidate without claiming the shared edge is active. A
@@ -128,6 +136,14 @@ application snapshot. Resolution ownership clears only at atomic finalization.
 A normal rollback B → A likewise restores edge A before it can record A active.
 Abort is allowed only before the attempt crosses its first runtime-mutation
 boundary.
+
+Retry and fix-forward use a separate operational shell contract with an
+explicit reviewed positive deployment sequence greater than the failed
+operation. The sequence is immutable input bound to the resolution operation
+ID: an identical retry is a no-op and a conflicting repeat fails closed. The
+failed candidate runtime remains byte-for-byte immutable and its rendered
+`DEPLOY_SEQUENCE` is not changed or copied for resolution. Ordinary CI deploys
+continue to consume the sequence from their rendered runtime.
 
 First production deploy has an explicit exception only to the meaning of
 "existing database": with database lifecycle `absent`, the attempt first

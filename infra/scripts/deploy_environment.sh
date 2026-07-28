@@ -2,17 +2,18 @@
 set -eu
 
 usage() {
-    echo "usage: deploy_environment.sh <staging|production> <runtime-dir> <release-manifest> <operation-id> [retry|fix-forward <failed-operation-id>]" >&2
+    echo "usage: deploy_environment.sh <staging|production> <runtime-dir> <release-manifest> <operation-id> [retry|fix-forward <failed-operation-id> <deployment-sequence>]" >&2
     exit 2
 }
 
-[ "$#" -eq 4 ] || [ "$#" -eq 6 ] || usage
+[ "$#" -eq 4 ] || [ "$#" -eq 7 ] || usage
 environment_name=$1
 runtime_dir=$2
 release_manifest=$3
 operation_id=$4
 resolution_kind=${5:-}
 failed_operation_id=${6:-}
+resolution_deploy_sequence=${7:-}
 case "$environment_name" in
     staging|production) ;;
     *) usage ;;
@@ -55,8 +56,12 @@ operation_field() {
 python3 "$repository_root/infra/scripts/validate_release_manifest.py" "$release_manifest"
 release_sha=$(python3 "$repository_root/infra/scripts/env_value.py" \
     "$control_env" RELEASE_SHA)
-deploy_sequence=$(python3 "$repository_root/infra/scripts/env_value.py" \
-    "$control_env" DEPLOY_SEQUENCE)
+if [ -n "$resolution_kind" ]; then
+    deploy_sequence=$resolution_deploy_sequence
+else
+    deploy_sequence=$(python3 "$repository_root/infra/scripts/env_value.py" \
+        "$control_env" DEPLOY_SEQUENCE)
+fi
 postgres_volume=$(python3 "$repository_root/infra/scripts/env_value.py" \
     "$control_env" POSTGRES_VOLUME)
 postgres_image=$(python3 "$repository_root/infra/scripts/env_value.py" \

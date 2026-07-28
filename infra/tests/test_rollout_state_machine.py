@@ -334,6 +334,20 @@ def failed_candidate_fixture(tmp_path):
     return module, operation_z, operation_a, operation_b
 
 
+def failed_recovery_fixture(tmp_path):
+    module, operation_z, operation_a, operation_b = failed_candidate_fixture(tmp_path)
+    recovery = begin_recovery_args(
+        operation_a,
+        "recovery-operation-a",
+        operation_b.operation_id,
+        4,
+    )
+    module.begin_recovery(recovery)
+    advance_to_pending(module, recovery)
+    module.fail(recovery)
+    return module, operation_z, operation_a, operation_b, recovery
+
+
 def test_failed_candidate_recovery_restores_active_a_and_preserves_evidence(tmp_path):
     module, operation_z, operation_a, operation_b = failed_candidate_fixture(tmp_path)
     state = module.load_state(operation_b.state_directory, "production")
@@ -376,6 +390,172 @@ def test_failed_candidate_recovery_restores_active_a_and_preserves_evidence(tmp_
         == "completed"
     )
     assert recovered["attempts"][recovery.operation_id]["status"] == "completed"
+
+
+@pytest.mark.parametrize("failed_retry_count", [0, 2])
+def test_retry_recovery_inherits_preserve_previous_recursively(
+    tmp_path, failed_retry_count
+):
+    module, operation_z, operation_a, _, failed = failed_recovery_fixture(tmp_path)
+    sequence = 5
+    for retry_number in range(failed_retry_count):
+        retry = begin_resolution_args(
+            operation_a,
+            f"retry-recovery-failed-{retry_number}",
+            failed.operation_id,
+            sequence,
+            "retry",
+        )
+        module.begin_resolution(retry)
+        advance_to_pending(module, retry)
+        module.fail(retry)
+        failed = retry
+        sequence += 1
+
+    retry = begin_resolution_args(
+        operation_a,
+        "retry-recovery-success",
+        failed.operation_id,
+        sequence,
+        "retry",
+    )
+    module.begin_resolution(retry)
+    state = module.load_state(retry.state_directory, "production")
+    assert (
+        state["attempts"][retry.operation_id]["activation_policy"]
+        == "preserve-previous"
+    )
+    advance_to_pending(module, retry)
+    module.finalize(retry)
+    finalized = state_file(retry).read_bytes()
+    module.finalize(retry)
+
+    assert state_file(retry).read_bytes() == finalized
+    state = module.load_state(retry.state_directory, "production")
+    assert state["active"]["application"]["release_sha"] == operation_a.release_sha
+    assert state["previous"]["application"]["release_sha"] == operation_z.release_sha
+    assert (
+        state["active"]["application"] != state["previous"]["application"]
+        or state["active"]["edge"] != state["previous"]["edge"]
+    )
+
+
+def test_failed_recovery_followed_by_new_recovery_preserves_previous_z(tmp_path):
+    module, operation_z, operation_a, _, failed_recovery = failed_recovery_fixture(
+        tmp_path
+    )
+    recovery = begin_recovery_args(
+        operation_a,
+        "recovery-operation-a-second",
+        failed_recovery.operation_id,
+        5,
+    )
+    module.begin_recovery(recovery)
+    advance_to_pending(module, recovery)
+    module.finalize(recovery)
+
+    state = module.load_state(recovery.state_directory, "production")
+    assert state["active"]["application"]["release_sha"] == operation_a.release_sha
+    assert state["previous"]["application"]["release_sha"] == operation_z.release_sha
+    assert (
+        state["attempts"][recovery.operation_id]["activation_policy"]
+        == "preserve-previous"
+    )
+
+
+def test_failed_recovery_fix_forward_rotates_active_a_to_previous(tmp_path):
+    module, _, operation_a, _, failed_recovery = failed_recovery_fixture(tmp_path)
+    candidate_c = operation_args(
+        tmp_path,
+        operation_id="fix-forward-operation-c",
+        sha="d" * 40,
+        image_seed="a",
+        sequence=5,
+    )
+    fix_forward = begin_resolution_args(
+        candidate_c,
+        candidate_c.operation_id,
+        failed_recovery.operation_id,
+        5,
+        "fix-forward",
+    )
+    module.begin_resolution(fix_forward)
+    advance_to_pending(module, fix_forward)
+    module.finalize(fix_forward)
+
+    state = module.load_state(fix_forward.state_directory, "production")
+    assert state["active"]["application"]["release_sha"] == candidate_c.release_sha
+    assert state["previous"]["application"]["release_sha"] == operation_a.release_sha
+    assert (
+        state["attempts"][fix_forward.operation_id]["activation_policy"]
+        == "rotate-active-to-previous"
+    )
+
+
+def test_failed_rollback_retry_rotates_active_b_to_previous(tmp_path):
+    module = load_script("record_rollout_state.py")
+    operation_a = operation_args(tmp_path)
+    activate(module, operation_a)
+    operation_b = operation_args(
+        tmp_path,
+        operation_id="deploy-operation-b",
+        sha="b" * 40,
+        image_seed="4",
+        sequence=2,
+    )
+    activate(module, operation_b)
+    rollback = operation_args(
+        tmp_path,
+        operation_id="rollback-operation-a",
+        operation="rollback",
+        sha=operation_a.release_sha,
+        image_seed="1",
+        sequence=3,
+    )
+    rollback.manifest = operation_a.manifest
+    rollback.runtime_directory = operation_a.runtime_directory
+    module.begin(rollback)
+    advance_to_pending(module, rollback)
+    module.fail(rollback)
+
+    retry = begin_resolution_args(
+        operation_a,
+        "retry-rollback-operation-a",
+        rollback.operation_id,
+        4,
+        "retry",
+    )
+    module.begin_resolution(retry)
+    advance_to_pending(module, retry)
+    module.finalize(retry)
+
+    state = module.load_state(retry.state_directory, "production")
+    assert state["active"]["application"]["release_sha"] == operation_a.release_sha
+    assert state["previous"]["application"]["release_sha"] == operation_b.release_sha
+    assert (
+        state["attempts"][retry.operation_id]["activation_policy"]
+        == "rotate-active-to-previous"
+    )
+
+
+def test_torn_retry_activation_policy_lineage_fails_deep_validation(tmp_path):
+    module, _, operation_a, _, failed_recovery = failed_recovery_fixture(tmp_path)
+    retry = begin_resolution_args(
+        operation_a,
+        "retry-recovery-operation-a",
+        failed_recovery.operation_id,
+        5,
+        "retry",
+    )
+    module.begin_resolution(retry)
+    payload = json.loads(state_file(retry).read_text())
+    payload["attempts"][retry.operation_id]["activation_policy"] = (
+        "rotate-active-to-previous"
+    )
+    state_file(retry).write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match="activation policy conflicts"):
+        module.load_state(retry.state_directory, "production")
 
 
 @pytest.mark.parametrize(
@@ -758,6 +938,137 @@ def test_failed_first_deploy_retry_same_candidate_succeeds_idempotently(tmp_path
     assert resolution["status"] == "completed"
 
 
+def test_resolve_shell_uses_reviewed_sequence_without_rewriting_failed_runtime(
+    tmp_path,
+):
+    module, operation_z, _, operation_b = failed_candidate_fixture(tmp_path)
+    manifest = json.loads(operation_b.manifest.read_text())
+    control_env = operation_b.runtime_directory / "control.env"
+    control_env.write_text(
+        f"RELEASE_SHA={operation_b.release_sha}\n"
+        "DEPLOY_SEQUENCE=3\n"
+        "POSTGRES_VOLUME=kirillwynn-production-test-postgres\n"
+        f"POSTGRES_IMAGE={operation_b.postgres_image}\n"
+        f"DJANGO_IMAGE={manifest['images']['django']}\n"
+        f"NEXT_IMAGE={manifest['images']['next']}\n"
+    )
+    (operation_b.runtime_directory / "postgres.env").write_text(
+        "POSTGRES_DB=kirillwynn_production\n"
+        "POSTGRES_USER=kirillwynn_production\n"
+        "POSTGRES_PASSWORD=test-only\n"
+    )
+    edge_env = tmp_path / "edge.env"
+    edge_env.write_text("EDGE_TEST_ONLY=1\n")
+    runtime_before = {
+        path.relative_to(operation_b.runtime_directory): path.read_bytes()
+        for path in operation_b.runtime_directory.rglob("*")
+        if path.is_file()
+    }
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    fake_docker(
+        binary_dir / "docker",
+        existing_volume=True,
+        operation_id=operation_z.operation_id,
+        application_images={
+            "django": manifest["images"]["django"],
+            "next": manifest["images"]["next"],
+        },
+        edge_image=manifest["images"]["edge"],
+    )
+    environment = {
+        **os.environ,
+        "PATH": f"{binary_dir}:{os.environ['PATH']}",
+        "STATE_DIRECTORY": str(operation_b.state_directory),
+        "BACKUP_DIRECTORY": str(tmp_path / "backups"),
+    }
+    base_command = [
+        SCRIPTS / "resolve_failed_rollout.sh",
+        "production",
+        operation_b.operation_id,
+        "retry-operation-b-shell",
+    ]
+
+    stale = subprocess.run(
+        [
+            *base_command,
+            "3",
+            "retry",
+            operation_b.runtime_directory,
+            operation_b.manifest,
+            edge_env,
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    assert stale.returncode != 0
+    assert "must advance failed operation" in stale.stderr
+
+    accepted = subprocess.run(
+        [
+            *base_command,
+            "4",
+            "retry",
+            operation_b.runtime_directory,
+            operation_b.manifest,
+            edge_env,
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    assert accepted.returncode == 0, accepted.stderr
+    state = module.load_state(operation_b.state_directory, "production")
+    attempt = state["attempts"]["retry-operation-b-shell"]
+    assert attempt["deployment_sequence"] == 4
+    assert attempt["phase"] == "pending-public-smoke"
+    assert (
+        attempt["candidate"]["application"]
+        == state["attempts"][operation_b.operation_id]["candidate"]["application"]
+    )
+    accepted_state = state_file(operation_b).read_bytes()
+
+    duplicate = subprocess.run(
+        [
+            *base_command,
+            "4",
+            "retry",
+            operation_b.runtime_directory,
+            operation_b.manifest,
+            edge_env,
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    assert duplicate.returncode == 0, duplicate.stderr
+    assert state_file(operation_b).read_bytes() == accepted_state
+
+    conflict = subprocess.run(
+        [
+            *base_command,
+            "5",
+            "retry",
+            operation_b.runtime_directory,
+            operation_b.manifest,
+            edge_env,
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    assert conflict.returncode != 0
+    assert "conflicting immutable input" in conflict.stderr
+    assert state_file(operation_b).read_bytes() == accepted_state
+    runtime_after = {
+        path.relative_to(operation_b.runtime_directory): path.read_bytes()
+        for path in operation_b.runtime_directory.rglob("*")
+        if path.is_file()
+    }
+    assert runtime_after == runtime_before
+
+
 def test_failed_first_deploy_fix_forward_to_new_release_uses_owned_database(
     tmp_path,
 ):
@@ -867,6 +1178,8 @@ def fake_docker(
     operation_id="deploy-operation-a",
     volume_name="kirillwynn-production-test-postgres",
     matching_labels=True,
+    application_images=None,
+    edge_image=None,
 ):
     log_line = f"printf '%s\\n' \"$*\" >> '{log_path}'\n" if log_path else ""
     marker = path.with_suffix(".volume")
@@ -875,6 +1188,25 @@ def fake_docker(
     label_environment = environment if matching_labels else "foreign"
     label_operation = operation_id if matching_labels else "foreign-operation"
     label_volume = volume_name if matching_labels else "foreign-volume"
+    container_commands = ""
+    if application_images is not None and edge_image is not None:
+        container_commands = (
+            'case "$*" in\n'
+            '  *" ps -q django") printf "%s\\n" "django-container" ;;\n'
+            '  *" ps -q worker") printf "%s\\n" "worker-container" ;;\n'
+            '  *" ps -q next") printf "%s\\n" "next-container" ;;\n'
+            '  *" ps -q edge") printf "%s\\n" "edge-container" ;;\n'
+            "esac\n"
+            'if [ "$1" = "inspect" ]; then\n'
+            '  case "$*" in\n'
+            f'    *django-container) printf "%s\\n" "{application_images["django"]}" ;;\n'
+            f'    *worker-container) printf "%s\\n" "{application_images["django"]}" ;;\n'
+            f'    *next-container) printf "%s\\n" "{application_images["next"]}" ;;\n'
+            f'    *edge-container) printf "%s\\n" "{edge_image}" ;;\n'
+            "  esac\n"
+            "  exit 0\n"
+            "fi\n"
+        )
     path.write_text(
         "#!/bin/sh\n"
         f"{log_line}"
@@ -894,6 +1226,7 @@ def fake_docker(
         f"  : > '{marker}'\n"
         "  exit 0\n"
         "fi\n"
+        f"{container_commands}"
         'case "$*" in\n'
         "  *pg_dump*) printf '%s' fake-custom-dump ;;\n"
         "  *) exit 0 ;;\n"

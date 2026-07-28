@@ -460,10 +460,12 @@ def test_recovery_restores_failed_base_application_and_production_edge():
 def test_reviewed_retry_and_fix_forward_use_separate_resolution_entrypoint():
     script = (SCRIPTS / "resolve_failed_rollout.sh").read_text()
     assert "retry|fix-forward" in script
+    assert "<deployment-sequence>" in script
     assert "deploy_environment.sh" in script
     assert "advance_edge_rollout.sh" in script
     deploy = (SCRIPTS / "deploy_environment.sh").read_text()
     assert "begin-resolution" in deploy
+    assert "resolution_deploy_sequence" in deploy
     assert "recovery-backup-started" in deploy
     assert "initial-empty" not in script
 
