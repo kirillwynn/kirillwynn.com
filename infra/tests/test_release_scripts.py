@@ -543,9 +543,23 @@ def test_deploy_workflows_map_github_oauth_from_allowed_secret_names():
         assert "secrets.GITHUB_OAUTH_CLIENT_" not in workflow
 
 
-def test_rebuild_branch_can_build_staging_release_only_from_push_ci():
+def test_rebuild_branch_calls_staging_release_only_from_push_ci():
+    ci_workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    assert "github.event_name == 'push'" in ci_workflow
+    assert "github.ref == 'refs/heads/rewrite/wagtail-next'" in ci_workflow
+    assert "uses: ./.github/workflows/staging-release.yml" in ci_workflow
+    assert "secrets: inherit" in ci_workflow
+
+    staging = (
+        ROOT / ".github" / "workflows" / "staging-release.yml"
+    ).read_text()
+    assert "workflow_call:" in staging
+    assert "needs: ci-required" in ci_workflow
+    assert "needs:\n      - release-manifest\n      - server-preflight" in staging
+    assert "if: vars.STAGING_DEPLOY_ENABLED == 'true'" in staging
+    assert "GHCR_TOKEN: ${{ github.token }}" in staging
+
     workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text()
-    assert "      - rewrite/wagtail-next" in workflow
     assert "github.event.workflow_run.event == 'push'" in workflow
     assert "GHCR_TOKEN: ${{ github.token }}" in workflow
     production = (
@@ -554,13 +568,11 @@ def test_rebuild_branch_can_build_staging_release_only_from_push_ci():
     assert "gh run list --workflow build.yml --branch main" in production
 
 
-def test_staging_preflight_is_gated_and_does_not_activate_rollout():
+def test_staging_preflight_does_not_activate_rollout():
     workflow = (
-        ROOT / ".github" / "workflows" / "staging-preflight.yml"
+        ROOT / ".github" / "workflows" / "staging-release.yml"
     ).read_text()
     script = (SCRIPTS / "ci_ssh_preflight.sh").read_text()
-    assert "STAGING_DEPLOY_ENABLED: ${{ vars.STAGING_DEPLOY_ENABLED }}" in workflow
-    assert 'test "$STAGING_DEPLOY_ENABLED" != true' in workflow
     assert "environment: staging" in workflow
     assert "packages: read" in workflow
     assert "docker login ghcr.io" in script
@@ -569,4 +581,3 @@ def test_staging_preflight_is_gated_and_does_not_activate_rollout():
     assert "/srv/kirillwynn/backups/staging" in script
     assert "kirillwynn-staging-postgres" in script
     assert "deploy_environment.sh" not in script
-    assert "rollout-state.json" not in workflow
