@@ -43,12 +43,16 @@ DENYLIST = re.compile(
 PLAIN_SUFFIXES = {
     ".css",
     ".html",
+    ".js",
     ".jpeg",
     ".jpg",
     ".json",
     ".md",
     ".png",
+    ".svg",
+    ".ttf",
     ".txt",
+    ".webmanifest",
     ".webp",
     ".xml",
 }

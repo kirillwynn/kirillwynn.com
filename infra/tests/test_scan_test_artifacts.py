@@ -424,6 +424,24 @@ def test_unknown_plain_artifact_format_fails_closed(tmp_path):
     assert run_scanner(tmp_path).returncode == 1
 
 
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "trace-viewer.js",
+        "playwright-logo.svg",
+        "codicon.ttf",
+        "manifest.webmanifest",
+    ],
+)
+def test_recognized_playwright_report_assets_are_scanned(tmp_path, filename):
+    artifact = tmp_path / filename
+    artifact.write_bytes(b"safe bundled Playwright report asset")
+    assert run_scanner(tmp_path).returncode == 0
+
+    artifact.write_bytes(b"Cookie: sessionid=sensitive")
+    assert run_scanner(tmp_path).returncode == 1
+
+
 def test_unsafe_plain_and_zip_artifacts_are_rejected(tmp_path):
     (tmp_path / "report.html").write_text("sessionid=sensitive", encoding="utf-8")
     with zipfile.ZipFile(tmp_path / "trace.zip", "w") as archive:
