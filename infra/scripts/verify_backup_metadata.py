@@ -9,6 +9,8 @@ from pathlib import Path
 SHA = re.compile(r"^[0-9a-f]{40}$")
 CHECKSUM = re.compile(r"^[0-9a-f]{64}$")
 TIMESTAMP = re.compile(r"^\d{8}T\d{6}Z$")
+OPERATION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
+BACKUP_KINDS = {"initial-empty", "pre-migration", "recovery", "manual"}
 FIELDS = {
     "schema_version",
     "environment",
@@ -16,6 +18,8 @@ FIELDS = {
     "created_at",
     "sha256",
     "dump_file",
+    "backup_kind",
+    "operation_id",
 }
 
 
@@ -29,7 +33,7 @@ def sha256(path):
 
 def verify(dump, metadata, environment):
     payload = json.loads(metadata.read_text())
-    if set(payload) != FIELDS or payload["schema_version"] != 1:
+    if set(payload) != FIELDS or payload["schema_version"] != 2:
         raise ValueError("backup metadata shape or schema is invalid")
     if payload["environment"] != environment:
         raise ValueError("backup metadata environment does not match")
@@ -41,6 +45,10 @@ def verify(dump, metadata, environment):
         raise ValueError("backup metadata timestamp is invalid")
     if not CHECKSUM.fullmatch(payload["sha256"]):
         raise ValueError("backup metadata checksum is invalid")
+    if payload["backup_kind"] not in BACKUP_KINDS:
+        raise ValueError("backup metadata kind is invalid")
+    if not OPERATION_ID.fullmatch(payload["operation_id"]):
+        raise ValueError("backup metadata operation ID is invalid")
     if sha256(dump) != payload["sha256"]:
         raise ValueError("backup SHA-256 mismatch")
     return payload

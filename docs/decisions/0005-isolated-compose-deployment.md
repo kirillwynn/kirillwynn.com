@@ -85,8 +85,9 @@ Candidate `nginx -t` remains mandatory before edge replacement.
 
 ### Migration, rollout, and rollback
 
-Release order is validate → backup → pull exact app digests → one-shot
-`migrate --noinput` with the new Django digest → bounded Compose `--wait` →
+Release order is durable operation attempt → validate/bootstrap or backup →
+pull exact app digests → one-shot `migrate --noinput` with the new Django
+digest → bounded Compose `--wait` →
 Django readiness/Next health/worker heartbeat/provider-egress/exact-image
 checks → public smoke → active-state commit. A failed gate leaves the candidate
 pending or failed and never marks its manifest active. Schema changes must be
@@ -94,11 +95,37 @@ expand/contract and compatible with the previous digest. This initial
 single-replica model expects brief service downtime; it does not claim zero
 downtime.
 
+Every rollout has a caller-stable immutable operation ID. The authoritative
+per-environment `rollout-state.json` records the attempt before the first
+PostgreSQL, application, or edge mutation. It contains active and previous
+component snapshots, the one in-progress operation, recovery ownership, all
+attempt phase/evidence records, and immutable manifest fingerprints. One
+fsynced temporary-file replacement plus parent-directory `fsync` is the only
+activation point. Consequently A → B moves A to previous atomically; retrying
+finalize B is a byte-for-byte no-op and cannot turn B into its own rollback
+target. Stale, duplicate, parallel, or operation-ID-conflicting attempts fail
+closed.
+
+Application and edge truth are explicit components. Production activation and
+rollback record and verify both; staging owns only its application snapshot and
+validates an edge candidate without claiming the shared edge is active. A
+production public-smoke failure leaves active=A and previous=Z while retaining
+candidate B and its failure evidence. A separate reviewed recovery operation
+restores the exact base snapshot A for both application and edge, repeats every
+health/digest/Nginx/public gate, and clears recovery ownership only at atomic
+finalization. A normal rollback B → A likewise restores edge A before it can
+record A active. Abort is allowed only before the attempt crosses its first
+runtime-mutation boundary.
+
 First production deploy has an explicit exception only to the meaning of
-"existing database": with no active production state it starts the pinned
-PostgreSQL service through the database-only Compose contract, takes and
-verifies an empty initial backup, and only then migrates or starts application
-services. Every later deploy backs up the active database before migration.
+"existing database": with no active production state and no named volume, the
+attempt first authorizes volume creation, starts pinned PostgreSQL through the
+database-only Compose contract, takes and verifies an `initial-empty` backup,
+and only then migrates or starts application services. An existing volume
+without a matching durable bootstrap/rollout phase is never adopted or assumed
+empty. An interrupted bootstrap resumes only through the same operation ID.
+Every later deploy takes a `pre-migration` backup; rollback/recovery takes a
+`recovery` backup.
 
 Application rollback selects the previous compatible manifest and restarts its
 Django/Next digests without rebuilding. Migrations are never reversed
@@ -119,7 +146,9 @@ claim transactions.
 Backups and restores use a database-only Compose contract that cannot
 interpolate Django or Next images. It targets the same named PostgreSQL volume
 and database network as the application contract. Backups use custom-format
-`pg_dump`, UTC/release metadata, SHA-256, and `pg_restore --list`. Restore
+`pg_dump`, UTC/release/operation metadata, an explicit `initial-empty`,
+`pre-migration`, `recovery`, or `manual` purpose, SHA-256, and
+`pg_restore --list`. Restore
 authenticates the required sidecar shape, source environment, filename, and
 checksum before `createdb`, creates only a new `restore_*` scratch database,
 and never drops a database. Production retains typed confirmation. S3 media
@@ -135,10 +164,12 @@ preserving allowed single-line bytes including dollar signs, `${...}`, `#`,
 quotes, backslashes, and spaces. Secrets never participate in Compose
 interpolation.
 
-Each release installs a versioned infrastructure bundle, manifest, and
-role-scoped runtime files under `/srv/kirillwynn/`. Per-environment state keeps
-the current and previous manifests plus active release evidence; backup
-metadata is retained with dumps. Staging and production jobs share one GitHub
+Each release installs a versioned infrastructure bundle, immutable manifest,
+and role-scoped runtime files under `/srv/kirillwynn/`. Per-environment
+`rollout-state.json` is the single authoritative current/previous/attempt/
+failure document; backup metadata is retained with dumps. State, runtime,
+release, and backup installs fsync their files and parent directories at
+durability boundaries. Staging and production jobs share one GitHub
 concurrency group and one server `flock`; pending state blocks a second
 rollout, and a monotonic deployment sequence prevents an older completed
 `main` workflow from rolling staging back. Rollback consumes the previous

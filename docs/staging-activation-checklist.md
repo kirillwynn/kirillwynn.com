@@ -17,8 +17,9 @@ Repository implementation does not activate staging. Complete externally:
 - prove edge starts with both apps absent, run candidate `nginx -t`, then
   bootstrap the staging database and migrations;
 - keep `STAGING_DEPLOY_ENABLED` false until all checks pass;
-- enable it for a controlled `main` release, then verify schema-2 attestation,
+- enable it for a controlled `main` release, then verify schema-3 attestation,
   exact active digests, worker heartbeat/egress, dynamic DNS replacement,
-  backup checksum, and scratch restore.
+  backup checksum, scratch restore, duplicate-finalize idempotency, and
+  reviewed failed-smoke recovery under the same server lock.
 
 Do not create a production administrator or promote production here.

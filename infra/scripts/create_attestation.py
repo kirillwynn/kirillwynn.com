@@ -2,21 +2,30 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 
 from validate_release_manifest import load_manifest
+
+OPERATION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("operation_id")
     args = parser.parse_args()
     manifest = load_manifest(args.manifest)
+    if not OPERATION_ID.fullmatch(args.operation_id) or not args.operation_id.endswith(
+        f"-staging-{manifest['release_sha']}"
+    ):
+        raise SystemExit("attestation operation ID does not match staging release")
     payload = {
-        "schema_version": 2,
+        "schema_version": 3,
         "environment": "staging",
         "release_sha": manifest["release_sha"],
+        "operation_id": args.operation_id,
         "status": "passed",
         "images": manifest["images"],
         "checks": {

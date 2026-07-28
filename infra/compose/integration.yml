@@ -59,7 +59,19 @@ services:
       - /bin/sh
       - -ec
     command:
-      - mc alias set integration http://minio:9000 integration integration-only && mc mb --ignore-existing integration/kirillwynn-integration-media && mc anonymous set download integration/kirillwynn-integration-media
+      - |
+        attempts=0
+        until mc alias set integration http://minio:9000 integration integration-only &&
+          mc ready integration; do
+          attempts=$$((attempts + 1))
+          if [ "$$attempts" -ge 60 ]; then
+            echo "MinIO did not become ready within the bounded retry window" >&2
+            exit 1
+          fi
+          sleep 1
+        done
+        mc mb --ignore-existing integration/kirillwynn-integration-media
+        mc anonymous set download integration/kirillwynn-integration-media
     networks:
       - egress
 

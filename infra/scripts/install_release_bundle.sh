@@ -37,6 +37,34 @@ find "$temporary" -type d -exec chmod 0700 {} +
 find "$temporary" -type f -exec chmod 0600 {} +
 find "$temporary/infra/scripts" -type f -name '*.sh' -exec chmod 0700 {} +
 find "$temporary/infra/scripts" -type f -name '*.py' -exec chmod 0700 {} +
+python3 - "$temporary" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+for path in sorted(root.rglob("*"), reverse=True):
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
 mv "$temporary" "$target"
+python3 - "$release_root" <<'PY'
+import os
+import sys
+
+descriptor = os.open(sys.argv[1], os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
 trap - EXIT HUP INT TERM
 echo "$target"

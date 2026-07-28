@@ -75,10 +75,25 @@ def install_directory(source, destination):
         for filename in sorted(ROLE_FIELDS):
             shutil.copyfile(source / filename, temporary / filename)
             os.chmod(temporary / filename, 0o600)
+            descriptor = os.open(temporary / filename, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
         os.chmod(temporary, 0o700)
+        descriptor = os.open(temporary, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
         if destination.exists():
             raise ValueError(f"runtime release directory already exists: {destination}")
         os.replace(temporary, destination)
+        descriptor = os.open(destination.parent, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
     finally:
         if temporary.exists():
             shutil.rmtree(temporary)

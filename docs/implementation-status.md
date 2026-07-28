@@ -5,9 +5,9 @@ Last updated: 2026-07-27
 Integration branch: `rewrite/wagtail-next`
 
 Overall state: Milestone 10 repository-owned staging/production infrastructure
-implemented and remediation-audited; deterministic checks pass, while external
-activation and local Docker/Nginx/PostgreSQL/provider/browser runtime
-verification remain deliberately pending
+and crash-safe rollout-state remediation implemented; deterministic checks
+pass, while external activation and local Docker/Nginx/PostgreSQL/provider/
+browser runtime verification remain deliberately pending
 
 ## Current repository state
 
@@ -367,19 +367,24 @@ verification remain deliberately pending
   exposure; Docker Compose 2.30.0 is the explicit minimum.
 - [x] Rollout is backup-first, one-migration, bounded-wait, readiness/health/
   heartbeat/egress/digest gated and two-phase. Versioned bundles/runtime,
-  current/previous manifests, pending state, cross-workflow/server locking, and
-  monotonic staging sequences make activation and rollback independent of a
-  server Git checkout.
+  cross-workflow/server locking, and monotonic staging sequences make
+  activation and rollback independent of a server Git checkout.
+- [x] Milestone 10 rollout-state remediation uses one fsynced atomic
+  `rollout-state.json`, immutable operation IDs/manifests, idempotent finalize,
+  exact application/edge component snapshots, retained failure evidence, and
+  explicit reviewed abort/recovery. First bootstrap refuses an unbound existing
+  PostgreSQL volume and resumes only the recorded attempt; backup metadata
+  distinguishes initial-empty, pre-migration, recovery, and manual evidence.
 
 ## Milestone transition
 
 Milestone 10 remediation is complete at the repository boundary. The repository
 now defines least-privilege runtime topology, immutable production images,
 dynamic same-origin edge routing, S3 media, the bounded worker, full
-CI/build/promotion gates, durable operational state, and isolated
-backup/restore/bootstrap procedures. No Milestone 11 work or server, registry,
-DNS, TLS, OAuth, Resend, GitHub Environment/secret, bucket, or production data
-state was changed.
+CI/build/promotion gates, crash-safe durable operational state, reviewed
+failed-smoke recovery, and isolated backup/restore/bootstrap procedures. No
+Milestone 11 work or server, registry, DNS, TLS, OAuth, Resend, GitHub
+Environment/secret, bucket, or production data state was changed.
 
 ### Next recommended session
 
@@ -462,6 +467,10 @@ Out of scope for that session:
 - The shared edge cannot be replaced independently per application environment;
   a changed edge digest requires a production-approved host-wide operation
   compatible with both live application versions.
+- A server carrying the superseded multi-file
+  `active-release.json`/manifest/pending state must not be auto-adopted. The new
+  state loader fails closed and requires a reviewed one-time migration before
+  any rollout; no external server state was changed in this repository session.
 - Email DNS records, verified Resend sender domains, webhook registrations,
   provider credentials, GitHub Environment values, and staging activation
   remain deliberately unconfigured. `docs/email-setup.md` and
@@ -487,6 +496,32 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-27:
 
+- Milestone 10 rollout-state remediation replaced separate mutable
+  active/current/previous/pending files with one mode-0600, fsynced, atomic
+  schema-2 document. Immutable operation IDs, manifest fingerprints,
+  phase-idempotent retries, duplicate-finalize no-op, component-specific
+  application/edge truth, reviewed abort/recovery, and retained failed-smoke
+  evidence are covered by fault injection before/after every unique atomic
+  transition.
+- First bootstrap now requires a newly absent volume or the same saved
+  volume-authorization attempt, and purpose-typed metadata distinguishes
+  `initial-empty`, `pre-migration`, `recovery`, and `manual` backups. Container
+  CI exercises a real fault-interrupted PostgreSQL bootstrap/resume and rejects
+  an existing unbound volume. MinIO initialization uses a bounded readiness
+  retry.
+- `backend/django/.venv/bin/python -m pytest -q infra/tests` passed 75
+  deterministic infrastructure regressions. The full backend SQLite suite
+  passed 474 tests with six PostgreSQL-only skips. Backend Ruff format/lint,
+  Django system check, migration drift, a complete empty-SQLite migration
+  chain, production `check --deploy`, `uv lock --check`, shell syntax, Python
+  compilation, workflow YAML parsing, full-SHA Action pins, source and existing
+  browser-asset secret/internal-origin scans, and `git diff --check` passed.
+- Docker/Compose, Nginx, PostgreSQL server tools, Node, and npm are unavailable
+  locally. Compose config, Docker integration, real `nginx -t`, PostgreSQL
+  bootstrap/backup/recovery container tests, and frontend format/lint/
+  typecheck/Vitest/build could not run locally and are not claimed. They remain
+  mandatory CI jobs; no external deployment or infrastructure mutation was
+  performed.
 - Milestone 10 remediation added role-scoped raw environments, distinct
   database/application/egress networks, database-only operations, verified
   backup metadata, first-production bootstrap, dynamic Docker-DNS upstreams,

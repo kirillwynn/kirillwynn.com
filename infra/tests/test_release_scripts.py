@@ -3,7 +3,6 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -192,12 +191,14 @@ def test_backup_metadata_is_required_and_checksum_verified(tmp_path):
     metadata.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "environment": "production",
                 "release_sha": "a" * 40,
                 "created_at": "20260727T120000Z",
                 "sha256": checksum,
                 "dump_file": dump.name,
+                "backup_kind": "pre-migration",
+                "operation_id": "deploy-12345678",
             }
         )
     )
@@ -272,12 +273,24 @@ def test_restore_authenticates_sidecar_before_createdb():
 
 def test_rollout_order_health_gates_and_active_state_policy():
     deploy = (SCRIPTS / "deploy_environment.sh").read_text()
-    backup = deploy.index("backup_postgres.sh")
+    attempt = deploy.index('python3 "$state_script" begin')
+    backup = deploy.index('"$repository_root/infra/scripts/backup_postgres.sh"')
     migrate = deploy.index("python manage.py migrate --noinput")
     wait = deploy.index("--wait-timeout")
-    pending = deploy.index("record_rollout_state.py")
-    assert backup < migrate < wait < pending
-    assert deploy.count("python manage.py migrate --noinput") == 1
+    healthy = deploy.index("checkpoint application-healthy")
+    assert attempt < backup < migrate < wait < healthy
+    assert deploy.count("checkpoint migration-started") == 1
+    assert deploy.count("checkpoint migration-completed") == 1
+    assert "python manage.py migrate --plan" in deploy
+    for proof in (
+        "verify_application_rollout.sh",
+        "migration-started",
+        "migration-completed",
+        "operation_id",
+    ):
+        assert proof in deploy
+    assert "finalize" not in deploy
+    health = (SCRIPTS / "verify_application_rollout.sh").read_text()
     for proof in (
         "/api/readiness/",
         "/internal/health",
@@ -285,19 +298,23 @@ def test_rollout_order_health_gates_and_active_state_policy():
         "WORKER_EGRESS_PROBE_URL",
         ".Config.Image",
     ):
-        assert proof in deploy
-    assert "finalize" not in deploy
+        assert proof in health
     finalize = (SCRIPTS / "finalize_rollout.sh").read_text()
     assert "record_rollout_state.py" in finalize
     assert "finalize" in finalize
+    assert "verify_application_rollout.sh" in finalize
+    assert "verify_active_edge.sh" in finalize
 
 
 def test_first_bootstrap_starts_only_pinned_postgres_then_backup():
     script = (SCRIPTS / "bootstrap_database.sh").read_text()
-    assert '-f "$repository_root/infra/compose/database.yml"' in script
+    assert '-f "$database_compose"' in script
     assert "pull postgres" in script
     assert "up -d --wait" in script
     assert script.index("up -d --wait") < script.index("backup_postgres.sh")
+    assert script.index("bootstrap-volume-authorized") < script.index("up -d --wait")
+    assert "existing PostgreSQL volume has no durable bootstrap/rollout state" in script
+    assert "initial-empty" in script
     for forbidden in ("django", "next", "worker", "application.yml"):
         assert forbidden not in script
 
@@ -310,6 +327,7 @@ def test_staging_attestation_requires_every_gate_and_exact_images(tmp_path):
     old_argv = sys.argv
     try:
         sys.argv = ["create_attestation.py", str(manifest), str(attestation)]
+        sys.argv.append(f"deploy-12345678-staging-{'a' * 40}")
         create.main()
     finally:
         sys.argv = old_argv
@@ -336,58 +354,46 @@ def test_staging_attestation_requires_every_gate_and_exact_images(tmp_path):
     assert result.returncode == 2
 
 
-def test_pending_to_active_state_keeps_previous_manifest(tmp_path):
-    module = load_script("record_rollout_state.py")
-    state = tmp_path / "state"
-    manifest_one = tmp_path / "one.json"
-    release_manifest(manifest_one, "a" * 40)
-    args = SimpleNamespace(
-        state_directory=state,
-        environment="staging",
-        release_sha="a" * 40,
-        deployment_sequence="1",
-        runtime_directory=tmp_path / "runtime-a",
-        manifest=manifest_one,
-        operation="deploy",
-    )
-    module.pending(args)
-    module.finalize(args)
-    assert (
-        json.loads((state / "staging" / "active-release.json").read_text())["status"]
-        == "active"
-    )
-
-    manifest_two = tmp_path / "two.json"
-    release_manifest(manifest_two, "b" * 40)
-    args.release_sha = "b" * 40
-    args.deployment_sequence = "2"
-    args.runtime_directory = tmp_path / "runtime-b"
-    args.manifest = manifest_two
-    module.pending(args)
-    module.finalize(args)
-    assert (
-        json.loads((state / "staging" / "previous-manifest.json").read_text())[
-            "release_sha"
-        ]
-        == "a" * 40
-    )
-
-
 def test_ssh_deployment_persists_bundle_and_uses_cross_workflow_lock():
     script = (SCRIPTS / "ci_ssh_deploy.sh").read_text()
     assert "install_release_bundle.sh" in script
     assert "/srv/kirillwynn/releases/$RELEASE_SHA" in script
     assert "flock -w 900 /srv/kirillwynn/locks/release.lock" in script
     assert script.index("deploy_environment.sh") < script.index("finalize_rollout.sh")
+    assert "A lost SSH response" in script
+    assert script.count('"$finalize_command"') == 2
+    assert "mark_rollout_failed.sh" in script
     assert "SERVER_REPOSITORY_PATH" not in script
 
 
 def test_rollback_uses_previous_durable_manifest_without_migration():
     script = (SCRIPTS / "rollback_environment.sh").read_text()
-    assert "previous-manifest.json" in script
-    assert "/srv/kirillwynn/releases" in script
+    assert "previous.application.manifest_path" in script
+    assert "candidate.application.manifest_path" in script
     assert "backup_postgres.sh" in script
     assert "--wait-timeout" in script
     assert "record_rollout_state.py" in script
+    assert "advance_edge_rollout.sh" in script
     assert "manage.py migrate" not in script
     assert "git " not in script
+
+
+def test_recovery_restores_failed_base_application_and_production_edge():
+    script = (SCRIPTS / "recover_failed_rollout.sh").read_text()
+    assert "begin-recovery" in script
+    assert "candidate.application.runtime_directory" in script
+    assert "candidate.application.manifest_path" in script
+    assert "recovery-backup-completed" in script
+    assert "verify_application_rollout.sh" in script
+    assert "advance_edge_rollout.sh" in script
+    assert "manage.py migrate" not in script
+    edge = (SCRIPTS / "advance_edge_rollout.sh").read_text()
+    assert "deploy_edge.sh" in edge
+    assert "edge-healthy" in edge
+    assert "pending-public-smoke" in edge
+
+
+def test_minio_initialization_has_bounded_readiness_retry():
+    compose = (ROOT / "infra" / "compose" / "integration.yml").read_text()
+    assert "mc ready integration" in compose
+    assert 'if [ "$$attempts" -ge 60 ]' in compose

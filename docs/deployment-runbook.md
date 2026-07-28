@@ -52,19 +52,31 @@ Per-environment operational state is:
 
 ```text
 /srv/kirillwynn/state/<environment>/
-  active-release.json
-  current-manifest.json
-  previous-manifest.json
-  pending-<sha>.json       # exists only between internal and public gates
+  rollout-state.json
 ```
 
-The current/previous files change only after every internal gate and public
-smoke succeeds. A failed rollout never marks the new manifest active. Pending
-state blocks another rollout until the failure is resolved. Staging and
-production GitHub jobs share `kirillwynn-server-release-operations`; the
-server also uses `/srv/kirillwynn/locks/release.lock`. Staging records a
-monotonic GitHub run sequence so an older completed `main` build cannot replace
-a newer active release.
+This schema-2 document is the only authoritative activation point. It contains
+exact `active.application`, production-owned `active.edge`, `previous`, the
+in-progress operation ID, a recovery-required pointer, and every immutable-ID
+attempt with phase history and evidence. Manifests are referenced by path and
+SHA-256 and are never rewritten. Every transition writes and `fsync`s a
+mode-0600 temporary file, atomically replaces the document, and `fsync`s its
+directory.
+
+The attempt is durable before any PostgreSQL/application/edge mutation.
+Repeating the same operation and phase is a no-op; a reused operation ID with
+different input, another in-progress operation, a stale sequence, or a second
+operation for an already-active release is rejected. Finalize performs one
+atomic A → B switch that preserves A as rollback target. Repeating finalize B
+does not write state. Staging owns only application state because it does not
+replace shared edge; production state records both application and exact live
+edge digest.
+
+Staging and production GitHub jobs share
+`kirillwynn-server-release-operations`; the server also uses
+`/srv/kirillwynn/locks/release.lock`. Staging records a monotonic GitHub run
+sequence so an older completed `main` build cannot replace a newer active
+release.
 
 ## Initial shared edge
 
@@ -81,26 +93,34 @@ Every edge replacement still runs the candidate `nginx -t` before `up`, then
 
 ## First production deploy
 
-With no `/srv/kirillwynn/state/production/active-release.json`:
+With no active snapshot in
+`/srv/kirillwynn/state/production/rollout-state.json`:
 
 1. validate the manifest and five runtime files;
 2. install the versioned bundle/runtime files;
-3. use `infra/compose/database.yml` to pull and start only the pinned
+3. durably record the immutable operation ID;
+4. prove the environment-qualified PostgreSQL volume does not exist, then
+   persist the operation's volume-creation authorization;
+5. use `infra/compose/database.yml` to pull and start only the pinned
    PostgreSQL digest with bounded `--wait`;
-4. take a custom-format backup of the initial database and verify
+6. take an `initial-empty` custom-format backup and verify
    `pg_restore --list`; no Django, Next, worker, migration, or public service
    starts before this backup;
-5. pull exact Django/Next digests;
-6. run `migrate --noinput` exactly once;
-7. start the application with bounded `--wait`;
-8. verify Django readiness, Next health, worker heartbeat, worker provider
+7. pull exact Django/Next digests;
+8. run `migrate --noinput`; a retry after a lost response uses the durable
+   `migration-started` phase and database migration plan rather than blindly
+   repeating completed work;
+9. start the application with bounded `--wait`;
+10. verify Django readiness, Next health, worker heartbeat, worker provider
    egress, and exact active image references;
-9. validate/replace edge, run public smoke, then atomically activate state.
+11. validate/replace edge, run public smoke, then atomically activate state.
 
 This empty-initial-backup policy is the documented equivalent of "backup the
-existing database" for the first production deployment. If a PostgreSQL
-volume exists without active state, stop and reconcile it; do not delete or
-assume it is empty.
+existing database" for the first production deployment. An existing volume
+without an active snapshot or the same operation's saved
+`bootstrap-volume-authorized` phase fails closed. Never delete it, adopt it, or
+assume it is empty. Resume an interrupted first deploy with exactly the
+original operation ID; a new operation cannot inherit its bootstrap phases.
 
 Every subsequent deployment uses the active runtime contract to back up the
 existing database before migration. The PostgreSQL digest cannot change in an
@@ -108,22 +128,66 @@ application rollout; database upgrades require separate review.
 
 ## Normal rollout and attestation
 
-The enforced application order is backup → pull exact app digests → one
-migration → `up --wait` → Django readiness → Next health → worker heartbeat →
-worker outbound HTTP path → exact container image references. These checks
-create only pending state.
+The enforced application order is durable attempt → purpose-typed backup →
+pull exact app digests → one migration → `up --wait` → Django readiness → Next
+health → worker heartbeat → worker outbound HTTP path → exact container image
+references. These checks advance the same attempt to pending public smoke.
 
 The CI caller then performs public health/readiness/root smoke (with staging
-Basic Auth where applicable) and finalizes state. Staging attestation schema 2
+Basic Auth where applicable) and finalizes state. Staging attestation schema 3
 contains the exact manifest images and affirmative evidence for public smoke,
 Django/Next health, worker heartbeat, worker egress, exact active application
-image digests, and the exact edge candidate's successful `nginx -t`.
-Production accepts only an exact matching attestation.
+image digests, the immutable operation ID, and the exact edge candidate's
+successful `nginx -t`. Production accepts only an exact matching attestation.
+Immediately before the atomic switch, `finalize_rollout.sh` rechecks live
+application health/digests and production edge digest/live `nginx -t`
+(staging rechecks its edge candidate), so recorded active component state
+cannot rely on a stale pre-smoke observation.
 
 Production edge replacement occurs after the application health gates and
-before public smoke. If public smoke fails, the new application/edge may be
-running but the manifest is not active; retain pending evidence and either fix
-forward or perform the reviewed rollback below.
+before public smoke. If public smoke fails, `mark_rollout_failed.sh` preserves
+candidate and failure evidence, leaves the prior active/previous snapshots
+unchanged, and requires explicit recovery. Do not start a new deployment or
+use normal rollback while recovery is required.
+
+## Reviewed abort and failed-smoke recovery
+
+An attempt may be aborted only while its phase is still `attempt-recorded`,
+before a volume, database, application, or edge mutation:
+
+```bash
+flock -w 900 /srv/kirillwynn/locks/release.lock \
+  /srv/kirillwynn/releases/<candidate-sha>/infra/scripts/abort_rollout.sh \
+  production <operation-id> "reviewed reason"
+```
+
+After any mutation, restore the failed operation's exact base snapshot. For
+active=A, previous=Z, failed candidate=B, choose a new reviewed recovery
+operation ID and a sequence greater than B:
+
+```bash
+flock -w 900 /srv/kirillwynn/locks/release.lock \
+  /srv/kirillwynn/releases/<candidate-sha>/infra/scripts/recover_failed_rollout.sh \
+  production <failed-operation-id-B> <recovery-operation-id> \
+  <next-sequence> /srv/kirillwynn/runtime/edge.env
+```
+
+The script takes a `recovery` backup of the failed candidate database, restores
+A's exact Django/worker/Next digests, restores and verifies production edge A,
+checks readiness, Next health, heartbeat, egress, exact images, candidate and
+live `nginx -t`, then leaves the recovery pending. Run public health,
+readiness, and root smoke. On failure, mark the recovery operation failed and
+retain all evidence. On success:
+
+```bash
+flock -w 900 /srv/kirillwynn/locks/release.lock \
+  /srv/kirillwynn/releases/<candidate-sha>/infra/scripts/finalize_rollout.sh \
+  production <recovery-operation-id>
+```
+
+Finalize is idempotent. It clears recovery ownership only after successful
+public smoke, keeps B's failed evidence, keeps Z as the normal rollback target,
+and records active application/edge exactly as A.
 
 ## Reproducible application rollback
 
@@ -133,23 +197,25 @@ current schema. It does not rebuild and does not trust Git:
 ```bash
 flock -w 900 /srv/kirillwynn/locks/release.lock \
   /srv/kirillwynn/releases/<current-sha>/infra/scripts/rollback_environment.sh \
-  staging
+  production <rollback-operation-id> <next-sequence> \
+  /srv/kirillwynn/runtime/edge.env
 ```
 
-The script selects `previous-manifest.json`, proves its durable bundle/runtime
-exist, refuses a PostgreSQL image change, backs up the active database, pulls
-the previous Django/Next digests, and performs the health/digest gates without
-running or reversing migrations. It leaves pending state. Run the public smoke,
-then finalize with the selected durable bundle:
+The script selects the authoritative previous component snapshot, proves its
+immutable bundle/runtime exist, refuses a PostgreSQL image change, takes a
+`recovery` backup, restores the previous Django/Next/worker and production edge
+digests, and performs health/digest/Nginx gates without running or reversing
+migrations. It leaves the operation pending. Run public smoke, then finalize:
 
 ```bash
 flock -w 900 /srv/kirillwynn/locks/release.lock \
   /srv/kirillwynn/releases/<rollback-sha>/infra/scripts/finalize_rollout.sh \
-  staging <rollback-sha>
+  production <rollback-operation-id>
 ```
 
-Do not roll edge back unless route compatibility requires it; if required,
-run the previous bundle's `verify_edge_candidate.sh` before `deploy_edge.sh`.
+Production rollback always restores edge with the same target snapshot; it
+cannot record application A active while edge B remains live. Staging rollback
+does not replace shared edge and records only its application truth.
 A reverse migration always needs a new verified backup, scratch restore
 rehearsal, and separate approval.
 

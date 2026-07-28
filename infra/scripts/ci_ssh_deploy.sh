@@ -22,6 +22,7 @@ case "$RELEASE_SHA" in
     *[!0-9a-f]*|"") exit 2 ;;
 esac
 test "${#RELEASE_SHA}" -eq 40
+operation_id="deploy-${GITHUB_RUN_ID:?}-${environment_name}-${RELEASE_SHA}"
 
 umask 077
 ssh_dir=${RUNNER_TEMP:?}/kirillwynn-ssh
@@ -61,36 +62,53 @@ ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "cd '$durable_release' && if test -d '$durable_runtime'; then diff -qr '$remote_dir/runtime-input' '$durable_runtime' >/dev/null; else infra/scripts/validate_runtime_env_file.py --environment '$environment_name' --input-dir '$remote_dir/runtime-input' --output-dir '$durable_runtime'; fi"
 
 edge_runtime_env=/srv/kirillwynn/runtime/edge.env
-if [ "$environment_name" = staging ]; then
-    remote_rollout="infra/scripts/deploy_environment.sh staging '$durable_runtime' '$durable_release/release-manifest.json' && infra/scripts/verify_edge_candidate.sh '$durable_release/release-manifest.json' '$edge_runtime_env'"
-else
-    remote_rollout="infra/scripts/deploy_environment.sh production '$durable_runtime' '$durable_release/release-manifest.json' && infra/scripts/deploy_edge.sh '$durable_release/release-manifest.json' '$edge_runtime_env'"
-fi
+remote_rollout="infra/scripts/deploy_environment.sh '$environment_name' '$durable_runtime' '$durable_release/release-manifest.json' '$operation_id' && infra/scripts/advance_edge_rollout.sh '$environment_name' '$operation_id' '$durable_release/release-manifest.json' '$edge_runtime_env'"
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "cd '$durable_release' && mkdir -p /srv/kirillwynn/locks && flock -w 900 /srv/kirillwynn/locks/release.lock sh -c \"$remote_rollout\""
 
+smoke_passed=false
 if [ "$environment_name" = staging ]; then
     : "${STAGING_BASIC_AUTH:?}"
-    curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
-        https://staging.kirillwynn.com/api/health/ >/dev/null
-    curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
-        https://staging.kirillwynn.com/api/readiness/ >/dev/null
-    curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
-        https://staging.kirillwynn.com/ >/dev/null
+    if curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
+        https://staging.kirillwynn.com/api/health/ >/dev/null &&
+        curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
+            https://staging.kirillwynn.com/api/readiness/ >/dev/null &&
+        curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
+            https://staging.kirillwynn.com/ >/dev/null; then
+        smoke_passed=true
+    fi
 else
-    curl --fail --silent --show-error --max-time 15 \
-        https://kirillwynn.com/api/health/ >/dev/null
-    curl --fail --silent --show-error --max-time 15 \
-        https://kirillwynn.com/api/readiness/ >/dev/null
-    curl --fail --silent --show-error --max-time 15 \
-        https://kirillwynn.com/ >/dev/null
+    if curl --fail --silent --show-error --max-time 15 \
+        https://kirillwynn.com/api/health/ >/dev/null &&
+        curl --fail --silent --show-error --max-time 15 \
+            https://kirillwynn.com/api/readiness/ >/dev/null &&
+        curl --fail --silent --show-error --max-time 15 \
+            https://kirillwynn.com/ >/dev/null; then
+        smoke_passed=true
+    fi
+fi
+if [ "$smoke_passed" != true ]; then
+    failure_command="cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' 'GitHub runner public smoke failed'"
+    ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$failure_command" ||
+        ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$failure_command"
+    echo "public smoke failed; reviewed recovery is required for $operation_id" >&2
+    exit 1
 fi
 
-ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-    "cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/finalize_rollout.sh '$environment_name' '$RELEASE_SHA'"
+finalize_command="cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/finalize_rollout.sh '$environment_name' '$operation_id'"
+if ! ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$finalize_command"; then
+    # A lost SSH response is indistinguishable from a completed atomic switch.
+    # Retry the same immutable operation before classifying it as failed.
+    if ! ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$finalize_command"; then
+        ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+            "cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' 'pre-activation live component re-attestation failed'"
+        echo "final live attestation failed; reviewed recovery is required" >&2
+        exit 1
+    fi
+fi
 if [ "$environment_name" = staging ]; then
     python3 infra/scripts/create_attestation.py \
-        "$manifest" "${ATTESTATION_OUTPUT:?}"
+        "$manifest" "${ATTESTATION_OUTPUT:?}" "$operation_id"
 fi
 
 cleanup_remote

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -15,6 +16,7 @@ CHECKS = {
     "active_application_image_digests",
     "edge_candidate_nginx_config",
 }
+OPERATION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 
 
 def main():
@@ -29,15 +31,20 @@ def main():
             "schema_version",
             "environment",
             "release_sha",
+            "operation_id",
             "status",
             "images",
             "checks",
         }:
             raise ValueError("attestation has unexpected fields")
         if (
-            attestation["schema_version"] != 2
+            attestation["schema_version"] != 3
             or attestation["environment"] != "staging"
             or attestation["status"] != "passed"
+            or not OPERATION_ID.fullmatch(attestation["operation_id"])
+            or not attestation["operation_id"].endswith(
+                f"-staging-{manifest['release_sha']}"
+            )
             or attestation["release_sha"] != manifest["release_sha"]
             or attestation["images"] != manifest["images"]
             or set(attestation["checks"]) != CHECKS

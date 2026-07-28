@@ -12,17 +12,29 @@ Use the runtime directory for the active release:
 /srv/kirillwynn/releases/<sha>/infra/scripts/backup_postgres.sh \
   staging \
   /srv/kirillwynn/runtime/releases/<sha>/staging \
-  <full-release-sha>
+  <full-release-sha> \
+  /srv/kirillwynn/backups \
+  manual \
+  <immutable-operation-id>
 ```
 
 The script writes an environment-qualified custom-format dump, verifies
 `pg_restore --list`, and creates a mode-0600 JSON sidecar containing schema
-version, environment, UTC timestamp, release SHA, dump filename, and SHA-256.
+version, environment, UTC timestamp, release SHA, dump filename, SHA-256,
+immutable operation ID, and one explicit purpose:
+
+- `initial-empty` — the newly created first-deploy database before migration;
+- `pre-migration` — every later rollout's active database;
+- `recovery` — rollback or failed-smoke recovery evidence;
+- `manual` — a reviewed operator backup.
+
 Both remain outside Git under `/srv/kirillwynn/backups/<environment>/`.
 
 First production deployment starts only the pinned PostgreSQL service and takes
-this backup before its first migration. Every later deployment backs up the
-database through the active runtime/bundle before migration.
+an `initial-empty` backup before its first migration. It refuses an existing
+volume unless the same durable bootstrap attempt already authorized its
+creation. Every later deployment takes `pre-migration`; rollback/recovery takes
+`recovery`. Backup dumps and sidecars are immutable and never overwritten.
 
 Retention remains explicit:
 

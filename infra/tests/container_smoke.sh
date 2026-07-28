@@ -6,10 +6,15 @@ compose_file="$repository_root/infra/compose/integration.yml"
 database_compose="$repository_root/infra/compose/database.yml"
 test_root=$(mktemp -d)
 bootstrap_control=
+orphan_control=
 cleanup() {
     docker compose --profile dynamic-edge -f "$compose_file" down --volumes --remove-orphans
     if [ -n "$bootstrap_control" ] && [ -f "$bootstrap_control" ]; then
         docker compose --env-file "$bootstrap_control" -f "$database_compose" \
+            down --volumes --remove-orphans
+    fi
+    if [ -n "$orphan_control" ] && [ -f "$orphan_control" ]; then
+        docker compose --env-file "$orphan_control" -f "$database_compose" \
             down --volumes --remove-orphans
     fi
     rm -rf "$test_root"
@@ -103,7 +108,8 @@ printf '%s\n' \
 docker compose -f "$compose_file" exec -T postgres sh -ec \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE TABLE backup_proof (value text NOT NULL); INSERT INTO backup_proof VALUES ('\''populated'\'');"'
 backup_dump=$("$repository_root/infra/scripts/backup_postgres.sh" \
-    staging "$database_runtime" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "$test_root/backups")
+    staging "$database_runtime" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+    "$test_root/backups" pre-migration integration-backup-operation)
 "$repository_root/infra/scripts/restore_postgres.sh" \
     staging "$database_runtime" "$backup_dump" restore_integration
 test "$(docker compose -f "$compose_file" exec -T postgres sh -ec \
@@ -158,9 +164,10 @@ if "$repository_root/infra/scripts/restore_postgres.sh" \
     exit 1
 fi
 
-# First-production bootstrap rehearsal has no prior runtime or app images:
-# only the content-addressed PostgreSQL service starts and its empty DB is
-# backed up before any migration could run.
+# First-production bootstrap rehearsal uses the real state and database
+# operational scripts. A fault after the database-ready atomic replace mimics
+# a lost SSH response; retrying the same operation does not recreate the
+# volume or repeat a completed migration/backup phase.
 postgres_digest=$(docker image inspect postgres:17.6-alpine --format '{{index .RepoDigests 0}}')
 bootstrap_runtime="$test_root/production-runtime"
 mkdir -p "$bootstrap_runtime"
@@ -175,7 +182,98 @@ printf '%s\n' \
     "POSTGRES_ENV_FILE=$bootstrap_runtime/postgres.env" \
     'POSTGRES_VOLUME=kirillwynn-production-bootstrap-postgres' \
     'DATABASE_NETWORK=kirillwynn-production-bootstrap-database' > "$bootstrap_control"
-"$repository_root/infra/scripts/bootstrap_database.sh" \
-    production "$bootstrap_runtime" bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb "$test_root/bootstrap-backups"
+bootstrap_manifest="$test_root/bootstrap-manifest.json"
+python3 - "$bootstrap_manifest" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+Path(sys.argv[1]).write_text(
+    json.dumps(
+        {
+            "schema_version": 1,
+            "release_sha": "b" * 40,
+            "repository": "kirillwynn/kirillwynn.com",
+            "built_at": "2026-07-27T00:00:00Z",
+            "images": {
+                "django": f"example/django@sha256:{'1' * 64}",
+                "next": f"example/next@sha256:{'2' * 64}",
+                "edge": f"example/edge@sha256:{'3' * 64}",
+            },
+        }
+    )
+)
+PY
+bootstrap_state="$test_root/bootstrap-state"
+bootstrap_operation=bootstrap-production-integration
+python3 "$repository_root/infra/scripts/record_rollout_state.py" begin \
+    --environment production \
+    --operation-id "$bootstrap_operation" \
+    --operation deploy \
+    --release-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+    --deployment-sequence 1 \
+    --runtime-directory "$bootstrap_runtime" \
+    --manifest "$bootstrap_manifest" \
+    --state-directory "$bootstrap_state"
+if STATE_DIRECTORY="$bootstrap_state" \
+    ROLLOUT_STATE_FAULT=checkpoint-bootstrap-database-ready:after-replace \
+    "$repository_root/infra/scripts/bootstrap_database.sh" \
+        production "$bootstrap_runtime" \
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+        "$bootstrap_operation" "$test_root/bootstrap-backups"; then
+    echo "fault-injected bootstrap unexpectedly succeeded" >&2
+    exit 1
+fi
+STATE_DIRECTORY="$bootstrap_state" \
+    "$repository_root/infra/scripts/bootstrap_database.sh" \
+    production "$bootstrap_runtime" \
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+    "$bootstrap_operation" "$test_root/bootstrap-backups"
 test "$(docker compose --env-file "$bootstrap_control" -f "$database_compose" ps --services --filter status=running)" = postgres
 test "$(find "$test_root/bootstrap-backups/production" -name '*.dump' | wc -l | tr -d ' ')" = 1
+python3 - "$bootstrap_state/production/rollout-state.json" \
+    "$test_root/bootstrap-backups/production" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+state = json.loads(Path(sys.argv[1]).read_text())
+attempt = state["attempts"]["bootstrap-production-integration"]
+assert attempt["phase"] == "initial-backup-completed"
+metadata = json.loads(next(Path(sys.argv[2]).glob("*.dump.json")).read_text())
+assert metadata["backup_kind"] == "initial-empty"
+assert metadata["operation_id"] == "bootstrap-production-integration"
+PY
+
+# An already-existing volume with only a new attempt-recorded state is not
+# adopted or declared empty.
+orphan_runtime="$test_root/orphan-runtime"
+mkdir -p "$orphan_runtime"
+cp "$bootstrap_runtime/postgres.env" "$orphan_runtime/postgres.env"
+orphan_control="$orphan_runtime/control.env"
+printf '%s\n' \
+    'COMPOSE_PROJECT_NAME=kirillwynn-production-orphan' \
+    "POSTGRES_IMAGE=$postgres_digest" \
+    "POSTGRES_ENV_FILE=$orphan_runtime/postgres.env" \
+    'POSTGRES_VOLUME=kirillwynn-production-orphan-postgres' \
+    'DATABASE_NETWORK=kirillwynn-production-orphan-database' > "$orphan_control"
+docker volume create kirillwynn-production-orphan-postgres >/dev/null
+orphan_state="$test_root/orphan-state"
+python3 "$repository_root/infra/scripts/record_rollout_state.py" begin \
+    --environment production \
+    --operation-id orphan-production-integration \
+    --operation deploy \
+    --release-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+    --deployment-sequence 1 \
+    --runtime-directory "$orphan_runtime" \
+    --manifest "$bootstrap_manifest" \
+    --state-directory "$orphan_state"
+if STATE_DIRECTORY="$orphan_state" \
+    "$repository_root/infra/scripts/bootstrap_database.sh" \
+    production "$orphan_runtime" \
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+    orphan-production-integration "$test_root/orphan-backups"; then
+    echo "existing unbound PostgreSQL volume was adopted" >&2
+    exit 1
+fi
+test ! -d "$test_root/orphan-backups/production"
