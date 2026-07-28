@@ -95,16 +95,16 @@ def test_release_manifest_requires_three_real_digests(tmp_path):
         module.load_manifest(manifest)
 
 
-def test_retained_artifact_scanner_checks_plain_image_metadata_and_zip_entries(tmp_path):
+def test_retained_artifact_scanner_checks_plain_image_metadata_and_zip_entries(
+    tmp_path,
+):
     scanner = ROOT / "infra" / "tests" / "scan_test_artifacts.sh"
     safe = tmp_path / "safe"
     safe.mkdir()
     (safe / "trace.txt").write_text("deterministic test result")
     assert subprocess.run([scanner, safe], check=False).returncode == 0
 
-    (safe / "failure.png").write_bytes(
-        b"\x89PNG\r\n\x1a\nmetadata=http://django:8000"
-    )
+    (safe / "failure.png").write_bytes(b"\x89PNG\r\n\x1a\nmetadata=http://django:8000")
     assert subprocess.run([scanner, safe], check=False).returncode != 0
     (safe / "failure.png").unlink()
 
@@ -503,3 +503,18 @@ def test_minio_initialization_has_bounded_readiness_retry():
     compose = (ROOT / "infra" / "compose" / "integration.yml").read_text()
     assert "mc ready integration" in compose
     assert 'if [ "$$attempts" -ge 60 ]' in compose
+
+
+def test_minio_fixture_uses_the_django_s3_credentials():
+    compose = (ROOT / "infra" / "compose" / "integration.yml").read_text()
+    django_environment = (
+        ROOT / "infra" / "tests" / "integration-env" / "django.env"
+    ).read_text()
+    s3_secret = next(
+        line.split("=", 1)[1]
+        for line in django_environment.splitlines()
+        if line.startswith("S3_MEDIA_SECRET_ACCESS_KEY=")
+    )
+
+    assert f"MINIO_ROOT_PASSWORD: {s3_secret}" in compose
+    assert f"minio:9000 integration {s3_secret}" in compose
