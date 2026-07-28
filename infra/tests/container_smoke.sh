@@ -59,7 +59,21 @@ docker run --rm --entrypoint sh kirillwynn-next:ci -ec \
 # S3-compatible upload/read URL uses the isolated integration bucket.
 media_url=$(docker compose -f "$compose_file" exec -T django python -c \
     "from django.core.files.base import ContentFile; from django.core.files.storage import default_storage; name=default_storage.save('integration-proof.txt',ContentFile(b'minio-proof')); assert default_storage.open(name).read()==b'minio-proof'; print(default_storage.url(name),end='')")
-curl --fail --silent --show-error --max-time 10 "$media_url" | grep -q minio-proof
+media_response="$test_root/media-response.txt"
+media_status=$(curl --silent --show-error --max-time 10 \
+    --output "$media_response" --write-out '%{http_code}' "$media_url")
+if [ "$media_status" != 200 ] || ! grep -q minio-proof "$media_response"; then
+    echo "Public integration media smoke failed with HTTP $media_status" >&2
+    wc -c "$media_response" >&2
+    sha256sum "$media_response" >&2
+    python3 - "$media_response" <<'PY' >&2
+import pathlib
+import sys
+
+print(pathlib.Path(sys.argv[1]).read_bytes()[:512].decode("utf-8", errors="replace"))
+PY
+    exit 1
+fi
 
 # Exact routes, auth exceptions, and hidden internal health.
 test "$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Host: staging.test' http://127.0.0.1:18080/)" = 401
