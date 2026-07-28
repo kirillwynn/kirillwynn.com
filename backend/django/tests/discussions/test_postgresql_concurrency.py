@@ -43,7 +43,7 @@ def _run_concurrently(functions):
 
 
 def test_rate_limit_bucket_creation_race_keeps_one_row(user):
-    _run_concurrently(
+    results = _run_concurrently(
         [
             lambda: consume_comment_rate_limit(
                 user=user,
@@ -56,6 +56,7 @@ def test_rate_limit_bucket_creation_race_keeps_one_row(user):
         ]
     )
 
+    assert results == [None, None]
     bucket = CommentRateLimitBucket.objects.get(
         user=user,
         scope=CommentRateLimitBucket.Scope.CREATE,

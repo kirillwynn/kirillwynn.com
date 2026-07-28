@@ -2,6 +2,7 @@ import math
 import unicodedata
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -86,6 +87,10 @@ def consume_comment_rate_limit(*, user, scope, at=None):
     limit, window_seconds = _rate_policy(scope)
     now = at or timezone.now()
     with transaction.atomic():
+        # Serialize the absent-bucket path on a durable parent row. A unique
+        # constraint alone can surface a concurrent insert error before the
+        # winning transaction's increment is visible to the loser.
+        get_user_model().objects.select_for_update().only("pk").get(pk=user.pk)
         try:
             bucket = CommentRateLimitBucket.objects.select_for_update().get(
                 user=user,

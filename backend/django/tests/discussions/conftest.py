@@ -8,6 +8,8 @@ from apps.blog.models import BlogIndexPage, BlogPostPage
 @pytest.fixture
 def blog_index():
     root = Page.get_first_root_node()
+    if root is None:
+        root = Page.add_root(instance=Page(title="Root", slug="root"))
     index = BlogIndexPage(title="Blog", slug="blog", live=False)
     root.add_child(instance=index)
     return index

@@ -6,7 +6,7 @@ from django.db import close_old_connections, connection
 from django.utils import timezone
 
 from apps.subscriptions.models import EmailOutbox, Subscriber
-from apps.subscriptions.outbox import claim_outbox_batch
+from apps.subscriptions.outbox import claim_outbox_batch, confirmation_outbox_snapshot
 from apps.subscriptions.rate_limits import consume_rate_limit
 
 pytestmark = [
@@ -42,6 +42,7 @@ def test_parallel_claimers_claim_event_once():
         credential_version=1,
         available_at=timezone.now(),
         idempotency_key=f"confirmation/{subscriber.pk}/1",
+        **confirmation_outbox_snapshot(),
     )
 
     results = _run_concurrently(
