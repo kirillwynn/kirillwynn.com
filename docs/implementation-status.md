@@ -7,8 +7,11 @@ Integration branch: `rewrite/wagtail-next`
 Overall state: Milestone 11 testing and security hardening is implemented at
 the repository boundary with explicit PostgreSQL/Compose/Playwright CI gates,
 upload and interaction boundary hardening, and deterministic four-viewport
-browser coverage; external staging activation, live providers, production
-deployment, and unavailable local Docker/Nginx/PostgreSQL checks remain pending
+browser coverage. Stage 13A staging activation is in progress: its GitHub
+boundary and required CI gate are verified, while server rollout, live
+providers, content/browser acceptance, and the staging restore drill remain
+pending. Production deployment and production external state remain out of
+scope.
 
 ## Current repository state
 
@@ -25,6 +28,59 @@ deployment, and unavailable local Docker/Nginx/PostgreSQL checks remain pending
   fronts isolated staging and production application projects.
 - The private product specification remains in the local Obsidian vault and is
   not committed.
+
+## Stage 13A staging activation
+
+Repository and GitHub verification completed on 2026-07-28:
+
+- Baseline `d6e166d865b0e4d8159ac5d8ee97a3c960ef479e` on
+  `rewrite/wagtail-next` matched the requested parent and began from a clean
+  worktree. The current reviewed candidate is
+  `b6d30fef1ec10aea159ce73b22a5aff96a3aa84f`.
+- Draft PR #32 targets `main`; no history was rewritten or squashed.
+- GitHub Environment `staging` exists with a custom `main` branch deployment
+  policy. Repository-level `SERVER_IP`, `SERVER_USER`, and
+  `SSH_PRIVATE_KEY` retain their legacy SSH mapping and are inherited by the
+  environment. Secret values were neither read nor logged.
+- New staging-only Django, PostgreSQL, revalidation, subscription-signing, and
+  Basic Auth credentials were generated directly into the `staging`
+  Environment. PostgreSQL is pinned to an immutable 17.6 Alpine digest.
+- `STAGING_DEPLOY_ENABLED` remains `false`. Provider/storage secrets and
+  `SERVER_KNOWN_HOSTS` remain unset rather than being guessed or copied from
+  production.
+- Push CI run `30397665416` and PR CI run `30397670777` both passed
+  `backend-sqlite`, `backend-postgresql`, `frontend`, `browser-contract`,
+  `cross-stack`, `infrastructure`, and the aggregate `ci-required` gate. The
+  infrastructure job includes Docker image builds, Nginx validation, isolated
+  PostgreSQL migration, MinIO media, worker egress/heartbeat, exact routing,
+  and scratch backup/restore rehearsal.
+- CI-discovered repository defects were fixed in separate commits: Wagtail
+  test bootstrap/locale handling, subscription locking/timestamps and
+  PostgreSQL row locks, Gunicorn module launch, HTTPS internal probes,
+  integration MinIO credentials, bounded failure diagnostics, existing VPS
+  secret mapping, public-origin preservation for internal content requests,
+  bounded internal Django hosts, retained Playwright report formats, and
+  shared edge security headers.
+
+Actual staging verification is still open:
+
+- `staging.kirillwynn.com` resolves, but no first rollout operation, immutable
+  application image digests, TLS/Basic Auth endpoint, public smoke,
+  `initial-empty` backup, or `restore_*` drill has been completed.
+- The legacy `kw_staging` and `kw_prod` configurations reference the same S3
+  bucket. Those credentials are therefore not eligible for the isolated new
+  staging boundary; a new staging-only bucket/access key is required.
+- Separate staging Google and GitHub OAuth applications and a staging Resend
+  sender/domain/webhook/idempotency namespace have not been created.
+- The observed SSH host key still requires out-of-band confirmation before it
+  can become `SERVER_KNOWN_HOSTS`. The local SSH agent has no loaded identity,
+  so server preflight must use the repository-level credentials through the
+  reviewed Actions workflow.
+- No Browser/Chrome session is connected. Live authoring, OAuth consent,
+  comments/reactions/subscription flows, accessibility, keyboard, and the four
+  requested viewports have not been run and are not represented by CI mocks.
+- No production deployment, production DNS/provider/storage change, or
+  production promotion has been performed.
 
 ## Completed
 
