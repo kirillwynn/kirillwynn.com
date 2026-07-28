@@ -75,12 +75,12 @@ def _lock_bucket_key(key_hash):
 
 def consume_rate_limit(*, scope, value, at=None):
     limit, window_seconds = _policy(scope)
-    now = at or timezone.now()
     key_hash = _hashed_key(scope, value)
     with transaction.atomic():
         # Anonymous buckets have no durable parent row to lock before the
         # first insert. Serialize the HMAC-keyed bucket for this transaction.
         _lock_bucket_key(key_hash)
+        now = at or timezone.now()
         try:
             bucket = SubscriptionRateLimitBucket.objects.select_for_update().get(
                 scope=scope,
