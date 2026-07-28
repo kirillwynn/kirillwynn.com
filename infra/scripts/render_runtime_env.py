@@ -182,7 +182,10 @@ def validate_environment_identity(environment, values):
         if values.get(name) != expected_value:
             raise ValueError(f"{name} does not identify the selected environment")
     checks = (
-        ("DJANGO_ALLOWED_HOSTS", values["DJANGO_ALLOWED_HOSTS"] == host),
+        (
+            "DJANGO_ALLOWED_HOSTS",
+            values["DJANGO_ALLOWED_HOSTS"] == f"{host},django,127.0.0.1",
+        ),
         ("POSTGRES_DB", bool(rules["database"].fullmatch(values["POSTGRES_DB"]))),
         (
             "POSTGRES_USER",
@@ -251,6 +254,8 @@ def runtime_values(environment):
             if name == "SERVICE_ROLE"
             else "config.settings.production"
             if name == "DJANGO_SETTINGS_MODULE"
+            else f"{os.environ[name]},django,127.0.0.1"
+            if name == "DJANGO_ALLOWED_HOSTS"
             else os.environ[name]
         )
         for name in DJANGO_FIELDS

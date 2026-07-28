@@ -136,6 +136,9 @@ def test_runtime_roles_are_minimal_and_preserve_raw_bytes(monkeypatch):
     assert roles["next.env"]["REVALIDATION_SECRET"] == sentinel
     assert set(roles["postgres.env"]) == module.POSTGRES_FIELDS
     assert set(roles["next.env"]) == module.NEXT_FIELDS
+    assert roles["django.env"]["DJANGO_ALLOWED_HOSTS"] == (
+        "kirillwynn.com,django,127.0.0.1"
+    )
     assert not (
         set(roles["next.env"])
         & {
@@ -194,6 +197,7 @@ def test_runtime_values_reject_multiline_nul_and_oversized(value, message):
 @pytest.mark.parametrize(
     ("name", "value"),
     [
+        ("DJANGO_ALLOWED_HOSTS", "shared.example"),
         ("POSTGRES_USER", "shared"),
         ("S3_MEDIA_BUCKET", "shared-media"),
         ("EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE", "resend/shared/account"),
