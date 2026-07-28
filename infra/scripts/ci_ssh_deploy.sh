@@ -17,11 +17,19 @@ esac
 : "${SERVER_USER:?}"
 : "${SSH_PRIVATE_KEY:?}"
 : "${SERVER_KNOWN_HOSTS:?}"
+: "${GHCR_USERNAME:?}"
+: "${GHCR_TOKEN:?}"
 : "${RELEASE_SHA:?}"
 case "$RELEASE_SHA" in
     *[!0-9a-f]*|"") exit 2 ;;
 esac
 test "${#RELEASE_SHA}" -eq 40
+case "$GHCR_USERNAME" in
+    *[!A-Za-z0-9_-]*|"")
+        echo "GHCR username contains unsupported characters" >&2
+        exit 2
+        ;;
+esac
 operation_id="deploy-${GITHUB_RUN_ID:?}-${environment_name}-${RELEASE_SHA}"
 
 umask 077
@@ -37,6 +45,7 @@ case "${GITHUB_RUN_ID:?}:${GITHUB_RUN_ATTEMPT:?}" in
     *[!0-9:]*) echo "GitHub run identifiers must be numeric" >&2; exit 2 ;;
 esac
 remote_dir="/tmp/kirillwynn-deploy-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
+remote_docker_config=$remote_dir/docker-config
 ssh_options="-i $key_file -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"
 cleanup_remote() {
     ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
@@ -45,7 +54,11 @@ cleanup_remote() {
 }
 trap cleanup_remote EXIT HUP INT TERM
 
-ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "umask 077 && mkdir -p '$remote_dir'"
+ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+    "umask 077 && mkdir -p '$remote_docker_config'"
+printf '%s' "$GHCR_TOKEN" |
+    ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+        "DOCKER_CONFIG='$remote_docker_config' docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin >/dev/null 2>&1"
 bundle_file=${RUNNER_TEMP:?}/kirillwynn-infra.tar.gz
 tar -czf "$bundle_file" infra/compose infra/scripts
 scp $ssh_options "$manifest" "$SERVER_USER@$SERVER_HOST:$remote_dir/release-manifest.json"
@@ -65,7 +78,7 @@ edge_runtime_env=/srv/kirillwynn/runtime/edge.env
 remote_rollout="infra/scripts/deploy_environment.sh '$environment_name' '$durable_runtime' '$durable_release/release-manifest.json' '$operation_id' && infra/scripts/advance_edge_rollout.sh '$environment_name' '$operation_id' '$durable_release/release-manifest.json' '$edge_runtime_env'"
 set +e
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-    "cd '$durable_release' && mkdir -p /srv/kirillwynn/locks && flock -w 900 /srv/kirillwynn/locks/release.lock sh -c \"$remote_rollout\""
+    "cd '$durable_release' && mkdir -p /srv/kirillwynn/locks && DOCKER_CONFIG='$remote_docker_config' flock -w 900 /srv/kirillwynn/locks/release.lock sh -c \"$remote_rollout\""
 remote_rollout_status=$?
 set -e
 if [ "$remote_rollout_status" -ne 0 ]; then

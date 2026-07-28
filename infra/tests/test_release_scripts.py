@@ -411,6 +411,9 @@ def test_ssh_deployment_persists_bundle_and_uses_cross_workflow_lock():
     assert script.count('"$finalize_command"') == 2
     assert "mark_rollout_failed.sh" in script
     assert "SERVER_REPOSITORY_PATH" not in script
+    assert "docker login ghcr.io" in script
+    assert "DOCKER_CONFIG='$remote_docker_config'" in script
+    assert "--password-stdin" in script
 
 
 def test_ssh_remote_rollout_failure_records_evidence_and_preserves_exit_status(
@@ -452,6 +455,8 @@ def test_ssh_remote_rollout_failure_records_evidence_and_preserves_exit_status(
             "GITHUB_RUN_ID": "12345678",
             "GITHUB_RUN_ATTEMPT": "1",
             "RUNNER_TEMP": str(runner_temp),
+            "GHCR_USERNAME": "kirillwynn",
+            "GHCR_TOKEN": "test-token",
         },
         text=True,
         capture_output=True,
@@ -536,3 +541,32 @@ def test_deploy_workflows_map_github_oauth_from_allowed_secret_names():
             "${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}" in workflow
         )
         assert "secrets.GITHUB_OAUTH_CLIENT_" not in workflow
+
+
+def test_rebuild_branch_can_build_staging_release_only_from_push_ci():
+    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text()
+    assert "      - rewrite/wagtail-next" in workflow
+    assert "github.event.workflow_run.event == 'push'" in workflow
+    assert "GHCR_TOKEN: ${{ github.token }}" in workflow
+    production = (
+        ROOT / ".github" / "workflows" / "deploy-production.yml"
+    ).read_text()
+    assert "gh run list --workflow build.yml --branch main" in production
+
+
+def test_staging_preflight_is_gated_and_does_not_activate_rollout():
+    workflow = (
+        ROOT / ".github" / "workflows" / "staging-preflight.yml"
+    ).read_text()
+    script = (SCRIPTS / "ci_ssh_preflight.sh").read_text()
+    assert "STAGING_DEPLOY_ENABLED: ${{ vars.STAGING_DEPLOY_ENABLED }}" in workflow
+    assert 'test "$STAGING_DEPLOY_ENABLED" != true' in workflow
+    assert "environment: staging" in workflow
+    assert "packages: read" in workflow
+    assert "docker login ghcr.io" in script
+    assert "require_compose_version.sh" in script
+    assert "/srv/kirillwynn/state/staging" in script
+    assert "/srv/kirillwynn/backups/staging" in script
+    assert "kirillwynn-staging-postgres" in script
+    assert "deploy_environment.sh" not in script
+    assert "rollout-state.json" not in workflow
