@@ -14,6 +14,9 @@ test -r "$edge_runtime_env" || {
     exit 2
 }
 
+EDGE_IMAGE=$(python3 "$repository_root/infra/scripts/release_image.py" \
+    "$release_manifest" edge)
+export EDGE_IMAGE
 edge_container=$(
     docker compose \
         --env-file "$edge_runtime_env" \

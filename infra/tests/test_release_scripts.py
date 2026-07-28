@@ -433,6 +433,14 @@ def test_ssh_deployment_persists_bundle_and_uses_cross_workflow_lock():
     assert "--password-stdin" in script
 
 
+def test_edge_bootstrap_binds_manifest_digest_before_compose_inspection():
+    script = (SCRIPTS / "bootstrap_edge_if_absent.sh").read_text()
+    bind = script.index("release_image.py")
+    inspect = script.index("docker compose")
+    assert bind < inspect
+    assert "export EDGE_IMAGE" in script[bind:inspect]
+
+
 def test_ssh_remote_rollout_failure_records_evidence_and_preserves_exit_status(
     tmp_path,
 ):
