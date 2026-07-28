@@ -582,6 +582,9 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "kirillwynn-staging-postgres" in script
     assert "/etc/letsencrypt/live/staging.kirillwynn.com/fullchain.pem" in script
     assert "/etc/letsencrypt/live/kirillwynn.com/fullchain.pem" in script
+    assert "certbot certonly" in script
+    assert "--cert-name staging.kirillwynn.com" in script
+    assert "ports 80/443 are in use" in script
     assert "openssl passwd -apr1 -stdin" in script
     assert "install -m 0600" in script
     assert "host_http_listeners" in script

@@ -101,9 +101,34 @@ install -d -m 0700 \
     /srv/kirillwynn/locks
 install -d -m 0755 /var/www/certbot/.well-known/acme-challenge
 
+staging_fullchain=/etc/letsencrypt/live/staging.kirillwynn.com/fullchain.pem
+staging_privkey=/etc/letsencrypt/live/staging.kirillwynn.com/privkey.pem
+if ! test -s "$staging_fullchain" || ! test -s "$staging_privkey"; then
+    command -v certbot >/dev/null || {
+        echo "certbot is required to issue the staging certificate" >&2
+        exit 2
+    }
+    listener_count=$(
+        ss -H -ltn |
+            awk '$4 ~ /:80$/ || $4 ~ /:443$/ { count += 1 } END { print count + 0 }'
+    )
+    test "$listener_count" -eq 0 || {
+        echo "cannot use the standalone ACME challenge while ports 80/443 are in use" >&2
+        exit 2
+    }
+    certbot certonly \
+        --standalone \
+        --preferred-challenges http \
+        --non-interactive \
+        --agree-tos \
+        --keep-until-expiring \
+        --cert-name staging.kirillwynn.com \
+        -d staging.kirillwynn.com
+fi
+
 for tls_file in \
-    /etc/letsencrypt/live/staging.kirillwynn.com/fullchain.pem \
-    /etc/letsencrypt/live/staging.kirillwynn.com/privkey.pem \
+    "$staging_fullchain" \
+    "$staging_privkey" \
     /etc/letsencrypt/live/kirillwynn.com/fullchain.pem \
     /etc/letsencrypt/live/kirillwynn.com/privkey.pem
 do
