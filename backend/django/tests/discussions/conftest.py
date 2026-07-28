@@ -1,6 +1,7 @@
 import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from wagtail.coreutils import get_supported_content_language_variant
 from wagtail.models import Locale, Page, Site
 
 from apps.blog.models import BlogIndexPage, BlogPostPage
@@ -10,8 +11,10 @@ from apps.blog.models import BlogIndexPage, BlogPostPage
 def blog_index():
     root = Page.get_first_root_node()
     if root is None:
-        Locale.objects.get_or_create(language_code=settings.LANGUAGE_CODE)
-        root = Page.add_root(instance=Page(title="Root", slug="root"))
+        locale, _ = Locale.objects.get_or_create(
+            language_code=get_supported_content_language_variant(settings.LANGUAGE_CODE)
+        )
+        root = Page.add_root(instance=Page(title="Root", slug="root", locale=locale))
         Site.objects.create(
             hostname="localhost",
             root_page=root,
