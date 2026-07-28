@@ -163,7 +163,7 @@ jobs:
       RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
       RESEND_API_URL: https://api.resend.com/emails
       WORKER_EGRESS_PROBE_URL: https://api.resend.com
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_HOST: ${{ secrets.SERVER_IP }}
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
