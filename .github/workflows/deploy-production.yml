@@ -53,8 +53,10 @@ jobs:
       S3_MEDIA_PUBLIC_ORIGIN: ${{ vars.S3_MEDIA_PUBLIC_ORIGIN }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-      GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GITHUB_OAUTH_CLIENT_ID }}
-      GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.GITHUB_OAUTH_CLIENT_SECRET }}
+      # GitHub reserves the GITHUB_ prefix for Actions secret names. Map
+      # provider-neutral source secrets to the runtime names Django expects.
+      GITHUB_OAUTH_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+      GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
       EMAIL_PROVIDER_ADAPTER: apps.subscriptions.providers.resend.ResendEmailProvider
       EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE: ${{ vars.EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE }}
       EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}

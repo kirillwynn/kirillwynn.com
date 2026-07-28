@@ -522,3 +522,17 @@ def test_minio_fixture_uses_the_django_s3_credentials():
 
     assert f"MINIO_ROOT_PASSWORD: {s3_secret}" in compose
     assert f"minio:9000 integration {s3_secret}" in compose
+
+
+def test_deploy_workflows_map_github_oauth_from_allowed_secret_names():
+    for workflow_name in ("build.yml", "deploy-production.yml"):
+        workflow = (ROOT / ".github" / "workflows" / workflow_name).read_text()
+        assert (
+            "GITHUB_OAUTH_CLIENT_ID: "
+            "${{ secrets.OAUTH_GITHUB_CLIENT_ID }}" in workflow
+        )
+        assert (
+            "GITHUB_OAUTH_CLIENT_SECRET: "
+            "${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}" in workflow
+        )
+        assert "secrets.GITHUB_OAUTH_CLIENT_" not in workflow

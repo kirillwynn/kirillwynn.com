@@ -33,10 +33,13 @@ values all fail closed; a successful production import guarantees non-empty
 Google and GitHub `APPS`. `SOCIALACCOUNT_REQUESTS_TIMEOUT` defaults to five
 seconds and, when configured, must be a finite positive number.
 
-The GitHub Environments for staging and production must each supply the four
-names above (client IDs as environment variables or secrets according to the
-workflow policy; client secrets as secrets). They are intentionally not added or
-changed by application implementation.
+The rendered runtime must supply the four names above. GitHub Actions reserves
+the `GITHUB_` prefix for secret names, so each GitHub Environment stores the
+GitHub provider credentials as `OAUTH_GITHUB_CLIENT_ID` and
+`OAUTH_GITHUB_CLIENT_SECRET`; the deployment workflows map those source secrets
+to the runtime names Django expects. Google credentials use
+`GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` directly. They are
+intentionally not added or changed by application implementation.
 
 ## Callback URLs
 
@@ -136,7 +139,9 @@ it against production as part of automated deployment.
 - Create separate staging and production Google OAuth web clients.
 - Create separate staging and production GitHub OAuth Apps.
 - Enter only the callback URL for the matching environment.
-- Put the four credential names in the matching GitHub Environment.
+- Put `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`,
+  `OAUTH_GITHUB_CLIENT_ID`, and `OAUTH_GITHUB_CLIENT_SECRET` in the matching
+  GitHub Environment; deployment maps the GitHub pair to the runtime names.
 - Confirm the public origin, allowed host, and CSRF trusted origin agree.
 - Run a staging live-consent smoke test before production.
 - Never log authorization codes, access tokens, refresh tokens, client secrets,
