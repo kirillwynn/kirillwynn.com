@@ -332,7 +332,6 @@ def test_production_settings_reject_short_revalidation_secret():
 @pytest.mark.parametrize(
     "missing_name",
     [
-        "RESEND_API_KEY",
         "RESEND_WEBHOOK_SECRET",
         "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
         "SUBSCRIPTION_SIGNING_SECRET",
@@ -352,6 +351,51 @@ def test_production_resend_settings_fail_fast(missing_name):
 
     assert result.returncode != 0
     assert f"Missing required production environment variables: {missing_name}" in result.stderr
+
+
+def test_production_web_does_not_receive_resend_api_key():
+    environment = production_environment()
+    environment.pop("RESEND_API_KEY")
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == 0
+
+
+def test_production_worker_uses_minimal_non_web_contract():
+    environment = production_environment()
+    environment["SERVICE_ROLE"] = "worker"
+    for name in (
+        "DJANGO_ALLOWED_HOSTS",
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "WAGTAIL_ADMIN_BASE_URL",
+        "FRONTEND_PREVIEW_URL",
+        "RESEND_WEBHOOK_SECRET",
+        *OAUTH_CREDENTIAL_NAMES,
+    ):
+        environment.pop(name)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from config.settings import production; "
+            "assert production.SERVICE_ROLE == 'worker'; "
+            "assert not production.RESEND_WEBHOOK_SECRET",
+        ],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == 0
 
 
 def test_production_rejects_short_subscription_signing_secret():

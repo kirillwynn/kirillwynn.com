@@ -22,10 +22,9 @@ services:
     image: ${POSTGRES_IMAGE:?set a pinned PostgreSQL image digest}
     restart: unless-stopped
     shm_size: 256m
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?set an environment-specific database}
-      POSTGRES_USER: ${POSTGRES_USER:?set an environment-specific user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set the database secret}
+    env_file:
+      - path: ${POSTGRES_ENV_FILE:?set the PostgreSQL-only environment file}
+        format: raw
     healthcheck:
       test:
         - CMD-SHELL
@@ -37,7 +36,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - internal
+      - database
     security_opt:
       - no-new-privileges:true
     logging:
@@ -50,7 +49,10 @@ services:
     <<: *service-defaults
     image: ${DJANGO_IMAGE:?set the release Django image digest}
     env_file:
-      - ${RUNTIME_ENV_FILE:?set the environment runtime file}
+      - path: ${POSTGRES_ENV_FILE:?set the PostgreSQL-only environment file}
+        format: raw
+      - path: ${DJANGO_ENV_FILE:?set the Django-only environment file}
+        format: raw
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
@@ -64,13 +66,15 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=3); raise SystemExit(0 if r.status == 200 else 1)"
-      interval: 15s
+        - "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/readiness/', timeout=3); raise SystemExit(0 if r.status == 200 else 1)"
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 15s
+      retries: 12
+      start_period: 20s
     networks:
-      internal:
+      database:
+      application:
+      egress:
       edge:
         aliases:
           - ${DJANGO_EDGE_ALIAS:?set a unique edge alias}
@@ -79,9 +83,8 @@ services:
     <<: *service-defaults
     image: ${NEXT_IMAGE:?set the release Next.js image digest}
     env_file:
-      - ${RUNTIME_ENV_FILE:?set the environment runtime file}
-    environment:
-      DJANGO_API_URL: http://django:8000
+      - path: ${NEXT_ENV_FILE:?set the Next-only environment file}
+        format: raw
     depends_on:
       django:
         condition: service_healthy
@@ -95,12 +98,13 @@ services:
         - node
         - -e
         - "fetch('http://127.0.0.1:3000/internal/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 15s
+      retries: 12
+      start_period: 20s
     networks:
-      internal:
+      application:
+      egress:
       edge:
         aliases:
           - ${NEXT_EDGE_ALIAS:?set a unique edge alias}
@@ -115,7 +119,10 @@ services:
       - --heartbeat-file
       - /tmp/kirillwynn-worker/heartbeat.json
     env_file:
-      - ${RUNTIME_ENV_FILE:?set the environment runtime file}
+      - path: ${POSTGRES_ENV_FILE:?set the PostgreSQL-only environment file}
+        format: raw
+      - path: ${WORKER_ENV_FILE:?set the worker-only environment file}
+        format: raw
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
@@ -128,21 +135,31 @@ services:
         - python
         - -c
         - "import json,time,pathlib; p=pathlib.Path('/tmp/kirillwynn-worker/heartbeat.json'); d=json.loads(p.read_text()); raise SystemExit(0 if time.time()-d['timestamp'] < 120 else 1)"
-      interval: 30s
+      interval: 15s
       timeout: 5s
-      retries: 4
+      retries: 8
       start_period: 30s
     stop_grace_period: 30s
     networks:
-      - internal
+      - database
+      - application
+      - egress
 
 volumes:
   postgres_data:
+    name: ${POSTGRES_VOLUME:?set an environment-specific PostgreSQL volume}
   next_cache:
+    name: ${NEXT_CACHE_VOLUME:?set an environment-specific Next cache volume}
 
 networks:
-  internal:
+  database:
+    name: ${DATABASE_NETWORK:?set an environment-specific database network}
     internal: true
+  application:
+    name: ${APPLICATION_NETWORK:?set an environment-specific application network}
+    internal: true
+  egress:
+    name: ${EGRESS_NETWORK:?set an environment-specific egress network}
   edge:
     name: ${EDGE_NETWORK:?set a unique environment edge network}
-    attachable: true
+    external: true

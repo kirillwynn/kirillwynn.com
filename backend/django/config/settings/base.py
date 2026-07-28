@@ -301,6 +301,7 @@ EMAIL_FROM_ADDRESS = normalize_email_from_address(
 )
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 RESEND_WEBHOOK_SECRET = os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()
+RESEND_API_URL = os.environ.get("RESEND_API_URL", "https://api.resend.com/emails")
 SUBSCRIPTION_SIGNING_SECRET = os.environ.get(
     "SUBSCRIPTION_SIGNING_SECRET",
     "local-subscription-signing-secret-change-me",

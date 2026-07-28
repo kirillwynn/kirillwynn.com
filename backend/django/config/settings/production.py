@@ -9,17 +9,17 @@ from svix.webhooks import Webhook
 from config.email_settings import normalize_email_from_address, normalize_transport_identity
 from config.settings.base import *  # noqa: F403
 
+SERVICE_ROLE = os.environ.get("SERVICE_ROLE", "web").strip()
+if SERVICE_ROLE not in {"web", "worker"}:
+    raise ImproperlyConfigured("SERVICE_ROLE must be 'web' or 'worker'")
+
 required_environment = {
     "DJANGO_SECRET_KEY": SECRET_KEY,  # noqa: F405
-    "DJANGO_ALLOWED_HOSTS": os.environ.get("DJANGO_ALLOWED_HOSTS"),
-    "DJANGO_CSRF_TRUSTED_ORIGINS": os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS"),
     "POSTGRES_HOST": os.environ.get("POSTGRES_HOST"),
     "POSTGRES_DB": os.environ.get("POSTGRES_DB"),
     "POSTGRES_USER": os.environ.get("POSTGRES_USER"),
     "POSTGRES_PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
-    "WAGTAIL_ADMIN_BASE_URL": os.environ.get("WAGTAIL_ADMIN_BASE_URL"),
     "PUBLIC_SITE_URL": os.environ.get("PUBLIC_SITE_URL"),
-    "FRONTEND_PREVIEW_URL": os.environ.get("FRONTEND_PREVIEW_URL"),
     "REVALIDATION_URL": os.environ.get("REVALIDATION_URL"),
     "REVALIDATION_SECRET": os.environ.get("REVALIDATION_SECRET"),
     "EMAIL_FROM_ADDRESS": os.environ.get("EMAIL_FROM_ADDRESS"),
@@ -33,19 +33,28 @@ required_environment = {
     "S3_MEDIA_REGION": os.environ.get("S3_MEDIA_REGION"),
     "S3_MEDIA_ADDRESSING_STYLE": os.environ.get("S3_MEDIA_ADDRESSING_STYLE"),
     "S3_MEDIA_PUBLIC_ORIGIN": os.environ.get("S3_MEDIA_PUBLIC_ORIGIN"),
-    **OAUTH_CREDENTIALS,  # noqa: F405
 }
+if SERVICE_ROLE == "web":
+    required_environment.update(
+        {
+            "DJANGO_ALLOWED_HOSTS": os.environ.get("DJANGO_ALLOWED_HOSTS"),
+            "DJANGO_CSRF_TRUSTED_ORIGINS": os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS"),
+            "WAGTAIL_ADMIN_BASE_URL": os.environ.get("WAGTAIL_ADMIN_BASE_URL"),
+            "FRONTEND_PREVIEW_URL": os.environ.get("FRONTEND_PREVIEW_URL"),
+            **OAUTH_CREDENTIALS,  # noqa: F405
+        }
+    )
 EMAIL_PROVIDER_ADAPTER = os.environ.get(
     "EMAIL_PROVIDER_ADAPTER",
     "apps.subscriptions.providers.resend.ResendEmailProvider",
 ).strip()
 if EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailProvider":
-    required_environment.update(
-        {
-            "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),
-            "RESEND_WEBHOOK_SECRET": os.environ.get("RESEND_WEBHOOK_SECRET"),
-        }
+    resend_required = (
+        {"RESEND_API_KEY": os.environ.get("RESEND_API_KEY")}
+        if SERVICE_ROLE == "worker"
+        else {"RESEND_WEBHOOK_SECRET": os.environ.get("RESEND_WEBHOOK_SECRET")}
     )
+    required_environment.update(resend_required)
 missing_environment = [
     name
     for name, value in required_environment.items()
@@ -102,7 +111,10 @@ EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE = normalize_transport_identity(
     os.environ["EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"],
     name="EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
 )
-if EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailProvider":
+if (
+    SERVICE_ROLE == "web"
+    and EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailProvider"
+):
     try:
         webhook_secret = os.environ["RESEND_WEBHOOK_SECRET"].strip()
         if not webhook_secret.startswith("whsec_"):
@@ -126,9 +138,11 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     *MIDDLEWARE[1:],  # noqa: F405
 ]
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")  # noqa: F405
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "worker.invalid")  # noqa: F405
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")  # noqa: F405
-WAGTAILADMIN_BASE_URL = os.environ["WAGTAIL_ADMIN_BASE_URL"]
+WAGTAILADMIN_BASE_URL = os.environ.get(
+    "WAGTAIL_ADMIN_BASE_URL", f"{os.environ['PUBLIC_SITE_URL'].rstrip('/')}/cms"
+)
 PUBLIC_SITE_URL = public_origin(os.environ["PUBLIC_SITE_URL"])
 S3_MEDIA_PUBLIC_ORIGIN = public_origin(os.environ["S3_MEDIA_PUBLIC_ORIGIN"])
 S3_MEDIA_ENDPOINT_URL = public_origin(os.environ["S3_MEDIA_ENDPOINT_URL"])
@@ -136,7 +150,7 @@ S3_MEDIA_PREFIX = media_prefix(os.environ["S3_MEDIA_PREFIX"])
 S3_MEDIA_ADDRESSING_STYLE = os.environ["S3_MEDIA_ADDRESSING_STYLE"].strip().lower()
 if S3_MEDIA_ADDRESSING_STYLE not in {"path", "virtual"}:
     raise ImproperlyConfigured("S3_MEDIA_ADDRESSING_STYLE must be 'path' or 'virtual'")
-FRONTEND_PREVIEW_URL = os.environ["FRONTEND_PREVIEW_URL"]
+FRONTEND_PREVIEW_URL = os.environ.get("FRONTEND_PREVIEW_URL", f"{PUBLIC_SITE_URL}/api/draft")
 WAGTAIL_HEADLESS_PREVIEW = {
     **WAGTAIL_HEADLESS_PREVIEW,  # noqa: F405
     "CLIENT_URLS": {"default": FRONTEND_PREVIEW_URL},
@@ -146,6 +160,7 @@ REVALIDATION_SECRET = os.environ["REVALIDATION_SECRET"]
 SUBSCRIPTION_SIGNING_SECRET = os.environ["SUBSCRIPTION_SIGNING_SECRET"]
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 RESEND_WEBHOOK_SECRET = os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()
+RESEND_API_URL = os.environ.get("RESEND_API_URL", "https://api.resend.com/emails")
 PREVIEW_COOKIE_SECURE = True
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

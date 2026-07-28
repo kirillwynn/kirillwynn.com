@@ -14,7 +14,7 @@ permissions:
   packages: read
 
 concurrency:
-  group: deploy-production
+  group: kirillwynn-server-release-operations
   cancel-in-progress: false
 
 jobs:
@@ -24,11 +24,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_SHA: ${{ inputs.release_sha }}
+      DEPLOY_SEQUENCE: ${{ github.run_id }}
       POSTGRES_IMAGE: ${{ vars.POSTGRES_IMAGE }}
       EDGE_NETWORK: kirillwynn-production-edge
       DJANGO_EDGE_ALIAS: production-django
       NEXT_EDGE_ALIAS: production-next
-      RUNTIME_ENV_FILE: /srv/kirillwynn/runtime/production.env
       DJANGO_SETTINGS_MODULE: config.settings.production
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
       DJANGO_ALLOWED_HOSTS: kirillwynn.com
@@ -60,6 +60,8 @@ jobs:
       EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
+      RESEND_API_URL: https://api.resend.com/emails
+      WORKER_EGRESS_PROBE_URL: https://api.resend.com
       SERVER_HOST: ${{ secrets.SERVER_HOST }}
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -81,13 +83,12 @@ jobs:
           gh run download "$run_id" --name "release-$RELEASE_SHA" --dir release
           gh run download "$run_id" --name "staging-attestation-$RELEASE_SHA" --dir attestation
           python infra/scripts/validate_release_manifest.py release/release-manifest.json --expect-sha "$RELEASE_SHA"
-          python -c "import json; d=json.load(open('attestation/staging-attestation.json')); assert d == {'schema_version': 1, 'release_sha': '$RELEASE_SHA', 'environment': 'staging', 'status': 'passed'}"
-      - name: Render bounded runtime environment
-        run: python infra/scripts/render_runtime_env.py --environment production --output "$RUNNER_TEMP/production.env"
-      - name: Backup gate and promote without rebuild
-        run: infra/scripts/ci_ssh_deploy.sh production "$RUNNER_TEMP/production.env" release/release-manifest.json
-      - name: Production smoke
+          python infra/scripts/validate_attestation.py attestation/staging-attestation.json release/release-manifest.json
+      - name: Bind release images
         run: |
-          curl --fail --silent --show-error --max-time 15 https://kirillwynn.com/api/health/
-          curl --fail --silent --show-error --max-time 15 https://kirillwynn.com/api/readiness/
-          curl --fail --silent --show-error --max-time 15 https://kirillwynn.com/ >/dev/null
+          printf 'DJANGO_IMAGE=%s\n' "$(python infra/scripts/release_image.py release/release-manifest.json django)" >> "$GITHUB_ENV"
+          printf 'NEXT_IMAGE=%s\n' "$(python infra/scripts/release_image.py release/release-manifest.json next)" >> "$GITHUB_ENV"
+      - name: Render bounded runtime environment
+        run: python infra/scripts/render_runtime_env.py --environment production --output-dir "$RUNNER_TEMP/production-runtime"
+      - name: Backup gate and promote without rebuild
+        run: infra/scripts/ci_ssh_deploy.sh production "$RUNNER_TEMP/production-runtime" release/release-manifest.json

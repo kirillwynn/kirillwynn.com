@@ -63,3 +63,26 @@ def test_forwarding_chain_is_replaced_not_appended():
         "X-Real-IP $remote_addr",
     ):
         assert header in proxy
+
+
+def test_live_upstreams_use_dynamic_docker_dns_and_isolated_zones():
+    nginx = (ROOT / "infra" / "nginx" / "nginx.conf").read_text()
+    assert "resolver 127.0.0.11" in nginx
+    assert "resolver_timeout 2s;" in nginx
+    zones = set()
+    for environment in ("staging", "production"):
+        contents = config(f"{environment}.conf")
+        for service in ("django", "next"):
+            alias = f"{environment}-{service}"
+            zone = f"{environment}_{service}_zone"
+            assert f"zone {zone} 64k;" in contents
+            assert f"server {alias}:" in contents
+            assert " resolve;" in contents
+            zones.add(zone)
+    assert len(zones) == 4
+
+
+def test_missing_upstreams_have_bounded_failure():
+    proxy = (ROOT / "infra" / "nginx" / "snippets" / "proxy.conf").read_text()
+    assert "proxy_connect_timeout 3s;" in proxy
+    assert "proxy_next_upstream_tries 1;" in proxy

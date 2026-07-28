@@ -2,11 +2,11 @@
 set -eu
 
 [ "$#" -eq 3 ] || {
-    echo "usage: ci_ssh_deploy.sh <staging|production> <runtime-env> <manifest>" >&2
+    echo "usage: ci_ssh_deploy.sh <staging|production> <runtime-dir> <manifest>" >&2
     exit 2
 }
 environment_name=$1
-runtime_env=$2
+runtime_dir=$2
 manifest=$3
 case "$environment_name" in
     staging|production) ;;
@@ -18,6 +18,10 @@ esac
 : "${SSH_PRIVATE_KEY:?}"
 : "${SERVER_KNOWN_HOSTS:?}"
 : "${RELEASE_SHA:?}"
+case "$RELEASE_SHA" in
+    *[!0-9a-f]*|"") exit 2 ;;
+esac
+test "${#RELEASE_SHA}" -eq 40
 
 umask 077
 ssh_dir=${RUNNER_TEMP:?}/kirillwynn-ssh
@@ -43,27 +47,50 @@ trap cleanup_remote EXIT HUP INT TERM
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "umask 077 && mkdir -p '$remote_dir'"
 bundle_file=${RUNNER_TEMP:?}/kirillwynn-infra.tar.gz
 tar -czf "$bundle_file" infra/compose infra/scripts
-scp $ssh_options "$runtime_env" "$SERVER_USER@$SERVER_HOST:$remote_dir/runtime.env"
 scp $ssh_options "$manifest" "$SERVER_USER@$SERVER_HOST:$remote_dir/release-manifest.json"
+scp $ssh_options -r "$runtime_dir" "$SERVER_USER@$SERVER_HOST:$remote_dir/runtime-input"
 scp $ssh_options "$bundle_file" "$SERVER_USER@$SERVER_HOST:$remote_dir/infra.tar.gz"
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "tar -xzf '$remote_dir/infra.tar.gz' -C '$remote_dir' && rm -f '$remote_dir/infra.tar.gz'"
 
-if [ "$environment_name" = production ]; then
-    ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-        "cd '$remote_dir' && infra/scripts/backup_postgres.sh production /srv/kirillwynn/runtime/production.env '$RELEASE_SHA'"
-fi
-
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-    "cd '$remote_dir' && infra/scripts/deploy_environment.sh '$environment_name' '$remote_dir/runtime.env' '$remote_dir/release-manifest.json'"
+    "cd '$remote_dir' && infra/scripts/install_release_bundle.sh '$remote_dir/release-manifest.json' >/dev/null"
+durable_release="/srv/kirillwynn/releases/$RELEASE_SHA"
+durable_runtime="/srv/kirillwynn/runtime/releases/$RELEASE_SHA/$environment_name"
+ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+    "cd '$durable_release' && if test -d '$durable_runtime'; then diff -qr '$remote_dir/runtime-input' '$durable_runtime' >/dev/null; else infra/scripts/validate_runtime_env_file.py --environment '$environment_name' --input-dir '$remote_dir/runtime-input' --output-dir '$durable_runtime'; fi"
 
 edge_runtime_env=/srv/kirillwynn/runtime/edge.env
 if [ "$environment_name" = staging ]; then
-    ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-        "cd '$remote_dir' && infra/scripts/verify_edge_candidate.sh '$remote_dir/release-manifest.json' '$edge_runtime_env'"
+    remote_rollout="infra/scripts/deploy_environment.sh staging '$durable_runtime' '$durable_release/release-manifest.json' && infra/scripts/verify_edge_candidate.sh '$durable_release/release-manifest.json' '$edge_runtime_env'"
 else
-    ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-        "cd '$remote_dir' && infra/scripts/deploy_edge.sh '$remote_dir/release-manifest.json' '$edge_runtime_env'"
+    remote_rollout="infra/scripts/deploy_environment.sh production '$durable_runtime' '$durable_release/release-manifest.json' && infra/scripts/deploy_edge.sh '$durable_release/release-manifest.json' '$edge_runtime_env'"
+fi
+ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+    "cd '$durable_release' && mkdir -p /srv/kirillwynn/locks && flock -w 900 /srv/kirillwynn/locks/release.lock sh -c \"$remote_rollout\""
+
+if [ "$environment_name" = staging ]; then
+    : "${STAGING_BASIC_AUTH:?}"
+    curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
+        https://staging.kirillwynn.com/api/health/ >/dev/null
+    curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
+        https://staging.kirillwynn.com/api/readiness/ >/dev/null
+    curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" \
+        https://staging.kirillwynn.com/ >/dev/null
+else
+    curl --fail --silent --show-error --max-time 15 \
+        https://kirillwynn.com/api/health/ >/dev/null
+    curl --fail --silent --show-error --max-time 15 \
+        https://kirillwynn.com/api/readiness/ >/dev/null
+    curl --fail --silent --show-error --max-time 15 \
+        https://kirillwynn.com/ >/dev/null
+fi
+
+ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+    "cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/finalize_rollout.sh '$environment_name' '$RELEASE_SHA'"
+if [ "$environment_name" = staging ]; then
+    python3 infra/scripts/create_attestation.py \
+        "$manifest" "${ATTESTATION_OUTPUT:?}"
 fi
 
 cleanup_remote

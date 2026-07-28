@@ -1,0 +1,41 @@
+name: ${COMPOSE_PROJECT_NAME:?set an environment-specific Compose project name}
+
+# This contract intentionally contains no application services or application
+# image interpolation. Backup, restore, and first-deploy bootstrap use it even
+# when no Django or Next release has ever been installed.
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?set a pinned PostgreSQL image digest}
+    restart: unless-stopped
+    shm_size: 256m
+    env_file:
+      - path: ${POSTGRES_ENV_FILE:?set the PostgreSQL-only environment file}
+        format: raw
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - database
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  postgres_data:
+    name: ${POSTGRES_VOLUME:?set an environment-specific PostgreSQL volume}
+
+networks:
+  database:
+    name: ${DATABASE_NETWORK:?set an environment-specific database network}
+    internal: true

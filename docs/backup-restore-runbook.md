@@ -1,49 +1,65 @@
 # PostgreSQL backup and restore
 
-`infra/scripts/backup_postgres.sh` runs environment-qualified custom-format
-`pg_dump`, validates with `pg_restore --list`, then atomically accepts the dump
-and metadata with UTC timestamp, release SHA, and checksum.
+Database operations use `infra/compose/database.yml`, not the application
+model. This contract contains only pinned PostgreSQL, the role-scoped
+`postgres.env`, the environment-qualified database network, and the existing
+PostgreSQL volume. It cannot require or interpolate `DJANGO_IMAGE` or
+`NEXT_IMAGE`.
+
+Use the runtime directory for the active release:
 
 ```bash
-infra/scripts/backup_postgres.sh \
-  staging /srv/kirillwynn/runtime/staging.env <full-release-sha>
+/srv/kirillwynn/releases/<sha>/infra/scripts/backup_postgres.sh \
+  staging \
+  /srv/kirillwynn/runtime/releases/<sha>/staging \
+  <full-release-sha>
 ```
 
-Production promotion uses the production equivalent as a mandatory gate.
-Backups live outside Git under `/srv/kirillwynn/backups/<environment>/`.
-Retention is explicit:
+The script writes an environment-qualified custom-format dump, verifies
+`pg_restore --list`, and creates a mode-0600 JSON sidecar containing schema
+version, environment, UTC timestamp, release SHA, dump filename, and SHA-256.
+Both remain outside Git under `/srv/kirillwynn/backups/<environment>/`.
+
+First production deployment starts only the pinned PostgreSQL service and takes
+this backup before its first migration. Every later deployment backs up the
+database through the active runtime/bundle before migration.
+
+Retention remains explicit:
 
 ```bash
-infra/scripts/prune_backups.sh staging 14 /srv/kirillwynn/backups
-infra/scripts/prune_backups.sh production 35 /srv/kirillwynn/backups
+/srv/kirillwynn/releases/<sha>/infra/scripts/prune_backups.sh staging 14 /srv/kirillwynn/backups
+/srv/kirillwynn/releases/<sha>/infra/scripts/prune_backups.sh production 35 /srv/kirillwynn/backups
 ```
 
-Restore always creates a new `restore_*` scratch database and fails if it
-exists:
+Restore refuses to run `createdb` until the required sidecar exists and its
+shape, source environment, dump filename, and SHA-256 match. `pg_restore
+--list` is the second pre-mutation gate. Restore creates only a new
+`restore_*` database and fails if it already exists:
 
 ```bash
-infra/scripts/restore_postgres.sh \
-  staging /srv/kirillwynn/runtime/staging.env <backup.dump>
+/srv/kirillwynn/releases/<sha>/infra/scripts/restore_postgres.sh \
+  staging \
+  /srv/kirillwynn/runtime/releases/<sha>/staging \
+  /srv/kirillwynn/backups/staging/<backup>.dump \
+  restore_drill_20260727
 ```
 
-Production-source restore additionally requires the exact confirmation:
+Production-source restore preserves typed confirmation:
 
 ```bash
-infra/scripts/restore_postgres.sh \
-  production /srv/kirillwynn/runtime/production.env <backup.dump> \
+/srv/kirillwynn/releases/<sha>/infra/scripts/restore_postgres.sh \
+  production \
+  /srv/kirillwynn/runtime/releases/<sha>/production \
+  /srv/kirillwynn/backups/production/<backup>.dump \
   restore_incident_20260727 \
   "RESTORE production restore_incident_20260727"
 ```
 
-This still targets only the new scratch database. Pointing an app at restored
-data, renaming, or deleting databases is a separate approved incident action.
+Pointing an application at restored data, renaming databases, or deleting
+scratch data is a separate approved incident action. Monthly staging drills
+must restore the newest dump, run Django migration/check plans, compare key row
+counts, and record duration/results.
 
-Monthly staging drill: restore the newest dump to scratch; run Django
-`migrate --plan` and `check`; compare key row counts; open representative
-Wagtail pages through a temporary protected task; record duration/result.
-Scratch deletion is separately reviewed.
-
-Media is not in PostgreSQL dumps. Configure S3 versioning, lifecycle, and
-off-site replication where available, then test recovery of an original,
-rendition, and document in staging. Never share a production bucket/prefix or
-credential with staging.
+PostgreSQL dumps do not contain media. S3 buckets remain environment-specific
+and require provider versioning/lifecycle/off-site protection plus a staging
+recovery drill for an original, rendition, and document.

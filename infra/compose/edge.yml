@@ -38,7 +38,5 @@ services:
 networks:
   staging_edge:
     name: ${STAGING_EDGE_NETWORK:-kirillwynn-staging-edge}
-    external: true
   production_edge:
     name: ${PRODUCTION_EDGE_NETWORK:-kirillwynn-production-edge}
-    external: true

@@ -121,15 +121,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     concurrency:
-      group: deploy-staging
+      group: kirillwynn-server-release-operations
       cancel-in-progress: false
     env:
       RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      DEPLOY_SEQUENCE: ${{ github.run_id }}
       POSTGRES_IMAGE: ${{ vars.POSTGRES_IMAGE }}
       EDGE_NETWORK: kirillwynn-staging-edge
       DJANGO_EDGE_ALIAS: staging-django
       NEXT_EDGE_ALIAS: staging-next
-      RUNTIME_ENV_FILE: /srv/kirillwynn/runtime/staging.env
       DJANGO_SETTINGS_MODULE: config.settings.production
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
       DJANGO_ALLOWED_HOSTS: staging.kirillwynn.com
@@ -161,6 +161,8 @@ jobs:
       EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
+      RESEND_API_URL: https://api.resend.com/emails
+      WORKER_EGRESS_PROBE_URL: https://api.resend.com
       SERVER_HOST: ${{ secrets.SERVER_HOST }}
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -173,19 +175,18 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-${{ github.event.workflow_run.head_sha }}
+      - name: Bind release images and render role-scoped runtime environments
+        run: |
+          printf 'DJANGO_IMAGE=%s\n' "$(python infra/scripts/release_image.py release-manifest.json django)" >> "$GITHUB_ENV"
+          printf 'NEXT_IMAGE=%s\n' "$(python infra/scripts/release_image.py release-manifest.json next)" >> "$GITHUB_ENV"
       - name: Render bounded runtime environment
-        run: python infra/scripts/render_runtime_env.py --environment staging --output "$RUNNER_TEMP/staging.env"
+        run: python infra/scripts/render_runtime_env.py --environment staging --output-dir "$RUNNER_TEMP/staging-runtime"
       - name: Deploy release digests
-        run: infra/scripts/ci_ssh_deploy.sh staging "$RUNNER_TEMP/staging.env" release-manifest.json
-      - name: Staging smoke
-        run: |
-          curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" https://staging.kirillwynn.com/api/health/
-          curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" https://staging.kirillwynn.com/api/readiness/
-          curl --fail --silent --show-error --max-time 15 -u "$STAGING_BASIC_AUTH" https://staging.kirillwynn.com/ >/dev/null
-      - name: Record staging attestation
-        run: |
-          printf '{"schema_version":1,"release_sha":"%s","environment":"staging","status":"passed"}\n' \
-            "$RELEASE_SHA" > staging-attestation.json
+        env:
+          ATTESTATION_OUTPUT: staging-attestation.json
+        run: infra/scripts/ci_ssh_deploy.sh staging "$RUNNER_TEMP/staging-runtime" release-manifest.json
+      - name: Validate complete staging attestation
+        run: python infra/scripts/validate_attestation.py staging-attestation.json release-manifest.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: staging-attestation-${{ github.event.workflow_run.head_sha }}

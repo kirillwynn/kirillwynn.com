@@ -1,17 +1,43 @@
 #!/usr/bin/env python3
+"""Render role-scoped Compose env files without quoting or interpolation.
+
+Docker Compose 2.30+ reads these files with ``env_file.format: raw``. Values
+are written byte-for-byte after rejecting line-oriented format hazards.
+"""
+
 import argparse
 import os
 import re
 import tempfile
 from pathlib import Path
 
-COMMON = {
+MAX_VALUE_BYTES = 8192
+DIGEST_REFERENCE = re.compile(r"^[^@\s]+@sha256:([0-9a-f]{64})$")
+
+CONTROL_FIELDS = {
+    "COMPOSE_PROJECT_NAME",
+    "ENVIRONMENT",
     "RELEASE_SHA",
+    "DEPLOY_SEQUENCE",
     "POSTGRES_IMAGE",
+    "DJANGO_IMAGE",
+    "NEXT_IMAGE",
+    "POSTGRES_ENV_FILE",
+    "DJANGO_ENV_FILE",
+    "WORKER_ENV_FILE",
+    "NEXT_ENV_FILE",
+    "DATABASE_NETWORK",
+    "APPLICATION_NETWORK",
+    "EGRESS_NETWORK",
     "EDGE_NETWORK",
+    "POSTGRES_VOLUME",
+    "NEXT_CACHE_VOLUME",
     "DJANGO_EDGE_ALIAS",
     "NEXT_EDGE_ALIAS",
-    "RUNTIME_ENV_FILE",
+}
+POSTGRES_FIELDS = {"POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"}
+DJANGO_FIELDS = {
+    "SERVICE_ROLE",
     "DJANGO_SETTINGS_MODULE",
     "DJANGO_SECRET_KEY",
     "DJANGO_ALLOWED_HOSTS",
@@ -22,9 +48,6 @@ COMMON = {
     "REVALIDATION_URL",
     "REVALIDATION_SECRET",
     "SUBSCRIPTION_SIGNING_SECRET",
-    "POSTGRES_DB",
-    "POSTGRES_USER",
-    "POSTGRES_PASSWORD",
     "POSTGRES_SSLMODE",
     "S3_MEDIA_ACCESS_KEY_ID",
     "S3_MEDIA_SECRET_ACCESS_KEY",
@@ -41,8 +64,31 @@ COMMON = {
     "EMAIL_PROVIDER_ADAPTER",
     "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
     "EMAIL_FROM_ADDRESS",
-    "RESEND_API_KEY",
     "RESEND_WEBHOOK_SECRET",
+}
+WORKER_FIELDS = {
+    "SERVICE_ROLE",
+    "DJANGO_SETTINGS_MODULE",
+    "DJANGO_SECRET_KEY",
+    "PUBLIC_SITE_URL",
+    "REVALIDATION_URL",
+    "REVALIDATION_SECRET",
+    "SUBSCRIPTION_SIGNING_SECRET",
+    "POSTGRES_SSLMODE",
+    "S3_MEDIA_ACCESS_KEY_ID",
+    "S3_MEDIA_SECRET_ACCESS_KEY",
+    "S3_MEDIA_BUCKET",
+    "S3_MEDIA_PREFIX",
+    "S3_MEDIA_ENDPOINT_URL",
+    "S3_MEDIA_REGION",
+    "S3_MEDIA_ADDRESSING_STYLE",
+    "S3_MEDIA_PUBLIC_ORIGIN",
+    "EMAIL_PROVIDER_ADAPTER",
+    "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
+    "EMAIL_FROM_ADDRESS",
+    "RESEND_API_KEY",
+    "RESEND_API_URL",
+    "WORKER_EGRESS_PROBE_URL",
     "WORKER_PUBLISH_INTERVAL_SECONDS",
     "WORKER_REVALIDATION_INTERVAL_SECONDS",
     "WORKER_EMAIL_INTERVAL_SECONDS",
@@ -52,7 +98,15 @@ COMMON = {
     "WORKER_EMAIL_DELIVERY_BATCH_SIZE",
     "WORKER_WEBHOOK_BATCH_SIZE",
 }
-REQUIRED = COMMON - {
+NEXT_FIELDS = {"PUBLIC_SITE_URL", "DJANGO_API_URL", "REVALIDATION_SECRET"}
+ROLE_FIELDS = {
+    "control.env": CONTROL_FIELDS,
+    "postgres.env": POSTGRES_FIELDS,
+    "django.env": DJANGO_FIELDS,
+    "worker.env": WORKER_FIELDS,
+    "next.env": NEXT_FIELDS,
+}
+OPTIONAL_INPUTS = {
     "WORKER_PUBLISH_INTERVAL_SECONDS",
     "WORKER_REVALIDATION_INTERVAL_SECONDS",
     "WORKER_EMAIL_INTERVAL_SECONDS",
@@ -62,6 +116,19 @@ REQUIRED = COMMON - {
     "WORKER_EMAIL_DELIVERY_BATCH_SIZE",
     "WORKER_WEBHOOK_BATCH_SIZE",
 }
+GENERATED_FIELDS = CONTROL_FIELDS | {
+    "SERVICE_ROLE",
+    "DJANGO_SETTINGS_MODULE",
+    "DJANGO_API_URL",
+}
+REQUIRED_INPUTS = (
+    (POSTGRES_FIELDS | DJANGO_FIELDS | WORKER_FIELDS | NEXT_FIELDS)
+    - GENERATED_FIELDS
+    - OPTIONAL_INPUTS
+)
+# Backward-compatible name used by infrastructure unit tests.
+REQUIRED = REQUIRED_INPUTS
+
 ENVIRONMENT_RULES = {
     "staging": {
         "host": "staging.kirillwynn.com",
@@ -70,10 +137,6 @@ ENVIRONMENT_RULES = {
         "prefix": re.compile(r"(^|/)staging(/|$)"),
         "bucket": re.compile(r".*staging.*"),
         "provider_namespace": re.compile(r"(^|/)staging(/|$)"),
-        "edge_network": "kirillwynn-staging-edge",
-        "django_alias": "staging-django",
-        "next_alias": "staging-next",
-        "runtime_file": "/srv/kirillwynn/runtime/staging.env",
     },
     "production": {
         "host": "kirillwynn.com",
@@ -82,19 +145,44 @@ ENVIRONMENT_RULES = {
         "prefix": re.compile(r"(^|/)production(/|$)"),
         "bucket": re.compile(r".*production.*"),
         "provider_namespace": re.compile(r"(^|/)production(/|$)"),
-        "edge_network": "kirillwynn-production-edge",
-        "django_alias": "production-django",
-        "next_alias": "production-next",
-        "runtime_file": "/srv/kirillwynn/runtime/production.env",
     },
 }
-DIGEST_REFERENCE = re.compile(r"^[^@\s]+@sha256:([0-9a-f]{64})$")
+
+
+def validate_value(name, value):
+    if not isinstance(value, str):
+        raise ValueError(f"{name} is not a string")
+    if "\n" in value or "\r" in value or "\0" in value:
+        raise ValueError(f"{name} is not a single-line NUL-free value")
+    if len(value.encode()) > MAX_VALUE_BYTES:
+        raise ValueError(f"{name} exceeds {MAX_VALUE_BYTES} bytes")
 
 
 def validate_environment_identity(environment, values):
     rules = ENVIRONMENT_RULES[environment]
+    host = rules["host"]
+    runtime_root = f"/srv/kirillwynn/runtime/releases/{values.get('RELEASE_SHA', '')}/{environment}"
+    expected = {
+        "COMPOSE_PROJECT_NAME": f"kirillwynn-{environment}",
+        "ENVIRONMENT": environment,
+        "DATABASE_NETWORK": f"kirillwynn-{environment}-database",
+        "APPLICATION_NETWORK": f"kirillwynn-{environment}-application",
+        "EGRESS_NETWORK": f"kirillwynn-{environment}-egress",
+        "EDGE_NETWORK": f"kirillwynn-{environment}-edge",
+        "POSTGRES_VOLUME": f"kirillwynn-{environment}-postgres",
+        "NEXT_CACHE_VOLUME": f"kirillwynn-{environment}-next-cache",
+        "DJANGO_EDGE_ALIAS": f"{environment}-django",
+        "NEXT_EDGE_ALIAS": f"{environment}-next",
+        "POSTGRES_ENV_FILE": f"{runtime_root}/postgres.env",
+        "DJANGO_ENV_FILE": f"{runtime_root}/django.env",
+        "WORKER_ENV_FILE": f"{runtime_root}/worker.env",
+        "NEXT_ENV_FILE": f"{runtime_root}/next.env",
+    }
+    for name, expected_value in expected.items():
+        if values.get(name) != expected_value:
+            raise ValueError(f"{name} does not identify the selected environment")
     checks = (
-        ("DJANGO_ALLOWED_HOSTS", values["DJANGO_ALLOWED_HOSTS"] == rules["host"]),
+        ("DJANGO_ALLOWED_HOSTS", values["DJANGO_ALLOWED_HOSTS"] == host),
         ("POSTGRES_DB", bool(rules["database"].fullmatch(values["POSTGRES_DB"]))),
         (
             "POSTGRES_USER",
@@ -110,35 +198,110 @@ def validate_environment_identity(environment, values):
                 )
             ),
         ),
-        ("EDGE_NETWORK", values["EDGE_NETWORK"] == rules["edge_network"]),
-        ("DJANGO_EDGE_ALIAS", values["DJANGO_EDGE_ALIAS"] == rules["django_alias"]),
-        ("NEXT_EDGE_ALIAS", values["NEXT_EDGE_ALIAS"] == rules["next_alias"]),
-        ("RUNTIME_ENV_FILE", values["RUNTIME_ENV_FILE"] == rules["runtime_file"]),
     )
     for name, valid in checks:
         if not valid:
             raise ValueError(f"{name} does not identify the selected environment")
     if not re.fullmatch(r"[0-9a-f]{40}", values["RELEASE_SHA"]):
         raise ValueError("RELEASE_SHA must be a full lowercase Git SHA")
-    digest_match = DIGEST_REFERENCE.fullmatch(values["POSTGRES_IMAGE"])
-    if not digest_match or digest_match.group(1) == "0" * 64:
-        raise ValueError("POSTGRES_IMAGE must use a non-zero immutable digest")
+    if not values["DEPLOY_SEQUENCE"].isdigit():
+        raise ValueError("DEPLOY_SEQUENCE must be an unsigned integer")
+    for name in ("POSTGRES_IMAGE", "DJANGO_IMAGE", "NEXT_IMAGE"):
+        digest_match = DIGEST_REFERENCE.fullmatch(values[name])
+        if not digest_match or digest_match.group(1) == "0" * 64:
+            raise ValueError(f"{name} must use a non-zero immutable digest")
 
 
-def validated_values(environment):
-    missing = sorted(name for name in REQUIRED if not os.environ.get(name, "").strip())
+def runtime_values(environment):
+    missing = sorted(
+        name
+        for name in REQUIRED_INPUTS
+        if os.environ.get(name) is None or not os.environ[name]
+    )
     if missing:
         raise ValueError("missing required runtime names: " + ", ".join(missing))
-    values = {}
-    for name in sorted(COMMON):
-        value = os.environ.get(name)
-        if value is None:
-            continue
-        if "\n" in value or "\r" in value or "\0" in value or len(value) > 8192:
-            raise ValueError(f"{name} is not a bounded single-line value")
-        values[name] = value
-    validate_environment_identity(environment, values)
-    return values
+    release_sha = os.environ.get("RELEASE_SHA", "")
+    deploy_sequence = os.environ.get("DEPLOY_SEQUENCE", "")
+    runtime_root = f"/srv/kirillwynn/runtime/releases/{release_sha}/{environment}"
+    control = {
+        "COMPOSE_PROJECT_NAME": f"kirillwynn-{environment}",
+        "ENVIRONMENT": environment,
+        "RELEASE_SHA": release_sha,
+        "DEPLOY_SEQUENCE": deploy_sequence,
+        "POSTGRES_IMAGE": os.environ.get("POSTGRES_IMAGE", ""),
+        "DJANGO_IMAGE": os.environ.get("DJANGO_IMAGE", ""),
+        "NEXT_IMAGE": os.environ.get("NEXT_IMAGE", ""),
+        "POSTGRES_ENV_FILE": f"{runtime_root}/postgres.env",
+        "DJANGO_ENV_FILE": f"{runtime_root}/django.env",
+        "WORKER_ENV_FILE": f"{runtime_root}/worker.env",
+        "NEXT_ENV_FILE": f"{runtime_root}/next.env",
+        "DATABASE_NETWORK": f"kirillwynn-{environment}-database",
+        "APPLICATION_NETWORK": f"kirillwynn-{environment}-application",
+        "EGRESS_NETWORK": f"kirillwynn-{environment}-egress",
+        "EDGE_NETWORK": f"kirillwynn-{environment}-edge",
+        "POSTGRES_VOLUME": f"kirillwynn-{environment}-postgres",
+        "NEXT_CACHE_VOLUME": f"kirillwynn-{environment}-next-cache",
+        "DJANGO_EDGE_ALIAS": f"{environment}-django",
+        "NEXT_EDGE_ALIAS": f"{environment}-next",
+    }
+    postgres = {name: os.environ[name] for name in POSTGRES_FIELDS}
+    django = {
+        name: (
+            "web"
+            if name == "SERVICE_ROLE"
+            else "config.settings.production"
+            if name == "DJANGO_SETTINGS_MODULE"
+            else os.environ[name]
+        )
+        for name in DJANGO_FIELDS
+    }
+    worker = {
+        name: (
+            "worker"
+            if name == "SERVICE_ROLE"
+            else "config.settings.production"
+            if name == "DJANGO_SETTINGS_MODULE"
+            else os.environ[name]
+        )
+        for name in WORKER_FIELDS
+        if name not in OPTIONAL_INPUTS or name in os.environ
+    }
+    next_values = {
+        "PUBLIC_SITE_URL": os.environ["PUBLIC_SITE_URL"],
+        "DJANGO_API_URL": "http://django:8000",
+        "REVALIDATION_SECRET": os.environ["REVALIDATION_SECRET"],
+    }
+    roles = {
+        "control.env": control,
+        "postgres.env": postgres,
+        "django.env": django,
+        "worker.env": worker,
+        "next.env": next_values,
+    }
+    combined = {}
+    for values in roles.values():
+        for name, value in values.items():
+            validate_value(name, value)
+            combined.setdefault(name, value)
+    validate_environment_identity(environment, combined)
+    return roles
+
+
+def write_raw_environment(path, values):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    os.umask(0o077)
+    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(descriptor, "w", newline="\n") as handle:
+            for name in sorted(values):
+                handle.write(f"{name}={values[name]}\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def main():
@@ -146,26 +309,14 @@ def main():
     parser.add_argument(
         "--environment", choices=sorted(ENVIRONMENT_RULES), required=True
     )
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
-    values = validated_values(args.environment)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    os.umask(0o077)
-    descriptor, temporary = tempfile.mkstemp(
-        dir=args.output.parent,
-        prefix=f".{args.output.name}.",
-    )
     try:
-        with os.fdopen(descriptor, "w") as handle:
-            for name, value in values.items():
-                handle.write(f"{name}={value}\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, args.output)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+        roles = runtime_values(args.environment)
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
+    for filename, values in roles.items():
+        write_raw_environment(args.output_dir / filename, values)
 
 
 if __name__ == "__main__":

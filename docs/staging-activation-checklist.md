@@ -5,17 +5,20 @@ Repository implementation does not activate staging. Complete externally:
 - create the `staging` GitHub Environment;
 - add unique Django, DB, signing, S3, OAuth, Resend, SSH, host-key, and Basic
   Auth secrets plus the documented non-secret variables;
-- provision restricted `/srv/kirillwynn/runtime` and backup directories;
-- install Docker Compose and authenticate the server to GHCR;
-- create environment edge networks by starting validated app projects;
+- provision restricted `/srv/kirillwynn/{runtime,releases,state,backups,locks}`;
+- install Docker Compose >= 2.30.0 and authenticate the server to GHCR;
+- validate/start shared edge first so it owns both empty edge networks;
 - provide TLS/ACME mounts and the staging htpasswd file to shared edge;
 - create the staging S3 bucket/prefix with versioning/lifecycle;
 - create staging-only Google/GitHub apps and callbacks;
 - verify staging Resend sender/DNS and register the exact signed webhook;
-- run simultaneous app `docker compose config` and shared edge config;
-- run `nginx -t`, empty-database migrations, and start shared edge;
+- run staging/production application and database-only Compose config, shared
+  edge config, and integration config in the same check;
+- prove edge starts with both apps absent, run candidate `nginx -t`, then
+  bootstrap the staging database and migrations;
 - keep `STAGING_DEPLOY_ENABLED` false until all checks pass;
-- enable it for a controlled `main` release, then verify attestation, worker
-  heartbeat, backup, and restore drill.
+- enable it for a controlled `main` release, then verify schema-2 attestation,
+  exact active digests, worker heartbeat/egress, dynamic DNS replacement,
+  backup checksum, and scratch restore.
 
 Do not create a production administrator or promote production here.

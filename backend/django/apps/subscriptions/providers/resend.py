@@ -11,8 +11,6 @@ from apps.subscriptions.providers.base import (
     serialize_email_request,
 )
 
-RESEND_SEND_URL = "https://api.resend.com/emails"
-
 
 def serialize_resend_request(message):
     return serialize_email_request(message)
@@ -72,7 +70,7 @@ class ResendEmailProvider(EmailProvider):
 
     def send(self, prepared_request, idempotency_key):
         request = urllib.request.Request(
-            RESEND_SEND_URL,
+            settings.RESEND_API_URL,
             data=prepared_request.body,
             method="POST",
             headers={

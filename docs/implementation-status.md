@@ -5,9 +5,9 @@ Last updated: 2026-07-27
 Integration branch: `rewrite/wagtail-next`
 
 Overall state: Milestone 10 repository-owned staging/production infrastructure
-implemented and statically/unit verified; external activation and local
-Docker, Nginx, PostgreSQL, provider, and browser runtime verification remain
-deliberately pending
+implemented and remediation-audited; deterministic checks pass, while external
+activation and local Docker/Nginx/PostgreSQL/provider/browser runtime
+verification remain deliberately pending
 
 ## Current repository state
 
@@ -353,14 +353,33 @@ deliberately pending
 - [x] Repository scripts and runbooks cover bounded secret transfer, migration
   order, custom-format PostgreSQL backup/integrity/retention, scratch-first
   restore, staging drills, and image/database rollback separation.
+- [x] Milestone 10 remediation separates database/application/egress/edge
+  networks; worker outbound no longer depends on edge and integration has an
+  egress-only HTTP provider regression.
+- [x] Database-only Compose owns bootstrap/backup/restore without Django/Next
+  image interpolation; restore authenticates required metadata and SHA-256
+  before `createdb`, and first production backs up pinned PostgreSQL before its
+  first migration or public application start.
+- [x] Docker DNS, shared upstream zones, and resolving Nginx 1.29 servers remove
+  stale container IPs and keep absent staging/production hosts independent.
+- [x] Raw role-scoped control/PostgreSQL/Django/worker/Next env contracts
+  preserve bounded single-line bytes while preventing cross-service secret
+  exposure; Docker Compose 2.30.0 is the explicit minimum.
+- [x] Rollout is backup-first, one-migration, bounded-wait, readiness/health/
+  heartbeat/egress/digest gated and two-phase. Versioned bundles/runtime,
+  current/previous manifests, pending state, cross-workflow/server locking, and
+  monotonic staging sequences make activation and rollback independent of a
+  server Git checkout.
 
 ## Milestone transition
 
-Milestone 10 is complete at the repository boundary. The repository now defines
-isolated runtime topology, immutable production images, exact same-origin edge
-routing, S3 media, the bounded worker, CI/build/promotion gates, and safe
-backup/restore procedures. No server, registry, DNS, TLS, OAuth, Resend, GitHub
-Environment/secret, bucket, or production data state was changed.
+Milestone 10 remediation is complete at the repository boundary. The repository
+now defines least-privilege runtime topology, immutable production images,
+dynamic same-origin edge routing, S3 media, the bounded worker, full
+CI/build/promotion gates, durable operational state, and isolated
+backup/restore/bootstrap procedures. No Milestone 11 work or server, registry,
+DNS, TLS, OAuth, Resend, GitHub Environment/secret, bucket, or production data
+state was changed.
 
 ### Next recommended session
 
@@ -468,6 +487,26 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-27:
 
+- Milestone 10 remediation added role-scoped raw environments, distinct
+  database/application/egress networks, database-only operations, verified
+  backup metadata, first-production bootstrap, dynamic Docker-DNS upstreams,
+  health/digest-gated two-phase activation, durable current/previous release
+  state, shared locking, rollback tooling, and expanded Docker CI coverage.
+- `backend/django/.venv/bin/python -m pytest -q infra/tests` passed 33
+  infrastructure regressions. Targeted production-settings and subscription
+  outbox coverage passed 131 tests; the full SQLite suite passed 474 tests
+  with six PostgreSQL-only skips. A fresh SQLite database applied the complete
+  migration chain and migration drift was empty. `uv lock --check`, production
+  `check --deploy`, Python compile, shell syntax, Ruff, workflow YAML parsing,
+  and `git diff --check` passed during remediation.
+- Node/npm are not installed in the local execution environment. The frontend
+  source and dependency manifests were unchanged, but frontend format/lint/
+  type/test/build/audit were unavailable and are not claimed as rerun.
+- Docker is not installed locally (`docker: command not found`). Therefore the
+  new Compose config matrix, Nginx 1.29 `nginx -t`, PostgreSQL
+  backup/restore/bootstrap, MinIO, worker egress, dynamic DNS/container
+  replacement, Basic Auth/forwarding, restart, and container secret-isolation
+  suite are implemented in CI but were not claimed as locally passed.
 - Milestone 10 adds ADR 0005, isolated application/edge Compose definitions,
   production Django/worker, Next standalone and edge images, exact same-origin
   routing, S3 Wagtail media, a bounded four-task worker, immutable release

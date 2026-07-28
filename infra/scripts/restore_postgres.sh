@@ -2,13 +2,13 @@
 set -eu
 
 usage() {
-    echo "usage: restore_postgres.sh <staging|production> <env-file> <dump> [target-db] [confirmation]" >&2
+    echo "usage: restore_postgres.sh <staging|production> <runtime-dir> <dump> [target-db] [confirmation]" >&2
     exit 2
 }
 
 [ "$#" -ge 3 ] && [ "$#" -le 5 ] || usage
 environment_name=$1
-env_file=$2
+runtime_dir=$2
 dump_file=$3
 target_database=${4:-restore_$(date -u +%Y%m%dT%H%M%SZ)}
 confirmation=${5:-}
@@ -24,32 +24,38 @@ esac
 case "$target_database" in
     *[!A-Za-z0-9_]*) echo "restore target contains unsupported characters" >&2; exit 2 ;;
 esac
-if [ "$environment_name" = production ] && [ "$confirmation" != "RESTORE production $target_database" ]; then
+if [ "$environment_name" = production ] &&
+    [ "$confirmation" != "RESTORE production $target_database" ]; then
     echo "production restore requires: RESTORE production $target_database" >&2
     exit 2
 fi
-[ -f "$dump_file" ] || { echo "dump file does not exist" >&2; exit 2; }
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
-database_user=$(python3 "$repository_root/infra/scripts/env_value.py" "$env_file" POSTGRES_USER)
-project_name="kirillwynn-$environment_name"
+control_env="$runtime_dir/control.env"
+postgres_env="$runtime_dir/postgres.env"
+test -r "$control_env" && test -r "$postgres_env" || {
+    echo "database runtime contract is incomplete" >&2
+    exit 2
+}
+
+# Metadata shape, source environment, sidecar filename, and SHA-256 are all
+# authenticated before pg_restore validation or any createdb side effect.
+python3 "$repository_root/infra/scripts/verify_backup_metadata.py" \
+    "$environment_name" "$dump_file"
+"$repository_root/infra/scripts/require_compose_version.sh"
+database_user=$(python3 "$repository_root/infra/scripts/env_value.py" "$postgres_env" POSTGRES_USER)
 
 docker compose \
-    --project-name "$project_name" \
-    --env-file "$env_file" \
-    -f "$repository_root/infra/compose/application.yml" \
+    --env-file "$control_env" \
+    -f "$repository_root/infra/compose/database.yml" \
     exec -T postgres pg_restore --list < "$dump_file" > /dev/null
-
 docker compose \
-    --project-name "$project_name" \
-    --env-file "$env_file" \
-    -f "$repository_root/infra/compose/application.yml" \
+    --env-file "$control_env" \
+    -f "$repository_root/infra/compose/database.yml" \
     exec -T postgres createdb --username "$database_user" "$target_database"
-
 docker compose \
-    --project-name "$project_name" \
-    --env-file "$env_file" \
-    -f "$repository_root/infra/compose/application.yml" \
+    --env-file "$control_env" \
+    -f "$repository_root/infra/compose/database.yml" \
     exec -T postgres pg_restore \
     --username "$database_user" \
     --dbname "$target_database" \

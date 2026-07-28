@@ -18,8 +18,14 @@ export EDGE_IMAGE
 docker compose \
     --env-file "$edge_runtime_env" \
     -f "$repository_root/infra/compose/edge.yml" \
-    up -d --no-deps edge
+    up -d --no-deps --wait --wait-timeout "${ROLLOUT_WAIT_TIMEOUT_SECONDS:-180}" edge
 docker compose \
     --env-file "$edge_runtime_env" \
     -f "$repository_root/infra/compose/edge.yml" \
     exec -T edge nginx -t
+edge_container=$(docker compose \
+    --env-file "$edge_runtime_env" \
+    -f "$repository_root/infra/compose/edge.yml" \
+    ps -q edge)
+test -n "$edge_container"
+test "$(docker inspect --format '{{.Config.Image}}' "$edge_container")" = "$EDGE_IMAGE"

@@ -1,88 +1,164 @@
 # Deployment and rollback runbook
 
-## Repository layout
+## Runtime contracts and minimum versions
 
-- `backend/django/Dockerfile`: one non-root Django/worker image.
-- `frontend/next/Dockerfile`: non-root Node 24 standalone image.
-- `infra/docker/edge.Dockerfile`: shared Nginx-only edge image.
-- `infra/compose/application.yml`: environment application project.
-- `infra/compose/edge.yml`: one shared 80/443 project.
-- `.github/workflows/ci.yml`: SQLite, PostgreSQL, frontend, image, Compose,
-  Nginx, and container checks.
-- `.github/workflows/build.yml`: build once, manifest, gated staging rollout.
-- `.github/workflows/deploy-production.yml`: manual attested promotion.
+The server requires Docker Compose 2.30.0 or newer. Run
+`infra/scripts/require_compose_version.sh` before activation. The minimum is
+required for `env_file.format: raw`; do not remove `raw` or quote secrets to
+work around an older Compose.
 
-## Release contract
+One edge project owns ports 80/443 and both named edge networks. Staging and
+production each own:
 
-The manifest contains a full source SHA and `django`, `next`, and `edge`
-references pinned by `sha256`. Mutable `latest` and zero placeholders are
-rejected. Django and worker use exactly the same image.
+- an internal PostgreSQL-only database network;
+- an internal application network for Django/Next/worker calls;
+- an egress bridge with no published ports for Django/Next/worker outbound;
+- a PostgreSQL volume and Next cache volume.
 
-The runner packages only `infra/compose` and `infra/scripts` from the checked
-out release SHA and executes that temporary bundle remotely. Deployment does
-not trust or update a server-side Git checkout. Runtime values are transferred
-separately through the fixed allowlist and the temporary directory is removed
-on both success and failure.
+PostgreSQL joins only database. Next does not join database. Worker joins
+database/application/egress but never edge. Django and Next alone receive
+environment-qualified edge aliases.
 
-Staging remains disabled until `STAGING_DEPLOY_ENABLED` is exactly `true`.
-After activation, successful CI on `main` builds one set, migrates staging
-once, rolls app services, checks the exact candidate edge digest with
-`nginx -t` without publishing its ports, and records an attestation only after
-smoke checks.
+Runtime files are role-scoped:
 
-Production is manually dispatched with the full SHA and protected by the
-`production` GitHub Environment. It downloads the existing manifest and
-staging attestation, takes a verified backup, migrates once, and starts those
-exact app digests. It then validates and replaces the shared edge with the
-attested edge digest. It never invokes a build.
+```text
+/srv/kirillwynn/runtime/releases/<sha>/<environment>/
+  control.env   # project, paths, networks, aliases, sequence, pinned images
+  postgres.env  # DB, user, password
+  django.env    # Django/S3/OAuth/webhook/session contract
+  worker.env    # minimal Django/S3/Resend worker contract
+  next.env      # PUBLIC_SITE_URL, DJANGO_API_URL, REVALIDATION_SECRET
+```
 
-## Migration and rollback
+Only `control.env` is passed as Compose interpolation input. The other files
+are loaded by the intended container with raw semantics. Validators reject
+extra, missing, multiline, NUL, oversized, or cross-environment values.
 
-Use expand/contract migrations compatible with the still-running prior app.
-Order is pull → backup → `migrate --noinput` → Compose replacement →
-readiness/smoke. A failed migration stops before replacement. CI only checks
-migration drift; it never generates or commits migrations.
+## Durable release and active state
 
-Rollback checklist:
+CI copies a release-owned bundle from the checked-out SHA into:
 
-1. identify the previous manifest and prove compatibility with current schema;
-2. pause the worker if delivery behavior is involved;
-3. restart the previous Django/Next digests;
-4. do not reverse migrations automatically;
-5. verify health, readiness, Feed, Bridge, CMS, login, and heartbeat;
-6. record active manifest and incident.
+```text
+/srv/kirillwynn/releases/<sha>/
+  release-manifest.json
+  infra/compose/
+  infra/scripts/
+```
 
-A required reverse migration needs a fresh backup, scratch rehearsal, and
-separate approval. Restoration never targets an existing database by default.
+It never executes a server Git checkout. Runtime candidates and these bundles
+survive cleanup of `/tmp/kirillwynn-deploy-*`.
 
-## Edge route contract
+Per-environment operational state is:
 
-Next.js receives `/`, `/posts/*`, `/bridge`, `/login`, `/account`,
-`/subscriptions/*`, `/_next/*`, and the exact `/api/draft`,
-`/api/draft/disable`, and `/api/revalidate` routes. The last three are matched
-before Django API prefixes. The internal Next liveness path is rejected at
-edge.
+```text
+/srv/kirillwynn/state/<environment>/
+  active-release.json
+  current-manifest.json
+  previous-manifest.json
+  pending-<sha>.json       # exists only between internal and public gates
+```
 
-Django receives exact `/api/health/`, `/api/readiness/`, `/api/me/`, and
-`/api/auth/logout/`, plus `/api/v1/*`, `/accounts/*`, `/cms/*`, and
-`/django-admin/*`. `/media/documents/*` is an explicit Wagtail redirect to S3;
-other `/api/*` and `/media/*` return 404. `/static/*` is served from Django's
-immutable collectstatic output, with edge immutable caching only for hashed
-filenames.
+The current/previous files change only after every internal gate and public
+smoke succeeds. A failed rollout never marks the new manifest active. Pending
+state blocks another rollout until the failure is resolved. Staging and
+production GitHub jobs share `kirillwynn-server-release-operations`; the
+server also uses `/srv/kirillwynn/locks/release.lock`. Staging records a
+monotonic GitHub run sequence so an older completed `main` build cannot replace
+a newer active release.
 
-Forwarded `Host`, `X-Forwarded-Host`, protocol, client IP, and forwarding chain
-are set by edge. Client-supplied forwarding chains are discarded. No proxy
-cache or cookie rewriting is configured. Wagtail uploads allow 25 MiB only
-under `/cms/`; the default request limit is 1 MiB. Staging Basic Auth excludes
-only ACME and exact `/api/v1/email/webhooks/resend/`.
+## Initial shared edge
 
-## Shared edge and availability
+Before the first application activation, install TLS/ACME/auth mounts, validate
+the exact edge digest with `verify_edge_candidate.sh`, and start edge with
+`deploy_edge.sh` under the server release lock. Edge creates both named edge
+networks and starts even while staging and production aliases do not exist.
+The absent host returns bounded 502; the other host remains independent.
 
-Only `kirillwynn-edge` publishes 80/443. Staging app deployment does not restart
-it; it tests the exact candidate in a one-shot no-port container. Manual
-production promotion performs the host-wide replacement after that attestation
-and a second `nginx -t`. Keep routes compatible with both active app versions.
+Nginx 1.29 uses Docker DNS, resolver timeouts, shared upstream zones, and
+`server ... resolve`. Replacing Django/Next is detected without edge restart.
+Every edge replacement still runs the candidate `nginx -t` before `up`, then
+`nginx -t` in the live container.
 
-One Django, Next, and worker replica per environment means Compose replacement
-may cause a brief interruption. A zero-downtime/blue-green model is deferred
-until server capacity and need justify a second replica.
+## First production deploy
+
+With no `/srv/kirillwynn/state/production/active-release.json`:
+
+1. validate the manifest and five runtime files;
+2. install the versioned bundle/runtime files;
+3. use `infra/compose/database.yml` to pull and start only the pinned
+   PostgreSQL digest with bounded `--wait`;
+4. take a custom-format backup of the initial database and verify
+   `pg_restore --list`; no Django, Next, worker, migration, or public service
+   starts before this backup;
+5. pull exact Django/Next digests;
+6. run `migrate --noinput` exactly once;
+7. start the application with bounded `--wait`;
+8. verify Django readiness, Next health, worker heartbeat, worker provider
+   egress, and exact active image references;
+9. validate/replace edge, run public smoke, then atomically activate state.
+
+This empty-initial-backup policy is the documented equivalent of "backup the
+existing database" for the first production deployment. If a PostgreSQL
+volume exists without active state, stop and reconcile it; do not delete or
+assume it is empty.
+
+Every subsequent deployment uses the active runtime contract to back up the
+existing database before migration. The PostgreSQL digest cannot change in an
+application rollout; database upgrades require separate review.
+
+## Normal rollout and attestation
+
+The enforced application order is backup → pull exact app digests → one
+migration → `up --wait` → Django readiness → Next health → worker heartbeat →
+worker outbound HTTP path → exact container image references. These checks
+create only pending state.
+
+The CI caller then performs public health/readiness/root smoke (with staging
+Basic Auth where applicable) and finalizes state. Staging attestation schema 2
+contains the exact manifest images and affirmative evidence for public smoke,
+Django/Next health, worker heartbeat, worker egress, exact active application
+image digests, and the exact edge candidate's successful `nginx -t`.
+Production accepts only an exact matching attestation.
+
+Production edge replacement occurs after the application health gates and
+before public smoke. If public smoke fails, the new application/edge may be
+running but the manifest is not active; retain pending evidence and either fix
+forward or perform the reviewed rollback below.
+
+## Reproducible application rollback
+
+Rollback is allowed only when the previous digest is compatible with the
+current schema. It does not rebuild and does not trust Git:
+
+```bash
+flock -w 900 /srv/kirillwynn/locks/release.lock \
+  /srv/kirillwynn/releases/<current-sha>/infra/scripts/rollback_environment.sh \
+  staging
+```
+
+The script selects `previous-manifest.json`, proves its durable bundle/runtime
+exist, refuses a PostgreSQL image change, backs up the active database, pulls
+the previous Django/Next digests, and performs the health/digest gates without
+running or reversing migrations. It leaves pending state. Run the public smoke,
+then finalize with the selected durable bundle:
+
+```bash
+flock -w 900 /srv/kirillwynn/locks/release.lock \
+  /srv/kirillwynn/releases/<rollback-sha>/infra/scripts/finalize_rollout.sh \
+  staging <rollback-sha>
+```
+
+Do not roll edge back unless route compatibility requires it; if required,
+run the previous bundle's `verify_edge_candidate.sh` before `deploy_edge.sh`.
+A reverse migration always needs a new verified backup, scratch restore
+rehearsal, and separate approval.
+
+## Route contract
+
+Next owns `/`, `/posts/*`, `/bridge`, account/subscription UI, `/_next/*`, and
+exact `/api/draft`, `/api/draft/disable`, `/api/revalidate`. Django owns
+health/readiness/session endpoints, `/api/v1/*`, `/accounts/*`, `/cms/*`, and
+`/django-admin/*`. `/media/documents/*` redirects through Django/S3; other
+`/media/*` and unknown `/api/*` return 404. Staging Basic Auth excludes only
+ACME and the exact signed Resend webhook. Edge replaces, never appends, inbound
+forwarding headers.

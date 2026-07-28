@@ -26,9 +26,15 @@ for document in (staging, production):
 
 assert staging["networks"]["edge"]["name"] == "kirillwynn-staging-edge"
 assert production["networks"]["edge"]["name"] == "kirillwynn-production-edge"
+assert staging["networks"]["egress"]["name"] == "kirillwynn-staging-egress"
+assert production["networks"]["egress"]["name"] == "kirillwynn-production-egress"
 assert (
-    staging["networks"]["internal"]["name"]
-    != production["networks"]["internal"]["name"]
+    staging["networks"]["application"]["name"]
+    != production["networks"]["application"]["name"]
+)
+assert (
+    staging["networks"]["database"]["name"]
+    != production["networks"]["database"]["name"]
 )
 assert (
     staging["volumes"]["postgres_data"]["name"]
@@ -43,3 +49,32 @@ staging_postgres = staging["services"]["postgres"]["environment"]
 production_postgres = production["services"]["postgres"]["environment"]
 assert staging_postgres["POSTGRES_DB"] != production_postgres["POSTGRES_DB"]
 assert staging_postgres["POSTGRES_USER"] != production_postgres["POSTGRES_USER"]
+
+for document in (staging, production):
+    services = document["services"]
+    assert set(services["postgres"]["networks"]) == {"database"}
+    assert set(services["worker"]["networks"]) == {
+        "application",
+        "database",
+        "egress",
+    }
+    assert set(services["django"]["networks"]) == {
+        "application",
+        "database",
+        "egress",
+        "edge",
+    }
+    assert set(services["next"]["networks"]) == {"application", "egress", "edge"}
+    assert document["networks"]["database"]["internal"] is True
+    assert document["networks"]["application"]["internal"] is True
+    assert "edge" not in services["worker"]["networks"]
+    assert set(services["postgres"]["environment"]) == {
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+    }
+    assert set(services["next"]["environment"]) == {
+        "PUBLIC_SITE_URL",
+        "DJANGO_API_URL",
+        "REVALIDATION_SECRET",
+    }

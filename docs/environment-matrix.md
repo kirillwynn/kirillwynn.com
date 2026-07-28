@@ -1,25 +1,37 @@
 # Runtime environment matrix
 
-| Boundary | Local | Staging | Production |
-|---|---|---|---|
-| Compose project | root dev stack | `kirillwynn-staging` | `kirillwynn-production` |
-| Public origin | `http://localhost:3000` | `https://staging.kirillwynn.com` | `https://kirillwynn.com` |
-| Edge network | none | `kirillwynn-staging-edge` | `kirillwynn-production-edge` |
-| Django alias | `django` | `staging-django` | `production-django` |
-| Next alias | `next` | `staging-next` | `production-next` |
-| Database | local `kirillwynn` | `kirillwynn_staging` | `kirillwynn_production` |
-| Media | filesystem | staging-only bucket + `staging/media` | production-only bucket + `production/media` |
-| OAuth | optional local apps | staging Google/GitHub apps | production Google/GitHub apps |
-| Email | memory adapter | staging Resend namespace/domain | production Resend namespace/domain |
-| Basic Auth | no | yes, except ACME and exact webhook | no |
-| Images | local build | release-manifest digests | same staging-attested digests |
+| Boundary | Staging | Production |
+|---|---|---|
+| Compose project | `kirillwynn-staging` | `kirillwynn-production` |
+| Public origin | `https://staging.kirillwynn.com` | `https://kirillwynn.com` |
+| Database network | `kirillwynn-staging-database` (`internal`) | `kirillwynn-production-database` (`internal`) |
+| Application network | `kirillwynn-staging-application` (`internal`) | `kirillwynn-production-application` (`internal`) |
+| Egress network | `kirillwynn-staging-egress` | `kirillwynn-production-egress` |
+| Edge network | `kirillwynn-staging-edge` | `kirillwynn-production-edge` |
+| Edge aliases | `staging-django`, `staging-next` | `production-django`, `production-next` |
+| PostgreSQL volume | `kirillwynn-staging-postgres` | `kirillwynn-production-postgres` |
+| Database | `kirillwynn_staging` | `kirillwynn_production` |
+| Media | staging-only bucket + `staging/media` | production-only bucket + `production/media` |
+| OAuth/Resend | staging-only apps/namespace | production-only apps/namespace |
+| Basic Auth | yes, narrow exceptions | no |
+| Images | release-manifest digests | same staging-attested digests |
 
-`DJANGO_SECRET_KEY`, revalidation/subscription keys, PostgreSQL password, S3,
-OAuth, Resend, and webhook credentials must be unique. Provider namespace,
-bucket/prefix, sender domain, media origin, database/user, Compose project,
-edge network, and aliases are non-secret but must also differ.
+## Role allowlists
 
-Committed `infra/env/*.env.example` files define names and placeholders only.
-GitHub Actions generates the real file, validates a fixed allowlist, transfers
-it as mode 0600, and atomically installs it under
-`/srv/kirillwynn/runtime/`.
+| File | Receives |
+|---|---|
+| `control.env` | project/environment/SHA/sequence, role-file paths, network/volume/alias names, pinned PostgreSQL/Django/Next images |
+| `postgres.env` | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` |
+| `django.env` | production Django settings, signing/session values, S3, OAuth, Resend webhook verification; no Resend send API key |
+| `worker.env` | minimal production worker settings, DB via separate PostgreSQL file, S3/revalidation/email-send values and worker intervals; no OAuth or webhook secret |
+| `next.env` | `PUBLIC_SITE_URL`, internal `DJANGO_API_URL`, `REVALIDATION_SECRET` |
+
+Compose interpolation receives only `control.env`; secrets are loaded through
+raw role env files. Docker Compose 2.30.0 is the minimum supported version.
+Single-line allowed values are byte-preserved, including `$`, `${...}`, `#`,
+quotes, backslashes, and spaces. Missing, extra, multiline, NUL, oversized, and
+cross-environment values are rejected.
+
+Committed `infra/env/*.env.example` files use syntactically valid non-zero fake
+digests and resolvable paths solely for `docker compose config`; they are never
+release evidence.

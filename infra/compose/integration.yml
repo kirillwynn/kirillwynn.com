@@ -1,58 +1,33 @@
 name: kirillwynn-integration
 
-x-django-environment: &django-environment
-  DJANGO_SETTINGS_MODULE: config.settings.production
-  DJANGO_SECRET_KEY: integration-secret
-  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
-  DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:18080
-  WAGTAIL_ADMIN_BASE_URL: http://localhost:18080/cms
-  PUBLIC_SITE_URL: http://localhost:18080
-  FRONTEND_PREVIEW_URL: http://localhost:18080/api/draft
-  REVALIDATION_URL: http://next:3000/api/revalidate
-  REVALIDATION_SECRET: integration-revalidation-secret-32-bytes
-  SUBSCRIPTION_SIGNING_SECRET: integration-subscription-secret-32-bytes
-  EMAIL_PROVIDER_ADAPTER: apps.subscriptions.providers.memory.MemoryEmailProvider
-  EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE: memory/integration
-  EMAIL_FROM_ADDRESS: Integration <integration@example.com>
-  POSTGRES_HOST: postgres
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: kirillwynn_integration
-  POSTGRES_USER: kirillwynn_integration
-  POSTGRES_PASSWORD: integration-only
-  POSTGRES_SSLMODE: disable
-  S3_MEDIA_ACCESS_KEY_ID: integration
-  S3_MEDIA_SECRET_ACCESS_KEY: integration-only
-  S3_MEDIA_BUCKET: kirillwynn-integration-media
-  S3_MEDIA_PREFIX: integration/media
-  S3_MEDIA_ENDPOINT_URL: http://minio:9000
-  S3_MEDIA_REGION: us-east-1
-  S3_MEDIA_ADDRESSING_STYLE: path
-  S3_MEDIA_PUBLIC_ORIGIN: http://localhost:19000
-  GOOGLE_OAUTH_CLIENT_ID: google-integration
-  GOOGLE_OAUTH_CLIENT_SECRET: google-integration-secret
-  GITHUB_OAUTH_CLIENT_ID: github-integration
-  GITHUB_OAUTH_CLIENT_SECRET: github-integration-secret
+x-django-defaults: &django-defaults
+  image: kirillwynn-django:ci
+  depends_on:
+    postgres:
+      condition: service_healthy
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=128m
 
 services:
   postgres:
     image: postgres:17.6-alpine
-    environment:
-      POSTGRES_DB: kirillwynn_integration
-      POSTGRES_USER: kirillwynn_integration
-      POSTGRES_PASSWORD: integration-only
+    env_file:
+      - path: ../tests/integration-env/postgres.env
+        format: raw
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U kirillwynn_integration -d kirillwynn_integration
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
       interval: 2s
       timeout: 3s
       retries: 30
     volumes:
-      - integration_postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - database
 
   minio:
-    profiles:
-      - integration
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     command:
       - server
@@ -61,30 +36,88 @@ services:
       MINIO_ROOT_USER: integration
       MINIO_ROOT_PASSWORD: integration-only
     volumes:
-      - integration_minio:/data
+      - minio_data:/data
+    networks:
+      - egress
 
-  django:
-    image: kirillwynn-django:ci
-    environment: *django-environment
+  minio-public:
+    image: nginx:1.29-alpine
     depends_on:
-      postgres:
-        condition: service_healthy
+      - minio
+    ports:
+      - "127.0.0.1:19000:8080"
+    volumes:
+      - ../tests/minio-public.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - egress
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - mc alias set integration http://minio:9000 integration integration-only && mc mb --ignore-existing integration/kirillwynn-integration-media && mc anonymous set download integration/kirillwynn-integration-media
+    networks:
+      - egress
+
+  mock-provider:
+    image: python:3.12.13-alpine
+    command:
+      - python
+      - /mock/http_mock.py
+      - --port
+      - "8080"
+      - --name
+      - egress-provider
+    volumes:
+      - ../tests/http_mock.py:/mock/http_mock.py:ro
     healthcheck:
       test:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=3)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks:
+      - egress
+
+  django:
+    <<: *django-defaults
+    env_file:
+      - path: ../tests/integration-env/postgres.env
+        format: raw
+      - path: ../tests/integration-env/django.env
+        format: raw
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/readiness/', timeout=3)"
       interval: 3s
       timeout: 3s
       retries: 30
+    networks:
+      database:
+      application:
+      egress:
+      staging_edge:
+        aliases:
+          - staging-django
 
   next:
     image: kirillwynn-next:ci
-    environment:
-      DJANGO_API_URL: http://django:8000
-      PUBLIC_SITE_URL: http://localhost:18080
-      REVALIDATION_SECRET: integration-revalidation-secret-32-bytes
+    env_file:
+      - path: ../tests/integration-env/next.env
+        format: raw
     depends_on:
       django:
         condition: service_healthy
@@ -97,19 +130,29 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
+    networks:
+      application:
+      egress:
+      staging_edge:
+        aliases:
+          - staging-next
 
   worker:
-    image: kirillwynn-django:ci
+    <<: *django-defaults
     command:
       - python
       - manage.py
       - run_worker
       - --heartbeat-file
       - /tmp/kirillwynn-worker/heartbeat.json
-    environment: *django-environment
-    depends_on:
-      postgres:
-        condition: service_healthy
+    env_file:
+      - path: ../tests/integration-env/postgres.env
+        format: raw
+      - path: ../tests/integration-env/worker.env
+        format: raw
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
     healthcheck:
       test:
         - CMD
@@ -119,6 +162,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    networks:
+      - database
+      - application
+      - egress
 
   edge:
     image: kirillwynn-edge:ci
@@ -128,16 +175,77 @@ services:
       - /etc/nginx/integration.conf
       - -g
       - daemon off;
-    depends_on:
-      django:
-        condition: service_healthy
-      next:
-        condition: service_healthy
     ports:
       - "127.0.0.1:18080:8080"
     volumes:
       - ../nginx/integration.conf:/etc/nginx/integration.conf:ro
+      - ../tests/integration.htpasswd:/etc/nginx/auth/integration.htpasswd:ro
+    healthcheck:
+      test:
+        - CMD
+        - nginx
+        - -t
+        - -c
+        - /etc/nginx/integration.conf
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks:
+      - staging_edge
+      - production_edge
+
+  production-django:
+    profiles:
+      - dynamic-edge
+    image: python:3.12.13-alpine
+    command:
+      - python
+      - /mock/http_mock.py
+      - --port
+      - "8080"
+      - --name
+      - production-django
+    volumes:
+      - ../tests/http_mock.py:/mock/http_mock.py:ro
+    networks:
+      production_edge:
+        aliases:
+          - production-django
+
+  production-next:
+    profiles:
+      - dynamic-edge
+    image: python:3.12.13-alpine
+    command:
+      - python
+      - /mock/http_mock.py
+      - --port
+      - "8080"
+      - --name
+      - production-next
+    volumes:
+      - ../tests/http_mock.py:/mock/http_mock.py:ro
+    networks:
+      production_edge:
+        aliases:
+          - production-next
 
 volumes:
-  integration_postgres:
-  integration_minio:
+  postgres_data:
+    name: kirillwynn-integration-postgres
+  minio_data:
+    name: kirillwynn-integration-minio
+
+networks:
+  database:
+    name: kirillwynn-integration-database
+    internal: true
+  application:
+    name: kirillwynn-integration-application
+    internal: true
+  egress:
+    name: kirillwynn-integration-egress
+  staging_edge:
+    name: kirillwynn-integration-staging-edge
+  production_edge:
+    name: kirillwynn-integration-production-edge
