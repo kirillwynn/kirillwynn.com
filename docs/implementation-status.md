@@ -425,11 +425,15 @@ deployment, and unavailable local Docker/Nginx/PostgreSQL checks remain pending
   email-transport inspection boundaries are test doubles; no production URL or
   production setting includes a test helper.
 - [x] Browser screenshots and traces are failure-only, video is disabled, and
-  retained artifacts are scanned (including ZIP entries and raw image bytes) for
-  credentials, secret sentinels, and internal origins; unsafe files are removed
-  before a second scan. Upload occurs only after both passes succeed; any
-  enumeration/ZIP/read/removal/scanner failure skips upload and fails CI. Raw
-  binary string search is not represented as visual pixel/OCR inspection.
+  retained artifacts are streamed and scanned (including ZIP entries and raw
+  image bytes) for Playwright URL/JSON cookie/header representations, OAuth and
+  signed credentials, provider sentinels, secret names, and internal origins.
+  Plain/ZIP/entry/count/declared/actual limits, encryption, corruption, and
+  short reads fail closed without whole-file decompression. Unsafe files are
+  removed before a second scan. Upload still requires
+  `artifacts.outcome == success`; any enumeration/ZIP/read/removal/scanner
+  failure skips upload and fails CI. Raw binary string search is not represented
+  as visual pixel/OCR inspection.
 - [x] CI retains the exact Next.js proxy allowlist without a broad `/api/*`
   rewrite, runs the full Compose/Nginx/PostgreSQL/backup-recovery/MinIO/egress/
   restart suite, and exposes one `ci-required` result that fails unless every
@@ -551,13 +555,20 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-28:
 
-- Milestone 11 remediation makes Playwright artifact upload fail closed:
-  upload is conditional on successful sanitization and re-scan, while
-  scanner/enumeration/ZIP/read/removal failure, corrupt ZIP, unknown top-level
-  format, and unsafe retained data fail without uploading the original.
-  Eight scanner regressions, including all four injected operational failures,
-  passed. PNG/JPEG/WebP checks are documented as raw forbidden-byte searches,
-  not pixel, OCR, or semantic visual inspection.
+- Final Milestone 11 point remediation expands the retained-artifact scanner to
+  real Playwright URL, cookie, header, OAuth, provider-boundary, preview, and
+  signed subscription credential representations. Seventy-six scanner
+  regressions passed: every representation is exercised as a plain artifact and
+  ZIP entry, realistic `trace.trace`/`trace.network` fixtures are included, all
+  four injected operational failures fail closed, and ZIP/plain preflight plus
+  streamed actual limits cover oversized, encrypted, corrupt, short, and
+  boundary-split inputs.
+- An intentionally failing cross-stack test with trace retention created a real
+  credential-bearing Playwright 1.62 trace. Sanitization removed its trace ZIP
+  and credential-bearing error context, retained only the byte-safe screenshot,
+  and the second scan passed. The unchanged CI upload condition is regression
+  tested to require `artifacts.outcome == success`, so the unsafe original
+  cannot reach `upload-artifact`.
 - Wagtail image upload now converts Pillow/Willow parsing, malformed EXIF,
   decode, and encode failures into form `ValidationError` responses. Twenty-seven
   targeted upload/security tests passed, including real Wagtail admin
@@ -582,11 +593,10 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   Podman, PostgreSQL server/client, `pg_isready`, and Nginx remain unavailable
   locally. PostgreSQL/Compose/Nginx results are not inferred; the PostgreSQL CI
   service retains the no-skip gate and `ci-required` requires it.
-- Deterministic infrastructure verification passed 140 pytest cases plus shell
-  syntax and Python compilation. `npm ci` installed 216 locked packages;
-  Prettier, ESLint, TypeScript, 152 Vitest tests, production Next.js build,
-  standalone runtime-origin probes, browser-asset scanning, and
-  `npm audit --audit-level=high` with zero vulnerabilities passed.
+- Deterministic infrastructure verification passed 208 pytest cases plus shell
+  syntax and Python compilation. Prettier, ESLint, TypeScript, 152 Vitest
+  tests, the production Next.js build, two standalone runtime-origin probes,
+  and browser-asset scanning passed.
 - Milestone 11 coverage audit recorded the pre-change 480 backend, 152 Vitest,
   and 131 infrastructure cases. The completed local SQLite selection passed
   486 tests with seven PostgreSQL cases deliberately deselected; Ruff format/

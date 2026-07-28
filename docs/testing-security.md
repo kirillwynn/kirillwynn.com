@@ -128,9 +128,25 @@ external OAuth, Resend, S3, DNS, GitHub Environment or production state.
 - A post-test scanner removes any failure artifact containing secret names,
   known sentinels, internal origins, authorization headers, cookies or session
   identifiers before upload, then verifies the retained set again.
+- The denylist covers Playwright URL query/fragment credentials; JSON cookie
+  objects for development and `__Host-` session/CSRF names; preview cookies;
+  JSON and raw `Cookie`, `Set-Cookie`, and authorization headers; OAuth access,
+  refresh, and authorization-code values; provider-boundary sentinels; and raw
+  or JSON signed preview/confirmation/unsubscribe credentials.
+- Plain files and ZIP entries are scanned in 64-KiB chunks with overlap. Plain
+  files and compressed ZIPs are limited to 100 MiB. Before any ZIP entry is
+  opened, the scanner rejects more than 10,000 entries, encryption, an entry
+  over 100 MiB, or declared compressed/uncompressed totals over 100 MiB. It
+  then enforces per-entry and cumulative actual byte limits while streaming and
+  verifies each actual entry size against its declaration; CRC, unsupported
+  compression, truncation, and read errors fail closed.
 - Upload is conditional on both successful sanitization and the second scan.
   Scanner/enumeration/ZIP/read/removal failure, corrupt ZIP, encrypted or
   oversized ZIP, and unknown top-level format fail the job and skip upload.
+- The regression suite applies every credential representation to both a plain
+  artifact and a ZIP entry. Fixtures mirror Playwright 1.62 newline-delimited
+  `trace.trace` and `trace.network` records, including `context-options`,
+  `before`, and `resource-snapshot` cookie/header shapes.
 - PNG/JPEG/WebP handling is only a forbidden-byte-pattern search over binary
   data. It does not inspect pixels, OCR text, or claim semantic/visual content
   safety.
