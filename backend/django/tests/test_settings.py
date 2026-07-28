@@ -197,6 +197,51 @@ def test_production_settings_normalize_public_site_origin():
     assert result.stdout.strip() == "https://example.com"
 
 
+def test_production_settings_accept_internal_s3_endpoint_origin():
+    environment = production_environment()
+    environment["S3_MEDIA_ENDPOINT_URL"] = "http://minio:9000/"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from config.settings import production; print(production.S3_MEDIA_ENDPOINT_URL)",
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "http://minio:9000"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "ftp://minio:9000",
+        "http://minio:9000/path",
+        "http://user@minio:9000",
+        "http://min io:9000",
+        "minio:9000",
+    ],
+)
+def test_production_settings_reject_invalid_s3_endpoint_origin(value):
+    environment = production_environment()
+    environment["S3_MEDIA_ENDPOINT_URL"] = value
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "S3_MEDIA_ENDPOINT_URL" in result.stderr
+
+
 @pytest.mark.parametrize(
     "missing_name",
     [

@@ -191,7 +191,9 @@ def build_delivery_batch(event_id, *, limit, at=None, provider=None):
     now = at or timezone.now()
     with transaction.atomic():
         event = (
-            EmailOutbox.objects.select_for_update().select_related("subscriber").get(pk=event_id)
+            EmailOutbox.objects.select_for_update(of=("self",))
+            .select_related("subscriber")
+            .get(pk=event_id)
         )
         if event.status != EmailOutbox.Status.PROCESSING:
             return []
@@ -264,7 +266,7 @@ def _claim_delivery(delivery_id, *, at=None):
     stale_before = now - timedelta(seconds=settings.EMAIL_OUTBOX_PROCESSING_TIMEOUT_SECONDS)
     with transaction.atomic():
         delivery = (
-            EmailDelivery.objects.select_for_update()
+            EmailDelivery.objects.select_for_update(of=("self",))
             .select_related("subscriber", "outbox", "outbox__post")
             .get(pk=delivery_id)
         )
@@ -346,7 +348,7 @@ def _mark_delivery_failure(delivery, error, *, at=None):
     now = at or timezone.now()
     with transaction.atomic():
         current = (
-            EmailDelivery.objects.select_for_update()
+            EmailDelivery.objects.select_for_update(of=("self",))
             .select_related("subscriber")
             .get(pk=delivery.pk)
         )
@@ -387,7 +389,7 @@ def _prepare_provider_attempt(delivery_id, *, provider, at=None):
     now = at or timezone.now()
     with transaction.atomic():
         delivery = (
-            EmailDelivery.objects.select_for_update()
+            EmailDelivery.objects.select_for_update(of=("self",))
             .select_related("subscriber", "outbox", "outbox__post")
             .get(pk=delivery_id)
         )

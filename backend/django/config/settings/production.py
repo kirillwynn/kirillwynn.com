@@ -67,16 +67,18 @@ if missing_environment:
     )
 
 
-def public_origin(value):
-    try:
-        URLValidator(schemes=["http", "https"])(value)
-    except ValidationError as error:
-        raise ImproperlyConfigured("PUBLIC_SITE_URL must be a valid http(s) URL") from error
+def http_origin(value, *, name, allow_internal_hostname=False):
+    if not allow_internal_hostname:
+        try:
+            URLValidator(schemes=["http", "https"])(value)
+        except ValidationError as error:
+            raise ImproperlyConfigured(f"{name} must be a valid http(s) URL") from error
     parsed = urlsplit(value)
     if (
         parsed.scheme not in {"http", "https"}
         or not parsed.netloc
         or parsed.hostname is None
+        or any(character.isspace() for character in parsed.netloc)
         or parsed.username is not None
         or parsed.password is not None
         or parsed.path not in {"", "/"}
@@ -84,12 +86,12 @@ def public_origin(value):
         or parsed.fragment
     ):
         raise ImproperlyConfigured(
-            "PUBLIC_SITE_URL must be an http(s) origin without path, query, or fragment"
+            f"{name} must be an http(s) origin without path, query, or fragment"
         )
     try:
         parsed.port
     except ValueError as error:
-        raise ImproperlyConfigured("PUBLIC_SITE_URL has an invalid port") from error
+        raise ImproperlyConfigured(f"{name} has an invalid port") from error
     return value.rstrip("/")
 
 
@@ -143,9 +145,16 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")  # noqa: F405
 WAGTAILADMIN_BASE_URL = os.environ.get(
     "WAGTAIL_ADMIN_BASE_URL", f"{os.environ['PUBLIC_SITE_URL'].rstrip('/')}/cms"
 )
-PUBLIC_SITE_URL = public_origin(os.environ["PUBLIC_SITE_URL"])
-S3_MEDIA_PUBLIC_ORIGIN = public_origin(os.environ["S3_MEDIA_PUBLIC_ORIGIN"])
-S3_MEDIA_ENDPOINT_URL = public_origin(os.environ["S3_MEDIA_ENDPOINT_URL"])
+PUBLIC_SITE_URL = http_origin(os.environ["PUBLIC_SITE_URL"], name="PUBLIC_SITE_URL")
+S3_MEDIA_PUBLIC_ORIGIN = http_origin(
+    os.environ["S3_MEDIA_PUBLIC_ORIGIN"],
+    name="S3_MEDIA_PUBLIC_ORIGIN",
+)
+S3_MEDIA_ENDPOINT_URL = http_origin(
+    os.environ["S3_MEDIA_ENDPOINT_URL"],
+    name="S3_MEDIA_ENDPOINT_URL",
+    allow_internal_hostname=True,
+)
 S3_MEDIA_PREFIX = media_prefix(os.environ["S3_MEDIA_PREFIX"])
 S3_MEDIA_ADDRESSING_STYLE = os.environ["S3_MEDIA_ADDRESSING_STYLE"].strip().lower()
 if S3_MEDIA_ADDRESSING_STYLE not in {"path", "virtual"}:

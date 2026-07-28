@@ -139,13 +139,17 @@ def create_top_level_comment(*, post, author, body):
 def create_reply(*, target_id, author, body):
     ensure_can_interact(author)
     target = (
-        Comment.objects.select_for_update()
+        Comment.objects.select_for_update(of=("self",))
         .select_related("thread_root", "post", "author")
         .get(pk=target_id)
     )
     root = target.thread_root or target
     if root.pk != target.pk:
-        root = Comment.objects.select_for_update().select_related("post", "author").get(pk=root.pk)
+        root = (
+            Comment.objects.select_for_update(of=("self",))
+            .select_related("post", "author")
+            .get(pk=root.pk)
+        )
     if root.thread_root_id is not None:
         raise ValidationError({"thread_root": "The selected thread root is invalid."})
     if root.moderation_state == Comment.ModerationState.HIDDEN:
@@ -168,7 +172,11 @@ def create_reply(*, target_id, author, body):
 @transaction.atomic
 def edit_comment(*, comment_id, actor, body):
     ensure_can_interact(actor)
-    comment = Comment.objects.select_for_update().select_related("author").get(pk=comment_id)
+    comment = (
+        Comment.objects.select_for_update(of=("self",))
+        .select_related("author")
+        .get(pk=comment_id)
+    )
     if comment.author_id != actor.pk:
         raise PermissionDenied("Only the author can edit this comment.")
     if comment.deleted_at is not None:
@@ -189,7 +197,11 @@ def edit_comment(*, comment_id, actor, body):
 @transaction.atomic
 def soft_delete_comment(*, comment_id, actor):
     ensure_can_interact(actor)
-    comment = Comment.objects.select_for_update().select_related("author").get(pk=comment_id)
+    comment = (
+        Comment.objects.select_for_update(of=("self",))
+        .select_related("author")
+        .get(pk=comment_id)
+    )
     if comment.author_id != actor.pk:
         raise PermissionDenied("Only the author can delete this comment.")
     if comment.deleted_at is None:

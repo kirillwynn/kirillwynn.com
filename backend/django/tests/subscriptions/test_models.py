@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import DataError, IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
@@ -193,7 +193,7 @@ def test_delivery_transport_identity_has_bounded_database_constraints(
     }
     values[field] = value
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises((DataError, IntegrityError)):
         with transaction.atomic():
             EmailDelivery.objects.create(**values)
 
