@@ -1,11 +1,19 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.urls import get_resolver
 
 pytestmark = pytest.mark.django_db
 
 
-def test_csrf_token_is_bound_to_the_issuing_session():
+def test_test_helpers_are_absent_from_the_application_urlconf(settings):
+    assert settings.ROOT_URLCONF == "config.urls"
+    routes = [str(pattern.pattern) for pattern in get_resolver().url_patterns]
+
+    assert all("__" not in route and "e2e" not in route for route in routes)
+
+
+def test_csrf_token_is_bound_to_its_csrf_cookie_secret_not_login_session(settings):
     user = get_user_model().objects.create_user(
         username="reader",
         email="reader@example.com",
@@ -16,13 +24,22 @@ def test_csrf_token_is_bound_to_the_issuing_session():
 
     other_session = Client(enforce_csrf_checks=True)
     other_session.force_login(user)
-    response = other_session.post(
+    rejected = other_session.post(
+        "/api/auth/logout/",
+        HTTP_X_CSRFTOKEN=foreign_token,
+    )
+    assert rejected.status_code == 403
+    assert other_session.get("/api/me/").json()["authenticated"] is True
+
+    other_session.cookies[settings.CSRF_COOKIE_NAME] = issuer.cookies[
+        settings.CSRF_COOKIE_NAME
+    ].value
+    accepted = other_session.post(
         "/api/auth/logout/",
         HTTP_X_CSRFTOKEN=foreign_token,
     )
 
-    assert response.status_code == 403
-    assert other_session.get("/api/me/").json()["authenticated"] is True
+    assert accepted.status_code == 204
 
 
 def test_cross_origin_and_cross_site_referer_are_rejected_even_with_valid_token():

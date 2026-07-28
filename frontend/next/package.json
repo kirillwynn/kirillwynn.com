@@ -15,7 +15,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:browser-contract": "playwright test --config=playwright.browser-contract.config.ts",
+    "test:cross-stack": "playwright test --config=playwright.cross-stack.config.ts",
+    "test:e2e": "npm run test:browser-contract && npm run test:cross-stack"
   },
   "dependencies": {
     "@emoji-mart/data": "1.2.1",

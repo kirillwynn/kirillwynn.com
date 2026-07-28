@@ -8,7 +8,7 @@ const viewports = [
 ];
 
 export default defineConfig({
-    testDir: "./e2e",
+    testDir: "./e2e/browser-contract",
     timeout: 45_000,
     fullyParallel: false,
     workers: 1,
@@ -35,7 +35,7 @@ export default defineConfig({
     })),
     webServer: [
         {
-            command: "node e2e/mock-backend.mjs",
+            command: "node e2e/browser-contract/mock-backend.mjs",
             url: "http://127.0.0.1:3101/__health",
             reuseExistingServer: !process.env.CI,
             timeout: 30_000,

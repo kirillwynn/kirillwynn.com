@@ -404,22 +404,32 @@ deployment, and unavailable local Docker/Nginx/PostgreSQL checks remain pending
 - [x] Milestone 11 began with the baseline coverage matrix in
   `docs/testing-security.md`; existing post/comment/thread/reaction/auth/
   subscription and infrastructure proofs are reused rather than duplicated.
-- [x] Backend security gaps now cover cross-session and cross-origin CSRF,
-  expired sessions, forbidden Unicode scalars, site-author/owner/moderator
+- [x] Backend security gaps now cover CSRF-cookie-secret mismatch and
+  cross-origin CSRF (without incorrectly binding standard Django CSRF to the
+  login session), expired sessions, forbidden Unicode scalars,
+  site-author/owner/moderator
   permissions, upload format/size/pixel limits, and metadata-free image
   originals.
 - [x] PostgreSQL search, comment/reaction/rate-limit locking, and outbox claim
   races are an explicit marker-selected CI suite; `PYTEST_FAIL_ON_SKIP=1`
   turns any PostgreSQL skip into a required-job failure.
-- [x] Deterministic Playwright coverage exercises anonymous reading, mock
-  Google/GitHub login, comments/threads/reactions, subscription confirmation
-  and unsubscribe, Draft Mode isolation, Feed search/tags/pagination, keyboard
-  traps/Escape/focus restoration, and axe at 375x812, 768x1024, 1440x900, and
-  1920x1080.
+- [x] The fast Playwright browser-contract matrix exercises anonymous reading,
+  mock Google/GitHub login, comments/threads/reactions, subscription
+  confirmation and unsubscribe, Draft Mode isolation, Feed
+  search/tags/pagination, keyboard traps/Escape/focus restoration, and axe at
+  375x812, 768x1024, 1440x900, and 1920x1080.
+- [x] A separate required cross-stack Playwright suite uses real Django API
+  views, SQLite database sessions, standard CSRF, Next rewrites, and
+  persistence for Google/GitHub allauth callbacks, comment/reply/reaction,
+  subscription confirm/unsubscribe, and Draft Mode. Only OAuth provider and
+  email-transport inspection boundaries are test doubles; no production URL or
+  production setting includes a test helper.
 - [x] Browser screenshots and traces are failure-only, video is disabled, and
-  retained artifacts are scanned (including zip entries and image bytes) for
+  retained artifacts are scanned (including ZIP entries and raw image bytes) for
   credentials, secret sentinels, and internal origins; unsafe files are removed
-  before the remaining failure artifacts receive a seven-day upload.
+  before a second scan. Upload occurs only after both passes succeed; any
+  enumeration/ZIP/read/removal/scanner failure skips upload and fails CI. Raw
+  binary string search is not represented as visual pixel/OCR inspection.
 - [x] CI retains the exact Next.js proxy allowlist without a broad `/api/*`
   rewrite, runs the full Compose/Nginx/PostgreSQL/backup-recovery/MinIO/egress/
   restart suite, and exposes one `ci-required` result that fails unless every
@@ -541,6 +551,42 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-28:
 
+- Milestone 11 remediation makes Playwright artifact upload fail closed:
+  upload is conditional on successful sanitization and re-scan, while
+  scanner/enumeration/ZIP/read/removal failure, corrupt ZIP, unknown top-level
+  format, and unsafe retained data fail without uploading the original.
+  Eight scanner regressions, including all four injected operational failures,
+  passed. PNG/JPEG/WebP checks are documented as raw forbidden-byte searches,
+  not pixel, OCR, or semantic visual inspection.
+- Wagtail image upload now converts Pillow/Willow parsing, malformed EXIF,
+  decode, and encode failures into form `ValidationError` responses. Twenty-seven
+  targeted upload/security tests passed, including real Wagtail admin
+  JPEG/PNG/WebP uploads, malformed JPEG/WebP EXIF, truncated/corrupt files,
+  metadata stripping, format/extension, size, pixel, and animation boundaries.
+  PDF upload is explicitly extension-and-size-only; actual PDF bytes are not
+  parsed or attested.
+- The former mock-backend Playwright suite is now the explicitly named
+  browser-contract suite and passed 20/20 runs at all four required viewports.
+  The new cross-stack suite passed 4/4 against real Django API views, SQLite
+  database sessions, standard CSRF, Next rewrites, and persistence for
+  Google/GitHub allauth callbacks, comments/replies/reactions, memory-transport
+  subscription confirmation/unsubscribe, and Draft Mode. No test helper URL or
+  production setting was added.
+- `uv lock --check` resolved 74 packages; Ruff format/lint, Django test and
+  production deploy checks, migration drift, a clean empty SQLite migration
+  chain, and subscriptions/discussions reverse-forward checks passed. Full
+  backend `pytest` passed 506 tests with seven PostgreSQL-only cases skipped on
+  SQLite.
+- The PostgreSQL marker selection was deliberately run with
+  `PYTEST_FAIL_ON_SKIP=1` and failed because all seven cases skipped: Docker,
+  Podman, PostgreSQL server/client, `pg_isready`, and Nginx remain unavailable
+  locally. PostgreSQL/Compose/Nginx results are not inferred; the PostgreSQL CI
+  service retains the no-skip gate and `ci-required` requires it.
+- Deterministic infrastructure verification passed 140 pytest cases plus shell
+  syntax and Python compilation. `npm ci` installed 216 locked packages;
+  Prettier, ESLint, TypeScript, 152 Vitest tests, production Next.js build,
+  standalone runtime-origin probes, browser-asset scanning, and
+  `npm audit --audit-level=high` with zero vulnerabilities passed.
 - Milestone 11 coverage audit recorded the pre-change 480 backend, 152 Vitest,
   and 131 infrastructure cases. The completed local SQLite selection passed
   486 tests with seven PostgreSQL cases deliberately deselected; Ruff format/
