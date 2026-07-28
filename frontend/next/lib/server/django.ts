@@ -6,7 +6,7 @@ import type {
     PostListResponse,
 } from "@/lib/content-contract";
 import { feedHref, type FeedState } from "@/lib/feed-state";
-import { djangoApiUrl } from "@/lib/server/config";
+import { djangoApiUrl, publicSiteUrl } from "@/lib/server/config";
 
 export class ContentApiError extends Error {
     constructor(message = "Public content API request failed") {
@@ -28,10 +28,19 @@ function assertPositivePage(page: number): void {
     }
 }
 
+function upstreamHeaders(extra: Record<string, string> = {}): HeadersInit {
+    const publicOrigin = new URL(publicSiteUrl());
+    return {
+        Host: publicOrigin.host,
+        "X-Forwarded-Proto": publicOrigin.protocol.slice(0, -1),
+        ...extra,
+    };
+}
+
 export async function resolvePreview(credential: string): Promise<PostDetail> {
     const response = await fetch(`${djangoApiUrl()}/api/v1/preview/resolve/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: upstreamHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ credential }),
         cache: "no-store",
     });
@@ -51,6 +60,7 @@ export async function getPublicPosts(
     const query = feedHref(state).slice(2);
     const suffix = query ? `?${query}` : "";
     const response = await fetch(`${djangoApiUrl()}/api/v1/posts/${suffix}`, {
+        headers: upstreamHeaders(),
         next: { tags: ["posts"] },
     });
     if (response.status === 404) {
@@ -64,6 +74,7 @@ export async function getPublicPosts(
 
 export async function getAvailableTags(): Promise<AvailableTagResponse> {
     const response = await fetch(`${djangoApiUrl()}/api/v1/tags/`, {
+        headers: upstreamHeaders(),
         next: { tags: ["posts"] },
     });
     if (!response.ok) {
@@ -76,6 +87,7 @@ export async function getPublicPost(slug: string): Promise<PostDetail | null> {
     const response = await fetch(
         `${djangoApiUrl()}/api/v1/posts/${encodeURIComponent(slug)}/`,
         {
+            headers: upstreamHeaders(),
             next: { tags: [`post-slug:${slug}`] },
         },
     );

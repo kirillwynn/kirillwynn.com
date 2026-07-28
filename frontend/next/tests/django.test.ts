@@ -32,7 +32,13 @@ describe("Django content client", () => {
 
         expect(fetchMock).toHaveBeenCalledWith(
             "http://localhost:8000/api/v1/posts/?page=2",
-            { next: { tags: ["posts"] } },
+            {
+                headers: {
+                    Host: "localhost:3000",
+                    "X-Forwarded-Proto": "http",
+                },
+                next: { tags: ["posts"] },
+            },
         );
     });
 
@@ -71,7 +77,13 @@ describe("Django content client", () => {
 
         expect(fetchMock).toHaveBeenCalledWith(
             "http://localhost:8000/api/v1/posts/?q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD&page=2",
-            { next: { tags: ["posts"] } },
+            {
+                headers: {
+                    Host: "localhost:3000",
+                    "X-Forwarded-Proto": "http",
+                },
+                next: { tags: ["posts"] },
+            },
         );
         expect(fetchMock.mock.calls[0]?.[0]).not.toContain("%25D1");
     });
@@ -88,7 +100,13 @@ describe("Django content client", () => {
 
         expect(fetchMock).toHaveBeenCalledWith(
             "http://localhost:8000/api/v1/tags/",
-            { next: { tags: ["posts"] } },
+            {
+                headers: {
+                    Host: "localhost:3000",
+                    "X-Forwarded-Proto": "http",
+                },
+                next: { tags: ["posts"] },
+            },
         );
     });
 
@@ -109,6 +127,10 @@ describe("Django content client", () => {
         expect(fetchMock).toHaveBeenCalledWith(
             "http://localhost:8000/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/",
             {
+                headers: {
+                    Host: "localhost:3000",
+                    "X-Forwarded-Proto": "http",
+                },
                 next: {
                     tags: ["post-slug:привет-мир"],
                 },
@@ -141,6 +163,11 @@ describe("Django content client", () => {
         );
         expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
             cache: "no-store",
+            headers: {
+                Host: "localhost:3000",
+                "X-Forwarded-Proto": "http",
+                "Content-Type": "application/json",
+            },
         });
         await expect(
             resolvePreview("valid-but-upstream-failed"),
