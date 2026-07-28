@@ -173,9 +173,7 @@ def create_reply(*, target_id, author, body):
 def edit_comment(*, comment_id, actor, body):
     ensure_can_interact(actor)
     comment = (
-        Comment.objects.select_for_update(of=("self",))
-        .select_related("author")
-        .get(pk=comment_id)
+        Comment.objects.select_for_update(of=("self",)).select_related("author").get(pk=comment_id)
     )
     if comment.author_id != actor.pk:
         raise PermissionDenied("Only the author can edit this comment.")
@@ -198,9 +196,7 @@ def edit_comment(*, comment_id, actor, body):
 def soft_delete_comment(*, comment_id, actor):
     ensure_can_interact(actor)
     comment = (
-        Comment.objects.select_for_update(of=("self",))
-        .select_related("author")
-        .get(pk=comment_id)
+        Comment.objects.select_for_update(of=("self",)).select_related("author").get(pk=comment_id)
     )
     if comment.author_id != actor.pk:
         raise PermissionDenied("Only the author can delete this comment.")

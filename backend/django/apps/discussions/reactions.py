@@ -95,9 +95,7 @@ def toggle_comment_reaction(*, comment_id, user, emoji):
     ensure_can_interact(user)
     normalized = normalize_emoji(emoji)
     comment = (
-        Comment.objects.select_for_update(of=("self",))
-        .select_related("post")
-        .get(pk=comment_id)
+        Comment.objects.select_for_update(of=("self",)).select_related("post").get(pk=comment_id)
     )
     if not public_blog_posts().filter(pk=comment.post_id).exists():
         raise ReactionTargetUnavailable
