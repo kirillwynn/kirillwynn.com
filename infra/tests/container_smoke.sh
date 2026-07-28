@@ -17,6 +17,8 @@ cleanup() {
         docker compose --env-file "$orphan_control" -f "$database_compose" \
             down --volumes --remove-orphans
     fi
+    docker volume rm kirillwynn-production-bootstrap-postgres \
+        kirillwynn-production-orphan-postgres >/dev/null 2>&1 || true
     rm -rf "$test_root"
 }
 trap cleanup EXIT HUP INT TERM
@@ -164,10 +166,9 @@ if "$repository_root/infra/scripts/restore_postgres.sh" \
     exit 1
 fi
 
-# First-production bootstrap rehearsal uses the real state and database
-# operational scripts. A fault after the database-ready atomic replace mimics
-# a lost SSH response; retrying the same operation does not recreate the
-# volume or repeat a completed migration/backup phase.
+# First-production bootstrap rehearsal uses real Docker volume labels, state,
+# and database scripts. Consecutive crashes cover authorization before create,
+# create before the next checkpoint, and container start before database-ready.
 postgres_digest=$(docker image inspect postgres:17.6-alpine --format '{{index .RepoDigests 0}}')
 bootstrap_runtime="$test_root/production-runtime"
 mkdir -p "$bootstrap_runtime"
@@ -214,14 +215,47 @@ python3 "$repository_root/infra/scripts/record_rollout_state.py" begin \
     --deployment-sequence 1 \
     --runtime-directory "$bootstrap_runtime" \
     --manifest "$bootstrap_manifest" \
+    --postgres-volume kirillwynn-production-bootstrap-postgres \
+    --postgres-image "$postgres_digest" \
     --state-directory "$bootstrap_state"
 if STATE_DIRECTORY="$bootstrap_state" \
-    ROLLOUT_STATE_FAULT=checkpoint-bootstrap-database-ready:after-replace \
+    BOOTSTRAP_DATABASE_FAULT=after-volume-authorization \
     "$repository_root/infra/scripts/bootstrap_database.sh" \
         production "$bootstrap_runtime" \
         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
         "$bootstrap_operation" "$test_root/bootstrap-backups"; then
     echo "fault-injected bootstrap unexpectedly succeeded" >&2
+    exit 1
+fi
+if docker volume inspect kirillwynn-production-bootstrap-postgres >/dev/null 2>&1; then
+    echo "authorization fault created the PostgreSQL volume too early" >&2
+    exit 1
+fi
+if STATE_DIRECTORY="$bootstrap_state" \
+    BOOTSTRAP_DATABASE_FAULT=after-volume-create \
+    "$repository_root/infra/scripts/bootstrap_database.sh" \
+        production "$bootstrap_runtime" \
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+        "$bootstrap_operation" "$test_root/bootstrap-backups"; then
+    echo "volume-create fault unexpectedly succeeded" >&2
+    exit 1
+fi
+test "$(docker volume inspect --format \
+    '{{ index .Labels "com.kirillwynn.bootstrap-operation-id" }}' \
+    kirillwynn-production-bootstrap-postgres)" = "$bootstrap_operation"
+test "$(docker volume inspect --format \
+    '{{ index .Labels "com.kirillwynn.environment" }}' \
+    kirillwynn-production-bootstrap-postgres)" = production
+test "$(docker volume inspect --format \
+    '{{ index .Labels "com.kirillwynn.role" }}' \
+    kirillwynn-production-bootstrap-postgres)" = postgres-data
+if STATE_DIRECTORY="$bootstrap_state" \
+    BOOTSTRAP_DATABASE_FAULT=after-container-start \
+    "$repository_root/infra/scripts/bootstrap_database.sh" \
+        production "$bootstrap_runtime" \
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+        "$bootstrap_operation" "$test_root/bootstrap-backups"; then
+    echo "container-start fault unexpectedly succeeded" >&2
     exit 1
 fi
 STATE_DIRECTORY="$bootstrap_state" \
@@ -240,6 +274,9 @@ from pathlib import Path
 state = json.loads(Path(sys.argv[1]).read_text())
 attempt = state["attempts"]["bootstrap-production-integration"]
 assert attempt["phase"] == "initial-backup-completed"
+assert state["database"]["lifecycle_state"] == "ready"
+assert state["database"]["volume_name"] == "kirillwynn-production-bootstrap-postgres"
+assert state["database"]["bootstrap_operation_id"] == attempt["operation_id"]
 metadata = json.loads(next(Path(sys.argv[2]).glob("*.dump.json")).read_text())
 assert metadata["backup_kind"] == "initial-empty"
 assert metadata["operation_id"] == "bootstrap-production-integration"
@@ -267,6 +304,8 @@ python3 "$repository_root/infra/scripts/record_rollout_state.py" begin \
     --deployment-sequence 1 \
     --runtime-directory "$orphan_runtime" \
     --manifest "$bootstrap_manifest" \
+    --postgres-volume kirillwynn-production-orphan-postgres \
+    --postgres-image "$postgres_digest" \
     --state-directory "$orphan_state"
 if STATE_DIRECTORY="$orphan_state" \
     "$repository_root/infra/scripts/bootstrap_database.sh" \

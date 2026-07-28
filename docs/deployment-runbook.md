@@ -55,13 +55,27 @@ Per-environment operational state is:
   rollout-state.json
 ```
 
-This schema-2 document is the only authoritative activation point. It contains
+This schema-3 document is the only authoritative activation point. It contains
 exact `active.application`, production-owned `active.edge`, `previous`, the
-in-progress operation ID, a recovery-required pointer, and every immutable-ID
-attempt with phase history and evidence. Manifests are referenced by path and
-SHA-256 and are never rewritten. Every transition writes and `fsync`s a
-mode-0600 temporary file, atomically replaces the document, and `fsync`s its
-directory.
+separate `database` lifecycle/ownership snapshot, the in-progress operation
+ID, a reviewed-resolution pointer, and every immutable-ID attempt with phase
+history and evidence. Manifests are referenced by path and SHA-256 and are
+never rewritten. Every transition writes and `fsync`s a mode-0600 temporary
+file, atomically replaces the document, and `fsync`s its directory.
+
+`database.lifecycle_state` is independent of `active`:
+
+| State | Durable meaning |
+| --- | --- |
+| `absent` | No database-volume side effect is authorized. |
+| `authorized` | One immutable bootstrap operation may create or resume its labeled volume. |
+| `ready` | The owned volume and initialized PostgreSQL were confirmed; disappearance fails closed. |
+| `migrated` | `last_migration` identifies the latest confirmed release/manifest/runtime boundary. |
+
+The same snapshot binds environment, volume name, pinned PostgreSQL image,
+bootstrap runtime and operation ID, `initial_backup`, `last_backup`, and
+`last_migration`. `active=null` therefore never implies that the database is
+absent.
 
 The attempt is durable before any PostgreSQL/application/edge mutation.
 Repeating the same operation and phase is a no-op; a reused operation ID with
@@ -93,7 +107,7 @@ Every edge replacement still runs the candidate `nginx -t` before `up`, then
 
 ## First production deploy
 
-With no active snapshot in
+With `database.lifecycle_state=absent` in
 `/srv/kirillwynn/state/production/rollout-state.json`:
 
 1. validate the manifest and five runtime files;
@@ -101,30 +115,36 @@ With no active snapshot in
 3. durably record the immutable operation ID;
 4. prove the environment-qualified PostgreSQL volume does not exist, then
    persist the operation's volume-creation authorization;
-5. use `infra/compose/database.yml` to pull and start only the pinned
-   PostgreSQL digest with bounded `--wait`;
-6. take an `initial-empty` custom-format backup and verify
+5. explicitly create it with exact environment, `postgres-data` role,
+   volume-name, and immutable bootstrap-operation labels, then verify those
+   labels;
+6. use `infra/compose/database.yml` to pull and start only the pinned
+   PostgreSQL digest with bounded `--wait`; the volume is external, so Compose
+   cannot implicitly create or remove it;
+7. take an `initial-empty` custom-format backup and verify
    `pg_restore --list`; no Django, Next, worker, migration, or public service
    starts before this backup;
-7. pull exact Django/Next digests;
-8. run `migrate --noinput`; a retry after a lost response uses the durable
+8. pull exact Django/Next digests;
+9. run `migrate --noinput`; a retry after a lost response uses the durable
    `migration-started` phase and database migration plan rather than blindly
    repeating completed work;
-9. start the application with bounded `--wait`;
-10. verify Django readiness, Next health, worker heartbeat, worker provider
+10. start the application with bounded `--wait`;
+11. verify Django readiness, Next health, worker heartbeat, worker provider
    egress, and exact active image references;
-11. validate/replace edge, run public smoke, then atomically activate state.
+12. validate/replace edge, run public smoke, then atomically activate state.
 
 This empty-initial-backup policy is the documented equivalent of "backup the
-existing database" for the first production deployment. An existing volume
-without an active snapshot or the same operation's saved
-`bootstrap-volume-authorized` phase fails closed. Never delete it, adopt it, or
-assume it is empty. Resume an interrupted first deploy with exactly the
-original operation ID; a new operation cannot inherit its bootstrap phases.
+existing database" for the first production deployment. Before authorization,
+any existing volume fails closed. After authorization, an absent volume may be
+created safely and a matching owned volume may be resumed; foreign, unlabeled,
+or mismatched labels are rejected. After `database-ready`, disappearance fails
+closed. Never delete a database volume, adopt a foreign one, or infer database
+existence from `active`.
 
-Every subsequent deployment uses the active runtime contract to back up the
-existing database before migration. The PostgreSQL digest cannot change in an
-application rollout; database upgrades require separate review.
+Every subsequent ordinary deployment with an active snapshot uses its runtime
+contract to back up the existing database before migration. The PostgreSQL
+digest cannot change in an application rollout; database upgrades require
+separate review.
 
 ## Normal rollout and attestation
 
@@ -145,12 +165,33 @@ application health/digests and production edge digest/live `nginx -t`
 cannot rely on a stale pre-smoke observation.
 
 Production edge replacement occurs after the application health gates and
-before public smoke. If public smoke fails, `mark_rollout_failed.sh` preserves
-candidate and failure evidence, leaves the prior active/previous snapshots
-unchanged, and requires explicit recovery. Do not start a new deployment or
-use normal rollback while recovery is required.
+before public smoke. Failure can be recorded from authorization/database,
+purpose-typed backup, migration, application rollout/health, edge rollout, or
+pending public smoke. The record contains bounded phase/category/reason,
+timestamp, candidate/base/database snapshots, possible side effects, and
+reviewed resolution ownership. It releases the mutation lease but leaves the
+prior active/previous snapshots unchanged and blocks ordinary deployment and
+normal rollback.
 
-## Reviewed abort and failed-smoke recovery
+`ci_ssh_deploy.sh` records remote-rollout failure evidence under the same
+server `flock`; a retry of identical evidence is a no-op, conflicting evidence
+is rejected, and the original remote exit status remains the job result.
+
+## Failure and reviewed resolution matrix
+
+| Failed state | Reviewed owner | Required database evidence | Runtime/public gates | Final result |
+| --- | --- | --- | --- | --- |
+| Active A, candidate B, any internal/public failure | `recovery` | `recovery` backup | Restore A application and production edge, then health/digests/Nginx/public smoke | Active A; previous unchanged |
+| First candidate B, `active=null`, transient failure | exact-candidate `retry` | Finish original initial backup only if still pre-migration; otherwise `recovery` backup | Migration plan, application, edge, health, public smoke | Active B |
+| First candidate B, `active=null`, reviewed replacement C | `fix-forward` | `recovery` backup of the existing owned database | Migrate C, application, edge, health, public smoke | Active C |
+| Failure before any runtime checkpoint | `retry` or `fix-forward` | Database remains `absent`; resolution authorizes bootstrap | Full first-deploy gates | Selected candidate active |
+
+Every resolution has a new immutable operation ID and greater deployment
+sequence. Repeating begin, identical failure, or finalize is a no-op. Another
+owner, reason/category, manifest, or operation binding conflicts and fails
+closed.
+
+## Reviewed abort and active-release recovery
 
 An attempt may be aborted only while its phase is still `attempt-recorded`,
 before a volume, database, application, or edge mutation:
@@ -188,6 +229,29 @@ flock -w 900 /srv/kirillwynn/locks/release.lock \
 Finalize is idempotent. It clears recovery ownership only after successful
 public smoke, keeps B's failed evidence, keeps Z as the normal rollback target,
 and records active application/edge exactly as A.
+
+## Failed first deployment: retry or fix-forward
+
+When `active=null` but `database` is `authorized`, `ready`, or `migrated`, do
+not use active application state as a database-existence test and do not run
+ordinary deployment. Transfer the authoritative failure under the lock:
+
+```bash
+flock -w 900 /srv/kirillwynn/locks/release.lock \
+  /srv/kirillwynn/releases/<resolution-sha>/infra/scripts/resolve_failed_rollout.sh \
+  production <failed-operation-id> <resolution-operation-id> \
+  retry \
+  /srv/kirillwynn/runtime/releases/<failed-sha>/production \
+  /srv/kirillwynn/releases/<failed-sha>/release-manifest.json \
+  /srv/kirillwynn/runtime/edge.env
+```
+
+`retry` requires the exact failed manifest fingerprint and runtime. For a
+reviewed new release, use `fix-forward` with C's runtime and manifest. When the
+database already exists, fix-forward takes a `recovery` backup before migration
+and never writes another `initial-empty` backup. Both paths stop at pending
+public smoke and use `finalize_rollout.sh` after the same external gates.
+Neither path removes or recreates a confirmed-ready volume.
 
 ## Reproducible application rollback
 

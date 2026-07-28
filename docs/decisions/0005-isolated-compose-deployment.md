@@ -98,8 +98,14 @@ downtime.
 Every rollout has a caller-stable immutable operation ID. The authoritative
 per-environment `rollout-state.json` records the attempt before the first
 PostgreSQL, application, or edge mutation. It contains active and previous
-component snapshots, the one in-progress operation, recovery ownership, all
-attempt phase/evidence records, and immutable manifest fingerprints. One
+component snapshots, a separate authoritative database lifecycle/ownership
+snapshot, the one in-progress operation, reviewed resolution ownership, all
+attempt phase/evidence records, and immutable manifest fingerprints. The
+database snapshot progresses through `absent`, `authorized`, `ready`, and
+`migrated`; it binds the environment-qualified volume, pinned PostgreSQL
+image, bootstrap runtime and immutable bootstrap operation ID, initial backup,
+and latest confirmed migration boundary independently of whether an
+application snapshot is active. One
 fsynced temporary-file replacement plus parent-directory `fsync` is the only
 activation point. Consequently A → B moves A to previous atomically; retrying
 finalize B is a byte-for-byte no-op and cannot turn B into its own rollback
@@ -109,23 +115,40 @@ closed.
 Application and edge truth are explicit components. Production activation and
 rollback record and verify both; staging owns only its application snapshot and
 validates an edge candidate without claiming the shared edge is active. A
-production public-smoke failure leaves active=A and previous=Z while retaining
-candidate B and its failure evidence. A separate reviewed recovery operation
-restores the exact base snapshot A for both application and edge, repeats every
-health/digest/Nginx/public gate, and clears recovery ownership only at atomic
-finalization. A normal rollback B → A likewise restores edge A before it can
-record A active. Abort is allowed only before the attempt crosses its first
-runtime-mutation boundary.
+failure after any runtime mutation leaves active=A and previous=Z while
+retaining candidate B and bounded evidence: failed phase/category/reason,
+candidate/base/database snapshots, possible side effects, and reviewed
+resolution ownership. The mutation lease is released, but ordinary deployment
+remains blocked. A separate reviewed recovery operation restores the exact base
+snapshot A for both application and edge and repeats backup, application
+health/digest, Nginx, and public gates even when B failed before public smoke.
+A failed first deployment instead transfers ownership to an exact-candidate
+retry or a new-release fix-forward operation; neither path depends on an active
+application snapshot. Resolution ownership clears only at atomic finalization.
+A normal rollback B → A likewise restores edge A before it can record A active.
+Abort is allowed only before the attempt crosses its first runtime-mutation
+boundary.
 
 First production deploy has an explicit exception only to the meaning of
-"existing database": with no active production state and no named volume, the
-attempt first authorizes volume creation, starts pinned PostgreSQL through the
-database-only Compose contract, takes and verifies an `initial-empty` backup,
-and only then migrates or starts application services. An existing volume
-without a matching durable bootstrap/rollout phase is never adopted or assumed
-empty. An interrupted bootstrap resumes only through the same operation ID.
-Every later deploy takes a `pre-migration` backup; rollback/recovery takes a
-`recovery` backup.
+"existing database": with database lifecycle `absent`, the attempt first
+persists authorization and only then explicitly creates the named volume with
+exact environment, `postgres-data` role, volume-name, and immutable bootstrap
+operation labels. PostgreSQL Compose declares that volume external and cannot
+create or delete it. An existing volume is accepted only when all ownership
+labels match authoritative state; foreign, unlabeled, mismatched, or
+disappeared-ready volumes fail closed. The database-only Compose contract then
+starts pinned PostgreSQL, takes and verifies an `initial-empty` backup, and
+only then migrates or starts application services.
+
+An interrupted bootstrap may recreate an absent volume only while lifecycle is
+`authorized`; once `ready` was confirmed, disappearance is never repaired
+automatically. A failed first deployment can retain `active=null` while its
+database remains owned and recoverable. Same-candidate retry may revalidate or
+resume its boundary. Fix-forward to a new release must first take a
+purpose-typed `recovery` backup of the existing owned database and never takes
+a new `initial-empty` backup over it. Every later ordinary deploy takes a
+`pre-migration` backup; rollback/recovery takes a `recovery` backup. No rollout
+path automatically removes the database volume.
 
 Application rollback selects the previous compatible manifest and restarts its
 Django/Next digests without rebuilding. Migrations are never reversed

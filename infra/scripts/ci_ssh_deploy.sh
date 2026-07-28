@@ -63,8 +63,23 @@ ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
 
 edge_runtime_env=/srv/kirillwynn/runtime/edge.env
 remote_rollout="infra/scripts/deploy_environment.sh '$environment_name' '$durable_runtime' '$durable_release/release-manifest.json' '$operation_id' && infra/scripts/advance_edge_rollout.sh '$environment_name' '$operation_id' '$durable_release/release-manifest.json' '$edge_runtime_env'"
+set +e
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "cd '$durable_release' && mkdir -p /srv/kirillwynn/locks && flock -w 900 /srv/kirillwynn/locks/release.lock sh -c \"$remote_rollout\""
+remote_rollout_status=$?
+set -e
+if [ "$remote_rollout_status" -ne 0 ]; then
+    failure_command="cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' remote-rollout 'remote rollout command failed'"
+    set +e
+    ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$failure_command"
+    failure_status=$?
+    if [ "$failure_status" -ne 0 ]; then
+        ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$failure_command"
+    fi
+    set -e
+    echo "remote rollout failed; failure evidence was attempted for $operation_id" >&2
+    exit "$remote_rollout_status"
+fi
 
 smoke_passed=false
 if [ "$environment_name" = staging ]; then
@@ -88,7 +103,7 @@ else
     fi
 fi
 if [ "$smoke_passed" != true ]; then
-    failure_command="cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' 'GitHub runner public smoke failed'"
+    failure_command="cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' public-smoke 'GitHub runner public smoke failed'"
     ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$failure_command" ||
         ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$failure_command"
     echo "public smoke failed; reviewed recovery is required for $operation_id" >&2
@@ -101,7 +116,7 @@ if ! ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$finalize_command"; then
     # Retry the same immutable operation before classifying it as failed.
     if ! ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$finalize_command"; then
         ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-            "cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' 'pre-activation live component re-attestation failed'"
+            "cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' pre-finalize-attestation 'pre-activation live component re-attestation failed'"
         echo "final live attestation failed; reviewed recovery is required" >&2
         exit 1
     fi

@@ -380,6 +380,15 @@ bounded health-gated replacement. Only public smoke finalizes current/previous
 active manifests. Application rollback selects the prior durable compatible
 bundle and never automatically reverses the database.
 
+The same authoritative atomic rollout document owns a database lifecycle
+independent of active application state. Explicit labeled PostgreSQL volume
+authorization/creation advances absent → authorized → ready → migrated;
+confirmed ownership, initial/last backup, and the latest migration boundary
+survive a failed first deployment with no active application. Every
+post-mutation failure releases its lease but requires reviewed active-release
+recovery, exact-candidate retry, or new-release fix-forward before ordinary
+deployment can resume.
+
 The Django image owns the worker executable and immutable collectstatic output.
 The Next.js image reads public/internal origins at dynamic server runtime,
 allowing one digest in both environments. Uploaded media uses isolated

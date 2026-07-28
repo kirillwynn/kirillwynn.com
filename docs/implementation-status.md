@@ -5,9 +5,10 @@ Last updated: 2026-07-27
 Integration branch: `rewrite/wagtail-next`
 
 Overall state: Milestone 10 repository-owned staging/production infrastructure
-and crash-safe rollout-state remediation implemented; deterministic checks
-pass, while external activation and local Docker/Nginx/PostgreSQL/provider/
-browser runtime verification remain deliberately pending
+and recovery-gap remediation implemented with operation-owned database volumes,
+an independent database lifecycle, and reviewed failure resolution;
+deterministic checks pass, while external activation and unavailable local
+Docker/Nginx/PostgreSQL/provider/browser runtime verification remain pending
 
 ## Current repository state
 
@@ -375,16 +376,37 @@ browser runtime verification remain deliberately pending
   explicit reviewed abort/recovery. First bootstrap refuses an unbound existing
   PostgreSQL volume and resumes only the recorded attempt; backup metadata
   distinguishes initial-empty, pre-migration, recovery, and manual evidence.
+- [x] The remaining Milestone 10 bootstrap crash gap is closed: authorization
+  is durable before an explicit labeled `docker volume create`, PostgreSQL
+  Compose treats the volume as external, exact environment/role/bootstrap
+  operation/volume labels are verified on every use, authorized absence may
+  resume, and confirmed-ready disappearance or foreign adoption fails closed.
+- [x] Schema-3 `rollout-state.json` owns a database snapshot independent of
+  active application state, including absent/authorized/ready/migrated
+  lifecycle, volume/PostgreSQL/bootstrap identity, initial/last backup, and the
+  latest confirmed migration boundary.
+- [x] Idempotent bounded failure evidence now closes every in-progress runtime
+  phase, releases the mutation lease, preserves candidate/base/database and
+  possible-side-effect snapshots, and transfers reviewed ownership to active-A
+  recovery, exact-candidate retry, or new-release fix-forward. Failed first
+  deployments remain recoverable with `active=null`; fix-forward takes a
+  recovery backup and cannot repeat initial-empty backup over an existing DB.
+- [x] CI remote rollout failure handling records evidence under the server lock
+  without replacing the original exit status; active-A internal recovery and
+  first-deploy retry/fix-forward repeat application, edge, health, and public
+  gates before idempotent finalize.
 
 ## Milestone transition
 
 Milestone 10 remediation is complete at the repository boundary. The repository
 now defines least-privilege runtime topology, immutable production images,
 dynamic same-origin edge routing, S3 media, the bounded worker, full
-CI/build/promotion gates, crash-safe durable operational state, reviewed
-failed-smoke recovery, and isolated backup/restore/bootstrap procedures. No
-Milestone 11 work or server, registry, DNS, TLS, OAuth, Resend, GitHub
-Environment/secret, bucket, or production data state was changed.
+CI/build/promotion gates, crash-safe durable operational and database lifecycle
+state, operation-owned volume bootstrap, failure evidence after every runtime
+mutation, reviewed active-release recovery and first-deploy retry/fix-forward,
+and isolated backup/restore/bootstrap procedures. No Milestone 11 work or
+server, registry, DNS, TLS, OAuth, Resend, GitHub Environment/secret, bucket,
+or production data state was changed.
 
 ### Next recommended session
 
@@ -467,10 +489,11 @@ Out of scope for that session:
 - The shared edge cannot be replaced independently per application environment;
   a changed edge digest requires a production-approved host-wide operation
   compatible with both live application versions.
-- A server carrying the superseded multi-file
-  `active-release.json`/manifest/pending state must not be auto-adopted. The new
-  state loader fails closed and requires a reviewed one-time migration before
-  any rollout; no external server state was changed in this repository session.
+- A server carrying superseded multi-file
+  `active-release.json`/manifest/pending state or schema-2
+  `rollout-state.json` must not be auto-adopted. The schema-3 loader fails
+  closed and requires a reviewed one-time migration before any rollout; no
+  external server state was changed in this repository session.
 - Email DNS records, verified Resend sender domains, webhook registrations,
   provider credentials, GitHub Environment values, and staging activation
   remain deliberately unconfigured. `docs/email-setup.md` and
@@ -496,6 +519,31 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-27:
 
+- The final Milestone 10 recovery-gap remediation advances the sole fsynced
+  authoritative document to schema 3 with operation-owned volume labels,
+  database lifecycle/backup/migration truth independent of active application,
+  bounded idempotent failure evidence, and reviewed recovery/retry/fix-forward
+  ownership. Fault coverage spans every failure phase plus authorization atomic
+  replace → volume create → container start → database-ready boundaries;
+  container CI uses real Docker volumes for those three crash gaps.
+- `backend/django/.venv/bin/python -m pytest -q infra/tests` passed 124
+  deterministic infrastructure regressions. Shell syntax, Python compilation,
+  Ruff format/lint, workflow/Compose contract parsing, remote-rollout
+  original-status preservation, source/browser-asset secret and internal-origin
+  scans, Obsidian checklist parity, and `git diff --check` passed.
+- Full backend SQLite `pytest` passed 474 tests with six PostgreSQL-only
+  concurrency/search skips. `uv lock --check` resolved 74 packages; Ruff,
+  Django test-settings check, migration drift, a complete empty-SQLite
+  migration chain, and production `check --deploy` passed.
+- Node.js 24.18.0/npm 11.16.0 frontend format, ESLint, TypeScript, 152 Vitest
+  tests in 16 files, and the Next.js 16.2.11 production build passed. The build
+  required the already approved out-of-sandbox local Turbopack CSS worker port
+  after the sandbox correctly rejected that bind.
+- Docker/Compose, Nginx, PostgreSQL, `psql`, and `pg_isready` are unavailable
+  locally. Therefore real Compose config, PostgreSQL/bootstrap/recovery, Nginx,
+  and container integration were not run locally and are not inferred from
+  deterministic tests. They remain mandatory in CI; no external or production
+  state was changed.
 - Milestone 10 rollout-state remediation replaced separate mutable
   active/current/previous/pending files with one mode-0600, fsynced, atomic
   schema-2 document. Immutable operation IDs, manifest fingerprints,

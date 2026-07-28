@@ -3,8 +3,11 @@
 Database operations use `infra/compose/database.yml`, not the application
 model. This contract contains only pinned PostgreSQL, the role-scoped
 `postgres.env`, the environment-qualified database network, and the existing
-PostgreSQL volume. It cannot require or interpolate `DJANGO_IMAGE` or
-`NEXT_IMAGE`.
+PostgreSQL volume. The volume is external: Compose cannot create or delete it.
+Before any Compose database use, rollout orchestration verifies the exact
+environment, `postgres-data` role, immutable bootstrap-operation, and
+volume-name labels against schema-3 `rollout-state.json`. It cannot require or
+interpolate `DJANGO_IMAGE` or `NEXT_IMAGE`.
 
 Use the runtime directory for the active release:
 
@@ -25,16 +28,26 @@ immutable operation ID, and one explicit purpose:
 
 - `initial-empty` — the newly created first-deploy database before migration;
 - `pre-migration` — every later rollout's active database;
-- `recovery` — rollback or failed-smoke recovery evidence;
+- `recovery` — rollback, failed rollout recovery, retry, or fix-forward evidence;
 - `manual` — a reviewed operator backup.
 
 Both remain outside Git under `/srv/kirillwynn/backups/<environment>/`.
 
 First production deployment starts only the pinned PostgreSQL service and takes
 an `initial-empty` backup before its first migration. It refuses an existing
-volume unless the same durable bootstrap attempt already authorized its
-creation. Every later deployment takes `pre-migration`; rollback/recovery takes
-`recovery`. Backup dumps and sidecars are immutable and never overwritten.
+volume before authorization, explicitly creates the authorized volume with
+ownership labels, and accepts an existing volume only when every ownership
+label matches. `initial-empty` is recorded once in the authoritative database
+lifecycle snapshot. A failed first deployment may leave `active=null`, but its
+`ready` or `migrated` database remains owned and recoverable.
+
+Every later ordinary deployment takes `pre-migration`; rollback and active-A
+recovery take `recovery`. A reviewed same-candidate retry finishes the original
+initial backup only when the database never crossed migration; otherwise it
+takes `recovery`. Fix-forward to a new release always takes `recovery` before
+migration and must never take `initial-empty` over an existing database.
+Backup dumps and sidecars are immutable and never overwritten. No backup,
+recovery, rollback, or deployment script removes the PostgreSQL volume.
 
 Retention remains explicit:
 

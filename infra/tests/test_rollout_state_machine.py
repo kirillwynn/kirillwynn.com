@@ -62,6 +62,10 @@ def operation_args(
         deployment_sequence=str(sequence),
         runtime_directory=runtime,
         manifest=manifest,
+        postgres_volume=f"kirillwynn-{environment}-test-postgres",
+        postgres_image="postgres@sha256:" + "9" * 64,
+        resolution=None,
+        category="public-smoke",
         phase=None,
         reason="test evidence",
         field=None,
@@ -93,6 +97,24 @@ def begin_recovery_args(base, operation_id, failed_operation_id, sequence):
             "operation_id": operation_id,
             "failed_operation_id": failed_operation_id,
             "deployment_sequence": str(sequence),
+        }
+    )
+
+
+def begin_resolution_args(
+    base,
+    operation_id,
+    failed_operation_id,
+    sequence,
+    resolution,
+):
+    return SimpleNamespace(
+        **{
+            **vars(base),
+            "operation_id": operation_id,
+            "failed_operation_id": failed_operation_id,
+            "deployment_sequence": str(sequence),
+            "resolution": resolution,
         }
     )
 
@@ -132,10 +154,13 @@ FIRST_DEPLOY_TRANSITIONS = [
     "begin",
     "checkpoint-bootstrap-volume-authorized",
     "checkpoint-bootstrap-database-ready",
+    "checkpoint-initial-backup-started",
     "checkpoint-initial-backup-completed",
     "checkpoint-migration-started",
     "checkpoint-migration-completed",
+    "checkpoint-application-rollout-started",
     "checkpoint-application-healthy",
+    "checkpoint-edge-rollout-started",
     "checkpoint-edge-healthy",
     "checkpoint-pending-public-smoke",
     "finalize",
@@ -259,6 +284,25 @@ def test_logically_torn_authoritative_state_fails_closed(tmp_path):
         module.load_state(operation_b.state_directory, "production")
 
 
+def test_logically_torn_resolution_ownership_fails_closed(tmp_path):
+    module, _, operation_a, operation_b = failed_candidate_fixture(tmp_path)
+    recovery = begin_recovery_args(
+        operation_a,
+        "recovery-operation-a",
+        operation_b.operation_id,
+        4,
+    )
+    module.begin_recovery(recovery)
+    payload = json.loads(state_file(recovery).read_text())
+    payload["attempts"][operation_b.operation_id]["failure"]["resolution"][
+        "operation_id"
+    ] = "foreign-resolution-operation"
+    state_file(recovery).write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match="invalid resolution ownership"):
+        module.load_state(recovery.state_directory, "production")
+
+
 def failed_candidate_fixture(tmp_path):
     module = load_script("record_rollout_state.py")
     operation_z = operation_args(
@@ -311,6 +355,7 @@ def test_failed_candidate_recovery_restores_active_a_and_preserves_evidence(tmp_
     assert pending["attempts"][operation_b.operation_id]["evidence"] == failure_evidence
     module.finalize(recovery)
     module.finalize(recovery)
+    module.begin_recovery(recovery)
 
     recovered = module.load_state(recovery.state_directory, "production")
     assert recovered["active"]["application"]["release_sha"] == "a" * 40
@@ -320,7 +365,78 @@ def test_failed_candidate_recovery_restores_active_a_and_preserves_evidence(tmp_
     assert (
         recovered["attempts"][operation_b.operation_id]["evidence"] == failure_evidence
     )
+    assert (
+        recovered["attempts"][operation_b.operation_id]["failure"]["resolution"]["kind"]
+        == "recovery"
+    )
+    assert (
+        recovered["attempts"][operation_b.operation_id]["failure"]["resolution"][
+            "status"
+        ]
+        == "completed"
+    )
     assert recovered["attempts"][recovery.operation_id]["status"] == "completed"
+
+
+@pytest.mark.parametrize(
+    "failed_phase",
+    [
+        "pre-migration-backup-started",
+        "pre-migration-backup-completed",
+        "migration-started",
+        "migration-completed",
+        "application-rollout-started",
+        "application-healthy",
+        "edge-rollout-started",
+        "edge-healthy",
+        "pending-public-smoke",
+    ],
+)
+def test_active_a_internal_failure_recovery_repeats_all_runtime_gates(
+    tmp_path, failed_phase
+):
+    module = load_script("record_rollout_state.py")
+    operation_a = operation_args(tmp_path)
+    activate(module, operation_a)
+    operation_b = operation_args(
+        tmp_path,
+        operation_id="deploy-operation-b",
+        sha="b" * 40,
+        image_seed="4",
+        sequence=2,
+    )
+    module.begin(operation_b)
+    state = module.load_state(operation_b.state_directory, "production")
+    for phase in module.operation_plan(state["attempts"][operation_b.operation_id])[1:]:
+        module.checkpoint(checkpoint_args(operation_b, phase))
+        if phase == failed_phase:
+            break
+    module.fail(operation_b)
+
+    recovery = begin_recovery_args(
+        operation_a,
+        "recovery-operation-a",
+        operation_b.operation_id,
+        3,
+    )
+    module.begin_recovery(recovery)
+    state = module.load_state(recovery.state_directory, "production")
+    assert module.operation_plan(state["attempts"][recovery.operation_id]) == [
+        "attempt-recorded",
+        "recovery-backup-started",
+        "recovery-backup-completed",
+        "application-rollout-started",
+        "application-healthy",
+        "edge-rollout-started",
+        "edge-healthy",
+        "pending-public-smoke",
+        "complete",
+    ]
+    advance_to_pending(module, recovery)
+    module.finalize(recovery)
+    state = module.load_state(recovery.state_directory, "production")
+    assert state["active"]["application"]["release_sha"] == "a" * 40
+    assert state["active"]["edge"]["edge_image"].endswith("3" * 64)
 
 
 def test_normal_rollback_b_to_a_restores_application_and_edge_digest(tmp_path):
@@ -464,6 +580,7 @@ def test_additional_transition_fault_matrix(
             sequence=2,
         )
         module.begin(args)
+        module.checkpoint(checkpoint_args(args, "pre-migration-backup-started"))
         phase = "pre-migration-backup-completed"
         transition = f"checkpoint-{phase}"
 
@@ -479,6 +596,7 @@ def test_additional_transition_fault_matrix(
             4,
         )
         module.begin_recovery(args)
+        module.checkpoint(checkpoint_args(args, "recovery-backup-started"))
         phase = "recovery-backup-completed"
         transition = f"checkpoint-{phase}"
 
@@ -502,7 +620,7 @@ def test_additional_transition_fault_matrix(
         args = operation_args(tmp_path)
         module.begin(args)
         advance_to_pending(module, args)
-        transition = "fail-public-smoke"
+        transition = "fail"
 
         def action():
             module.fail(args)
@@ -532,15 +650,250 @@ def test_reviewed_abort_transition_is_fault_safe(tmp_path, monkeypatch, fault_si
     assert state["active"] is None
 
 
-def fake_docker(path, *, existing_volume, log_path=None):
+FIRST_DEPLOY_MUTATION_PHASES = [
+    "bootstrap-volume-authorized",
+    "bootstrap-database-ready",
+    "initial-backup-started",
+    "initial-backup-completed",
+    "migration-started",
+    "migration-completed",
+    "application-rollout-started",
+    "application-healthy",
+    "edge-rollout-started",
+    "edge-healthy",
+    "pending-public-smoke",
+]
+
+
+@pytest.mark.parametrize("failed_phase", FIRST_DEPLOY_MUTATION_PHASES)
+@pytest.mark.parametrize("fault_side", ["before-replace", "after-replace"])
+def test_first_deploy_failure_is_durable_review_required_and_idempotent(
+    tmp_path, monkeypatch, failed_phase, fault_side
+):
+    module = load_script("record_rollout_state.py")
+    args = operation_args(tmp_path)
+    module.begin(args)
+    state = module.load_state(args.state_directory, args.environment)
+    for phase in module.operation_plan(state["attempts"][args.operation_id])[1:]:
+        module.checkpoint(checkpoint_args(args, phase))
+        if phase == failed_phase:
+            break
+
+    monkeypatch.setenv("ROLLOUT_STATE_FAULT", f"fail:{fault_side}")
+    with pytest.raises(RuntimeError, match="injected fault"):
+        module.fail(args)
+    monkeypatch.delenv("ROLLOUT_STATE_FAULT")
+    module.fail(args)
+    once = state_file(args).read_bytes()
+    module.fail(args)
+    assert state_file(args).read_bytes() == once
+
+    state = module.load_state(args.state_directory, "production")
+    attempt = state["attempts"][args.operation_id]
+    failure = attempt["failure"]
+    assert attempt["status"] == "failed"
+    assert failure["failed_at_phase"] == failed_phase
+    assert failure["category"] == "public-smoke"
+    assert failure["candidate"] == attempt["candidate"]
+    assert failure["base_active"] is None
+    assert failure["base_database"]["lifecycle_state"] == "absent"
+    assert failure["database_at_failure"]["environment"] == "production"
+    assert failure["possible_side_effects"]
+    assert state["in_progress_operation_id"] is None
+    assert state["recovery_required_for"] == args.operation_id
+
+    conflict = SimpleNamespace(**{**vars(args), "reason": "different evidence"})
+    with pytest.raises(ValueError, match="conflicting failure"):
+        module.fail(conflict)
+    ordinary = operation_args(
+        tmp_path,
+        operation_id="deploy-operation-c",
+        sha="c" * 40,
+        image_seed="7",
+        sequence=2,
+    )
+    with pytest.raises(ValueError, match="reviewed recovery"):
+        module.begin(ordinary)
+
+
+def failed_first_candidate(module, tmp_path):
+    failed = operation_args(tmp_path, operation_id="deploy-operation-b")
+    module.begin(failed)
+    advance_to_pending(module, failed)
+    module.fail(failed)
+    return failed
+
+
+def test_failed_first_deploy_retry_same_candidate_succeeds_idempotently(tmp_path):
+    module = load_script("record_rollout_state.py")
+    failed = failed_first_candidate(module, tmp_path)
+    retry = begin_resolution_args(
+        failed,
+        "retry-operation-b",
+        failed.operation_id,
+        2,
+        "retry",
+    )
+    module.begin_resolution(retry)
+    module.begin_resolution(retry)
+    state = module.load_state(retry.state_directory, "production")
+    plan = module.operation_plan(state["attempts"][retry.operation_id])
+    assert "recovery-backup-completed" in plan
+    assert "initial-backup-completed" not in plan
+    advance_to_pending(module, retry)
+    module.finalize(retry)
+    before = state_file(retry).read_bytes()
+    module.finalize(retry)
+    module.begin_resolution(retry)
+    assert state_file(retry).read_bytes() == before
+
+    state = module.load_state(retry.state_directory, "production")
+    assert state["active"]["application"]["release_sha"] == "a" * 40
+    assert state["previous"] is None
+    assert state["database"]["lifecycle_state"] == "migrated"
+    assert state["database"]["last_backup"]["purpose"] == "recovery"
+    assert state["recovery_required_for"] is None
+    resolution = state["attempts"][failed.operation_id]["failure"]["resolution"]
+    assert resolution["kind"] == "retry"
+    assert resolution["status"] == "completed"
+
+
+def test_failed_first_deploy_fix_forward_to_new_release_uses_owned_database(
+    tmp_path,
+):
+    module = load_script("record_rollout_state.py")
+    failed = failed_first_candidate(module, tmp_path)
+    candidate_c = operation_args(
+        tmp_path,
+        operation_id="fix-forward-operation-c",
+        sha="c" * 40,
+        image_seed="7",
+        sequence=2,
+    )
+    fix_forward = begin_resolution_args(
+        candidate_c,
+        candidate_c.operation_id,
+        failed.operation_id,
+        2,
+        "fix-forward",
+    )
+    module.begin_resolution(fix_forward)
+    module.begin_resolution(fix_forward)
+    state = module.load_state(fix_forward.state_directory, "production")
+    plan = module.operation_plan(state["attempts"][fix_forward.operation_id])
+    assert "recovery-backup-completed" in plan
+    assert "initial-backup-completed" not in plan
+    advance_to_pending(module, fix_forward)
+    module.finalize(fix_forward)
+    module.finalize(fix_forward)
+    before = state_file(fix_forward).read_bytes()
+    module.begin_resolution(fix_forward)
+    assert state_file(fix_forward).read_bytes() == before
+
+    state = module.load_state(fix_forward.state_directory, "production")
+    assert state["active"]["application"]["release_sha"] == "c" * 40
+    assert state["database"]["bootstrap_operation_id"] == failed.operation_id
+    assert state["database"]["initial_backup"]["operation_id"] == failed.operation_id
+    assert (
+        state["database"]["last_migration"]["operation_id"] == fix_forward.operation_id
+    )
+    assert state["database"]["last_backup"]["purpose"] == "recovery"
+
+
+def test_failed_first_authorization_can_transfer_to_reviewed_retry(tmp_path):
+    module = load_script("record_rollout_state.py")
+    failed = operation_args(tmp_path)
+    module.begin(failed)
+    module.checkpoint(checkpoint_args(failed, "bootstrap-volume-authorized"))
+    module.fail(failed)
+    retry = begin_resolution_args(
+        failed,
+        "retry-operation-a",
+        failed.operation_id,
+        2,
+        "retry",
+    )
+    module.begin_resolution(retry)
+    state = module.load_state(retry.state_directory, "production")
+    plan = module.operation_plan(state["attempts"][retry.operation_id])
+    assert plan[1:4] == [
+        "bootstrap-database-ready",
+        "initial-backup-started",
+        "initial-backup-completed",
+    ]
+    advance_to_pending(module, retry)
+    module.finalize(retry)
+    state = module.load_state(retry.state_directory, "production")
+    assert state["database"]["bootstrap_operation_id"] == failed.operation_id
+    assert state["active"]["application"]["release_sha"] == failed.release_sha
+
+
+def test_pre_mutation_remote_failure_has_reviewed_retry_path(tmp_path):
+    module = load_script("record_rollout_state.py")
+    failed = operation_args(tmp_path)
+    module.begin(failed)
+    failure = SimpleNamespace(
+        **{
+            **vars(failed),
+            "category": "remote-rollout",
+            "reason": "remote rollout command failed",
+        }
+    )
+    module.fail(failure)
+    retry = begin_resolution_args(
+        failed,
+        "retry-operation-a",
+        failed.operation_id,
+        2,
+        "retry",
+    )
+    module.begin_resolution(retry)
+    state = module.load_state(retry.state_directory, "production")
+    plan = module.operation_plan(state["attempts"][retry.operation_id])
+    assert plan[1:5] == [
+        "bootstrap-volume-authorized",
+        "bootstrap-database-ready",
+        "initial-backup-started",
+        "initial-backup-completed",
+    ]
+
+
+def fake_docker(
+    path,
+    *,
+    existing_volume,
+    log_path=None,
+    environment="production",
+    operation_id="deploy-operation-a",
+    volume_name="kirillwynn-production-test-postgres",
+    matching_labels=True,
+):
     log_line = f"printf '%s\\n' \"$*\" >> '{log_path}'\n" if log_path else ""
+    marker = path.with_suffix(".volume")
+    if existing_volume:
+        marker.touch()
+    label_environment = environment if matching_labels else "foreign"
+    label_operation = operation_id if matching_labels else "foreign-operation"
+    label_volume = volume_name if matching_labels else "foreign-volume"
     path.write_text(
         "#!/bin/sh\n"
         f"{log_line}"
         'if [ "$1 $2 $3" = "compose version --short" ]; then '
         "printf '%s\\n' 2.30.0; exit 0; fi\n"
-        'if [ "$1 $2" = "volume inspect" ]; then '
-        f"exit {0 if existing_volume else 1}; fi\n"
+        'if [ "$1 $2" = "volume inspect" ]; then\n'
+        f"  test -e '{marker}' || exit 1\n"
+        '  case "$*" in\n'
+        f'    *com.kirillwynn.environment*) printf "%s\\n" "{label_environment}" ;;\n'
+        '    *com.kirillwynn.role*) printf "%s\\n" "postgres-data" ;;\n'
+        f'    *com.kirillwynn.bootstrap-operation-id*) printf "%s\\n" "{label_operation}" ;;\n'
+        f'    *com.kirillwynn.volume-name*) printf "%s\\n" "{label_volume}" ;;\n'
+        "  esac\n"
+        "  exit 0\n"
+        "fi\n"
+        'if [ "$1 $2" = "volume create" ]; then\n'
+        f"  : > '{marker}'\n"
+        "  exit 0\n"
+        "fi\n"
         'case "$*" in\n'
         "  *pg_dump*) printf '%s' fake-custom-dump ;;\n"
         "  *) exit 0 ;;\n"
@@ -610,6 +963,7 @@ def test_interrupted_first_deploy_resumes_same_attempt_without_rebootstrap(
         binary_dir / "docker",
         existing_volume=True,
         log_path=docker_log,
+        operation_id=args.operation_id,
     )
     environment = {
         **os.environ,
@@ -639,3 +993,136 @@ def test_interrupted_first_deploy_resumes_same_attempt_without_rebootstrap(
     payload = json.loads(metadata.read_text())
     assert payload["backup_kind"] == "initial-empty"
     assert payload["operation_id"] == args.operation_id
+
+
+@pytest.mark.parametrize(
+    ("fault", "expected_up_calls"),
+    [
+        ("after-volume-authorization", 1),
+        ("after-volume-create", 1),
+        ("after-container-start", 2),
+    ],
+)
+def test_bootstrap_crash_gaps_resume_with_one_matching_owned_volume(
+    tmp_path, fault, expected_up_calls
+):
+    module = load_script("record_rollout_state.py")
+    args = operation_args(tmp_path)
+    module.begin(args)
+    runtime = bootstrap_runtime(tmp_path)
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    docker_log = tmp_path / "docker.log"
+    fake_docker(
+        binary_dir / "docker",
+        existing_volume=False,
+        log_path=docker_log,
+        operation_id=args.operation_id,
+    )
+    environment = {
+        **os.environ,
+        "PATH": f"{binary_dir}:{os.environ['PATH']}",
+        "STATE_DIRECTORY": str(args.state_directory),
+        "BOOTSTRAP_DATABASE_FAULT": fault,
+    }
+    command = [
+        SCRIPTS / "bootstrap_database.sh",
+        "production",
+        runtime,
+        args.release_sha,
+        args.operation_id,
+        tmp_path / "backups",
+    ]
+    first = subprocess.run(command, env=environment, text=True, capture_output=True)
+    assert first.returncode == 97
+    environment.pop("BOOTSTRAP_DATABASE_FAULT")
+    second = subprocess.run(command, env=environment, text=True, capture_output=True)
+    assert second.returncode == 0, second.stderr
+
+    log = docker_log.read_text()
+    assert log.count("volume create") == 1
+    assert log.count("up -d --wait") == expected_up_calls
+    for label in (
+        "com.kirillwynn.environment=production",
+        "com.kirillwynn.role=postgres-data",
+        f"com.kirillwynn.bootstrap-operation-id={args.operation_id}",
+        "com.kirillwynn.volume-name=kirillwynn-production-test-postgres",
+    ):
+        assert label in log
+    state = module.load_state(args.state_directory, "production")
+    assert state["database"]["lifecycle_state"] == "ready"
+    assert state["database"]["bootstrap_operation_id"] == args.operation_id
+    assert state["attempts"][args.operation_id]["phase"] == "initial-backup-completed"
+
+
+def test_authorized_foreign_volume_is_rejected_without_starting_postgres(tmp_path):
+    module = load_script("record_rollout_state.py")
+    args = operation_args(tmp_path)
+    module.begin(args)
+    module.checkpoint(checkpoint_args(args, "bootstrap-volume-authorized"))
+    runtime = bootstrap_runtime(tmp_path)
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    docker_log = tmp_path / "docker.log"
+    fake_docker(
+        binary_dir / "docker",
+        existing_volume=True,
+        log_path=docker_log,
+        operation_id=args.operation_id,
+        matching_labels=False,
+    )
+    result = subprocess.run(
+        [
+            SCRIPTS / "bootstrap_database.sh",
+            "production",
+            runtime,
+            args.release_sha,
+            args.operation_id,
+            tmp_path / "backups",
+        ],
+        env={
+            **os.environ,
+            "PATH": f"{binary_dir}:{os.environ['PATH']}",
+            "STATE_DIRECTORY": str(args.state_directory),
+        },
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 2
+    assert "ownership labels do not match" in result.stderr
+    assert "up -d --wait" not in docker_log.read_text()
+
+
+def test_confirmed_database_ready_volume_disappearance_fails_closed(tmp_path):
+    module = load_script("record_rollout_state.py")
+    args = operation_args(tmp_path)
+    module.begin(args)
+    module.checkpoint(checkpoint_args(args, "bootstrap-volume-authorized"))
+    module.checkpoint(checkpoint_args(args, "bootstrap-database-ready"))
+    runtime = bootstrap_runtime(tmp_path)
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    fake_docker(
+        binary_dir / "docker",
+        existing_volume=False,
+        operation_id=args.operation_id,
+    )
+    result = subprocess.run(
+        [
+            SCRIPTS / "bootstrap_database.sh",
+            "production",
+            runtime,
+            args.release_sha,
+            args.operation_id,
+            tmp_path / "backups",
+        ],
+        env={
+            **os.environ,
+            "PATH": f"{binary_dir}:{os.environ['PATH']}",
+            "STATE_DIRECTORY": str(args.state_directory),
+        },
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 2
+    assert "database-ready PostgreSQL volume disappeared" in result.stderr

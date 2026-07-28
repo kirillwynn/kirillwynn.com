@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -286,6 +287,7 @@ def test_rollout_order_health_gates_and_active_state_policy():
         "verify_application_rollout.sh",
         "migration-started",
         "migration-completed",
+        "checkpoint-status",
         "operation_id",
     ):
         assert proof in deploy
@@ -314,7 +316,19 @@ def test_first_bootstrap_starts_only_pinned_postgres_then_backup():
     assert script.index("up -d --wait") < script.index("backup_postgres.sh")
     assert script.index("bootstrap-volume-authorized") < script.index("up -d --wait")
     assert "existing PostgreSQL volume has no durable bootstrap/rollout state" in script
+    assert "checkpoint-status" in script
+    assert "2>/dev/null" not in script
+    assert "docker volume create" in script
+    assert "com.kirillwynn.bootstrap-operation-id" in script
+    assert "com.kirillwynn.role=postgres-data" in script
+    assert "after-volume-authorization" in script
+    assert "after-volume-create" in script
+    assert "after-container-start" in script
     assert "initial-empty" in script
+    for compose_name in ("database.yml", "application.yml"):
+        compose = (ROOT / "infra" / "compose" / compose_name).read_text()
+        postgres_volume = compose.split("postgres_data:", 1)[1]
+        assert "external: true" in postgres_volume
     for forbidden in ("django", "next", "worker", "application.yml"):
         assert forbidden not in script
 
@@ -366,6 +380,56 @@ def test_ssh_deployment_persists_bundle_and_uses_cross_workflow_lock():
     assert "SERVER_REPOSITORY_PATH" not in script
 
 
+def test_ssh_remote_rollout_failure_records_evidence_and_preserves_exit_status(
+    tmp_path,
+):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    manifest = tmp_path / "manifest.json"
+    release_manifest(manifest)
+    runner_temp = tmp_path / "runner"
+    runner_temp.mkdir()
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    ssh_log = tmp_path / "ssh.log"
+    ssh = binary_dir / "ssh"
+    ssh.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s\\n' \"$*\" >> '{ssh_log}'\n"
+        'case "$*" in\n'
+        "  *deploy_environment.sh*) exit 42 ;;\n"
+        "  *) exit 0 ;;\n"
+        "esac\n"
+    )
+    ssh.chmod(0o700)
+    scp = binary_dir / "scp"
+    scp.write_text("#!/bin/sh\nexit 0\n")
+    scp.chmod(0o700)
+    result = subprocess.run(
+        [SCRIPTS / "ci_ssh_deploy.sh", "production", runtime, manifest],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "PATH": f"{binary_dir}:{os.environ['PATH']}",
+            "SERVER_HOST": "example.invalid",
+            "SERVER_USER": "deploy",
+            "SSH_PRIVATE_KEY": "test-key",
+            "SERVER_KNOWN_HOSTS": "example.invalid test-key",
+            "RELEASE_SHA": "a" * 40,
+            "GITHUB_RUN_ID": "12345678",
+            "GITHUB_RUN_ATTEMPT": "1",
+            "RUNNER_TEMP": str(runner_temp),
+        },
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 42
+    log = ssh_log.read_text()
+    assert "mark_rollout_failed.sh" in log
+    assert "remote-rollout" in log
+    assert "flock -w 900 /srv/kirillwynn/locks/release.lock" in log
+
+
 def test_rollback_uses_previous_durable_manifest_without_migration():
     script = (SCRIPTS / "rollback_environment.sh").read_text()
     assert "previous.application.manifest_path" in script
@@ -391,6 +455,17 @@ def test_recovery_restores_failed_base_application_and_production_edge():
     assert "deploy_edge.sh" in edge
     assert "edge-healthy" in edge
     assert "pending-public-smoke" in edge
+
+
+def test_reviewed_retry_and_fix_forward_use_separate_resolution_entrypoint():
+    script = (SCRIPTS / "resolve_failed_rollout.sh").read_text()
+    assert "retry|fix-forward" in script
+    assert "deploy_environment.sh" in script
+    assert "advance_edge_rollout.sh" in script
+    deploy = (SCRIPTS / "deploy_environment.sh").read_text()
+    assert "begin-resolution" in deploy
+    assert "recovery-backup-started" in deploy
+    assert "initial-empty" not in script
 
 
 def test_minio_initialization_has_bounded_readiness_retry():

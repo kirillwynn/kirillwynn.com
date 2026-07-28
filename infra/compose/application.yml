@@ -148,6 +148,7 @@ services:
 volumes:
   postgres_data:
     name: ${POSTGRES_VOLUME:?set an environment-specific PostgreSQL volume}
+    external: true
   next_cache:
     name: ${NEXT_CACHE_VOLUME:?set an environment-specific Next cache volume}
 

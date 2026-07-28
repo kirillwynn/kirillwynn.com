@@ -2,15 +2,17 @@
 set -eu
 
 usage() {
-    echo "usage: deploy_environment.sh <staging|production> <runtime-dir> <release-manifest> <operation-id>" >&2
+    echo "usage: deploy_environment.sh <staging|production> <runtime-dir> <release-manifest> <operation-id> [retry|fix-forward <failed-operation-id>]" >&2
     exit 2
 }
 
-[ "$#" -eq 4 ] || usage
+[ "$#" -eq 4 ] || [ "$#" -eq 6 ] || usage
 environment_name=$1
 runtime_dir=$2
 release_manifest=$3
 operation_id=$4
+resolution_kind=${5:-}
+failed_operation_id=${6:-}
 case "$environment_name" in
     staging|production) ;;
     *) usage ;;
@@ -23,12 +25,14 @@ state_root=${STATE_DIRECTORY:-/srv/kirillwynn/state}
 backup_root=${BACKUP_DIRECTORY:-/srv/kirillwynn/backups}
 state_script="$repository_root/infra/scripts/record_rollout_state.py"
 
-needs() {
-    python3 "$state_script" needs \
+needs_optional() {
+    printf '%s\n' "$operation_plan" | grep -Fxq -- "$1" || return 1
+    checkpoint_status=$(python3 "$state_script" checkpoint-status \
         --environment "$environment_name" \
         --operation-id "$operation_id" \
         --phase "$1" \
-        --state-directory "$state_root"
+        --state-directory "$state_root") || exit 2
+    [ "$checkpoint_status" = needed ]
 }
 
 checkpoint() {
@@ -53,6 +57,10 @@ release_sha=$(python3 "$repository_root/infra/scripts/env_value.py" \
     "$control_env" RELEASE_SHA)
 deploy_sequence=$(python3 "$repository_root/infra/scripts/env_value.py" \
     "$control_env" DEPLOY_SEQUENCE)
+postgres_volume=$(python3 "$repository_root/infra/scripts/env_value.py" \
+    "$control_env" POSTGRES_VOLUME)
+postgres_image=$(python3 "$repository_root/infra/scripts/env_value.py" \
+    "$control_env" POSTGRES_IMAGE)
 python3 "$repository_root/infra/scripts/validate_release_manifest.py" \
     "$release_manifest" --expect-sha "$release_sha"
 
@@ -76,15 +84,36 @@ mkdir -p "$backup_root"
 # The durable attempt is the first state mutation and precedes any Docker,
 # PostgreSQL, application, or edge mutation. Reusing the same immutable
 # operation ID resumes; a different operation cannot adopt its progress.
-python3 "$state_script" begin \
-    --environment "$environment_name" \
-    --operation-id "$operation_id" \
-    --operation deploy \
-    --release-sha "$release_sha" \
-    --deployment-sequence "$deploy_sequence" \
-    --runtime-directory "$runtime_dir" \
-    --manifest "$release_manifest" \
-    --state-directory "$state_root"
+if [ -n "$resolution_kind" ]; then
+    case "$resolution_kind" in
+        retry|fix-forward) ;;
+        *) usage ;;
+    esac
+    python3 "$state_script" begin-resolution \
+        --environment "$environment_name" \
+        --operation-id "$operation_id" \
+        --failed-operation-id "$failed_operation_id" \
+        --resolution "$resolution_kind" \
+        --release-sha "$release_sha" \
+        --deployment-sequence "$deploy_sequence" \
+        --runtime-directory "$runtime_dir" \
+        --manifest "$release_manifest" \
+        --postgres-volume "$postgres_volume" \
+        --postgres-image "$postgres_image" \
+        --state-directory "$state_root"
+else
+    python3 "$state_script" begin \
+        --environment "$environment_name" \
+        --operation-id "$operation_id" \
+        --operation deploy \
+        --release-sha "$release_sha" \
+        --deployment-sequence "$deploy_sequence" \
+        --runtime-directory "$runtime_dir" \
+        --manifest "$release_manifest" \
+        --postgres-volume "$postgres_volume" \
+        --postgres-image "$postgres_image" \
+        --state-directory "$state_root"
+fi
 
 operation_status=$(operation_field status)
 case "$operation_status" in
@@ -96,13 +125,19 @@ case "$operation_status" in
     in-progress) ;;
     *) echo "rollout operation is not resumable" >&2; exit 2 ;;
 esac
+operation_plan=$(python3 "$state_script" plan \
+    --environment "$environment_name" \
+    --operation-id "$operation_id" \
+    --state-directory "$state_root")
 
-first_deploy=$(operation_field first_deploy)
-if [ "$first_deploy" = true ]; then
-    "$repository_root/infra/scripts/bootstrap_database.sh" \
-        "$environment_name" "$runtime_dir" "$release_sha" "$operation_id" \
-        "$backup_root"
-else
+"$repository_root/infra/scripts/bootstrap_database.sh" \
+    "$environment_name" "$runtime_dir" "$release_sha" "$operation_id" \
+    "$backup_root"
+
+if needs_optional pre-migration-backup-started; then
+    checkpoint pre-migration-backup-started
+fi
+if needs_optional pre-migration-backup-completed; then
     active_runtime=$(operation_field base_active.application.runtime_directory)
     active_sha=$(operation_field base_active.application.release_sha)
     active_postgres_image=$(python3 "$repository_root/infra/scripts/env_value.py" \
@@ -113,22 +148,43 @@ else
         echo "PostgreSQL image changes require a reviewed database upgrade" >&2
         exit 2
     }
-    if needs pre-migration-backup-completed; then
-        "$repository_root/infra/scripts/backup_postgres.sh" \
-            "$environment_name" "$active_runtime" "$active_sha" "$backup_root" \
-            pre-migration "$operation_id"
-        checkpoint pre-migration-backup-completed
+    "$repository_root/infra/scripts/backup_postgres.sh" \
+        "$environment_name" "$active_runtime" "$active_sha" "$backup_root" \
+        pre-migration "$operation_id"
+    checkpoint pre-migration-backup-completed
+fi
+if needs_optional recovery-backup-started; then
+    checkpoint recovery-backup-started
+fi
+if needs_optional recovery-backup-completed; then
+    failed_runtime=$(operation_field base_database.bootstrap_runtime_directory)
+    failed_sha=$(operation_field candidate.application.release_sha)
+    if [ -n "$failed_operation_id" ]; then
+        failed_runtime=$(python3 "$state_script" inspect \
+            --environment "$environment_name" \
+            --operation-id "$failed_operation_id" \
+            --field candidate.application.runtime_directory \
+            --state-directory "$state_root")
+        failed_sha=$(python3 "$state_script" inspect \
+            --environment "$environment_name" \
+            --operation-id "$failed_operation_id" \
+            --field candidate.application.release_sha \
+            --state-directory "$state_root")
     fi
+    "$repository_root/infra/scripts/backup_postgres.sh" \
+        "$environment_name" "$failed_runtime" "$failed_sha" "$backup_root" \
+        recovery "$operation_id"
+    checkpoint recovery-backup-completed
 fi
 
 docker compose --env-file "$control_env" -f "$compose_file" pull django next worker
 
 migration_started_now=false
-if needs migration-started; then
+if needs_optional migration-started; then
     checkpoint migration-started
     migration_started_now=true
 fi
-if needs migration-completed; then
+if needs_optional migration-completed; then
     if [ "$migration_started_now" = true ]; then
         docker compose --env-file "$control_env" -f "$compose_file" \
             run --rm --no-deps django python manage.py migrate --noinput
@@ -147,7 +203,10 @@ if needs migration-completed; then
     checkpoint migration-completed
 fi
 
-if needs application-healthy; then
+if needs_optional application-rollout-started; then
+    checkpoint application-rollout-started
+fi
+if needs_optional application-healthy; then
     docker compose --env-file "$control_env" -f "$compose_file" up \
         -d --remove-orphans --wait \
         --wait-timeout "${ROLLOUT_WAIT_TIMEOUT_SECONDS:-180}"

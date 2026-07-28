@@ -44,6 +44,9 @@ case "$status" in
     *) echo "rollout operation cannot advance edge" >&2; exit 2 ;;
 esac
 
+if needs edge-rollout-started; then
+    checkpoint edge-rollout-started
+fi
 if [ "$environment_name" = production ]; then
     if needs edge-healthy; then
         "$repository_root/infra/scripts/deploy_edge.sh" \

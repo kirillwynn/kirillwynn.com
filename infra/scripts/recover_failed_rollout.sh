@@ -81,7 +81,14 @@ test "$(python3 "$repository_root/infra/scripts/env_value.py" \
     echo "recovery cannot change the PostgreSQL image" >&2
     exit 2
 }
+"$repository_root/infra/scripts/bootstrap_database.sh" \
+    "$environment_name" "$recovery_runtime" \
+    "$(operation_field "$operation_id" candidate.application.release_sha)" \
+    "$operation_id" "$backup_root"
 
+if needs recovery-backup-started; then
+    checkpoint recovery-backup-started
+fi
 if needs recovery-backup-completed; then
     "$repository_root/infra/scripts/backup_postgres.sh" \
         "$environment_name" "$failed_runtime" "$failed_sha" "$backup_root" \
@@ -89,6 +96,9 @@ if needs recovery-backup-completed; then
     checkpoint recovery-backup-completed
 fi
 
+if needs application-rollout-started; then
+    checkpoint application-rollout-started
+fi
 if needs application-healthy; then
     docker compose --env-file "$control_env" -f "$compose_file" \
         pull django next worker

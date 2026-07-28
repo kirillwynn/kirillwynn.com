@@ -62,6 +62,11 @@ else
     rollback_runtime=$(state_field previous.application.runtime_directory)
     rollback_sha=$(state_field previous.application.release_sha)
 fi
+control_env="$rollback_runtime/control.env"
+postgres_volume=$(python3 "$repository_root/infra/scripts/env_value.py" \
+    "$control_env" POSTGRES_VOLUME)
+postgres_image=$(python3 "$repository_root/infra/scripts/env_value.py" \
+    "$control_env" POSTGRES_IMAGE)
 
 # The rollback attempt is durable before backup, application, or edge mutation.
 python3 "$state_script" begin \
@@ -72,6 +77,8 @@ python3 "$state_script" begin \
     --deployment-sequence "$deployment_sequence" \
     --runtime-directory "$rollback_runtime" \
     --manifest "$rollback_manifest" \
+    --postgres-volume "$postgres_volume" \
+    --postgres-image "$postgres_image" \
     --state-directory "$state_root"
 
 status=$(operation_field status)
@@ -87,7 +94,6 @@ esac
 
 current_runtime=$(operation_field base_active.application.runtime_directory)
 current_sha=$(operation_field base_active.application.release_sha)
-control_env="$rollback_runtime/control.env"
 compose_file="$(dirname "$rollback_manifest")/infra/compose/application.yml"
 test "$(python3 "$repository_root/infra/scripts/env_value.py" \
     "$current_runtime/control.env" POSTGRES_IMAGE)" = \
@@ -96,7 +102,13 @@ test "$(python3 "$repository_root/infra/scripts/env_value.py" \
     echo "rollback cannot change the PostgreSQL image" >&2
     exit 2
 }
+"$repository_root/infra/scripts/bootstrap_database.sh" \
+    "$environment_name" "$rollback_runtime" "$rollback_sha" \
+    "$operation_id" "$backup_root"
 
+if needs recovery-backup-started; then
+    checkpoint recovery-backup-started
+fi
 if needs recovery-backup-completed; then
     "$repository_root/infra/scripts/backup_postgres.sh" \
         "$environment_name" "$current_runtime" "$current_sha" "$backup_root" \
@@ -104,6 +116,9 @@ if needs recovery-backup-completed; then
     checkpoint recovery-backup-completed
 fi
 
+if needs application-rollout-started; then
+    checkpoint application-rollout-started
+fi
 if needs application-healthy; then
     docker compose --env-file "$control_env" -f "$compose_file" \
         pull django next worker
