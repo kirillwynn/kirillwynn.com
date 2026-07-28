@@ -8,6 +8,15 @@ test_root=$(mktemp -d)
 bootstrap_control=
 orphan_control=
 cleanup() {
+    status=$?
+    trap - EXIT HUP INT TERM
+    set +e
+    if [ "$status" -ne 0 ]; then
+        echo "Container smoke failed; reporting bounded non-secret runtime diagnostics" >&2
+        docker compose --profile dynamic-edge -f "$compose_file" ps --all >&2
+        docker compose --profile dynamic-edge -f "$compose_file" \
+            logs --no-color --tail=200 django >&2
+    fi
     docker compose --profile dynamic-edge -f "$compose_file" down --volumes --remove-orphans
     if [ -n "$bootstrap_control" ] && [ -f "$bootstrap_control" ]; then
         docker compose --env-file "$bootstrap_control" -f "$database_compose" \
@@ -20,6 +29,7 @@ cleanup() {
     docker volume rm kirillwynn-production-bootstrap-postgres \
         kirillwynn-production-orphan-postgres >/dev/null 2>&1 || true
     rm -rf "$test_root"
+    exit "$status"
 }
 trap cleanup EXIT HUP INT TERM
 
