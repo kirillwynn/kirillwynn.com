@@ -199,7 +199,6 @@ def test_runtime_values_reject_multiline_nul_and_oversized(value, message):
     [
         ("DJANGO_ALLOWED_HOSTS", "shared.example"),
         ("POSTGRES_USER", "shared"),
-        ("S3_MEDIA_BUCKET", "shared-media"),
         ("EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE", "resend/shared/account"),
         ("POSTGRES_IMAGE", "postgres:17-alpine"),
         ("DJANGO_IMAGE", f"django@sha256:{'0' * 64}"),
@@ -213,6 +212,21 @@ def test_runtime_environment_rejects_shared_or_mutable_boundaries(
     monkeypatch.setenv(name, value)
     with pytest.raises(ValueError, match=name):
         module.runtime_values("production")
+
+
+def test_runtime_environment_accepts_provider_assigned_bucket_name(monkeypatch):
+    module = load_script("render_runtime_env.py")
+    set_runtime_environment(monkeypatch, "staging")
+    monkeypatch.setenv(
+        "S3_MEDIA_BUCKET",
+        "ae45930d-8f972d69-0fec-4a82-99fc-18aa222510b0",
+    )
+    roles = module.runtime_values("staging")
+    assert (
+        roles["django.env"]["S3_MEDIA_BUCKET"]
+        == "ae45930d-8f972d69-0fec-4a82-99fc-18aa222510b0"
+    )
+    assert roles["django.env"]["S3_MEDIA_PREFIX"] == "staging/media"
 
 
 def test_backup_metadata_is_required_and_checksum_verified(tmp_path):
@@ -406,6 +420,9 @@ def test_ssh_deployment_persists_bundle_and_uses_cross_workflow_lock():
     assert "install_release_bundle.sh" in script
     assert "/srv/kirillwynn/releases/$RELEASE_SHA" in script
     assert "flock -w 900 /srv/kirillwynn/locks/release.lock" in script
+    assert script.index("bootstrap_edge_if_absent.sh") < script.index(
+        "deploy_environment.sh"
+    )
     assert script.index("deploy_environment.sh") < script.index("finalize_rollout.sh")
     assert "A lost SSH response" in script
     assert script.count('"$finalize_command"') == 2
@@ -587,5 +604,18 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "ports 80/443 are in use" in script
     assert "openssl passwd -apr1 -stdin" in script
     assert "install -m 0600" in script
+    assert "/srv/kirillwynn/runtime/edge.env" in script
+    assert "edge_runtime=ready" in script
     assert "host_http_listeners" in script
     assert "deploy_environment.sh" not in script
+
+
+def test_staging_runtime_preflight_runs_before_activation_flag():
+    workflow = (
+        ROOT / ".github" / "workflows" / "staging-release.yml"
+    ).read_text()
+    render = workflow.index("Render bounded runtime environment")
+    deploy = workflow.index("Deploy release digests")
+    assert render < deploy
+    assert "if: vars.STAGING_DEPLOY_ENABLED == 'true'" in workflow[deploy:]
+    assert "if: vars.STAGING_DEPLOY_ENABLED != 'true'" in workflow

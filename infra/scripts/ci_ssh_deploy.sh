@@ -75,7 +75,7 @@ ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "cd '$durable_release' && if test -d '$durable_runtime'; then diff -qr '$remote_dir/runtime-input' '$durable_runtime' >/dev/null; else infra/scripts/validate_runtime_env_file.py --environment '$environment_name' --input-dir '$remote_dir/runtime-input' --output-dir '$durable_runtime'; fi"
 
 edge_runtime_env=/srv/kirillwynn/runtime/edge.env
-remote_rollout="infra/scripts/deploy_environment.sh '$environment_name' '$durable_runtime' '$durable_release/release-manifest.json' '$operation_id' && infra/scripts/advance_edge_rollout.sh '$environment_name' '$operation_id' '$durable_release/release-manifest.json' '$edge_runtime_env'"
+remote_rollout="infra/scripts/bootstrap_edge_if_absent.sh '$durable_release/release-manifest.json' '$edge_runtime_env' && infra/scripts/deploy_environment.sh '$environment_name' '$durable_runtime' '$durable_release/release-manifest.json' '$operation_id' && infra/scripts/advance_edge_rollout.sh '$environment_name' '$operation_id' '$durable_release/release-manifest.json' '$edge_runtime_env'"
 set +e
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "cd '$durable_release' && mkdir -p /srv/kirillwynn/locks && DOCKER_CONFIG='$remote_docker_config' flock -w 900 /srv/kirillwynn/locks/release.lock sh -c \"$remote_rollout\""

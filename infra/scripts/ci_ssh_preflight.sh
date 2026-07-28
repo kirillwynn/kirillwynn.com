@@ -100,6 +100,19 @@ install -d -m 0700 \
     /srv/kirillwynn/backups/staging \
     /srv/kirillwynn/locks
 install -d -m 0755 /var/www/certbot/.well-known/acme-challenge
+edge_runtime_tmp=/srv/kirillwynn/runtime/.edge.env.$$
+trap 'rm -f -- "$edge_runtime_tmp"' EXIT HUP INT TERM
+umask 077
+printf '%s\n' \
+    'STAGING_EDGE_NETWORK=kirillwynn-staging-edge' \
+    'PRODUCTION_EDGE_NETWORK=kirillwynn-production-edge' \
+    'LETSENCRYPT_DIR=/etc/letsencrypt' \
+    'ACME_WEBROOT=/var/www/certbot' \
+    'STAGING_HTPASSWD_FILE=/etc/nginx/.htpasswd' \
+    > "$edge_runtime_tmp"
+chmod 0600 "$edge_runtime_tmp"
+mv -f -- "$edge_runtime_tmp" /srv/kirillwynn/runtime/edge.env
+trap - EXIT HUP INT TERM
 
 staging_fullchain=/etc/letsencrypt/live/staging.kirillwynn.com/fullchain.pem
 staging_privkey=/etc/letsencrypt/live/staging.kirillwynn.com/privkey.pem
@@ -161,6 +174,7 @@ printf 'staging_rollout_state=%s\n' "$rollout_state"
 echo "tls_material=ready"
 echo "acme_webroot=ready"
 echo "staging_htpasswd=ready"
+echo "edge_runtime=ready"
 listener_count=$(
     ss -H -ltn |
         awk '$4 ~ /:80$/ || $4 ~ /:443$/ { count += 1 } END { print count + 0 }'

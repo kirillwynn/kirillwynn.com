@@ -135,7 +135,6 @@ ENVIRONMENT_RULES = {
         "database": re.compile(r".*staging.*"),
         "database_user": re.compile(r".*staging.*"),
         "prefix": re.compile(r"(^|/)staging(/|$)"),
-        "bucket": re.compile(r".*staging.*"),
         "provider_namespace": re.compile(r"(^|/)staging(/|$)"),
     },
     "production": {
@@ -143,7 +142,6 @@ ENVIRONMENT_RULES = {
         "database": re.compile(r".*production.*"),
         "database_user": re.compile(r".*production.*"),
         "prefix": re.compile(r"(^|/)production(/|$)"),
-        "bucket": re.compile(r".*production.*"),
         "provider_namespace": re.compile(r"(^|/)production(/|$)"),
     },
 }
@@ -192,7 +190,6 @@ def validate_environment_identity(environment, values):
             bool(rules["database_user"].fullmatch(values["POSTGRES_USER"])),
         ),
         ("S3_MEDIA_PREFIX", bool(rules["prefix"].search(values["S3_MEDIA_PREFIX"]))),
-        ("S3_MEDIA_BUCKET", bool(rules["bucket"].fullmatch(values["S3_MEDIA_BUCKET"]))),
         (
             "EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
             bool(

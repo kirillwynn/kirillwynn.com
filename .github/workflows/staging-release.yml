@@ -124,7 +124,6 @@ jobs:
     needs:
       - release-manifest
       - server-preflight
-    if: vars.STAGING_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: staging
     permissions:
@@ -191,13 +190,19 @@ jobs:
           printf 'NEXT_IMAGE=%s\n' "$(python infra/scripts/release_image.py release-manifest.json next)" >> "$GITHUB_ENV"
       - name: Render bounded runtime environment
         run: python infra/scripts/render_runtime_env.py --environment staging --output-dir "$RUNNER_TEMP/staging-runtime"
+      - name: Report disabled staging activation
+        if: vars.STAGING_DEPLOY_ENABLED != 'true'
+        run: echo "staging runtime and server preflight passed; activation remains disabled"
       - name: Deploy release digests
+        if: vars.STAGING_DEPLOY_ENABLED == 'true'
         env:
           ATTESTATION_OUTPUT: staging-attestation.json
         run: infra/scripts/ci_ssh_deploy.sh staging "$RUNNER_TEMP/staging-runtime" release-manifest.json
       - name: Validate complete staging attestation
+        if: vars.STAGING_DEPLOY_ENABLED == 'true'
         run: python infra/scripts/validate_attestation.py staging-attestation.json release-manifest.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: vars.STAGING_DEPLOY_ENABLED == 'true'
         with:
           name: staging-attestation-${{ github.sha }}
           path: staging-attestation.json
