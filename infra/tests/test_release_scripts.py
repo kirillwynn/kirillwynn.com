@@ -580,4 +580,9 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "/srv/kirillwynn/state/staging" in script
     assert "/srv/kirillwynn/backups/staging" in script
     assert "kirillwynn-staging-postgres" in script
+    assert "/etc/letsencrypt/live/staging.kirillwynn.com/fullchain.pem" in script
+    assert "/etc/letsencrypt/live/kirillwynn.com/fullchain.pem" in script
+    assert "openssl passwd -apr1 -stdin" in script
+    assert "install -m 0600" in script
+    assert "host_http_listeners" in script
     assert "deploy_environment.sh" not in script

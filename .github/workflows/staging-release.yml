@@ -112,6 +112,7 @@ jobs:
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+      STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
       GHCR_USERNAME: ${{ github.actor }}
       GHCR_TOKEN: ${{ github.token }}
     steps:

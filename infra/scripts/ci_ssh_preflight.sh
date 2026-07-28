@@ -5,6 +5,7 @@ set -eu
 : "${SERVER_USER:?}"
 : "${SSH_PRIVATE_KEY:?}"
 : "${SERVER_KNOWN_HOSTS:?}"
+: "${STAGING_BASIC_AUTH:?}"
 : "${GHCR_USERNAME:?}"
 : "${GHCR_TOKEN:?}"
 : "${GITHUB_RUN_ID:?}"
@@ -17,6 +18,31 @@ case "$GHCR_USERNAME" in
         exit 2
         ;;
 esac
+case "$STAGING_BASIC_AUTH" in
+    *'
+'*)
+        echo "staging Basic Auth credential must be single-line" >&2
+        exit 2
+        ;;
+    *:*)
+        auth_user=${STAGING_BASIC_AUTH%%:*}
+        auth_password=${STAGING_BASIC_AUTH#*:}
+        ;;
+    *)
+        echo "staging Basic Auth credential must use user:password format" >&2
+        exit 2
+        ;;
+esac
+case "$auth_user" in
+    *[!A-Za-z0-9._-]*|"")
+        echo "staging Basic Auth username contains unsupported characters" >&2
+        exit 2
+        ;;
+esac
+test -n "$auth_password" || {
+    echo "staging Basic Auth password must not be empty" >&2
+    exit 2
+}
 case "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" in
     *[!0-9:]*)
         echo "GitHub run identifiers must be numeric" >&2
@@ -49,6 +75,16 @@ printf '%s' "$GHCR_TOKEN" |
     ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
         "DOCKER_CONFIG='$remote_docker_config' docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin >/dev/null 2>&1"
 
+auth_hash=$(printf '%s' "$auth_password" | openssl passwd -apr1 -stdin)
+local_auth_file=$ssh_dir/staging.htpasswd
+printf '%s:%s\n' "$auth_user" "$auth_hash" > "$local_auth_file"
+chmod 600 "$local_auth_file"
+scp $ssh_options "$local_auth_file" \
+    "$SERVER_USER@$SERVER_HOST:$remote_dir/staging.htpasswd"
+rm -f -- "$local_auth_file"
+ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+    "install -d -m 0755 /etc/nginx && install -m 0600 '$remote_dir/staging.htpasswd' /etc/nginx/.htpasswd"
+
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "DOCKER_CONFIG='$remote_docker_config' docker info >/dev/null"
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" sh -s \
@@ -63,6 +99,23 @@ install -d -m 0700 \
     /srv/kirillwynn/state/staging \
     /srv/kirillwynn/backups/staging \
     /srv/kirillwynn/locks
+install -d -m 0755 /var/www/certbot/.well-known/acme-challenge
+
+for tls_file in \
+    /etc/letsencrypt/live/staging.kirillwynn.com/fullchain.pem \
+    /etc/letsencrypt/live/staging.kirillwynn.com/privkey.pem \
+    /etc/letsencrypt/live/kirillwynn.com/fullchain.pem \
+    /etc/letsencrypt/live/kirillwynn.com/privkey.pem
+do
+    test -s "$tls_file" || {
+        echo "required TLS material is missing: $tls_file" >&2
+        exit 2
+    }
+done
+test -s /etc/nginx/.htpasswd || {
+    echo "staging htpasswd file is missing" >&2
+    exit 2
+}
 
 volume_state=absent
 if docker volume inspect kirillwynn-staging-postgres >/dev/null 2>&1; then
@@ -80,6 +133,14 @@ fi
 printf 'compose_version=%s\n' "$(docker compose version --short)"
 printf 'staging_postgres_volume=%s\n' "$volume_state"
 printf 'staging_rollout_state=%s\n' "$rollout_state"
+echo "tls_material=ready"
+echo "acme_webroot=ready"
+echo "staging_htpasswd=ready"
+listener_count=$(
+    ss -H -ltn |
+        awk '$4 ~ /:80$/ || $4 ~ /:443$/ { count += 1 } END { print count + 0 }'
+)
+printf 'host_http_listeners=%s\n' "$listener_count"
 if test -f /srv/kirillwynn/state/production/rollout-state.json; then
     echo "production_rollout_state=present"
 else
