@@ -437,8 +437,11 @@ def test_edge_bootstrap_binds_manifest_digest_before_compose_inspection():
     script = (SCRIPTS / "bootstrap_edge_if_absent.sh").read_text()
     bind = script.index("release_image.py")
     inspect = script.index("docker compose")
+    deploy = script.index("deploy_edge.sh")
     assert bind < inspect
     assert "export EDGE_IMAGE" in script[bind:inspect]
+    assert "reviewed ingress migration is required" in script[inspect:deploy]
+    assert "ss -H -ltn" in script[inspect:deploy]
 
 
 def test_ssh_remote_rollout_failure_records_evidence_and_preserves_exit_status(
@@ -615,6 +618,9 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "/srv/kirillwynn/runtime/edge.env" in script
     assert "edge_runtime=ready" in script
     assert "host_http_listeners" in script
+    assert "com.docker.compose.project=kirillwynn-edge" in script
+    assert "com.docker.compose.service=edge" in script
+    assert "reviewed ingress migration is required" in script
     assert "deploy_environment.sh" not in script
 
 

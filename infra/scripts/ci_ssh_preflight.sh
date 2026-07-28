@@ -179,7 +179,21 @@ listener_count=$(
     ss -H -ltn |
         awk '$4 ~ /:80$/ || $4 ~ /:443$/ { count += 1 } END { print count + 0 }'
 )
+shared_edge_container=$(
+    docker ps -q \
+        --filter label=com.docker.compose.project=kirillwynn-edge \
+        --filter label=com.docker.compose.service=edge
+)
+if test "$listener_count" -gt 0 && test -z "$shared_edge_container"; then
+    echo "shared edge is absent while host ports 80/443 are allocated; reviewed ingress migration is required" >&2
+    exit 2
+fi
 printf 'host_http_listeners=%s\n' "$listener_count"
+if test -n "$shared_edge_container"; then
+    echo "shared_edge=present"
+else
+    echo "shared_edge=absent"
+fi
 if test -f /srv/kirillwynn/state/production/rollout-state.json; then
     echo "production_rollout_state=present"
 else

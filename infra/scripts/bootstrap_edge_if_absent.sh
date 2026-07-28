@@ -28,6 +28,15 @@ if [ -n "$edge_container" ]; then
     exit 0
 fi
 
+listener_count=$(
+    ss -H -ltn |
+        awk '$4 ~ /:80$/ || $4 ~ /:443$/ { count += 1 } END { print count + 0 }'
+)
+test "$listener_count" -eq 0 || {
+    echo "shared edge is absent while host ports 80/443 are allocated; reviewed ingress migration is required" >&2
+    exit 2
+}
+
 "$repository_root/infra/scripts/deploy_edge.sh" \
     "$release_manifest" \
     "$edge_runtime_env"
