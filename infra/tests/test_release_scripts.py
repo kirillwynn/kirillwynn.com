@@ -329,6 +329,7 @@ def test_rollout_order_health_gates_and_active_state_policy():
         ".Config.Image",
     ):
         assert proof in health
+    assert "X-Forwarded-Proto" in health
     finalize = (SCRIPTS / "finalize_rollout.sh").read_text()
     assert "record_rollout_state.py" in finalize
     assert "finalize" in finalize

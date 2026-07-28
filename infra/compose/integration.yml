@@ -113,7 +113,7 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/readiness/', timeout=3)"
+        - "import urllib.request; q=urllib.request.Request('http://127.0.0.1:8000/api/readiness/',headers={'X-Forwarded-Proto':'https'}); urllib.request.urlopen(q,timeout=3)"
       interval: 3s
       timeout: 3s
       retries: 30

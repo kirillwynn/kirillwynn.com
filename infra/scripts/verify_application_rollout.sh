@@ -18,7 +18,7 @@ next_image=$(python3 "$repository_root/infra/scripts/release_image.py" \
     "$release_manifest" next)
 
 docker compose --env-file "$control_env" -f "$compose_file" exec -T django \
-    python -c "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/readiness/', timeout=5); raise SystemExit(0 if r.status == 200 else 1)"
+    python -c "import urllib.request; q=urllib.request.Request('http://127.0.0.1:8000/api/readiness/',headers={'X-Forwarded-Proto':'https'}); r=urllib.request.urlopen(q,timeout=5); raise SystemExit(0 if r.status == 200 else 1)"
 docker compose --env-file "$control_env" -f "$compose_file" exec -T django \
     python manage.py check --deploy
 docker compose --env-file "$control_env" -f "$compose_file" exec -T next \
