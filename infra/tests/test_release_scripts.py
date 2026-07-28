@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -92,6 +93,33 @@ def test_release_manifest_requires_three_real_digests(tmp_path):
     manifest.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="forbidden placeholder"):
         module.load_manifest(manifest)
+
+
+def test_retained_artifact_scanner_checks_plain_image_metadata_and_zip_entries(tmp_path):
+    scanner = ROOT / "infra" / "tests" / "scan_test_artifacts.sh"
+    safe = tmp_path / "safe"
+    safe.mkdir()
+    (safe / "trace.txt").write_text("deterministic test result")
+    assert subprocess.run([scanner, safe], check=False).returncode == 0
+
+    (safe / "failure.png").write_bytes(
+        b"\x89PNG\r\n\x1a\nmetadata=http://django:8000"
+    )
+    assert subprocess.run([scanner, safe], check=False).returncode != 0
+    (safe / "failure.png").unlink()
+
+    with zipfile.ZipFile(safe / "trace.zip", "w") as archive:
+        archive.writestr("network.log", "Authorization: Bearer leaked")
+    assert subprocess.run([scanner, safe], check=False).returncode != 0
+    assert (
+        subprocess.run(
+            [scanner, "--remove-unsafe", safe],
+            check=False,
+        ).returncode
+        == 0
+    )
+    assert not (safe / "trace.zip").exists()
+    assert subprocess.run([scanner, safe], check=False).returncode == 0
 
 
 def test_runtime_roles_are_minimal_and_preserve_raw_bytes(monkeypatch):

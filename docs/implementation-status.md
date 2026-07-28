@@ -4,11 +4,11 @@ Last updated: 2026-07-28
 
 Integration branch: `rewrite/wagtail-next`
 
-Overall state: Milestone 10 repository-owned staging/production infrastructure
-and recovery-gap remediation implemented with operation-owned database volumes,
-an independent database lifecycle, and reviewed failure resolution;
-deterministic checks pass, while external activation and unavailable local
-Docker/Nginx/PostgreSQL/provider/browser runtime verification remain pending
+Overall state: Milestone 11 testing and security hardening is implemented at
+the repository boundary with explicit PostgreSQL/Compose/Playwright CI gates,
+upload and interaction boundary hardening, and deterministic four-viewport
+browser coverage; external staging activation, live providers, production
+deployment, and unavailable local Docker/Nginx/PostgreSQL checks remain pending
 
 ## Current repository state
 
@@ -401,22 +401,40 @@ Docker/Nginx/PostgreSQL/provider/browser runtime verification remain pending
   carry deep-validated activation policy so recovery retry lineages preserve
   previous while deploy/rollback/fix-forward lineages rotate active to
   previous.
+- [x] Milestone 11 began with the baseline coverage matrix in
+  `docs/testing-security.md`; existing post/comment/thread/reaction/auth/
+  subscription and infrastructure proofs are reused rather than duplicated.
+- [x] Backend security gaps now cover cross-session and cross-origin CSRF,
+  expired sessions, forbidden Unicode scalars, site-author/owner/moderator
+  permissions, upload format/size/pixel limits, and metadata-free image
+  originals.
+- [x] PostgreSQL search, comment/reaction/rate-limit locking, and outbox claim
+  races are an explicit marker-selected CI suite; `PYTEST_FAIL_ON_SKIP=1`
+  turns any PostgreSQL skip into a required-job failure.
+- [x] Deterministic Playwright coverage exercises anonymous reading, mock
+  Google/GitHub login, comments/threads/reactions, subscription confirmation
+  and unsubscribe, Draft Mode isolation, Feed search/tags/pagination, keyboard
+  traps/Escape/focus restoration, and axe at 375x812, 768x1024, 1440x900, and
+  1920x1080.
+- [x] Browser screenshots and traces are failure-only, video is disabled, and
+  retained artifacts are scanned (including zip entries and image bytes) for
+  credentials, secret sentinels, and internal origins; unsafe files are removed
+  before the remaining failure artifacts receive a seven-day upload.
+- [x] CI retains the exact Next.js proxy allowlist without a broad `/api/*`
+  rewrite, runs the full Compose/Nginx/PostgreSQL/backup-recovery/MinIO/egress/
+  restart suite, and exposes one `ci-required` result that fails unless every
+  mandatory Milestone 11 job succeeds.
 
 ## Milestone transition
 
-Milestone 10 remediation is complete at the repository boundary. The repository
-now defines least-privilege runtime topology, immutable production images,
-dynamic same-origin edge routing, S3 media, the bounded worker, full
-CI/build/promotion gates, crash-safe durable operational and database lifecycle
-state, operation-owned volume bootstrap, failure evidence after every runtime
-mutation, reviewed active-release recovery and first-deploy retry/fix-forward,
-and isolated backup/restore/bootstrap procedures. No Milestone 11 work or
-server, registry, DNS, TLS, OAuth, Resend, GitHub Environment/secret, bucket,
-or production data state was changed.
+Milestone 11 testing and security hardening is complete at the repository
+boundary. It did not activate staging, perform the functional launch, redesign
+the public UI, deploy production, or change server, registry, DNS, TLS, OAuth,
+Resend, GitHub Environment/secret, bucket, or production data state.
 
 ### Next recommended session
 
-Milestone 11: end-to-end hardening and functional launch, only after the
+Functional staging acceptance (product checklist Stage 13), only after the
 external staging activation checklist is completed.
 
 Scope:
@@ -424,7 +442,7 @@ Scope:
 1. Activate the protected staging environment and required external namespaces.
 2. Run the repository container/PostgreSQL/Nginx smoke checks on the target
    runtime.
-3. Complete real staging OAuth, Resend, S3, browser, responsive, accessibility,
+3. Complete real staging OAuth, Resend, S3, authoring, scheduled publication,
    backup/restore-drill, and rollback rehearsal.
 4. Reconcile every failed or unavailable check before considering production.
 
@@ -439,7 +457,8 @@ Out of scope for that session:
 - Staging runtime passes all container and PostgreSQL checks.
 - OAuth, Resend, S3, media, Draft Mode, and signed revalidation pass on staging.
 - Backup/restore and compatible image rollback are rehearsed.
-- 375x812 and 1440x900 browser, keyboard, focus, and non-hover checks pass.
+- The same release SHA passes the already-required 375x812, 768x1024,
+  1440x900, and 1920x1080 browser matrix in CI.
 
 ## Milestone queue
 
@@ -453,7 +472,8 @@ Out of scope for that session:
 - [x] Milestone 8 — PostgreSQL search and tag filtering.
 - [x] Milestone 9 — email subscriptions and durable outbox worker.
 - [x] Milestone 10 — isolated staging/production infrastructure.
-- [ ] Milestone 11 — end-to-end hardening and functional launch.
+- [x] Milestone 11 — testing and security hardening.
+- [ ] Functional staging acceptance and launch.
 - [ ] Milestone 12 — visual design and polish.
 
 ## Known risks
@@ -478,18 +498,14 @@ Out of scope for that session:
   unverified locally because Docker and PostgreSQL server binaries are not
   available. YAML parsing and route-contract tests are not represented as
   Docker Compose, image, Nginx, PostgreSQL, or integration-runtime verification.
-- PostgreSQL-only row-lock concurrency tests for rate-bucket creation and
-  comment edit/delete and reaction toggle serialization exist but were skipped
-  locally because the test database is SQLite. The production model was not
-  weakened or imitated for SQLite.
-- PostgreSQL search ranking/weight assertions exist but were skipped locally
-  with the other PostgreSQL-only tests because no PostgreSQL or container
-  runtime is installed. SQLite verifies fields, Unicode, visibility, filtering,
-  validation, and pagination but is not represented as PostgreSQL ranking.
-- Browser runtime setup and troubleshooting succeeded, but no in-app Browser or
-  Chrome backend was connected. Feed checks at 375x812 and 1440x900, real
-  keyboard focus order, Back/Forward restoration, and visual empty/pagination
-  states remain unverified rather than simulated.
+- Seven PostgreSQL-only search/locking/concurrency cases were deselected from
+  the local SQLite run because no PostgreSQL or container runtime is installed.
+  They run in a dedicated CI selection where any skip fails the job; the
+  production model was not weakened or imitated for SQLite.
+- Local Chromium passed the complete deterministic Playwright matrix at all
+  four required viewports. This proves repository browser behavior against
+  mock providers, not live staging OAuth/Resend/S3, target Nginx, or production
+  data.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - The shared edge cannot be replaced independently per application environment;
@@ -525,6 +541,22 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 
 2026-07-28:
 
+- Milestone 11 coverage audit recorded the pre-change 480 backend, 152 Vitest,
+  and 131 infrastructure cases. The completed local SQLite selection passed
+  486 tests with seven PostgreSQL cases deliberately deselected; Ruff format/
+  lint, Django check, migration drift, and the targeted security suite passed.
+- Playwright 1.62.0 with Chromium passed 20/20 critical-flow runs: five flows
+  at each of 375x812, 768x1024, 1440x900, and 1920x1080. Axe, keyboard trap,
+  Escape/focus restoration, mobile full-screen thread, mock Google/GitHub,
+  subscriptions, Draft Mode isolation, and feed controls are included.
+- Frontend format, ESLint, TypeScript, 152 Vitest tests, production Next.js
+  build, and `npm audit --audit-level=high` (zero vulnerabilities) passed.
+  Turbopack build and browser servers required the approved loopback sandbox
+  exception.
+- Deterministic infrastructure verification passed 132 pytest cases plus shell
+  syntax and Python compilation. Docker, Compose, Nginx, PostgreSQL, `psql`,
+  and `pg_isready` remain unavailable locally; their full suite is required by
+  `ci-required` and is not claimed as locally executed.
 - Exact-candidate retry now receives a positive reviewed sequence explicitly
   through `resolve_failed_rollout.sh`; ordinary CI still reads rendered
   `DEPLOY_SEQUENCE`. Shell regression invokes the real resolution entrypoint

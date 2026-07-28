@@ -15,6 +15,7 @@ from apps.discussions.services import (
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
+    pytest.mark.postgresql,
     pytest.mark.skipif(
         connection.vendor != "postgresql",
         reason="Row-locking semantics require PostgreSQL.",
@@ -29,7 +30,10 @@ def _run_concurrently(functions):
         close_old_connections()
         barrier.wait()
         try:
-            return function()
+            try:
+                return function()
+            except Exception as error:
+                return error
         finally:
             close_old_connections()
 
@@ -57,6 +61,27 @@ def test_rate_limit_bucket_creation_race_keeps_one_row(user):
         scope=CommentRateLimitBucket.Scope.CREATE,
     )
     assert bucket.request_count == 2
+
+
+def test_parallel_comment_create_limit_allows_exactly_one_request(user, settings):
+    from apps.discussions.services import RateLimitExceeded
+
+    settings.COMMENT_CREATE_RATE_LIMIT_COUNT = 1
+    results = _run_concurrently(
+        [
+            lambda: consume_comment_rate_limit(
+                user=user,
+                scope=CommentRateLimitBucket.Scope.CREATE,
+            ),
+            lambda: consume_comment_rate_limit(
+                user=user,
+                scope=CommentRateLimitBucket.Scope.CREATE,
+            ),
+        ]
+    )
+
+    assert sum(result is None for result in results) == 1
+    assert sum(isinstance(result, RateLimitExceeded) for result in results) == 1
 
 
 def test_edit_delete_race_serializes_to_deleted_state(public_post, user):

@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@emoji-mart/data": "1.2.1",
@@ -25,7 +26,9 @@
     "server-only": "0.0.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.62.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "24.10.4",
     "@types/react": "19.2.5",
@@ -41,6 +44,7 @@
   },
   "overrides": {
     "brace-expansion": "5.0.8",
+    "playwright-core": "1.62.0",
     "postcss": "8.5.23",
     "sharp": "0.35.3"
   }

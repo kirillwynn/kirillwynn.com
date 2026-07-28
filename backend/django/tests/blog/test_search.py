@@ -435,7 +435,11 @@ def test_empty_query_is_absent_and_unknown_unicode_tag_is_empty(blog_index):
     assert unknown_tag.data["results"] == []
 
 
-@pytest.mark.skipif(connection.vendor != "postgresql", reason="PostgreSQL ranking assertion")
+@pytest.mark.postgresql
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="PostgreSQL ranking assertion",
+)
 def test_postgresql_ranking_respects_weights_and_pk_tie_break(blog_index):
     title = make_search_post(
         blog_index,

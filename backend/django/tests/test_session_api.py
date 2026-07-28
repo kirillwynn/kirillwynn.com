@@ -81,6 +81,22 @@ def test_inactive_user_session_is_rejected(client):
     assert payload["user"] is None
 
 
+def test_expired_database_session_is_anonymous_and_cannot_restore_authentication(client):
+    user = get_user_model().objects.create_user(
+        username="reader",
+        email="reader@example.com",
+    )
+    client.force_login(user)
+    session = client.session
+    session.set_expiry(-1)
+    session.save()
+
+    payload = client.get("/api/me/").json()
+
+    assert payload["authenticated"] is False
+    assert payload["user"] is None
+
+
 def test_authenticated_logout_requires_valid_csrf_and_get_never_logs_out():
     from django.test import Client
 

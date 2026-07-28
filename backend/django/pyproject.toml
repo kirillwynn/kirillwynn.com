@@ -40,6 +40,9 @@ addopts = [
     "--strict-markers",
 ]
 testpaths = ["tests"]
+markers = [
+    "postgresql: requires PostgreSQL locking, search, or concurrency semantics",
+]
 
 [tool.ruff]
 line-length = 100

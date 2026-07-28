@@ -158,11 +158,26 @@ def test_create_requires_session_csrf_and_rejects_identity_fields(public_post, u
         ("x" * 5001, 400),
         ("nul\u0000byte", 400),
         ("bidi\u202etext", 400),
+        ("\ufdd0", 400),
+        ("\U0010ffff", 400),
     ],
 )
 def test_body_boundaries(public_post, user, body, status):
     response = login_api(user).post(comments_url(public_post), {"body": body}, format="json")
     assert response.status_code == status
+
+
+def test_raw_json_surrogate_is_rejected_without_encoding_or_database_error(public_post, user):
+    client = login_api(user)
+    response = client.generic(
+        "POST",
+        comments_url(public_post),
+        data=b'{"body":"\\ud800"}',
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert response.data["body"]
 
 
 def test_reply_to_reply_flattens_and_thread_orders_oldest_first(public_post, user, other_user):
@@ -229,6 +244,34 @@ def test_owner_edit_delete_permissions_and_noop(public_post, user, other_user, a
     assert deleted.status_code == 204
     assert deleted_again.status_code == 204
     assert rejected_edit.status_code == 400
+
+
+def test_site_author_identity_does_not_grant_cross_owner_or_moderation_permission(
+    public_post, user, other_user
+):
+    from django.core.exceptions import PermissionDenied
+
+    site_author = other_user
+    site_author.is_staff = True
+    site_author.save(update_fields=("is_staff",))
+    owned = create_top_level_comment(post=public_post, author=user, body="Reader-owned")
+    authored = create_top_level_comment(post=public_post, author=site_author, body="Author-owned")
+
+    listing = APIClient().get(comments_url(public_post))
+    by_id = {item["id"]: item for item in listing.data["results"]}
+    assert by_id[authored.pk]["author"]["is_site_author"] is True
+    assert (
+        login_api(site_author)
+        .patch(
+            reverse("discussions_api:comment-detail", kwargs={"pk": owned.pk}),
+            {"body": "Cross-owner edit"},
+            format="json",
+        )
+        .status_code
+        == 403
+    )
+    with pytest.raises(PermissionDenied):
+        set_comment_hidden(comment_id=owned.pk, moderator=site_author, hidden=True)
 
 
 def test_delete_then_edit_is_deterministically_rejected(public_post, user):

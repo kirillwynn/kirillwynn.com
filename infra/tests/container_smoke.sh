@@ -60,6 +60,16 @@ curl --fail --silent --show-error --max-time 15 -u staging:integration \
 curl --fail --silent --show-error --max-time 15 -u staging:integration \
     -H 'Host: staging.test' http://127.0.0.1:18080/ >/dev/null
 curl --fail --silent --show-error --max-time 15 -u staging:integration \
+    -H 'Host: staging.test' -D "$test_root/security-headers.txt" \
+    -o /dev/null http://127.0.0.1:18080/
+grep -Eiq '^Content-Security-Policy:.*default-src '\''self'\''.*object-src '\''none'\''' \
+    "$test_root/security-headers.txt"
+grep -Eiq '^X-Content-Type-Options: nosniff' "$test_root/security-headers.txt"
+grep -Eiq '^Referrer-Policy: strict-origin-when-cross-origin' \
+    "$test_root/security-headers.txt"
+grep -Eiq '^Strict-Transport-Security: max-age=31536000; includeSubDomains; preload' \
+    "$test_root/security-headers.txt"
+curl --fail --silent --show-error --max-time 15 -u staging:integration \
     -H 'Host: staging.test' http://127.0.0.1:18080/bridge >/dev/null
 test "$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Host: staging.test' -X POST http://127.0.0.1:18080/api/v1/email/webhooks/resend/)" != 401
 test "$(curl --silent --output /dev/null --write-out '%{http_code}' -u staging:integration -H 'Host: staging.test' http://127.0.0.1:18080/media/missing)" = 404

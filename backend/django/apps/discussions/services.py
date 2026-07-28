@@ -25,6 +25,14 @@ _DANGEROUS_FORMAT_CONTROLS = {
 }
 
 
+def _is_forbidden_scalar(code_point):
+    return (
+        0xD800 <= code_point <= 0xDFFF
+        or 0xFDD0 <= code_point <= 0xFDEF
+        or (code_point & 0xFFFF) in {0xFFFE, 0xFFFF}
+    )
+
+
 class RateLimitExceeded(Exception):
     def __init__(self, retry_after):
         self.retry_after = max(1, math.ceil(retry_after))
@@ -47,6 +55,7 @@ def normalize_comment_body(value):
             unicodedata.category(character) == "Cc"
             or character in _DANGEROUS_FORMAT_CONTROLS
             or code_point == 0
+            or _is_forbidden_scalar(code_point)
         ):
             raise ValidationError({"body": "Comment body contains a forbidden control character."})
     return normalized
@@ -186,7 +195,7 @@ def soft_delete_comment(*, comment_id, actor):
 
 @transaction.atomic
 def set_comment_hidden(*, comment_id, moderator, hidden, reason=""):
-    if not moderator.is_active or not (moderator.is_staff or moderator.is_superuser):
+    if not moderator.is_active or not moderator.has_perm("discussions.change_comment"):
         raise PermissionDenied("Administrator moderation permission is required.")
     comment = Comment.objects.select_for_update().get(pk=comment_id)
     if hidden:

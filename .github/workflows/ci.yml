@@ -31,12 +31,12 @@ jobs:
           uv run ruff check .
           uv run python manage.py check
           uv run python manage.py makemigrations --check --dry-run
-          uv run pytest
+          uv run pytest -m "not postgresql"
       - name: Production settings check
         working-directory: backend/django
         env:
           DJANGO_SETTINGS_MODULE: config.settings.production
-          DJANGO_SECRET_KEY: production-check-only
+          DJANGO_SECRET_KEY: ci-only-django-secret-not-for-runtime-32-bytes-unique-12345
           DJANGO_ALLOWED_HOSTS: example.com
           DJANGO_CSRF_TRUSTED_ORIGINS: https://example.com
           POSTGRES_HOST: db
@@ -101,7 +101,8 @@ jobs:
         working-directory: backend/django
         run: |
           uv sync --frozen
-          uv run pytest
+          PYTEST_FAIL_ON_SKIP=1 uv run pytest -m postgresql
+          PYTEST_FAIL_ON_SKIP=1 uv run pytest -m "not postgresql"
           uv run python manage.py migrate --noinput
           uv run python manage.py migrate subscriptions 0002 --noinput
           uv run python manage.py migrate subscriptions --noinput
@@ -133,6 +134,45 @@ jobs:
           ! grep -R -E \
             'DJANGO_API_URL|REVALIDATION_SECRET|RESEND_API_KEY|RESEND_WEBHOOK_SECRET|SUBSCRIPTION_SIGNING_SECRET|POSTGRES_PASSWORD|S3_MEDIA_SECRET_ACCESS_KEY|OAUTH_CLIENT_SECRET|http://django:8000|postgres sentinel|django sentinel|s3-only-integration-secret|google-only-integration-secret|github-only-integration-secret' \
             frontend/next/.next/static
+
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/next/package-lock.json
+      - working-directory: frontend/next
+        run: npm ci
+      - working-directory: frontend/next
+        run: npx playwright install --with-deps chromium
+      - id: e2e
+        continue-on-error: true
+        working-directory: frontend/next
+        run: npm run test:e2e
+      - name: Sanitize and scan retained browser artifacts
+        if: always()
+        run: |
+          infra/tests/scan_test_artifacts.sh --remove-unsafe frontend/next/test-results
+          infra/tests/scan_test_artifacts.sh --remove-unsafe frontend/next/playwright-report
+          infra/tests/scan_test_artifacts.sh frontend/next/test-results
+          infra/tests/scan_test_artifacts.sh frontend/next/playwright-report
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && steps.e2e.outcome == 'failure'
+        with:
+          name: playwright-failure-${{ github.sha }}
+          path: |
+            frontend/next/test-results
+            frontend/next/playwright-report
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce Playwright result
+        if: always()
+        env:
+          PLAYWRIGHT_OUTCOME: ${{ steps.e2e.outcome }}
+        run: test "$PLAYWRIGHT_OUTCOME" = success
 
   infrastructure:
     runs-on: ubuntu-latest
@@ -169,3 +209,27 @@ jobs:
         run: infra/tests/nginx_config_test.sh kirillwynn-edge:ci
       - name: Container integration smoke
         run: infra/tests/container_smoke.sh
+
+  ci-required:
+    if: always()
+    needs:
+      - backend-sqlite
+      - backend-postgresql
+      - frontend
+      - playwright
+      - infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Milestone 11 gate
+        env:
+          BACKEND_SQLITE: ${{ needs.backend-sqlite.result }}
+          BACKEND_POSTGRESQL: ${{ needs.backend-postgresql.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+          PLAYWRIGHT: ${{ needs.playwright.result }}
+          INFRASTRUCTURE: ${{ needs.infrastructure.result }}
+        run: |
+          test "$BACKEND_SQLITE" = success
+          test "$BACKEND_POSTGRESQL" = success
+          test "$FRONTEND" = success
+          test "$PLAYWRIGHT" = success
+          test "$INFRASTRUCTURE" = success

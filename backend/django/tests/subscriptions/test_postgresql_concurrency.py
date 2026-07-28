@@ -11,6 +11,7 @@ from apps.subscriptions.rate_limits import consume_rate_limit
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
+    pytest.mark.postgresql,
     pytest.mark.skipif(
         connection.vendor != "postgresql",
         reason="Outbox skip-locked and bucket races require PostgreSQL.",

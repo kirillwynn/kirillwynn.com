@@ -244,6 +244,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 WAGTAIL_SITE_NAME = "kirillwynn.com"
+WAGTAILIMAGES_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
+WAGTAILIMAGES_MAX_UPLOAD_SIZE = 8 * 1024 * 1024
+WAGTAILIMAGES_MAX_IMAGE_PIXELS = 40_000_000
+WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.blog.forms.MetadataStrippingImageForm"
+WAGTAILDOCS_EXTENSIONS = ["pdf"]
+WAGTAILDOCS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 WAGTAILSEARCH_BACKENDS = {
     "default": {
         "BACKEND": "wagtail.search.backends.database",
