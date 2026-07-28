@@ -7,11 +7,14 @@ Integration branch: `rewrite/wagtail-next`
 Overall state: Milestone 11 testing and security hardening is implemented at
 the repository boundary with explicit PostgreSQL/Compose/Playwright CI gates,
 upload and interaction boundary hardening, and deterministic four-viewport
-browser coverage. Stage 13A staging activation is in progress: staging-only
-storage, OAuth, email/DNS, GitHub Environment, TLS, Basic Auth, shared-edge,
-server, and runtime preflight boundaries are verified. The first application
-rollout, live content/browser acceptance, and staging restore drill remain
-pending. Production deployment and production promotion remain out of scope.
+browser coverage. Stage 13A staging activation is blocked before the first
+database/application mutation: staging-only storage, OAuth, email/DNS, GitHub
+Environment, TLS, Basic Auth, server, and runtime boundaries are prepared, but
+the legacy production Nginx still owns host ports 80/443. Replacing or changing
+that production ingress requires separate owner approval and is outside the
+staging-only authorization. Live content/browser acceptance and the staging
+restore drill remain pending. Production deployment and production promotion
+remain out of scope.
 
 ## Current repository state
 
@@ -35,8 +38,9 @@ Repository and GitHub verification completed on 2026-07-28:
 
 - Baseline `d6e166d865b0e4d8159ac5d8ee97a3c960ef479e` on
   `rewrite/wagtail-next` matched the requested parent and began from a clean
-  worktree. The latest fully preflighted release candidate is
-  `9b1621ec143913000db224892b9d4bbf402fc7c6`.
+  worktree. The latest pushed release candidate is
+  `ba99ccfe0ee99b38728b7f6861ff3b197277c6c6`; fail-closed foreign-ingress
+  detection is committed locally as `78eb114`.
 - Draft PR #32 targets `main`; no history was rewritten or squashed.
 - GitHub Environment `staging` allows only `main` and
   `rewrite/wagtail-next`. Repository-level server credentials are inherited;
@@ -60,6 +64,13 @@ Repository and GitHub verification completed on 2026-07-28:
   remained disabled for that attempt. Attempt 2 was deliberately canceled
   before release-image jobs after detecting that a full rerun would violate
   the build-once activation boundary.
+- Push CI runs `30408290526` and `30408776933` passed every required
+  repository gate, three immutable image builds, release-manifest creation,
+  and server preflight. Their staging deploy jobs failed before creation of a
+  rollout operation: first because edge bootstrap did not bind the manifest
+  digest before Compose inspection, then because the legacy Nginx already
+  owned ports 80/443. Neither failure reached backup, database bootstrap,
+  migration, application startup, public smoke, or attestation.
 - CI-discovered repository defects were fixed in separate commits: Wagtail
   test bootstrap/locale handling, subscription locking/timestamps and
   PostgreSQL row locks, Gunicorn module launch, HTTPS internal probes,
@@ -70,24 +81,30 @@ Repository and GitHub verification completed on 2026-07-28:
   GHCR authentication, TLS/Basic Auth host preflight, real runtime rendering
   before activation, provider-assigned bucket names with strict staging
   prefixes, and first-use shared-edge bootstrap under the release lock.
+  Stage 13A additionally fixed manifest edge-digest binding (`ba99ccf`) and
+  added fail-closed foreign-ingress detection before any edge mutation
+  (`78eb114`); the full local infrastructure suite passes 219 tests.
 
 Actual staging verification completed:
 
 - Compose 2.34.0, GHCR authentication, durable restricted directories,
   staging TLS, ACME webroot, generated htpasswd, and edge runtime contract
-  passed server preflight. Before application activation the staging
-  PostgreSQL volume and rollout state were both absent.
+  passed the initial server checks. Before and after the failed activation
+  attempts, the staging PostgreSQL volume and rollout state were both absent.
 - `https://staging.kirillwynn.com` presents valid TLS and requires Basic Auth.
-  Shared edge owns 80/443 and the isolated edge networks.
+  Read-only server inspection proved that this response comes from the legacy
+  Compose project `kirillwynn`: its `nginx` service owns 80/443 and proxies the
+  staging vhost to the old Flask `app`. The new shared edge is not active.
 - Immutable candidate images are Django
-  `sha256:c3087cd9a9bcaa953bc4ef5cddd02d2004bc9332e5f695c3e01331fb78cc3512`,
+  `sha256:b0f97be11493583c8b9ee3910d8208254fadfdd5fe23bae8a187f96ce713e033`,
   Next
-  `sha256:e26e7064bf18bda9d418f2a4b16cb5bc10a12f7247bcc58e282f30ef618b8ebd`,
+  `sha256:533cd51878919f0707352407c81dbaddf558e3070bffe764c5499f2ea5deaa66`,
   and edge
-  `sha256:56e49ab2933a0f014f9553596c6616da8a1fa7cefb45cfbb466f3e1d466248ee`.
+  `sha256:50cd1383ce0466bd9664f6c6ca4eb6807e82c2178773a2be1434a79532885434`.
 - `STAGING_DEPLOY_ENABLED` was enabled only after all preceding server,
   runtime, provider, storage, OAuth, email, TLS, and DNS preflight checks
-  passed.
+  passed. It was set back to `false` immediately after the foreign-ingress
+  blocker was confirmed.
 
 Actual staging verification still open:
 
@@ -98,13 +115,17 @@ Actual staging verification still open:
   subscriptions and signed webhook, Draft Mode/revalidation, S3 media,
   scheduler, accessibility/keyboard, and the four requested viewports remain
   unverified.
+- The second failed bootstrap left one stopped `kirillwynn-edge` container in
+  `Created` state and created the isolated staging/production edge networks.
+  They were retained as failure evidence; no automatic cleanup was performed.
 - The staging backup/restore drill into a new `restore_*` database remains
   unverified.
-- Starting the shared edge exposed the pre-existing legacy production
-  application at `kirillwynn.com`; its existing certificate is expired and no
-  production rollout state exists. Stage 13A does not renew that certificate,
-  deploy/replace the production application, alter production DNS/providers/
-  storage/database, or promote a release to production.
+- The blocking decision is how to migrate the only host ingress from the
+  legacy production Nginx to the shared edge without authorizing a production
+  deployment. Stage 13A has not stopped/reconfigured the legacy containers,
+  renewed the production certificate, deployed/replaced the production
+  application, altered production DNS/providers/storage/database, or promoted
+  a release to production.
 
 ## Completed
 
