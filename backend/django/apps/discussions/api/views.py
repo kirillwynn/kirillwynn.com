@@ -409,7 +409,7 @@ class PostReactionParticipantAPIView(ReactionParticipantAPIView):
 
     def reactions(self, request, **kwargs):
         post = _public_post_or_404(kwargs["slug"])
-        return PostReaction.objects.filter(post=post)
+        return PostReaction.objects.filter(post=post, catalog_item__isnull=True)
 
 
 class CommentReactionParticipantAPIView(ReactionParticipantAPIView):
@@ -419,7 +419,7 @@ class CommentReactionParticipantAPIView(ReactionParticipantAPIView):
         comment = _public_comment_or_404(kwargs["pk"])
         if comment.public_status != "visible":
             raise Http404
-        return CommentReaction.objects.filter(comment=comment)
+        return CommentReaction.objects.filter(comment=comment, catalog_item__isnull=True)
 
 
 class ReactionConfigAPIView(ReactionAPIViewMixin, APIView):

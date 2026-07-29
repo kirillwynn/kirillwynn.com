@@ -1,10 +1,32 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.core.validators import RegexValidator
+from django.db import models, transaction
 from django.db.models import F, Q
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.contrib.settings.models import BaseSiteSetting
 
 from apps.discussions.emoji import normalize_emoji
+
+CATALOG_ID_VALIDATOR = RegexValidator(
+    regex=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    message="Use lowercase ASCII letters, numbers, and single hyphens.",
+)
+SHA256_VALIDATOR = RegexValidator(
+    regex=r"^[0-9a-f]{64}$",
+    message="Enter a lowercase SHA-256 digest.",
+)
+ASSET_VERSION_VALIDATOR = RegexValidator(
+    regex=r"^sha256-[0-9a-f]{64}$",
+    message="Asset versions must be an immutable sha256-<digest> value.",
+)
+REACTION_STORAGE_KEY_VALIDATOR = RegexValidator(
+    regex=(
+        r"^reactions/[a-z0-9]+(?:-[a-z0-9]+)*/[0-9a-f]{64}/"
+        r"(?:asset\.webp|animation\.gif|poster\.webp)$"
+    ),
+    message="Use a content-addressed reaction storage key.",
+)
 
 
 class Comment(models.Model):
@@ -154,8 +176,155 @@ class CommentRateLimitBucket(models.Model):
         ]
 
 
+class ReactionCatalogItem(models.Model):
+    class Kind(models.TextChoices):
+        STATIC = "static", "Static"
+        ANIMATED = "animated", "Animated"
+
+    class ApprovalStatus(models.TextChoices):
+        STAGING_ONLY = "staging-only/unverified", "Staging only / unverified"
+        PRODUCTION_APPROVED = "production-approved", "Production approved"
+
+    catalog_id = models.SlugField(
+        primary_key=True,
+        max_length=80,
+        validators=[CATALOG_ID_VALIDATOR],
+    )
+    display_name = models.CharField(max_length=120)
+    accessibility_label = models.CharField(max_length=160)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    ordering = models.PositiveIntegerField(unique=True)
+    enabled = models.BooleanField(default=False)
+    selectable = models.BooleanField(default=False)
+    quick_order = models.PositiveSmallIntegerField(null=True, blank=True, unique=True)
+    source_sha256 = models.CharField(max_length=64, validators=[SHA256_VALIDATOR])
+    normalized_sha256 = models.CharField(max_length=64, validators=[SHA256_VALIDATOR])
+    poster_sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        validators=[SHA256_VALIDATOR],
+    )
+    immutable_asset_version = models.CharField(
+        max_length=71,
+        validators=[ASSET_VERSION_VALIDATOR],
+    )
+    intrinsic_width = models.PositiveSmallIntegerField()
+    intrinsic_height = models.PositiveSmallIntegerField()
+    frame_count = models.PositiveSmallIntegerField()
+    duration_ms = models.PositiveIntegerField()
+    minimum_frame_delay_ms = models.PositiveIntegerField()
+    asset_storage_key = models.CharField(
+        max_length=320,
+        unique=True,
+        validators=[REACTION_STORAGE_KEY_VALIDATOR],
+    )
+    poster_storage_key = models.CharField(
+        max_length=320,
+        blank=True,
+        validators=[REACTION_STORAGE_KEY_VALIDATOR],
+    )
+    provenance_source = models.CharField(max_length=500)
+    provenance_author = models.CharField(max_length=200, blank=True)
+    license = models.CharField(max_length=200, blank=True)
+    rights_basis = models.CharField(max_length=500)
+    approval_status = models.CharField(max_length=32, choices=ApprovalStatus.choices)
+    manifest_sha256 = models.CharField(max_length=64, validators=[SHA256_VALIDATOR])
+    imported_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ("ordering", "catalog_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(intrinsic_width__lte=512, intrinsic_height__lte=512),
+                name="discussion_catalog_dimensions",
+            ),
+            models.CheckConstraint(
+                condition=Q(frame_count__gte=1, frame_count__lte=160),
+                name="discussion_catalog_frame_count",
+            ),
+            models.CheckConstraint(
+                condition=Q(duration_ms__lte=10_000),
+                name="discussion_catalog_duration",
+            ),
+            models.CheckConstraint(
+                condition=Q(quick_order__isnull=True) | Q(quick_order__gte=1, quick_order__lte=3),
+                name="discussion_catalog_quick_order",
+            ),
+            models.CheckConstraint(
+                condition=Q(selectable=False) | Q(enabled=True),
+                name="discussion_catalog_selectable_enabled",
+            ),
+            models.CheckConstraint(
+                condition=Q(quick_order__isnull=True) | Q(enabled=True, selectable=True),
+                name="discussion_catalog_quick_selectable",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        kind="static",
+                        frame_count=1,
+                        duration_ms=0,
+                        minimum_frame_delay_ms=0,
+                        poster_sha256="",
+                        poster_storage_key="",
+                    )
+                    | Q(
+                        kind="animated",
+                        frame_count__gte=2,
+                        duration_ms__gt=0,
+                        minimum_frame_delay_ms__gt=0,
+                    )
+                ),
+                name="discussion_catalog_kind_metadata",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.immutable_asset_version != f"sha256-{self.normalized_sha256}":
+            raise ValidationError(
+                {
+                    "immutable_asset_version": (
+                        "The immutable version must identify the normalized asset bytes."
+                    )
+                }
+            )
+        expected_directory = f"reactions/{self.catalog_id}/{self.normalized_sha256}/"
+        if not self.asset_storage_key.startswith(expected_directory):
+            raise ValidationError(
+                {"asset_storage_key": "The key must contain this item and normalized hash."}
+            )
+        if self.kind == self.Kind.STATIC:
+            if not self.asset_storage_key.endswith("/asset.webp"):
+                raise ValidationError({"asset_storage_key": "Static items must use asset.webp."})
+        else:
+            if not self.asset_storage_key.endswith("/animation.gif"):
+                raise ValidationError(
+                    {"asset_storage_key": "Animated items must use animation.gif."}
+                )
+            expected_poster = f"reactions/{self.catalog_id}/{self.normalized_sha256}/poster.webp"
+            if self.poster_storage_key != expected_poster or not self.poster_sha256:
+                raise ValidationError(
+                    {"poster_storage_key": "Animated items require the attested poster key."}
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.display_name} ({self.catalog_id})"
+
+
 class ReactionModel(models.Model):
-    emoji = models.CharField(max_length=128)
+    emoji = models.CharField(max_length=128, blank=True, default="")
+    catalog_item = models.ForeignKey(
+        ReactionCatalogItem,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -163,10 +332,18 @@ class ReactionModel(models.Model):
 
     def clean(self):
         super().clean()
-        self.emoji = normalize_emoji(self.emoji)
+        if self.catalog_item_id is None:
+            self.emoji = normalize_emoji(self.emoji)
+        elif self.emoji:
+            raise ValidationError(
+                {"emoji": "Catalog reactions cannot also carry a legacy Unicode value."}
+            )
 
     def save(self, *args, **kwargs):
-        self.emoji = normalize_emoji(self.emoji)
+        if self.catalog_item_id is None:
+            self.emoji = normalize_emoji(self.emoji)
+        else:
+            self.emoji = ""
         return super().save(*args, **kwargs)
 
 
@@ -187,13 +364,27 @@ class PostReaction(ReactionModel):
             models.UniqueConstraint(
                 fields=("post", "user", "emoji"),
                 name="discussion_unique_post_reaction",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("post", "user", "catalog_item"),
+                condition=Q(catalog_item__isnull=False),
+                name="discussion_unique_post_catalog_reaction",
+            ),
+            models.CheckConstraint(
+                condition=(Q(emoji="", catalog_item__isnull=False))
+                | (~Q(emoji="") & Q(catalog_item__isnull=True)),
+                name="discussion_post_reaction_identity",
+            ),
         ]
         indexes = [
             models.Index(
                 fields=("post", "emoji", "created_at", "id"),
                 name="discussion_post_reaction_idx",
-            )
+            ),
+            models.Index(
+                fields=("post", "catalog_item", "created_at", "id"),
+                name="discuss_post_catalog_react",
+            ),
         ]
 
 
@@ -214,13 +405,27 @@ class CommentReaction(ReactionModel):
             models.UniqueConstraint(
                 fields=("comment", "user", "emoji"),
                 name="discussion_unique_comment_reaction",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("comment", "user", "catalog_item"),
+                condition=Q(catalog_item__isnull=False),
+                name="discussion_unique_comment_catalog_reaction",
+            ),
+            models.CheckConstraint(
+                condition=(Q(emoji="", catalog_item__isnull=False))
+                | (~Q(emoji="") & Q(catalog_item__isnull=True)),
+                name="discussion_comment_reaction_identity",
+            ),
         ]
         indexes = [
             models.Index(
                 fields=("comment", "emoji", "created_at", "id"),
                 name="discussion_comment_react_idx",
-            )
+            ),
+            models.Index(
+                fields=("comment", "catalog_item", "created_at", "id"),
+                name="discuss_comment_catalog_react",
+            ),
         ]
 
 
@@ -238,6 +443,37 @@ class ReactionSettings(BaseSiteSetting):
     quick_reaction_one = models.CharField(max_length=128, default="👍")
     quick_reaction_two = models.CharField(max_length=128, default="❤️")
     quick_reaction_three = models.CharField(max_length=128, default="🎉")
+    quick_reaction_item_one = models.ForeignKey(
+        ReactionCatalogItem,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    quick_reaction_item_two = models.ForeignKey(
+        ReactionCatalogItem,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    quick_reaction_item_three = models.ForeignKey(
+        ReactionCatalogItem,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    panels = [
+        MultiFieldPanel(
+            [
+                FieldPanel("quick_reaction_item_one"),
+                FieldPanel("quick_reaction_item_two"),
+                FieldPanel("quick_reaction_item_three"),
+            ],
+            heading="Custom quick reactions",
+        )
+    ]
 
     @property
     def quick_reactions(self):
@@ -245,6 +481,14 @@ class ReactionSettings(BaseSiteSetting):
             self.quick_reaction_one,
             self.quick_reaction_two,
             self.quick_reaction_three,
+        ]
+
+    @property
+    def quick_reaction_items(self):
+        return [
+            self.quick_reaction_item_one,
+            self.quick_reaction_item_two,
+            self.quick_reaction_item_three,
         ]
 
     def clean(self):
@@ -257,7 +501,35 @@ class ReactionSettings(BaseSiteSetting):
             self.quick_reaction_two,
             self.quick_reaction_three,
         ) = normalized
+        custom_ids = [
+            self.quick_reaction_item_one_id,
+            self.quick_reaction_item_two_id,
+            self.quick_reaction_item_three_id,
+        ]
+        if any(custom_ids):
+            if any(value is None for value in custom_ids):
+                raise ValidationError("Choose exactly three custom quick reactions.")
+            if len(set(custom_ids)) != 3:
+                raise ValidationError("Custom quick reactions must be distinct.")
+            for item in self.quick_reaction_items:
+                if not item.enabled or not item.selectable:
+                    raise ValidationError("Custom quick reactions must be enabled and selectable.")
 
     def save(self, *args, **kwargs):
-        self.clean()
-        return super().save(*args, **kwargs)
+        with transaction.atomic():
+            self.clean()
+            result = super().save(*args, **kwargs)
+            custom_ids = [
+                self.quick_reaction_item_one_id,
+                self.quick_reaction_item_two_id,
+                self.quick_reaction_item_three_id,
+            ]
+            if all(custom_ids):
+                ReactionCatalogItem.objects.filter(quick_order__isnull=False).update(
+                    quick_order=None
+                )
+                for quick_order, catalog_id in enumerate(custom_ids, start=1):
+                    ReactionCatalogItem.objects.filter(pk=catalog_id).update(
+                        quick_order=quick_order
+                    )
+            return result

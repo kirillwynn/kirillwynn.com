@@ -1,0 +1,4573 @@
+{
+  "approval_scope": "staging-only/unverified",
+  "catalog_id": "kirillwynn-reactions",
+  "catalog_version": "stage16-staging-v1",
+  "items": [
+    {
+      "accessibility_label": "Amaze reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "amaze",
+      "display_name": "Amaze",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e35e97cfa2907b139c49bb374dd2455bdc2268cb584f3e4b84976342787c27eb",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 10,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/amaze.gif",
+      "source_sha256": "e35e97cfa2907b139c49bb374dd2455bdc2268cb584f3e4b84976342787c27eb"
+    },
+    {
+      "accessibility_label": "Anime brows reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animebrows",
+      "display_name": "Anime brows",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-31eeeb445eea68e2c2a3465ca468ec973f619c1885d62ca95f837b375c06fa44",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 20,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/animebrows.gif",
+      "source_sha256": "31eeeb445eea68e2c2a3465ca468ec973f619c1885d62ca95f837b375c06fa44"
+    },
+    {
+      "accessibility_label": "Anime dance reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animedance",
+      "display_name": "Anime dance",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-bfac45ba9daba4f7afff1466dbc0a05b4837740ec00f23add9e5e7cdd847124e",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 30,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/animedance.gif",
+      "source_sha256": "bfac45ba9daba4f7afff1466dbc0a05b4837740ec00f23add9e5e7cdd847124e"
+    },
+    {
+      "accessibility_label": "Anime lick reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animelick",
+      "display_name": "Anime lick",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8d699917cf8789f58d466622d575ba1d83149dcf4e8937040393d9346418a393",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 40,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/animelick.gif",
+      "source_sha256": "8d699917cf8789f58d466622d575ba1d83149dcf4e8937040393d9346418a393"
+    },
+    {
+      "accessibility_label": "Anime noted reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animenoted",
+      "display_name": "Anime noted",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-fa52e0df17c73345cb25088e8e2f6eb3ee717a0f38b1cd120e341e416b1c9a4b",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 50,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/animenoted.gif",
+      "source_sha256": "fa52e0df17c73345cb25088e8e2f6eb3ee717a0f38b1cd120e341e416b1c9a4b"
+    },
+    {
+      "accessibility_label": "Anime sip reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animesip",
+      "display_name": "Anime sip",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d71b956494baa1aca6c21256c318ade9664b9fb11fc3d9389a3482c94bf6352c",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 60,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/animesip.gif",
+      "source_sha256": "d71b956494baa1aca6c21256c318ade9664b9fb11fc3d9389a3482c94bf6352c"
+    },
+    {
+      "accessibility_label": "Batman hmm reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "batmanhmm",
+      "display_name": "Batman hmm",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d15c3a84e84d1b289021a7a866baa0a79d20779d726958eb424b45fd7a4e4b8e",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 70,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/batmanhmm.gif",
+      "source_sha256": "d15c3a84e84d1b289021a7a866baa0a79d20779d726958eb424b45fd7a4e4b8e"
+    },
+    {
+      "accessibility_label": "Cat cool reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "catcool",
+      "display_name": "Cat cool",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-331c8f942b82dd6c40ee4ac000864346e8e98fef6fb9405444a219974579e1df",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 80,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/catcool.gif",
+      "source_sha256": "331c8f942b82dd6c40ee4ac000864346e8e98fef6fb9405444a219974579e1df"
+    },
+    {
+      "accessibility_label": "Cat sus reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "catsus",
+      "display_name": "Cat sus",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-373a4a0753c52c4c275d03aae1b4b4a04fffde6d59f9dafaca2f4f9a07c2a6f8",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 90,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/catsus.gif",
+      "source_sha256": "373a4a0753c52c4c275d03aae1b4b4a04fffde6d59f9dafaca2f4f9a07c2a6f8"
+    },
+    {
+      "accessibility_label": "Doge cool reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "dogecool",
+      "display_name": "Doge cool",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a1e191479d2db5000ea2d1444acf87a1c86deb360baefc49feb5f489d642dc5a",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 100,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/dogecool.gif",
+      "source_sha256": "a1e191479d2db5000ea2d1444acf87a1c86deb360baefc49feb5f489d642dc5a"
+    },
+    {
+      "accessibility_label": "El resitas reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "elresitas",
+      "display_name": "El resitas",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-646cc2d6d4726869c4189a629538b9a97fd447351ab07f992fe4832ec2ba70ae",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 110,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/elresitas.gif",
+      "source_sha256": "646cc2d6d4726869c4189a629538b9a97fd447351ab07f992fe4832ec2ba70ae"
+    },
+    {
+      "accessibility_label": "El resitas kek wait reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "elresitaskekwait",
+      "display_name": "El resitas kek wait",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-59ae102f967a4d21aa5c3897e54cf7dc57797458bf3b7f92b454a92e5f0f2823",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 120,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/elresitaskekwait.gif",
+      "source_sha256": "59ae102f967a4d21aa5c3897e54cf7dc57797458bf3b7f92b454a92e5f0f2823"
+    },
+    {
+      "accessibility_label": "Hu Tao burn reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "hutaoburn",
+      "display_name": "Hu Tao burn",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-7d6bd4749700557f41d4493aec6f4999382ce64014852dce1292ac478349f763",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 130,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/hutaoburn.gif",
+      "source_sha256": "7d6bd4749700557f41d4493aec6f4999382ce64014852dce1292ac478349f763"
+    },
+    {
+      "accessibility_label": "Hu Tao haha reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "hutaohaha",
+      "display_name": "Hu Tao haha",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8df755af3a70ea9c60d8644ba150a7a6914f0ce289bd686ab66e11c78a63c46b",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 140,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/hutaohaha.gif",
+      "source_sha256": "8df755af3a70ea9c60d8644ba150a7a6914f0ce289bd686ab66e11c78a63c46b"
+    },
+    {
+      "accessibility_label": "Mochi angry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochiangry",
+      "display_name": "Mochi angry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c1a16733278c8ed29376ba6c96320a2b03d0b355f9ec02dd697b545a7bc5a38f",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 150,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochiangry.gif",
+      "source_sha256": "c1a16733278c8ed29376ba6c96320a2b03d0b355f9ec02dd697b545a7bc5a38f"
+    },
+    {
+      "accessibility_label": "Mochi drink reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochidrink",
+      "display_name": "Mochi drink",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d59e658dbc218dfc5845f15ed052a4881f9428c6862d589c012e9008acdde44d",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 160,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochidrink.gif",
+      "source_sha256": "d59e658dbc218dfc5845f15ed052a4881f9428c6862d589c012e9008acdde44d"
+    },
+    {
+      "accessibility_label": "Mochi fire reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochifire",
+      "display_name": "Mochi fire",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c142252dfe5149fcf4b184049b052e43bec75ea17006996b25d78bcfe7475b9d",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 170,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochifire.gif",
+      "source_sha256": "c142252dfe5149fcf4b184049b052e43bec75ea17006996b25d78bcfe7475b9d"
+    },
+    {
+      "accessibility_label": "Mochi hugg reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochihugg",
+      "display_name": "Mochi hugg",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-5678cb3ce0e5dba51762d04a5a529d95722c296e51d46d1a610e69fc1a687d12",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 180,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochihugg.gif",
+      "source_sha256": "5678cb3ce0e5dba51762d04a5a529d95722c296e51d46d1a610e69fc1a687d12"
+    },
+    {
+      "accessibility_label": "Mochi lets go reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochiletsgo",
+      "display_name": "Mochi lets go",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-7b2dd5c4e03d76153f994de49e3f5bffc54c0ecf8f5e0bdb4dde833ed5a3f819",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 190,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochiletsgo.gif",
+      "source_sha256": "7b2dd5c4e03d76153f994de49e3f5bffc54c0ecf8f5e0bdb4dde833ed5a3f819"
+    },
+    {
+      "accessibility_label": "Mochi nope reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochinope",
+      "display_name": "Mochi nope",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-eac58c3c2cae544a54c23b69fb1aa17a9ef10f2e2c2464ae239f923a7a21ce10",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 200,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochinope.gif",
+      "source_sha256": "eac58c3c2cae544a54c23b69fb1aa17a9ef10f2e2c2464ae239f923a7a21ce10"
+    },
+    {
+      "accessibility_label": "Mochi pizza reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochipizza",
+      "display_name": "Mochi pizza",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a826ea56bafee5355fe31629e641d92d76e6df8ca27a823d10ec8e00d870d65e",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 210,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochipizza.gif",
+      "source_sha256": "a826ea56bafee5355fe31629e641d92d76e6df8ca27a823d10ec8e00d870d65e"
+    },
+    {
+      "accessibility_label": "Mochi sad reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochisad",
+      "display_name": "Mochi sad",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c95edbd52a6c9a267dfd695e385bb0fe8f44b215b1b4800a467f4913b32bf1d0",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 220,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/mochisad.gif",
+      "source_sha256": "c95edbd52a6c9a267dfd695e385bb0fe8f44b215b1b4800a467f4913b32bf1d0"
+    },
+    {
+      "accessibility_label": "Monkey sus reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "monkeysus",
+      "display_name": "Monkey sus",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d05bb50df568a8b7bde9ca20e47704a0a2f9e136333069e08036005bb90fa4e0",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 230,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/monkeysus.gif",
+      "source_sha256": "d05bb50df568a8b7bde9ca20e47704a0a2f9e136333069e08036005bb90fa4e0"
+    },
+    {
+      "accessibility_label": "Pepe clap reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeclap",
+      "display_name": "Pepe clap",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9acd8b6176339b50a74f2f0734681f1f550d8fa84b047e415bd54ab16409efa9",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 240,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": 1,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepeclap.gif",
+      "source_sha256": "9acd8b6176339b50a74f2f0734681f1f550d8fa84b047e415bd54ab16409efa9"
+    },
+    {
+      "accessibility_label": "Pepe cough reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecough",
+      "display_name": "Pepe cough",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-aaec183ec252b40da261cb53597880c674eaaae0c262f17fdeeefab67d7a9e81",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 250,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepecough.gif",
+      "source_sha256": "aaec183ec252b40da261cb53597880c674eaaae0c262f17fdeeefab67d7a9e81"
+    },
+    {
+      "accessibility_label": "Pepe credit card reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecreditcard",
+      "display_name": "Pepe credit card",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-25a4044231d3960626daeeca34c9cc9bf5a25aaed498f5799110727881aad76e",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 260,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepecreditcard.gif",
+      "source_sha256": "25a4044231d3960626daeeca34c9cc9bf5a25aaed498f5799110727881aad76e"
+    },
+    {
+      "accessibility_label": "Pepe dollars reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepedollars",
+      "display_name": "Pepe dollars",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3281f375d20c48586308b37dff9dd750797eb48aca46a1a9b1fffcc8421b4e83",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 270,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepedollars.gif",
+      "source_sha256": "3281f375d20c48586308b37dff9dd750797eb48aca46a1a9b1fffcc8421b4e83"
+    },
+    {
+      "accessibility_label": "Pepe ga police reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepegapolice",
+      "display_name": "Pepe ga police",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b556c0f6e9139eec3277929c47ac49daecb9adf0bd6443de5dd88cc1f5217c15",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 280,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepegapolice.gif",
+      "source_sha256": "b556c0f6e9139eec3277929c47ac49daecb9adf0bd6443de5dd88cc1f5217c15"
+    },
+    {
+      "accessibility_label": "Pepe hacker reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepehacker",
+      "display_name": "Pepe hacker",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-57523b1cb12f97e6a82eb3edcebe340133631ecd34e50901456bd59e579e0e89",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 290,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepehacker.gif",
+      "source_sha256": "57523b1cb12f97e6a82eb3edcebe340133631ecd34e50901456bd59e579e0e89"
+    },
+    {
+      "accessibility_label": "Pepe hmm reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepehmm",
+      "display_name": "Pepe hmm",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-7d7917ccd9e544c5453a021ecba9cccfbe4026db35f7dc04d129248cd941d95c",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 300,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": 2,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepehmm.gif",
+      "source_sha256": "7d7917ccd9e544c5453a021ecba9cccfbe4026db35f7dc04d129248cd941d95c"
+    },
+    {
+      "accessibility_label": "Pepe lmao reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepelmao",
+      "display_name": "Pepe lmao",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-cd77f41c3a5bdb05e8bcf543dca687d44347b08c23802d76eb05e6bdfc2806a6",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 310,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepelmao.gif",
+      "source_sha256": "cd77f41c3a5bdb05e8bcf543dca687d44347b08c23802d76eb05e6bdfc2806a6"
+    },
+    {
+      "accessibility_label": "Pepe queen reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepequeen",
+      "display_name": "Pepe queen",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9a2a671c0be94726c7827765258d4d0fe1ad49bbe637e47b6eb1e3ab932e2e4c",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 320,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepequeen.gif",
+      "source_sha256": "9a2a671c0be94726c7827765258d4d0fe1ad49bbe637e47b6eb1e3ab932e2e4c"
+    },
+    {
+      "accessibility_label": "Pepe santa run reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepesantarun",
+      "display_name": "Pepe santa run",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-53d8d4147c36c46cb84a033db5f25064bbe328d59eaa35c9f14c2a4a5f4b14f1",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 330,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepesantarun.gif",
+      "source_sha256": "53d8d4147c36c46cb84a033db5f25064bbe328d59eaa35c9f14c2a4a5f4b14f1"
+    },
+    {
+      "accessibility_label": "Pepe shoot reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeshoot",
+      "display_name": "Pepe shoot",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-1c7e28f352628a76e801bee4f81f5fd826acb251f333b311c89c037f45396b2a",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 340,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepeshoot.gif",
+      "source_sha256": "1c7e28f352628a76e801bee4f81f5fd826acb251f333b311c89c037f45396b2a"
+    },
+    {
+      "accessibility_label": "Pepe smoke reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepesmoke",
+      "display_name": "Pepe smoke",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3221402bf9a1234db3414b82271eb3f489c33b752fc808d52c4ce0420a74769e",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 350,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepesmoke.gif",
+      "source_sha256": "3221402bf9a1234db3414b82271eb3f489c33b752fc808d52c4ce0420a74769e"
+    },
+    {
+      "accessibility_label": "Pepe trip reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepetrip",
+      "display_name": "Pepe trip",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9665a05680a044bac490c66d758c165971859a6b1a803be9e8d81747616fe51d",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 360,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepetrip.gif",
+      "source_sha256": "9665a05680a044bac490c66d758c165971859a6b1a803be9e8d81747616fe51d"
+    },
+    {
+      "accessibility_label": "Pepe vroom reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepevroom",
+      "display_name": "Pepe vroom",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3b4a6c43b0e2ba085b962ad3af8b4ef1688dfaca1086122685591b5d6438fa2a",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 370,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pepevroom.gif",
+      "source_sha256": "3b4a6c43b0e2ba085b962ad3af8b4ef1688dfaca1086122685591b5d6438fa2a"
+    },
+    {
+      "accessibility_label": "Pokémon pika hi reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pokemonpikahi",
+      "display_name": "Pokémon pika hi",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0a8eebdaf595a276ec4be58bbf48a71f6cd4e44d3322054fa27fb504b4d8d7e1",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 380,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/pokemonpikahi.gif",
+      "source_sha256": "0a8eebdaf595a276ec4be58bbf48a71f6cd4e44d3322054fa27fb504b4d8d7e1"
+    },
+    {
+      "accessibility_label": "Rock sus reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "rocksus",
+      "display_name": "Rock sus",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8afcf6fbbe2d4c5dbfdc52ca70a68927e9e1a85945ded3217f71bc31f8b022e1",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 390,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/rocksus.gif",
+      "source_sha256": "8afcf6fbbe2d4c5dbfdc52ca70a68927e9e1a85945ded3217f71bc31f8b022e1"
+    },
+    {
+      "accessibility_label": "Roflan sunglasses reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "roflansunglasses",
+      "display_name": "Roflan sunglasses",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b0699b1a52241322562391c6aee0fb0a2b178aa06b8dc6e4ebad26e8045b5c9b",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 400,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/roflansunglasses.gif",
+      "source_sha256": "b0699b1a52241322562391c6aee0fb0a2b178aa06b8dc6e4ebad26e8045b5c9b"
+    },
+    {
+      "accessibility_label": "Sage cry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "sagecry",
+      "display_name": "Sage cry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-75a6123f864533132371b3ec932fe52f23a331b7b12d586e1da6835bbde1097a",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 410,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/sagecry.gif",
+      "source_sha256": "75a6123f864533132371b3ec932fe52f23a331b7b12d586e1da6835bbde1097a"
+    },
+    {
+      "accessibility_label": "Scanlon wait what reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "scanlonwaitwhat",
+      "display_name": "Scanlon wait what",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-fadbf098e8245c39cbaf6495f1c5a252ec2b219f833b52f33eb676bc858c1bab",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 420,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/scanlonwaitwhat.gif",
+      "source_sha256": "fadbf098e8245c39cbaf6495f1c5a252ec2b219f833b52f33eb676bc858c1bab"
+    },
+    {
+      "accessibility_label": "Think about it reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "thinkabout",
+      "display_name": "Think about it",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-1a1a22c96b2a57fd6c7ab160a6e9dc73173d26f10f4a89e2eeacc96f8529a9c4",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 430,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/thinkabout.gif",
+      "source_sha256": "1a1a22c96b2a57fd6c7ab160a6e9dc73173d26f10f4a89e2eeacc96f8529a9c4"
+    },
+    {
+      "accessibility_label": "This is fine reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "thisisfine",
+      "display_name": "This is fine",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c26db333d3b0e9e2a9b86e5d694d47d9924e352e36edc78527b48a17cb599d3b",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 440,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/thisisfine.gif",
+      "source_sha256": "c26db333d3b0e9e2a9b86e5d694d47d9924e352e36edc78527b48a17cb599d3b"
+    },
+    {
+      "accessibility_label": "Weee wooo reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "weeewooo",
+      "display_name": "Weee wooo",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-86a7f3a00f2605daf18584e88454d292b6e3ef8a3e7518b3f15dc07a8f0f67d2",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 450,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animated/weeewooo.gif",
+      "source_sha256": "86a7f3a00f2605daf18584e88454d292b6e3ef8a3e7518b3f15dc07a8f0f67d2"
+    },
+    {
+      "accessibility_label": "Anime angry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animeangry",
+      "display_name": "Anime angry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-5ddeea3d945a013fb42c46b7dd7de40da64ca76d0a7b50dde6d660fb762a188b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 460,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animeangry.png",
+      "source_sha256": "5ddeea3d945a013fb42c46b7dd7de40da64ca76d0a7b50dde6d660fb762a188b"
+    },
+    {
+      "accessibility_label": "Anime cry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animecry",
+      "display_name": "Anime cry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d116292289df7a29e78f3735421bd651277d084775a95e2fda6f3d0c7fdb49b3",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 470,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animecry.png",
+      "source_sha256": "d116292289df7a29e78f3735421bd651277d084775a95e2fda6f3d0c7fdb49b3"
+    },
+    {
+      "accessibility_label": "Anime cute reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animecute",
+      "display_name": "Anime cute",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-fbe9be0ed634185a3924d9aa2403614663ab29042d1607bad91ed9c2bcf1c014",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 480,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animecute.png",
+      "source_sha256": "fbe9be0ed634185a3924d9aa2403614663ab29042d1607bad91ed9c2bcf1c014"
+    },
+    {
+      "accessibility_label": "Anime smug reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animesmug",
+      "display_name": "Anime smug",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-852bf0390a6994e133a6a232f8c565dfeb1a1696e61ac8057fd31f5c9e404792",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 490,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animesmug.png",
+      "source_sha256": "852bf0390a6994e133a6a232f8c565dfeb1a1696e61ac8057fd31f5c9e404792"
+    },
+    {
+      "accessibility_label": "Anime think reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animethink",
+      "display_name": "Anime think",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0c137cb735909a30745a811d08a3e3acf95d72e1ce15e3991fa52973db624b3e",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 500,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animethink.png",
+      "source_sha256": "0c137cb735909a30745a811d08a3e3acf95d72e1ce15e3991fa52973db624b3e"
+    },
+    {
+      "accessibility_label": "Anime wow reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "animewow",
+      "display_name": "Anime wow",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-1f17b8d5cb2919396c942a9afb14407202ed2b1c9e44a134d1f4ceaf1e101159",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 510,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "animewow.png",
+      "source_sha256": "1f17b8d5cb2919396c942a9afb14407202ed2b1c9e44a134d1f4ceaf1e101159"
+    },
+    {
+      "accessibility_label": "Awesome reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "awesome",
+      "display_name": "Awesome",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-428da2ba2aa135ce2a45be9464a71b055879b8bc9a4217f025a8d0cf5d5a433b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 520,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "awesome.png",
+      "source_sha256": "428da2ba2aa135ce2a45be9464a71b055879b8bc9a4217f025a8d0cf5d5a433b"
+    },
+    {
+      "accessibility_label": "Ban reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "ban",
+      "display_name": "Ban",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9c8155c155279f49a221589e22c032fb30bda355272f5e4e6d99e9def990069d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 530,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "ban.png",
+      "source_sha256": "9c8155c155279f49a221589e22c032fb30bda355272f5e4e6d99e9def990069d"
+    },
+    {
+      "accessibility_label": "Barbie smile reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "barbiesmile",
+      "display_name": "Barbie smile",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-1be1fca81bca71ea40ea4d6fcd85b6bff26396d8249aabcc493228c4ec6fc6f5",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 540,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "barbiesmile.png",
+      "source_sha256": "1be1fca81bca71ea40ea4d6fcd85b6bff26396d8249aabcc493228c4ec6fc6f5"
+    },
+    {
+      "accessibility_label": "Cage really reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "cagereally",
+      "display_name": "Cage really",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e3d233faafb97b04028c349bdc864066c678bec8d0bd3c187a264a306ca84e30",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 550,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "cagereally.png",
+      "source_sha256": "e3d233faafb97b04028c349bdc864066c678bec8d0bd3c187a264a306ca84e30"
+    },
+    {
+      "accessibility_label": "Cat gun point reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "catgunpoint",
+      "display_name": "Cat gun point",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-dd27115f98c9e9bae5966f97a58fef68a60ea900d18b2a875bad57dfbb37e449",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 560,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "catgunpoint.png",
+      "source_sha256": "dd27115f98c9e9bae5966f97a58fef68a60ea900d18b2a875bad57dfbb37e449"
+    },
+    {
+      "accessibility_label": "Cat police reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "catpolice",
+      "display_name": "Cat police",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9fdfe3a202d26d881d5af4527cc521541b401e94733caa10a79b3362fa3205c7",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 570,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "catpolice.png",
+      "source_sha256": "9fdfe3a202d26d881d5af4527cc521541b401e94733caa10a79b3362fa3205c7"
+    },
+    {
+      "accessibility_label": "Charma reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "charma",
+      "display_name": "Charma",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a5048dcbebf5644512a58c323d0d48e69cec113759ea7ca0658175efd0f6cd03",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 580,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "charma.png",
+      "source_sha256": "a5048dcbebf5644512a58c323d0d48e69cec113759ea7ca0658175efd0f6cd03"
+    },
+    {
+      "accessibility_label": "Cool story Bob reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "coolstorybob",
+      "display_name": "Cool story Bob",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3742943ad4e6a9048930f6b51960a1731710655919447dd6943cf3824ee257b9",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 590,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "coolstorybob.png",
+      "source_sha256": "3742943ad4e6a9048930f6b51960a1731710655919447dd6943cf3824ee257b9"
+    },
+    {
+      "accessibility_label": "Coronavirus reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "coronavirus",
+      "display_name": "Coronavirus",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-47978bb05968f88f7db42e5824c1481e9fed70ecfcc2126027a354d786f65979",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 600,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "coronavirus.png",
+      "source_sha256": "47978bb05968f88f7db42e5824c1481e9fed70ecfcc2126027a354d786f65979"
+    },
+    {
+      "accessibility_label": "Cruise laugh reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "cruiselaugh",
+      "display_name": "Cruise laugh",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-331bcaab235a3d1b4832d322677e0420de2dff74ad1f6bb47db556af450a6308",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 610,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "cruiselaugh.png",
+      "source_sha256": "331bcaab235a3d1b4832d322677e0420de2dff74ad1f6bb47db556af450a6308"
+    },
+    {
+      "accessibility_label": "Doge reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "doge",
+      "display_name": "Doge",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c9f245263b961b236658e320bc4cd673f10221d64c78be7ca5ae6f8af89700d5",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 620,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "doge.png",
+      "source_sha256": "c9f245263b961b236658e320bc4cd673f10221d64c78be7ca5ae6f8af89700d5"
+    },
+    {
+      "accessibility_label": "Doge cringe reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "dogecringe",
+      "display_name": "Doge cringe",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-f0c319192571d16326f16f5ac8aca858b74afea6615d20b5c6e6a7a245e3b1d9",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 630,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "dogecringe.png",
+      "source_sha256": "f0c319192571d16326f16f5ac8aca858b74afea6615d20b5c6e6a7a245e3b1d9"
+    },
+    {
+      "accessibility_label": "Drake nope reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "drakenope",
+      "display_name": "Drake nope",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-7cb38d7aba817688a352c6b9dbbf5378a3df79ec6cfbc45ab19b8dc68ecf0bc2",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 640,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "drakenope.png",
+      "source_sha256": "7cb38d7aba817688a352c6b9dbbf5378a3df79ec6cfbc45ab19b8dc68ecf0bc2"
+    },
+    {
+      "accessibility_label": "Dr. Evil reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "drevil",
+      "display_name": "Dr. Evil",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-22c512ee81a0ff4227ec5302bfbc6cb8f673a3b4b55a44d45c154242302712ee",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 650,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "drevil.png",
+      "source_sha256": "22c512ee81a0ff4227ec5302bfbc6cb8f673a3b4b55a44d45c154242302712ee"
+    },
+    {
+      "accessibility_label": "Durka reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "durka",
+      "display_name": "Durka",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-441403712c71b530ac73a2ea4acb0353332fb083f21626f0ab0d6e7778c5c640",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 660,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "durka.png",
+      "source_sha256": "441403712c71b530ac73a2ea4acb0353332fb083f21626f0ab0d6e7778c5c640"
+    },
+    {
+      "accessibility_label": "Facepalm reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "facepalm",
+      "display_name": "Facepalm",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-70df59619df58c4c9c67eda45114b4738729bd7000ef7ce005e16c781211eb18",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 670,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "facepalm.png",
+      "source_sha256": "70df59619df58c4c9c67eda45114b4738729bd7000ef7ce005e16c781211eb18"
+    },
+    {
+      "accessibility_label": "GigaChad reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "gigachad",
+      "display_name": "GigaChad",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-18390348ec8ec70faf2fb9a320fd8adceefe8d412f43b037e388bcb7b0f1305f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 680,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "gigachad.png",
+      "source_sha256": "18390348ec8ec70faf2fb9a320fd8adceefe8d412f43b037e388bcb7b0f1305f"
+    },
+    {
+      "accessibility_label": "Girl grrr reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "girlgrrr",
+      "display_name": "Girl grrr",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-307032ca33e63d5272ef1785bccf429c71d80caf02f2fc70b01300453083a6c6",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 690,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "girlgrrr.png",
+      "source_sha256": "307032ca33e63d5272ef1785bccf429c71d80caf02f2fc70b01300453083a6c6"
+    },
+    {
+      "accessibility_label": "Harold reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "harold",
+      "display_name": "Harold",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6c22f16ce8fb64609f1aea99e42cf65645f49ab114e406a1f9f913de2bc302df",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 700,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "harold.png",
+      "source_sha256": "6c22f16ce8fb64609f1aea99e42cf65645f49ab114e406a1f9f913de2bc302df"
+    },
+    {
+      "accessibility_label": "Huh reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "huh",
+      "display_name": "Huh",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-2e251bd01986191668c4fa690aa9798db1d5abdb16b0c3d8d3b38b0339bfc080",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 710,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "huh.png",
+      "source_sha256": "2e251bd01986191668c4fa690aa9798db1d5abdb16b0c3d8d3b38b0339bfc080"
+    },
+    {
+      "accessibility_label": "Hu Tao pog reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "hutaopog",
+      "display_name": "Hu Tao pog",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-349210abe3faaff68d324dbb2879deb2d3f1f133844e324463044c62637654c9",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 720,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "hutaopog.png",
+      "source_sha256": "349210abe3faaff68d324dbb2879deb2d3f1f133844e324463044c62637654c9"
+    },
+    {
+      "accessibility_label": "Hu Tao think reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "hutaothink",
+      "display_name": "Hu Tao think",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-88478ee2a62557a9ce66d9180e9ccf5c838787fc32c6225a623cfec07a8e37f3",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 730,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "hutaothink.png",
+      "source_sha256": "88478ee2a62557a9ce66d9180e9ccf5c838787fc32c6225a623cfec07a8e37f3"
+    },
+    {
+      "accessibility_label": "Jerry oops reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jerryoops",
+      "display_name": "Jerry oops",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-fe0a68d3180761933d61d149f71f7372d7f238f8cf7de70890462b12f4747425",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 740,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jerryoops.png",
+      "source_sha256": "fe0a68d3180761933d61d149f71f7372d7f238f8cf7de70890462b12f4747425"
+    },
+    {
+      "accessibility_label": "Jerry saudi arabia reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jerrysaudiarabia",
+      "display_name": "Jerry saudi arabia",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0ea4502bc825daee1525988138f088ad7756e50769d2a5479af5c761ed7c89e1",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 750,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jerrysaudiarabia.png",
+      "source_sha256": "0ea4502bc825daee1525988138f088ad7756e50769d2a5479af5c761ed7c89e1"
+    },
+    {
+      "accessibility_label": "Jerry wheeze reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jerrywheeze",
+      "display_name": "Jerry wheeze",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3379bdac1f735a3dcd1a72ea46ac70d0af49cc682790fb8af1bec7e2968d6351",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 760,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jerrywheeze.png",
+      "source_sha256": "3379bdac1f735a3dcd1a72ea46ac70d0af49cc682790fb8af1bec7e2968d6351"
+    },
+    {
+      "accessibility_label": "Jesus reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jesus",
+      "display_name": "Jesus",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-787182a370eacc6ab7bb04cbec496d3c8840d4f3f31c9403689d114daa4fb264",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 770,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jesus.png",
+      "source_sha256": "787182a370eacc6ab7bb04cbec496d3c8840d4f3f31c9403689d114daa4fb264"
+    },
+    {
+      "accessibility_label": "Jett angry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jettangry",
+      "display_name": "Jett angry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-1e05880160f7f3c78b6d571ae0093b7c98ea9796c06d50691bd1d396ed9b57e3",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 780,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jettangry.png",
+      "source_sha256": "1e05880160f7f3c78b6d571ae0093b7c98ea9796c06d50691bd1d396ed9b57e3"
+    },
+    {
+      "accessibility_label": "Jett cry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jettcry",
+      "display_name": "Jett cry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-81e8afd15143d244e8b2593fd11008adefad52ee02262ef2d9c5c3ee0cd49603",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 790,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jettcry.png",
+      "source_sha256": "81e8afd15143d244e8b2593fd11008adefad52ee02262ef2d9c5c3ee0cd49603"
+    },
+    {
+      "accessibility_label": "Jett dont care reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jettdontcare",
+      "display_name": "Jett dont care",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b31428e63d862e265e4f065a3f3fb3c2fb12175b7ee4bcd6dc8a98db9aed013c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 800,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jettdontcare.png",
+      "source_sha256": "b31428e63d862e265e4f065a3f3fb3c2fb12175b7ee4bcd6dc8a98db9aed013c"
+    },
+    {
+      "accessibility_label": "Jett hello reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jetthello",
+      "display_name": "Jett hello",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0f3ed2bfa5c8bf6912ea6b35a419cea0f7a2fe45969ced3e543b73bcdc868695",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 810,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jetthello.png",
+      "source_sha256": "0f3ed2bfa5c8bf6912ea6b35a419cea0f7a2fe45969ced3e543b73bcdc868695"
+    },
+    {
+      "accessibility_label": "Jett love reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jettlove",
+      "display_name": "Jett love",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-328a32184b6637f0c1b7e5f5ee7c3c847bbb72c5a79295ee761ca91ea553274c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 820,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jettlove.png",
+      "source_sha256": "328a32184b6637f0c1b7e5f5ee7c3c847bbb72c5a79295ee761ca91ea553274c"
+    },
+    {
+      "accessibility_label": "Jett lurk reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jettlurk",
+      "display_name": "Jett lurk",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b698e3aa63109e642befbfc358a691589981cf01d0854c11a2082f15395ca761",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 830,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jettlurk.png",
+      "source_sha256": "b698e3aa63109e642befbfc358a691589981cf01d0854c11a2082f15395ca761"
+    },
+    {
+      "accessibility_label": "Jett smug reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jettsmug",
+      "display_name": "Jett smug",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-bc22a87657e1f979c4c1014228fe5a67329dfb7ff0087d40112f92d59d9ca541",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 840,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jettsmug.png",
+      "source_sha256": "bc22a87657e1f979c4c1014228fe5a67329dfb7ff0087d40112f92d59d9ca541"
+    },
+    {
+      "accessibility_label": "Jett waku reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "jettwaku",
+      "display_name": "Jett waku",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-05bc8c13ddb5d319b5834e3b7d3b39c2008e867d7a96aaf729b26a5e2d455632",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 850,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "jettwaku.png",
+      "source_sha256": "05bc8c13ddb5d319b5834e3b7d3b39c2008e867d7a96aaf729b26a5e2d455632"
+    },
+    {
+      "accessibility_label": "Kappa reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "kappa",
+      "display_name": "Kappa",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-358f686e24d7b5be4765c074b8077269e5c0e2de6147419c795dc86bab7119ea",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 860,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "kappa.png",
+      "source_sha256": "358f686e24d7b5be4765c074b8077269e5c0e2de6147419c795dc86bab7119ea"
+    },
+    {
+      "accessibility_label": "Leo cheers reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "leocheers",
+      "display_name": "Leo cheers",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6e41af01e2a0702d0423b39bb2472b447343e94571b5d63e493b889599163566",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 870,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "leocheers.png",
+      "source_sha256": "6e41af01e2a0702d0423b39bb2472b447343e94571b5d63e493b889599163566"
+    },
+    {
+      "accessibility_label": "Luffy cry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "luffycry",
+      "display_name": "Luffy cry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b4b3bed78626495493b4e54c04a5aaf1df0508c9e9da467dfe83a910988f42ba",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 880,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "luffycry.png",
+      "source_sha256": "b4b3bed78626495493b4e54c04a5aaf1df0508c9e9da467dfe83a910988f42ba"
+    },
+    {
+      "accessibility_label": "Luffy jeer reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "luffyjeer",
+      "display_name": "Luffy jeer",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-ad72e6108f02ad649cf68ae9343369d2c36743a545c44125ba3ffe3cdfefe71a",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 890,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "luffyjeer.png",
+      "source_sha256": "ad72e6108f02ad649cf68ae9343369d2c36743a545c44125ba3ffe3cdfefe71a"
+    },
+    {
+      "accessibility_label": "Luffy shock reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "luffyshock",
+      "display_name": "Luffy shock",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e6e9face5e5e460b5f4c2c20bd1874b91327f08eb5bdf687da66fbd0391f67d6",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 900,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "luffyshock.png",
+      "source_sha256": "e6e9face5e5e460b5f4c2c20bd1874b91327f08eb5bdf687da66fbd0391f67d6"
+    },
+    {
+      "accessibility_label": "Matthew smoking reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "matthewsmoking",
+      "display_name": "Matthew smoking",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0cb561b79fcdb09b3d78028796aa3e98a547680dd96e97754fb1ac704cef7fac",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 910,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "matthewsmoking.png",
+      "source_sha256": "0cb561b79fcdb09b3d78028796aa3e98a547680dd96e97754fb1ac704cef7fac"
+    },
+    {
+      "accessibility_label": "Mochi insomnia reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "mochiinsomnia",
+      "display_name": "Mochi insomnia",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e6a7906bb8b1a861b5833982198d831640c1813f950537ebca4a07baca20d376",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 920,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "mochiinsomnia.png",
+      "source_sha256": "e6a7906bb8b1a861b5833982198d831640c1813f950537ebca4a07baca20d376"
+    },
+    {
+      "accessibility_label": "Not sure if reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "notsureif",
+      "display_name": "Not sure if",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b0774e32ad24f883d0740313b3318a2c92e861cfab88c41750c0dc4b6c93e67d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 930,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "notsureif.png",
+      "source_sha256": "b0774e32ad24f883d0740313b3318a2c92e861cfab88c41750c0dc4b6c93e67d"
+    },
+    {
+      "accessibility_label": "OLS respect reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "olsrespect",
+      "display_name": "OLS respect",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e29e2a0b40ed35ea77d815b5b09ad29203bf1cc2039868174395ed973080dd80",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 940,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "olsrespect.png",
+      "source_sha256": "e29e2a0b40ed35ea77d815b5b09ad29203bf1cc2039868174395ed973080dd80"
+    },
+    {
+      "accessibility_label": "OmegaLUL reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "omegalul",
+      "display_name": "OmegaLUL",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b568e08e3406edb382e3f4199749c71a6460313a591f3bd66b74808ed611ed67",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 950,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "omegalul.png",
+      "source_sha256": "b568e08e3406edb382e3f4199749c71a6460313a591f3bd66b74808ed611ed67"
+    },
+    {
+      "accessibility_label": "Oversmart reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "oversmart",
+      "display_name": "Oversmart",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a5a8a1b89c84233950785c73046bddd729d9bc7bf9669271f291c6d3e3b6023d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 960,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "oversmart.png",
+      "source_sha256": "a5a8a1b89c84233950785c73046bddd729d9bc7bf9669271f291c6d3e3b6023d"
+    },
+    {
+      "accessibility_label": "Panda cool reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandacool",
+      "display_name": "Panda cool",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3347b0191196905cac022f5749a740d7bd29d06a716668923103b5610e51fadb",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 970,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandacool.png",
+      "source_sha256": "3347b0191196905cac022f5749a740d7bd29d06a716668923103b5610e51fadb"
+    },
+    {
+      "accessibility_label": "Panda cop reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandacop",
+      "display_name": "Panda cop",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b4a1aeb99568062d0a883758e256b4ad065ef61c60f340b999c26da5b0cf718a",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 980,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandacop.png",
+      "source_sha256": "b4a1aeb99568062d0a883758e256b4ad065ef61c60f340b999c26da5b0cf718a"
+    },
+    {
+      "accessibility_label": "Panda devil reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandadevil",
+      "display_name": "Panda devil",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-ef033810094b9b2d784d29fa70a37ddbe3ad0afe75f719c7d8af2ffb379589f5",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 990,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandadevil.png",
+      "source_sha256": "ef033810094b9b2d784d29fa70a37ddbe3ad0afe75f719c7d8af2ffb379589f5"
+    },
+    {
+      "accessibility_label": "Panda genius reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandagenius",
+      "display_name": "Panda genius",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e318fed052c5ff09aa8882b20c7c463d4adb34cd579b48796206814c89d05455",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1000,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandagenius.png",
+      "source_sha256": "e318fed052c5ff09aa8882b20c7c463d4adb34cd579b48796206814c89d05455"
+    },
+    {
+      "accessibility_label": "Panda love reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandalove",
+      "display_name": "Panda love",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8ce4dc6c9bacd95acdd66a710cf44db46bdc28af82199294e93f5767a47deb5f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1010,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandalove.png",
+      "source_sha256": "8ce4dc6c9bacd95acdd66a710cf44db46bdc28af82199294e93f5767a47deb5f"
+    },
+    {
+      "accessibility_label": "Panda rage reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandarage",
+      "display_name": "Panda rage",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e910781a4d8339c2acd928a9ca872b4a2adafa30de09100c1af0c1d34fd28572",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1020,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandarage.png",
+      "source_sha256": "e910781a4d8339c2acd928a9ca872b4a2adafa30de09100c1af0c1d34fd28572"
+    },
+    {
+      "accessibility_label": "Panda smart reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandasmart",
+      "display_name": "Panda smart",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-cb91c1c58179f603a32cf2593841b69de49e373e02651b78e2f0500fa8f9b921",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1030,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandasmart.png",
+      "source_sha256": "cb91c1c58179f603a32cf2593841b69de49e373e02651b78e2f0500fa8f9b921"
+    },
+    {
+      "accessibility_label": "Panda vampire reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandavampire",
+      "display_name": "Panda vampire",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-32c02f5225909d9c9a06cfb964f4cafe98b978ec6ec315141b88ac76f19eddfd",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1040,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandavampire.png",
+      "source_sha256": "32c02f5225909d9c9a06cfb964f4cafe98b978ec6ec315141b88ac76f19eddfd"
+    },
+    {
+      "accessibility_label": "Panda zombie reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pandazombie",
+      "display_name": "Panda zombie",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c9f771ec051bdc05087d6044e4cd3664fecc450063fe3251852ef471454a45b4",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1050,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pandazombie.png",
+      "source_sha256": "c9f771ec051bdc05087d6044e4cd3664fecc450063fe3251852ef471454a45b4"
+    },
+    {
+      "accessibility_label": "Patrick ban reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patrickban",
+      "display_name": "Patrick ban",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-ac633d2596445e8e3e657fd30551f23fbde1db7303453f8d2c027547a0a08e50",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1060,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patrickban.png",
+      "source_sha256": "ac633d2596445e8e3e657fd30551f23fbde1db7303453f8d2c027547a0a08e50"
+    },
+    {
+      "accessibility_label": "Patrick chill reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patrickchill",
+      "display_name": "Patrick chill",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-fd79e319b7dd8cfe084ab1488efd9c645f3cafe9e392cdb8a42e2dd632c1c80b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1070,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patrickchill.png",
+      "source_sha256": "fd79e319b7dd8cfe084ab1488efd9c645f3cafe9e392cdb8a42e2dd632c1c80b"
+    },
+    {
+      "accessibility_label": "Patrick cry reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patrickcry",
+      "display_name": "Patrick cry",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0ccec61a323a9176b981ef5a9bcc935e21a93a3c1e45f938e32ac07181d8c5fa",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1080,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patrickcry.png",
+      "source_sha256": "0ccec61a323a9176b981ef5a9bcc935e21a93a3c1e45f938e32ac07181d8c5fa"
+    },
+    {
+      "accessibility_label": "Patrick dab reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patrickdab",
+      "display_name": "Patrick dab",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a16c85142841fa5af96b75d62ee18443f60458b5ce34cdb7ba782290ad5e655a",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1090,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patrickdab.png",
+      "source_sha256": "a16c85142841fa5af96b75d62ee18443f60458b5ce34cdb7ba782290ad5e655a"
+    },
+    {
+      "accessibility_label": "Patrick hmm reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patrickhmm",
+      "display_name": "Patrick hmm",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-cb675ca02b7c696fa626860c51372cb56d5406d61ae7a50adc9919def782472d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1100,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patrickhmm.png",
+      "source_sha256": "cb675ca02b7c696fa626860c51372cb56d5406d61ae7a50adc9919def782472d"
+    },
+    {
+      "accessibility_label": "Patrick lol reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patricklol",
+      "display_name": "Patrick lol",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c2c7a62a1d82a2e75c4550486b10cc253eeb0c977c82a1dcf8ba615825c60b4c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1110,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patricklol.png",
+      "source_sha256": "c2c7a62a1d82a2e75c4550486b10cc253eeb0c977c82a1dcf8ba615825c60b4c"
+    },
+    {
+      "accessibility_label": "Patrick note reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patricknote",
+      "display_name": "Patrick note",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8fcd604d553fd8619ef4b4486397fc770776218b62a1f7c9c6827685a646fb6f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1120,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patricknote.png",
+      "source_sha256": "8fcd604d553fd8619ef4b4486397fc770776218b62a1f7c9c6827685a646fb6f"
+    },
+    {
+      "accessibility_label": "Patrick rage reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patrickrage",
+      "display_name": "Patrick rage",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e27c6f7f7804b00f66276c5923b166acbfed76282613fe9570f6588a019c0afe",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1130,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patrickrage.png",
+      "source_sha256": "e27c6f7f7804b00f66276c5923b166acbfed76282613fe9570f6588a019c0afe"
+    },
+    {
+      "accessibility_label": "Patrick sip reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "patricksip",
+      "display_name": "Patrick sip",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9bf65c3dc2b4577faf8753cd6508efa9dab0711c584e52f484b0f50e388bb018",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1140,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "patricksip.png",
+      "source_sha256": "9bf65c3dc2b4577faf8753cd6508efa9dab0711c584e52f484b0f50e388bb018"
+    },
+    {
+      "accessibility_label": "Pepe ban reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeban",
+      "display_name": "Pepe ban",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8d2808b6db93f00434c8bc195e1f8d8a0f107ead8c35bdc201253a6b00ed99b0",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1150,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeban.png",
+      "source_sha256": "8d2808b6db93f00434c8bc195e1f8d8a0f107ead8c35bdc201253a6b00ed99b0"
+    },
+    {
+      "accessibility_label": "Pepe bdsm reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepebdsm",
+      "display_name": "Pepe bdsm",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e8be8889d6b49660ceb56f6d91750b3f1333ec49b88e8e065216aad6c2639394",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1160,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepebdsm.png",
+      "source_sha256": "e8be8889d6b49660ceb56f6d91750b3f1333ec49b88e8e065216aad6c2639394"
+    },
+    {
+      "accessibility_label": "Pepe begging reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepebegging",
+      "display_name": "Pepe begging",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-643ed2365deffe4bcdd0aef0649e7e19551e4c99854a34531416020dd0e53e80",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1170,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepebegging.png",
+      "source_sha256": "643ed2365deffe4bcdd0aef0649e7e19551e4c99854a34531416020dd0e53e80"
+    },
+    {
+      "accessibility_label": "Pepe bite lip reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepebitelip",
+      "display_name": "Pepe bite lip",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-406a825ec3429cd45d1e5051c35948ffa8da690ac358af6c4acb6e2f55b64f22",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1180,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepebitelip.png",
+      "source_sha256": "406a825ec3429cd45d1e5051c35948ffa8da690ac358af6c4acb6e2f55b64f22"
+    },
+    {
+      "accessibility_label": "Pepe catch reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecatch",
+      "display_name": "Pepe catch",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-66ad32d197ca1597d7c624dc6b8597e9242cb15d686f0e3fd64cbffff7155a20",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1190,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepecatch.png",
+      "source_sha256": "66ad32d197ca1597d7c624dc6b8597e9242cb15d686f0e3fd64cbffff7155a20"
+    },
+    {
+      "accessibility_label": "Pepe cigarette reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecigarette",
+      "display_name": "Pepe cigarette",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-de1ef76f40526bd56e3a297a3712d23a2a7a6c8cc1f28e1bd8ed2ce996705f5d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1200,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepecigarette.png",
+      "source_sha256": "de1ef76f40526bd56e3a297a3712d23a2a7a6c8cc1f28e1bd8ed2ce996705f5d"
+    },
+    {
+      "accessibility_label": "Pepe classic reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeclassic",
+      "display_name": "Pepe classic",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a19c15a1eb5ab9ad262a1c0dfb0aae011ecff373f4ff60b54ea3745c6ddb5746",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1210,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeclassic.png",
+      "source_sha256": "a19c15a1eb5ab9ad262a1c0dfb0aae011ecff373f4ff60b54ea3745c6ddb5746"
+    },
+    {
+      "accessibility_label": "Pepe clown reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeclown",
+      "display_name": "Pepe clown",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-07a193592335b0445783eb2c6ed9f015cbbf05bfc966e2124e217076e1bc1fc7",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1220,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeclown.png",
+      "source_sha256": "07a193592335b0445783eb2c6ed9f015cbbf05bfc966e2124e217076e1bc1fc7"
+    },
+    {
+      "accessibility_label": "Pepe cold reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecold",
+      "display_name": "Pepe cold",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b2b13400ca0d8b60c628865104564492ed7de54b0b0a6a7cf29d09bbec9ebabb",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1230,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepecold.png",
+      "source_sha256": "b2b13400ca0d8b60c628865104564492ed7de54b0b0a6a7cf29d09bbec9ebabb"
+    },
+    {
+      "accessibility_label": "Pepe covid reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecovid",
+      "display_name": "Pepe covid",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-baba0bdeb1eac05535fffff685b3155ac9ee4eeabaf785ed3b0b0803238ecbe3",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1240,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepecovid.png",
+      "source_sha256": "baba0bdeb1eac05535fffff685b3155ac9ee4eeabaf785ed3b0b0803238ecbe3"
+    },
+    {
+      "accessibility_label": "Pepe cringe reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecringe",
+      "display_name": "Pepe cringe",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e475691764b1e7e9a7ccde7e3ed8afc8ad1ac02bac13dc393577536295c33a97",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1250,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepecringe.png",
+      "source_sha256": "e475691764b1e7e9a7ccde7e3ed8afc8ad1ac02bac13dc393577536295c33a97"
+    },
+    {
+      "accessibility_label": "Pepe cross reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepecross",
+      "display_name": "Pepe cross",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-899a86fa3188639b64c6d1148aa2999cafe057a851abc144876a481a09f128ce",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1260,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepecross.png",
+      "source_sha256": "899a86fa3188639b64c6d1148aa2999cafe057a851abc144876a481a09f128ce"
+    },
+    {
+      "accessibility_label": "Pepe dark side reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepedarkside",
+      "display_name": "Pepe dark side",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6604f4027347fb352d83368a776a09468aa489c6f29a3a401afb3bed66d5be42",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 1270,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepedarkside.gif",
+      "source_sha256": "6604f4027347fb352d83368a776a09468aa489c6f29a3a401afb3bed66d5be42"
+    },
+    {
+      "accessibility_label": "Pepe dead reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepedead",
+      "display_name": "Pepe dead",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-df4461df0a5000a0d830e62d09c262546ba48ed2c30aa97d8dbc91ecfeb18b34",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1280,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepedead.png",
+      "source_sha256": "df4461df0a5000a0d830e62d09c262546ba48ed2c30aa97d8dbc91ecfeb18b34"
+    },
+    {
+      "accessibility_label": "Pepe dumb reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepedumb",
+      "display_name": "Pepe dumb",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6a53d38cfc254293d23ae59a0226ab93d931dc6c03d6733d0bd258187f1e134b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1290,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepedumb.png",
+      "source_sha256": "6a53d38cfc254293d23ae59a0226ab93d931dc6c03d6733d0bd258187f1e134b"
+    },
+    {
+      "accessibility_label": "Pepe eyes reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeeyes",
+      "display_name": "Pepe eyes",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-4057a8a619ef55770bcba5a5ed71e0e0add57ac65b96bb9a6e80ac7a0899e64b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1300,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeeyes.png",
+      "source_sha256": "4057a8a619ef55770bcba5a5ed71e0e0add57ac65b96bb9a6e80ac7a0899e64b"
+    },
+    {
+      "accessibility_label": "Pepe ez reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeez",
+      "display_name": "Pepe ez",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-28c402acd8a566af10e620705492b4ddfe8099f3965e2d08b51defd09fd8ea23",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1310,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeez.png",
+      "source_sha256": "28c402acd8a566af10e620705492b4ddfe8099f3965e2d08b51defd09fd8ea23"
+    },
+    {
+      "accessibility_label": "Pepe french reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepefrench",
+      "display_name": "Pepe french",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a8fa6f7cbec6fc0eb898f9052b923796e95f2cc9cf29208c5b1339ee4eea24f1",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1320,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepefrench.png",
+      "source_sha256": "a8fa6f7cbec6fc0eb898f9052b923796e95f2cc9cf29208c5b1339ee4eea24f1"
+    },
+    {
+      "accessibility_label": "Pepe ga reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepega",
+      "display_name": "Pepe ga",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c073e463a362909259c278ed34df8982332dcb14c0eec452df0726af19cb189d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1330,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepega.png",
+      "source_sha256": "c073e463a362909259c278ed34df8982332dcb14c0eec452df0726af19cb189d"
+    },
+    {
+      "accessibility_label": "Pepe gamer reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepegamer",
+      "display_name": "Pepe gamer",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b0345d0a69efa572d76425dbd4132eee82c503105cf7737c012a9e02f9922879",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1340,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepegamer.png",
+      "source_sha256": "b0345d0a69efa572d76425dbd4132eee82c503105cf7737c012a9e02f9922879"
+    },
+    {
+      "accessibility_label": "Pepe gimme reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepegimme",
+      "display_name": "Pepe gimme",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-402b38ee80e971bb0625fd1a07ece8de3779ca1f0a1acffb93c80255da6aede5",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1350,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepegimme.png",
+      "source_sha256": "402b38ee80e971bb0625fd1a07ece8de3779ca1f0a1acffb93c80255da6aede5"
+    },
+    {
+      "accessibility_label": "Pepe gopnik reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepegopnik",
+      "display_name": "Pepe gopnik",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-130191c27e7a58ad034b427d2b4d0ba505086f19846112e61293d89fd9952e27",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1360,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepegopnik.png",
+      "source_sha256": "130191c27e7a58ad034b427d2b4d0ba505086f19846112e61293d89fd9952e27"
+    },
+    {
+      "accessibility_label": "Pepe hand rub reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepehandrub",
+      "display_name": "Pepe hand rub",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-2f6e97188d0035a4a407cd17ac355198a49c40c7212c3c01ef3ddec11f44f902",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 1370,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepehandrub.gif",
+      "source_sha256": "2f6e97188d0035a4a407cd17ac355198a49c40c7212c3c01ef3ddec11f44f902"
+    },
+    {
+      "accessibility_label": "Pepe hands up reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepehandsup",
+      "display_name": "Pepe hands up",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b1413695afd0736a85852890318f4dbc0210ef95bebb5e84a824ee02f2416097",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1380,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepehandsup.png",
+      "source_sha256": "b1413695afd0736a85852890318f4dbc0210ef95bebb5e84a824ee02f2416097"
+    },
+    {
+      "accessibility_label": "Pepe hide reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepehide",
+      "display_name": "Pepe hide",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-df25aa4c72ddeb972bf3a99eb38d14fcfcf8b4b9018901082c4d0024a4e69e62",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1390,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepehide.png",
+      "source_sha256": "df25aa4c72ddeb972bf3a99eb38d14fcfcf8b4b9018901082c4d0024a4e69e62"
+    },
+    {
+      "accessibility_label": "Pepe horny reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepehorny",
+      "display_name": "Pepe horny",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-27194df1262a5e29de520c9f0d0450f788470d10c96b82788d699d50a8f2ef78",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1400,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepehorny.png",
+      "source_sha256": "27194df1262a5e29de520c9f0d0450f788470d10c96b82788d699d50a8f2ef78"
+    },
+    {
+      "accessibility_label": "Pepe juice reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepejuice",
+      "display_name": "Pepe juice",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-2560ac1ae37e14584d005c04c94ccc77dc63caaef1337fb50469a6f8489fb47f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1410,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepejuice.png",
+      "source_sha256": "2560ac1ae37e14584d005c04c94ccc77dc63caaef1337fb50469a6f8489fb47f"
+    },
+    {
+      "accessibility_label": "Pepe king reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeking",
+      "display_name": "Pepe king",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-5b0f21fb5f70fafe27caea722ea9bea57cf1547f3c161c0d0023f7a349f471bc",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1420,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeking.png",
+      "source_sha256": "5b0f21fb5f70fafe27caea722ea9bea57cf1547f3c161c0d0023f7a349f471bc"
+    },
+    {
+      "accessibility_label": "Pepe listening reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepelistening",
+      "display_name": "Pepe listening",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-1c127d4754501a119831acedfcdef8e76cfd764cab6a2e6918f9479604248924",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1430,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepelistening.png",
+      "source_sha256": "1c127d4754501a119831acedfcdef8e76cfd764cab6a2e6918f9479604248924"
+    },
+    {
+      "accessibility_label": "Pepe love reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepelove",
+      "display_name": "Pepe love",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d18c627ee19da3368e340cd6b3eb8aeda488737426244cf445bde9e4c1f1507b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1440,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": 3,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepelove.png",
+      "source_sha256": "d18c627ee19da3368e340cd6b3eb8aeda488737426244cf445bde9e4c1f1507b"
+    },
+    {
+      "accessibility_label": "Pepe meditate reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepemeditate",
+      "display_name": "Pepe meditate",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-cffbb97ed6acc9ec0a97c964ebe2177f5edb8013123587bfa9e5136d658004cb",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1450,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepemeditate.png",
+      "source_sha256": "cffbb97ed6acc9ec0a97c964ebe2177f5edb8013123587bfa9e5136d658004cb"
+    },
+    {
+      "accessibility_label": "Pepe money reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepemoney",
+      "display_name": "Pepe money",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8eb42720df676347f7d55292eb617f9e133c2b29916efb637769a22dd6eb5b0a",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1460,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepemoney.png",
+      "source_sha256": "8eb42720df676347f7d55292eb617f9e133c2b29916efb637769a22dd6eb5b0a"
+    },
+    {
+      "accessibility_label": "Pepe ohh reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeohh",
+      "display_name": "Pepe ohh",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-71d90d55978172ebaf696a5d519f4cd1408be863f5c26d119d863f7b7dd9c7c9",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1470,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeohh.png",
+      "source_sha256": "71d90d55978172ebaf696a5d519f4cd1408be863f5c26d119d863f7b7dd9c7c9"
+    },
+    {
+      "accessibility_label": "Pepe ok reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeok",
+      "display_name": "Pepe ok",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9e76c4ad8c088e713bc8e10ea1795c40ec768ca98176a3f05e3e600d7b1a738b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1480,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeok.png",
+      "source_sha256": "9e76c4ad8c088e713bc8e10ea1795c40ec768ca98176a3f05e3e600d7b1a738b"
+    },
+    {
+      "accessibility_label": "Pepe pog champ reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepepogchamp",
+      "display_name": "Pepe pog champ",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-74c5f392461be3ec126d29a6d70fae1af2ce428600571607e5531608b37a5bb0",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1490,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepepogchamp.png",
+      "source_sha256": "74c5f392461be3ec126d29a6d70fae1af2ce428600571607e5531608b37a5bb0"
+    },
+    {
+      "accessibility_label": "Pepe poker reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepepoker",
+      "display_name": "Pepe poker",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-31c06c05415a3f64fdd4c94aca2927ec3b57f76a7ebfa6203dce1e756d79e4ab",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1500,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepepoker.png",
+      "source_sha256": "31c06c05415a3f64fdd4c94aca2927ec3b57f76a7ebfa6203dce1e756d79e4ab"
+    },
+    {
+      "accessibility_label": "Pepe police reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepepolice",
+      "display_name": "Pepe police",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-330dbab95463bdd91f3c51376dd6f653657dc244e6cd9a41f5a1077a4a416f51",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1510,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepepolice.png",
+      "source_sha256": "330dbab95463bdd91f3c51376dd6f653657dc244e6cd9a41f5a1077a4a416f51"
+    },
+    {
+      "accessibility_label": "Pepe rage reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "peperage",
+      "display_name": "Pepe rage",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-c2eb436d197f7ab83c60cf5ab864bb297120568249e89486a5091fec749a7567",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1520,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "peperage.png",
+      "source_sha256": "c2eb436d197f7ab83c60cf5ab864bb297120568249e89486a5091fec749a7567"
+    },
+    {
+      "accessibility_label": "Pepe rain reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "peperain",
+      "display_name": "Pepe rain",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-a4994a97bda1361d2965f4eb81de19adebab96b3666d01cebc5ae86b86972934",
+      "kind": "animated",
+      "license": "unknown / not supplied",
+      "ordering": 1530,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "peperain.gif",
+      "source_sha256": "a4994a97bda1361d2965f4eb81de19adebab96b3666d01cebc5ae86b86972934"
+    },
+    {
+      "accessibility_label": "Pepe sad reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepesad",
+      "display_name": "Pepe sad",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d2858b47ba78d9f2cd2235a3df44ac25430b5f452f383405986ed24915cc590d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1540,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepesad.png",
+      "source_sha256": "d2858b47ba78d9f2cd2235a3df44ac25430b5f452f383405986ed24915cc590d"
+    },
+    {
+      "accessibility_label": "Pepe shock reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepeshock",
+      "display_name": "Pepe shock",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e77b503f5360c7845f125910a907b4fd2b5b814d3723c5603281b7117b7b4ea7",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1550,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepeshock.png",
+      "source_sha256": "e77b503f5360c7845f125910a907b4fd2b5b814d3723c5603281b7117b7b4ea7"
+    },
+    {
+      "accessibility_label": "Pepe sleep reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepesleep",
+      "display_name": "Pepe sleep",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-fe5da1c739082e5d869ffe168b73e9ca03dad011520394ee0fe3a5a806e51b46",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1560,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepesleep.png",
+      "source_sha256": "fe5da1c739082e5d869ffe168b73e9ca03dad011520394ee0fe3a5a806e51b46"
+    },
+    {
+      "accessibility_label": "Pepe spit reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepespit",
+      "display_name": "Pepe spit",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0da224cf1cb84d4dc3c0f8d8c3f0174f93c7d8d43d26199c5d2ef6a90133e19c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1570,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepespit.png",
+      "source_sha256": "0da224cf1cb84d4dc3c0f8d8c3f0174f93c7d8d43d26199c5d2ef6a90133e19c"
+    },
+    {
+      "accessibility_label": "Pepe stab reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepestab",
+      "display_name": "Pepe stab",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-765d73c3648933dcc374f0eafacde351d03119880ae40850228a2e86364527af",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1580,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepestab.png",
+      "source_sha256": "765d73c3648933dcc374f0eafacde351d03119880ae40850228a2e86364527af"
+    },
+    {
+      "accessibility_label": "Pepe stocks reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepestocks",
+      "display_name": "Pepe stocks",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6351d6b6d4c946dc8bddce774ee6b740590736d89e4b95136d610d4ff4448927",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1590,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepestocks.png",
+      "source_sha256": "6351d6b6d4c946dc8bddce774ee6b740590736d89e4b95136d610d4ff4448927"
+    },
+    {
+      "accessibility_label": "Pepe success reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepesuccess",
+      "display_name": "Pepe success",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-f0d067217406a23f848944da8ea57eab77ebdc12b0c38f999700c7773574a965",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1600,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepesuccess.png",
+      "source_sha256": "f0d067217406a23f848944da8ea57eab77ebdc12b0c38f999700c7773574a965"
+    },
+    {
+      "accessibility_label": "Pepe suit reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepesuit",
+      "display_name": "Pepe suit",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-ae670f4c37d9be2858e620344e1a6cbb6ee0b0895e2ca2791b036a0448f2ef0a",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1610,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepesuit.png",
+      "source_sha256": "ae670f4c37d9be2858e620344e1a6cbb6ee0b0895e2ca2791b036a0448f2ef0a"
+    },
+    {
+      "accessibility_label": "Pepe toast reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepetoast",
+      "display_name": "Pepe toast",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-de0c4e3c05a3ba4ae46046ead5609af61634a0845091ef9b75b092c543026a28",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1620,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepetoast.png",
+      "source_sha256": "de0c4e3c05a3ba4ae46046ead5609af61634a0845091ef9b75b092c543026a28"
+    },
+    {
+      "accessibility_label": "Pepe troll reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepetroll",
+      "display_name": "Pepe troll",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-7bd7591bd2178654a2c86460abadb82cd95f55e4a4782be09a39f2f54683d87b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1630,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepetroll.png",
+      "source_sha256": "7bd7591bd2178654a2c86460abadb82cd95f55e4a4782be09a39f2f54683d87b"
+    },
+    {
+      "accessibility_label": "Pepe watch reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepewatch",
+      "display_name": "Pepe watch",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9bd98a0beb6f757285a9b9f32c5e6ec37596507545f7c992e71caf28d355aeb2",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1640,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepewatch.png",
+      "source_sha256": "9bd98a0beb6f757285a9b9f32c5e6ec37596507545f7c992e71caf28d355aeb2"
+    },
+    {
+      "accessibility_label": "Pepe write reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepewrite",
+      "display_name": "Pepe write",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-4c80d2403e4c205df36664aae87dcc9bdb51c0d6c217a38b02b1fd173048f3e4",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1650,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepewrite.png",
+      "source_sha256": "4c80d2403e4c205df36664aae87dcc9bdb51c0d6c217a38b02b1fd173048f3e4"
+    },
+    {
+      "accessibility_label": "Pepe zombie reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepezombie",
+      "display_name": "Pepe zombie",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8b0e0438c60063dd75098d17f5e881cc9395f06c28a05ae0d25c46506951aff0",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1660,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepezombie.png",
+      "source_sha256": "8b0e0438c60063dd75098d17f5e881cc9395f06c28a05ae0d25c46506951aff0"
+    },
+    {
+      "accessibility_label": "Pepe zoom reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pepezoom",
+      "display_name": "Pepe zoom",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-af864884578ea7202676cfe77b2909b06c867769f0967f9264a71402a8bf3aee",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1670,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pepezoom.png",
+      "source_sha256": "af864884578ea7202676cfe77b2909b06c867769f0967f9264a71402a8bf3aee"
+    },
+    {
+      "accessibility_label": "Peter drink reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "peterdrink",
+      "display_name": "Peter drink",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-af59463d9332bfa15c5e69c4cd699636edebe88f414c7aaa8707a95a3e242abc",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1680,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "peterdrink.png",
+      "source_sha256": "af59463d9332bfa15c5e69c4cd699636edebe88f414c7aaa8707a95a3e242abc"
+    },
+    {
+      "accessibility_label": "Peter smile reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "petersmile",
+      "display_name": "Peter smile",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-2f7f17dc7a301b19fc9b478cfbe1b74ee41b873256236555c93dca4baf950a90",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1690,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "petersmile.png",
+      "source_sha256": "2f7f17dc7a301b19fc9b478cfbe1b74ee41b873256236555c93dca4baf950a90"
+    },
+    {
+      "accessibility_label": "PogU reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pogu",
+      "display_name": "PogU",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d02f2c84bb28d963a4195acaa49e04006e8fecb9dfae296ee357397d96a92938",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1700,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pogu.png",
+      "source_sha256": "d02f2c84bb28d963a4195acaa49e04006e8fecb9dfae296ee357397d96a92938"
+    },
+    {
+      "accessibility_label": "Pokémon bulba reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pokemonbulba",
+      "display_name": "Pokémon bulba",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-bdf90ad7dfe5ec557408f0e41bba6d295a7e042ddff64aca24e566d26e4e5a26",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1710,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pokemonbulba.png",
+      "source_sha256": "bdf90ad7dfe5ec557408f0e41bba6d295a7e042ddff64aca24e566d26e4e5a26"
+    },
+    {
+      "accessibility_label": "Pokémon pika gun reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pokemonpikagun",
+      "display_name": "Pokémon pika gun",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-62212966380d5aedef4e0f55910220b24456fbf897bb79dd9d17e3a57f860bfa",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1720,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pokemonpikagun.png",
+      "source_sha256": "62212966380d5aedef4e0f55910220b24456fbf897bb79dd9d17e3a57f860bfa"
+    },
+    {
+      "accessibility_label": "Pokémon psyduck reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pokemonpsyduck",
+      "display_name": "Pokémon psyduck",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3fdf43d0125ea9262464e666e5e5ef700007e5b349dad44ebef8e91aeaa654b9",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1730,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pokemonpsyduck.png",
+      "source_sha256": "3fdf43d0125ea9262464e666e5e5ef700007e5b349dad44ebef8e91aeaa654b9"
+    },
+    {
+      "accessibility_label": "Pokémon slowpoke reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pokemonslowpoke",
+      "display_name": "Pokémon slowpoke",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d0eb3544b44c61b30e450535a615f1474438764bb009654224a3d69cecec3ac9",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1740,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pokemonslowpoke.png",
+      "source_sha256": "d0eb3544b44c61b30e450535a615f1474438764bb009654224a3d69cecec3ac9"
+    },
+    {
+      "accessibility_label": "Pokémon toxic reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "pokemontoxic",
+      "display_name": "Pokémon toxic",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e49369316ccb2eac3ec1cc98b1ebe9775500936475b10c6f4200e06559fcd615",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1750,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "pokemontoxic.png",
+      "source_sha256": "e49369316ccb2eac3ec1cc98b1ebe9775500936475b10c6f4200e06559fcd615"
+    },
+    {
+      "accessibility_label": "Roflan pominki reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "roflanpominki",
+      "display_name": "Roflan pominki",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-f43ea2e90c2026d9d29229740d96e9b539aa27bf25de8d2bbdd933a0122b51fd",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1760,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "roflanpominki.png",
+      "source_sha256": "f43ea2e90c2026d9d29229740d96e9b539aa27bf25de8d2bbdd933a0122b51fd"
+    },
+    {
+      "accessibility_label": "Sage bin reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "sagebin",
+      "display_name": "Sage bin",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b056d476b270d9b19a53a94dad07192d92617c1bb6433f810ac3d4b359870bed",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1770,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "sagebin.png",
+      "source_sha256": "b056d476b270d9b19a53a94dad07192d92617c1bb6433f810ac3d4b359870bed"
+    },
+    {
+      "accessibility_label": "Sage ok reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "sageok",
+      "display_name": "Sage ok",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-466bf36053f2182a0b21fdd3b1ba5e24762d16d750e41c08f931ab0602881584",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1780,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "sageok.png",
+      "source_sha256": "466bf36053f2182a0b21fdd3b1ba5e24762d16d750e41c08f931ab0602881584"
+    },
+    {
+      "accessibility_label": "Sage peek reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "sagepeek",
+      "display_name": "Sage peek",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-40b32294a69e5b227d8fcbf52a70972f8560e7d4fee28a65a6aa6a34fef5134e",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1790,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "sagepeek.png",
+      "source_sha256": "40b32294a69e5b227d8fcbf52a70972f8560e7d4fee28a65a6aa6a34fef5134e"
+    },
+    {
+      "accessibility_label": "Sage popcorn reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "sagepopcorn",
+      "display_name": "Sage popcorn",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-09e3dbf2ae910e730fabf791aa633933adf2e7d3d25ae65f396abfd14faf4f2e",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1800,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "sagepopcorn.png",
+      "source_sha256": "09e3dbf2ae910e730fabf791aa633933adf2e7d3d25ae65f396abfd14faf4f2e"
+    },
+    {
+      "accessibility_label": "Sage shy reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "sageshy",
+      "display_name": "Sage shy",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-73b7fb9d17e4589c8dd3a0f6102181764118b399b43b550dfb6ce91256fc987f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1810,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "sageshy.png",
+      "source_sha256": "73b7fb9d17e4589c8dd3a0f6102181764118b399b43b550dfb6ce91256fc987f"
+    },
+    {
+      "accessibility_label": "Shiba heart reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "shibaheart",
+      "display_name": "Shiba heart",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e63283fd0acf3554e612124b035d15497e903a69988c490bfe5211ebf0aa9d08",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1820,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "shibaheart.png",
+      "source_sha256": "e63283fd0acf3554e612124b035d15497e903a69988c490bfe5211ebf0aa9d08"
+    },
+    {
+      "accessibility_label": "Skeletor joy reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "skeletorjoy",
+      "display_name": "Skeletor joy",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-f1093c10b01af1b895c6da479dea86d48a3e24d0c2745c168910a13182689716",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1830,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "skeletorjoy.png",
+      "source_sha256": "f1093c10b01af1b895c6da479dea86d48a3e24d0c2745c168910a13182689716"
+    },
+    {
+      "accessibility_label": "Skeletor smug reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "skeletorsmug",
+      "display_name": "Skeletor smug",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-3272b754709284b40c7604b5548a43d7579eda9d0b4707f69ee8bb133d71e631",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1840,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "skeletorsmug.png",
+      "source_sha256": "3272b754709284b40c7604b5548a43d7579eda9d0b4707f69ee8bb133d71e631"
+    },
+    {
+      "accessibility_label": "Slozhna reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "slozhna",
+      "display_name": "Slozhna",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6fc096bb0b0f26526a4c17cd7efc2ce47acaa85585746ce0a46b6795e472934d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1850,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "slozhna.png",
+      "source_sha256": "6fc096bb0b0f26526a4c17cd7efc2ce47acaa85585746ce0a46b6795e472934d"
+    },
+    {
+      "accessibility_label": "Spravedlivo reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "spravedlivo",
+      "display_name": "Spravedlivo",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6c1d1fffe0feed866583485fe0e073f98ad38d163266bc9ca95db1fb6d357c46",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1860,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "spravedlivo.png",
+      "source_sha256": "6c1d1fffe0feed866583485fe0e073f98ad38d163266bc9ca95db1fb6d357c46"
+    },
+    {
+      "accessibility_label": "Stonks reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "stonks",
+      "display_name": "Stonks",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-20d5e62a38071ec7e5562cbc2651c554089d66c81cd939fc62d33a1cd37c2e3c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1870,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "stonks.png",
+      "source_sha256": "20d5e62a38071ec7e5562cbc2651c554089d66c81cd939fc62d33a1cd37c2e3c"
+    },
+    {
+      "accessibility_label": "Take my money reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "takemymoney",
+      "display_name": "Take my money",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-156c4baf1ba2a7062cd5fc98971d6dc02b318896c1b21c32804c5db67a0160e8",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1880,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "takemymoney.png",
+      "source_sha256": "156c4baf1ba2a7062cd5fc98971d6dc02b318896c1b21c32804c5db67a0160e8"
+    },
+    {
+      "accessibility_label": "Teemo GG reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "teemogg",
+      "display_name": "Teemo GG",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-191284247fe570d6195198d03681a3ca76626ea41d0749fd407a66be96399517",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1890,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "teemogg.png",
+      "source_sha256": "191284247fe570d6195198d03681a3ca76626ea41d0749fd407a66be96399517"
+    },
+    {
+      "accessibility_label": "Tom nope reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "tomnope",
+      "display_name": "Tom nope",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0839ef78585165627ddd6ea2e1b38ca2dfad3f7b94c9530adc97afee1427f41c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1900,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "tomnope.png",
+      "source_sha256": "0839ef78585165627ddd6ea2e1b38ca2dfad3f7b94c9530adc97afee1427f41c"
+    },
+    {
+      "accessibility_label": "Tom tired reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "tomtired",
+      "display_name": "Tom tired",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-5fc57bb5dc455d4ad39a9a8ddd81b2c4cf6c63b50f71f6d7b0775048f01320e0",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1910,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "tomtired.png",
+      "source_sha256": "5fc57bb5dc455d4ad39a9a8ddd81b2c4cf6c63b50f71f6d7b0775048f01320e0"
+    },
+    {
+      "accessibility_label": "Turtle angel reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "turtleangel",
+      "display_name": "Turtle angel",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-139f6508a7ec1f51ad7298a9c031a8f8be799e2c4d1ccbec607efe059f99730f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1920,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "turtleangel.png",
+      "source_sha256": "139f6508a7ec1f51ad7298a9c031a8f8be799e2c4d1ccbec607efe059f99730f"
+    },
+    {
+      "accessibility_label": "Vault Boy angel reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyangel",
+      "display_name": "Vault Boy angel",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-8320c04a9feab35ca7473c39b6f069c8e1373877793646fa29a5e78a654d9bf1",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1930,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyangel.png",
+      "source_sha256": "8320c04a9feab35ca7473c39b6f069c8e1373877793646fa29a5e78a654d9bf1"
+    },
+    {
+      "accessibility_label": "Vault Boy bubble reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboybubble",
+      "display_name": "Vault Boy bubble",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6d86e01a7ae8780dc5f86ebe2a400f678aeb90c05352ae9178a550da14c837ba",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1940,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboybubble.png",
+      "source_sha256": "6d86e01a7ae8780dc5f86ebe2a400f678aeb90c05352ae9178a550da14c837ba"
+    },
+    {
+      "accessibility_label": "Vault Boy confuse reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyconfuse",
+      "display_name": "Vault Boy confuse",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-bd6c31e0e63f11cfd6d1ef66ce201ef872a173157e422d24e520c9839ac53c8b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1950,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyconfuse.png",
+      "source_sha256": "bd6c31e0e63f11cfd6d1ef66ce201ef872a173157e422d24e520c9839ac53c8b"
+    },
+    {
+      "accessibility_label": "Vault Boy cool reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboycool",
+      "display_name": "Vault Boy cool",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e5bb7a8b9b732b8053b15d317261f1a57916b5d6c8ee9d78bcd224b78032f373",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1960,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboycool.png",
+      "source_sha256": "e5bb7a8b9b732b8053b15d317261f1a57916b5d6c8ee9d78bcd224b78032f373"
+    },
+    {
+      "accessibility_label": "Vault Boy dislike reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboydislike",
+      "display_name": "Vault Boy dislike",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9db970a99762f9078b87e46816f8ba418b75d5f04fd83ae55081a7d65a10410c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1970,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboydislike.png",
+      "source_sha256": "9db970a99762f9078b87e46816f8ba418b75d5f04fd83ae55081a7d65a10410c"
+    },
+    {
+      "accessibility_label": "Vault Boy evil reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyevil",
+      "display_name": "Vault Boy evil",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-6bae5e3bcc8e61ecea07f7e8747488b7f202a1ab526973bc1009f178a45dadda",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1980,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyevil.png",
+      "source_sha256": "6bae5e3bcc8e61ecea07f7e8747488b7f202a1ab526973bc1009f178a45dadda"
+    },
+    {
+      "accessibility_label": "Vault Boy frustrate reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyfrustrate",
+      "display_name": "Vault Boy frustrate",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-2faa0c5cc9374e3b79da2513010c6ac0ebdd942f14575d787a44df94d90f2053",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 1990,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyfrustrate.png",
+      "source_sha256": "2faa0c5cc9374e3b79da2513010c6ac0ebdd942f14575d787a44df94d90f2053"
+    },
+    {
+      "accessibility_label": "Vault Boy gun reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboygun",
+      "display_name": "Vault Boy gun",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-879249d69941ff1cca75edf7055c1726c38a507dbe03c3150c3f5b9e26584625",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2000,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboygun.png",
+      "source_sha256": "879249d69941ff1cca75edf7055c1726c38a507dbe03c3150c3f5b9e26584625"
+    },
+    {
+      "accessibility_label": "Vault Boy injure reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyinjure",
+      "display_name": "Vault Boy injure",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-046ff12e1f642262b3f1b75c4236037d3e793c14246f470a11539a9457cac7f5",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2010,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyinjure.png",
+      "source_sha256": "046ff12e1f642262b3f1b75c4236037d3e793c14246f470a11539a9457cac7f5"
+    },
+    {
+      "accessibility_label": "Vault Boy knife reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyknife",
+      "display_name": "Vault Boy knife",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b483624503686b976ea65b5dfe75576568514fc1faff809b192098557a30428d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2020,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyknife.png",
+      "source_sha256": "b483624503686b976ea65b5dfe75576568514fc1faff809b192098557a30428d"
+    },
+    {
+      "accessibility_label": "Vault Boy love reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboylove",
+      "display_name": "Vault Boy love",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-036d7b6498b7b0e823cd3c965f841ca37ce7bf1e7ef140c1781c6d209761dc52",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2030,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboylove.png",
+      "source_sha256": "036d7b6498b7b0e823cd3c965f841ca37ce7bf1e7ef140c1781c6d209761dc52"
+    },
+    {
+      "accessibility_label": "Vault Boy lul reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboylul",
+      "display_name": "Vault Boy lul",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-5737ae36d2a47c15fed6f11acf8feb2c6313428a464d79fd93c6775cfad428dc",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2040,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboylul.png",
+      "source_sha256": "5737ae36d2a47c15fed6f11acf8feb2c6313428a464d79fd93c6775cfad428dc"
+    },
+    {
+      "accessibility_label": "Vault Boy melody reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboymelody",
+      "display_name": "Vault Boy melody",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-50371619ef1fb55cbf0450ee17cc7e3a556244f2e70ab18d871fb4297a8b6cd7",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2050,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboymelody.png",
+      "source_sha256": "50371619ef1fb55cbf0450ee17cc7e3a556244f2e70ab18d871fb4297a8b6cd7"
+    },
+    {
+      "accessibility_label": "Vault Boy party reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyparty",
+      "display_name": "Vault Boy party",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-50c30a913637a91a7ae3c468b23beb06a13cf14297aecafd5cc3982e52b212d4",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2060,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyparty.png",
+      "source_sha256": "50c30a913637a91a7ae3c468b23beb06a13cf14297aecafd5cc3982e52b212d4"
+    },
+    {
+      "accessibility_label": "Vault Boy pistol reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboypistol",
+      "display_name": "Vault Boy pistol",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-49be9fa054c8b374ac07100a72c1acd4c771305448305b1c9aa29c5ee8f9bb08",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2070,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboypistol.png",
+      "source_sha256": "49be9fa054c8b374ac07100a72c1acd4c771305448305b1c9aa29c5ee8f9bb08"
+    },
+    {
+      "accessibility_label": "Vault Boy pog reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboypog",
+      "display_name": "Vault Boy pog",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-89e395c06d77c6fc86223d28bbd1e286bc45c6513fea0378e99fd79b77a071a4",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2080,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboypog.png",
+      "source_sha256": "89e395c06d77c6fc86223d28bbd1e286bc45c6513fea0378e99fd79b77a071a4"
+    },
+    {
+      "accessibility_label": "Vault Boy rage reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyrage",
+      "display_name": "Vault Boy rage",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-f31ed4a4c2084d746b660fd8441d86e006b815ff9bd18df5ffd2f0cab9500df4",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2090,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyrage.png",
+      "source_sha256": "f31ed4a4c2084d746b660fd8441d86e006b815ff9bd18df5ffd2f0cab9500df4"
+    },
+    {
+      "accessibility_label": "Vault Boy shock reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyshock",
+      "display_name": "Vault Boy shock",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-38d0ce0b73bbf4bf8bf3fbae9b2e58a489ef98806a08bb57a8f1b744601aac5f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2100,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyshock.png",
+      "source_sha256": "38d0ce0b73bbf4bf8bf3fbae9b2e58a489ef98806a08bb57a8f1b744601aac5f"
+    },
+    {
+      "accessibility_label": "Vault Boy sport reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboysport",
+      "display_name": "Vault Boy sport",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-4ee91b1108007c3a93f97da1463cfe95ecb283e000a0bdc62058a69e2b1720ba",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2110,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboysport.png",
+      "source_sha256": "4ee91b1108007c3a93f97da1463cfe95ecb283e000a0bdc62058a69e2b1720ba"
+    },
+    {
+      "accessibility_label": "Vault Boy spy reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboyspy",
+      "display_name": "Vault Boy spy",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-167af159ac107057ed6341860fb5d388b8edc42fb7d6dd177e27a1778cf4cd18",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2120,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboyspy.png",
+      "source_sha256": "167af159ac107057ed6341860fb5d388b8edc42fb7d6dd177e27a1778cf4cd18"
+    },
+    {
+      "accessibility_label": "Vault Boy stop reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboystop",
+      "display_name": "Vault Boy stop",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-afe58fbe22a82c6bef523b97fa74b8f368aad0a5c7ffbb654e5461719b8b4da5",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2130,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboystop.png",
+      "source_sha256": "afe58fbe22a82c6bef523b97fa74b8f368aad0a5c7ffbb654e5461719b8b4da5"
+    },
+    {
+      "accessibility_label": "Vault Boy tears reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboytears",
+      "display_name": "Vault Boy tears",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-0a0996ec6239fb0667caf089496d6599df0fa27e1a964f5ac26c2ea89e4e3ce7",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2140,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboytears.png",
+      "source_sha256": "0a0996ec6239fb0667caf089496d6599df0fa27e1a964f5ac26c2ea89e4e3ce7"
+    },
+    {
+      "accessibility_label": "Vault Boy think reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboythink",
+      "display_name": "Vault Boy think",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-9e8310457751975a2e959e790c6115800821dd2704e3b018b1f71e73ae3b1b25",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2150,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboythink.png",
+      "source_sha256": "9e8310457751975a2e959e790c6115800821dd2704e3b018b1f71e73ae3b1b25"
+    },
+    {
+      "accessibility_label": "Vault Boy thumbs up reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboythumbsup",
+      "display_name": "Vault Boy thumbs up",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-d893dd964459bfb992eecda3cf6a46785e6ce318b483de089bc5d4c3a212dba6",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2160,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboythumbsup.png",
+      "source_sha256": "d893dd964459bfb992eecda3cf6a46785e6ce318b483de089bc5d4c3a212dba6"
+    },
+    {
+      "accessibility_label": "Vault Boy wink reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultboywink",
+      "display_name": "Vault Boy wink",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-aec0a2daed06a9c680319a7b24904f2cf62a80fdc7a3dda889dccbdeccf78b2f",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2170,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultboywink.png",
+      "source_sha256": "aec0a2daed06a9c680319a7b24904f2cf62a80fdc7a3dda889dccbdeccf78b2f"
+    },
+    {
+      "accessibility_label": "Vault girl reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultgirl",
+      "display_name": "Vault girl",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-1ee5550674b028774ad77d3fa14ac9703e90e111d82b2a3bee52bd67c7d143ae",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2180,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultgirl.png",
+      "source_sha256": "1ee5550674b028774ad77d3fa14ac9703e90e111d82b2a3bee52bd67c7d143ae"
+    },
+    {
+      "accessibility_label": "Vault Girl evil reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultgirlevil",
+      "display_name": "Vault Girl evil",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-16c9c30e70dc5c50ab39506b8bcf4aecaca5d5db4ef7026030edb0d213bc4308",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2190,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultgirlevil.png",
+      "source_sha256": "16c9c30e70dc5c50ab39506b8bcf4aecaca5d5db4ef7026030edb0d213bc4308"
+    },
+    {
+      "accessibility_label": "Vault Girl love reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultgirllove",
+      "display_name": "Vault Girl love",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-97745a09655808052cce87b34e8eb58413b724b8e9e7a099d0c94a95d2187f1c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2200,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultgirllove.png",
+      "source_sha256": "97745a09655808052cce87b34e8eb58413b724b8e9e7a099d0c94a95d2187f1c"
+    },
+    {
+      "accessibility_label": "Vault Girl nerd reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultgirlnerd",
+      "display_name": "Vault Girl nerd",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e07cbc525dfad473724c86b68caf9611cc07d6dcefbc5bb4fd9d51079d4cf9ef",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2210,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultgirlnerd.png",
+      "source_sha256": "e07cbc525dfad473724c86b68caf9611cc07d6dcefbc5bb4fd9d51079d4cf9ef"
+    },
+    {
+      "accessibility_label": "Vault Girl wink reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultgirlwink",
+      "display_name": "Vault Girl wink",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-edb51e2b0576086263281e027231936e58080045332f80ffc953141f97b3950c",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2220,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultgirlwink.png",
+      "source_sha256": "edb51e2b0576086263281e027231936e58080045332f80ffc953141f97b3950c"
+    },
+    {
+      "accessibility_label": "Vault money reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultmoney",
+      "display_name": "Vault money",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-b3261054275bfeebf5d930a8ab9f71bcb8c1c1cb834a32c933a4fa9b3eb0577d",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2230,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultmoney.png",
+      "source_sha256": "b3261054275bfeebf5d930a8ab9f71bcb8c1c1cb834a32c933a4fa9b3eb0577d"
+    },
+    {
+      "accessibility_label": "Vault nuke reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultnuke",
+      "display_name": "Vault nuke",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-e7d42f8c92b727f7774f022c44ee24985f26b1b6264d386bfd58e4a00f7f1b12",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2240,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultnuke.png",
+      "source_sha256": "e7d42f8c92b727f7774f022c44ee24985f26b1b6264d386bfd58e4a00f7f1b12"
+    },
+    {
+      "accessibility_label": "Vault nuke boom reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultnukeboom",
+      "display_name": "Vault nuke boom",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-7382b34b4d0d0942bb41d6e8d398f4df120a8224af64ee1470a4db18dc22f65b",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2250,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultnukeboom.png",
+      "source_sha256": "7382b34b4d0d0942bb41d6e8d398f4df120a8224af64ee1470a4db18dc22f65b"
+    },
+    {
+      "accessibility_label": "Vault whiskey reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "vaultwhiskey",
+      "display_name": "Vault whiskey",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-296860eeab249a33af3b186d07ae8d3baf3fe63d243980b1a6781cd19df1c802",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2260,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "vaultwhiskey.png",
+      "source_sha256": "296860eeab249a33af3b186d07ae8d3baf3fe63d243980b1a6781cd19df1c802"
+    },
+    {
+      "accessibility_label": "What reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "what",
+      "display_name": "What",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-f1839b27baf94656b111553805466ceaceb989f7d4022d4d9259f7cfb29aa3b3",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2270,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "what.png",
+      "source_sha256": "f1839b27baf94656b111553805466ceaceb989f7d4022d4d9259f7cfb29aa3b3"
+    },
+    {
+      "accessibility_label": "Yoba reaction",
+      "approval_status": "staging-only/unverified",
+      "catalog_id": "yoba",
+      "display_name": "Yoba",
+      "enabled": true,
+      "immutable_asset_version": "source-sha256-16cbf0125e498b0c5a8bd291c547a220a43c8a1148156d47a96bf84267b3abdb",
+      "kind": "static",
+      "license": "unknown / not supplied",
+      "ordering": 2280,
+      "provenance": {
+        "author": "unknown",
+        "source": "Owner-supplied local corpus from an unidentified public download collection"
+      },
+      "quick_order": null,
+      "rights_basis": "Owner-approved staging evaluation only; no production authorization",
+      "selectable": true,
+      "source_path": "yoba.png",
+      "source_sha256": "16cbf0125e498b0c5a8bd291c547a220a43c8a1148156d47a96bf84267b3abdb"
+    }
+  ],
+  "quick_reactions": [
+    "pepeclap",
+    "pepehmm",
+    "pepelove"
+  ],
+  "schema_version": 1
+}

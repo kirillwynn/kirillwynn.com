@@ -28,6 +28,47 @@ schema-3 attestation, and read-only live Chrome QA passed. New-stack production
 deployment, production provider configuration, DNS changes, data migration,
 and promotion remain out of scope and unverified.
 
+## Stage 16 custom reaction catalog
+
+Stage 16 is being delivered before Stage 15 through a two-release
+expand/activate rollout. Stage 15 and Stage 17 remain untouched.
+
+The expansion candidate now contains:
+
+- accepted ADR 0006 and a checked-in manifest-only allowlist for all 228
+  owner-selected assets, with stable ASCII IDs, 180 static / 48 animated
+  kinds, `staging-only/unverified` rights status, and quick IDs `pepeclap`,
+  `pepehmm`, and `pepelove`;
+- additive `discussions.0003_reaction_catalog_expansion`, which preserves the
+  deployed Unicode columns/rows and adds a catalog model, nullable `PROTECT`
+  relations, side-by-side identity checks, custom unique constraints and
+  aggregation indexes, plus an explicit empty legacy mapping table;
+- manifest-managed Wagtail controls that allow label/order/enabled/selectable
+  curation and exactly three quick selections while denying add/delete/copy,
+  upload, key/hash/version, and binary-replacement actions;
+- deterministic prepare/sync commands with explicit allowlisting, source
+  hashes, byte-detected formats, exact-container validation, full-frame decode,
+  hard resource limits, sRGB/metadata normalization, animation posters,
+  immutable content-addressed S3 keys, upload-before-activation, read-back
+  verification, prefix isolation, idempotence, and production fail-closed
+  approval checks.
+
+The real corpus was read locally without copying binaries into Git, a container
+image, S3, or the public API. Two prepare runs produced the same 228-item /
+276-object attestation SHA-256
+`c9b1eaee39db47dc4725aaa5604e873a9fad154f95ba4b45bdb468bc54c16914`.
+Detected input formats were 128 PNG, 52 WebP (despite `.png` names), and 48
+GIF. The largest normalized object was 200,832 bytes, below the fixed 512 KiB
+limit. The manifest SHA-256 is
+`1b0a409b80ddb46eed4059a19210eec82f5444530eb268a33d5cb0945e08c018`.
+
+Expansion local verification passed `uv lock --check`, Ruff format/lint,
+Django checks, migration drift, 537 full SQLite tests with seven expected
+PostgreSQL-only skips, 99 discussion tests with four PostgreSQL skips, and 24
+focused catalog/admin/migration tests. Required PostgreSQL, infrastructure,
+container, and cross-stack execution remains a CI gate. No staging or
+production object/database/application state has yet changed in this phase.
+
 ## Current repository state
 
 - The `main` branch contains the deployed legacy Flask/React implementation.

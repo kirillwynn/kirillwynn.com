@@ -3,8 +3,9 @@ from django.contrib.admin.sites import site
 from django.test import RequestFactory
 
 from apps.discussions.admin import CommentAdmin
-from apps.discussions.models import Comment
+from apps.discussions.models import Comment, ReactionCatalogItem
 from apps.discussions.services import create_top_level_comment
+from apps.discussions.wagtail_hooks import ReactionCatalogItemViewSet
 from apps.users.admin import ProjectUserAdmin
 from apps.users.models import User
 
@@ -34,3 +35,27 @@ def test_user_admin_exposes_ban_and_unban_actions(admin_user, user):
     model_admin.unban_users(request, User.objects.filter(pk=user.pk))
     user.refresh_from_db()
     assert user.is_banned is False
+
+
+def test_reaction_catalog_wagtail_viewset_is_manifest_managed(admin_user):
+    viewset = ReactionCatalogItemViewSet()
+    policy = viewset.permission_policy
+
+    assert policy.user_has_permission(admin_user, "change") is True
+    assert policy.user_has_permission(admin_user, "add") is False
+    assert policy.user_has_permission(admin_user, "delete") is False
+    assert viewset.copy_view_enabled is False
+    assert set(viewset.get_form_fields()) == {
+        "display_name",
+        "accessibility_label",
+        "ordering",
+        "enabled",
+        "selectable",
+    }
+    assert {
+        "asset_storage_key",
+        "poster_storage_key",
+        "normalized_sha256",
+        "immutable_asset_version",
+    }.isdisjoint(viewset.get_form_fields())
+    assert viewset.model is ReactionCatalogItem

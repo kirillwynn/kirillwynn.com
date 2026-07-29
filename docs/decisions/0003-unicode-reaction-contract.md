@@ -6,6 +6,11 @@ Date: 2026-07-26
 
 Amended: 2026-07-29 (bounded Feed batch reads and explicit Feed participants)
 
+Superseded for the public reaction identity, picker, and browser storage by
+[ADR 0006](0006-manifest-managed-reaction-catalog.md). This record remains the
+historical contract for preserved Unicode rows and the safeguards explicitly
+retained by ADR 0006.
+
 ## Context
 
 Posts, top-level comments, and thread replies need Slack-style Unicode emoji

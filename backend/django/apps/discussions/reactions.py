@@ -116,7 +116,10 @@ def _groups(*, model, target_field, target_ids, viewer, participants_path):
         return grouped
 
     rows = (
-        model.objects.filter(**{f"{target_field}__in": grouped})
+        model.objects.filter(
+            **{f"{target_field}__in": grouped},
+            catalog_item__isnull=True,
+        )
         .values(target_field, "emoji")
         .annotate(count=Count("id"))
         .order_by(target_field)
@@ -126,6 +129,7 @@ def _groups(*, model, target_field, target_ids, viewer, participants_path):
         viewer_reactions = set(
             model.objects.filter(
                 **{f"{target_field}__in": grouped},
+                catalog_item__isnull=True,
                 user=viewer,
             ).values_list(target_field, "emoji")
         )
