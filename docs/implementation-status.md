@@ -968,10 +968,19 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   icon-only eight-link grid with a visually hidden heading and unique
   accessible link names; it contains no visible heading, description, or
   network labels.
+- Stage 14B feature commit
+  `39b1b20d45f9179afa9cacc60e46de8bd98d15c8` has exact parent
+  `ce6c5b9e786f013d75469caa02488ef46267b3c7`. Push CI run `30481008202`
+  attempt 1 passed backend SQLite and PostgreSQL, frontend,
+  browser-contract, cross-stack, infrastructure, `ci-required`, all three
+  immutable image builds, release-manifest creation, server preflight, and the
+  gate-disabled staging job. Its release artifact is `8735803770`; no
+  activation occurred because `STAGING_DEPLOY_ENABLED` remained false for the
+  run.
 - Stage 14B local verification is recorded in its dedicated section above.
-  Required CI, immutable image construction, staging rollout, schema-3
-  attestation, and live Chrome acceptance remain pending and must not be
-  inferred from local results.
+  A fresh ordinary staging activation candidate, schema-3 attestation, and
+  live Chrome acceptance remain pending and must not be inferred from the
+  green gate-disabled candidate.
 
 Earlier Stage 14A acceptance on the same date:
 
