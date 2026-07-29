@@ -444,6 +444,83 @@ CI, deployment, and live acceptance passed:
   The repository rollout stayed within the isolated staging projects; the
   preserved legacy containers, mounts, and data were not targeted or changed.
 
+## Stage 14C shell, reactions, and live-search remediation
+
+Stage 14C is implemented and has a green gate-disabled candidate on
+`rewrite/wagtail-next` as of 2026-07-29:
+
+- Every public Next.js route and shared loading/error/not-found state now uses
+  one centered semantic `dl` footer. Its only visible content is
+  `Current Team — Yandex` and `Previous Team — Deeplay` on separate rows;
+  route-specific footer branching, copyright, owner name, year, tagline, and
+  all other footer text are removed. Bridge remains icon-only with its
+  visually hidden `h1` and eight unique accessible link names unchanged.
+- The existing Feed and Bridge links now share one compact right-aligned header
+  group with theme and account/login in the exact order Feed, Bridge, Theme,
+  Account/Login. Existing names, `aria-current`, focus treatment, 44px controls,
+  safe-area gutters, and non-overflowing 320px behavior are preserved.
+- Feed and post-detail reaction pills have a 30px visual shell, 16px emoji, and
+  12px count while each separate button retains a non-overlapping 44px hit
+  target. Emoji Mart cells and comment/thread picker behavior are unchanged.
+- Feed participant reads are explicit-activation-only: hover, pointer entry,
+  focus alone, touch followed by a synthetic mouse event, and all pre-activation
+  states issue no participant request. Click/tap and native Enter/Space count
+  activation open the existing responsive surface; Close, Escape, focus return,
+  stale-request rejection, and participant deduplication remain intact. Post,
+  comment, and thread behavior is deliberately unchanged.
+- Feed search now applies URL state with an approximately 300ms debounce and
+  `router.replace`. It preserves the active tag, resets pagination without
+  serializing `page=1`, removes an empty `q`, encodes Unicode once, synchronizes
+  back/forward state, supports immediate Search/Enter submission, suppresses
+  intermediate IME navigation, cancels stale timers, and prevents duplicate or
+  superseded navigation. `Clear search`, `Clear tag`, and generic
+  `Clear filters` controls are removed; ordinary text deletion and `All` own
+  those reset paths.
+- The REST search/cache contract, database schema, Draft Mode, batched Feed
+  reaction read, theme persistence, post/comment/thread APIs, and Bridge
+  content contract did not change.
+
+Local verification passed before the feature commit:
+
+- `uv lock --check` resolved 74 packages. Ruff format checked 144 files; Ruff
+  lint, Django test-settings check, migration drift, an empty SQLite migration
+  chain, and the production deploy-check passed. The SQLite CI selection passed
+  516 tests with seven PostgreSQL-only cases deselected.
+- Prettier, ESLint, TypeScript, and full Vitest passed: 169 tests in 18 files.
+  The Next.js 16.2.11 production build, runtime-origin verifier, browser-static
+  secret/internal-origin scan, retained Playwright artifact scans, and
+  `npm audit --audit-level=high` passed with zero vulnerabilities.
+- Browser-contract passed 32/32 across 375x812, 768x1024, 1440x900, and
+  1920x1080, plus the dedicated 320px assertions. Coverage includes both
+  themes, axe, visible focus, hydration/console diagnostics, horizontal
+  overflow, universal footer routes/states, icon-only Bridge, reaction geometry
+  and touch targets, explicit Feed participant activation, Unicode/debounced/
+  IME/back-forward search, Draft Mode, theme persistence, and batched Feed
+  reactions. Cross-stack passed 5/5 against real Django views, SQLite sessions,
+  standard CSRF, exact Next rewrites, and persistence.
+- Shell parsing/compilation and all 221 deterministic infrastructure tests
+  passed. Docker, Compose, Nginx, PostgreSQL, `psql`, `postgres`, and
+  `pg_isready` are unavailable locally, so local container and PostgreSQL
+  execution are not claimed; both remained mandatory in CI.
+
+Green candidate evidence:
+
+- Feature commit `776ffa80f1f99851078a844bf0da9aa878c53476` has exact
+  parent `5ad3f51547e6aa46a31bb374e2c1454b827965d2`. Push CI run
+  `30491324455` attempt 1 passed backend SQLite and PostgreSQL, frontend,
+  browser-contract, cross-stack, infrastructure, `ci-required`, all three
+  immutable image builds, server preflight, release-manifest creation, and the
+  gate-disabled staging job.
+- Release artifact `8739942335` has GitHub SHA-256
+  `752e0cfd216192b432ed06cad5e56bad58c50599d8a95fccac4ed358e9c9a156`.
+  `STAGING_DEPLOY_ENABLED` remained `false`, so no activation occurred and the
+  active staging release remained
+  `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`.
+- `origin/main` remained `1d02912430277cdf5465f856b158a6820bc12be4`.
+  Production, production providers/data, and preserved legacy mounts/data were
+  not changed. Staging rollout and read-only live Chrome acceptance remain the
+  next controlled steps.
+
 ## Completed
 
 - [x] Product functionality agreed with the owner.
