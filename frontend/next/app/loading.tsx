@@ -1,11 +1,9 @@
 export default function Loading() {
     return (
         <div className="page-shell" role="status" aria-live="polite">
+            <h1 className="sr-only">Feed</h1>
             <span className="sr-only">Loading content</span>
             <div className="skeleton-pulse" aria-hidden="true">
-                <div className="feed-header">
-                    <div className="skeleton-line w-16" />
-                </div>
                 <div className="feed-controls">
                     <div className="skeleton-block w-full" />
                     <div className="mt-3 flex gap-2">

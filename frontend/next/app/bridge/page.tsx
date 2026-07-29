@@ -16,18 +16,13 @@ export const metadata: Metadata = {
 export default function BridgePage() {
     return (
         <div className="page-shell-wide">
-            <header className="bridge-header">
-                <h1>Bridge</h1>
-                <p>
-                    Profiles and places where you can find me elsewhere on the
-                    internet.
-                </p>
-            </header>
+            <h1 className="sr-only">Bridge</h1>
 
             <ul className="bridge-grid">
                 {bridgeLinks.map((link) => (
                     <li key={link.name}>
                         <a
+                            aria-label={`${link.name} (opens in a new tab)`}
                             className="bridge-link"
                             href={link.url}
                             target="_blank"
@@ -41,13 +36,6 @@ export default function BridgePage() {
                                 width="42"
                                 height="42"
                             />
-                            <span>
-                                {link.name}
-                                <span className="sr-only">
-                                    {" "}
-                                    (opens in a new tab)
-                                </span>
-                            </span>
                         </a>
                     </li>
                 ))}

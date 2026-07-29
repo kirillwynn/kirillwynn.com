@@ -3,8 +3,15 @@ import { DateTime } from "@/components/date-time";
 import { Tags } from "@/components/tags";
 import type { PostListItem } from "@/lib/content-contract";
 import { postPath } from "@/lib/slug";
+import type { ReactNode } from "react";
 
-export function PostCard({ post }: { post: PostListItem }) {
+export function PostCard({
+    post,
+    reactionContent,
+}: {
+    post: PostListItem;
+    reactionContent?: ReactNode;
+}) {
     const href = postPath(post.slug);
     if (!href) {
         return null;
@@ -26,6 +33,7 @@ export function PostCard({ post }: { post: PostListItem }) {
                         <a href={href}>{post.title}</a>
                     </h2>
                     <p className="feed-entry-excerpt">{post.excerpt}</p>
+                    {reactionContent}
                 </div>
                 {post.lead_image ? (
                     <a

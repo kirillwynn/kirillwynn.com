@@ -38,6 +38,35 @@ async function login(page: Page, provider: "Google" | "GitHub" = "Google") {
     await expect(page.getByRole("button", { name: /reader/i })).toBeVisible();
 }
 
+test("real batch reaction endpoint hydrates the cached Feed with one private read", async ({
+    page,
+}) => {
+    const batchRequests: string[] = [];
+    page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.pathname === "/api/v1/reactions/posts/") {
+            batchRequests.push(request.url());
+        }
+    });
+
+    await page.goto("/");
+    const feedReactions = page
+        .locator(".feed-entry")
+        .getByRole("group", { name: "Reactions" });
+    await expect(
+        feedReactions.getByRole("button", { name: "Add 🔥 reaction" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await expect(
+        feedReactions.getByRole("button", {
+            name: "View 1 participant for 🔥",
+        }),
+    ).toBeVisible();
+    expect(batchRequests).toHaveLength(1);
+    await expect(
+        page.getByRole("button", { name: "Open full emoji picker" }),
+    ).toHaveCount(0);
+});
+
 test("real allauth provider callbacks create and persist a Django database session", async ({
     page,
 }) => {

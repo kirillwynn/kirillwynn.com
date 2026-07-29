@@ -39,6 +39,10 @@ def post_toggle_url(post):
     return reverse("discussions_api:post-reaction-toggle", kwargs={"slug": post.slug})
 
 
+def post_reaction_batch_url():
+    return reverse("discussions_api:post-reaction-batch")
+
+
 def comment_reactions_url(comment):
     return reverse("discussions_api:comment-reactions", kwargs={"pk": comment.pk})
 
@@ -51,6 +55,19 @@ def authenticated(user):
     client = APIClient()
     client.force_authenticate(user=user)
     return client
+
+
+def publish_post(blog_index, slug):
+    post = BlogPostPage(
+        title=slug,
+        slug=slug,
+        excerpt=f"Excerpt for {slug}.",
+        body=[("rich_text", "<p>Body.</p>")],
+        live=False,
+    )
+    blog_index.add_child(instance=post)
+    post.save_revision().publish()
+    return BlogPostPage.objects.get(pk=post.pk)
 
 
 @pytest.mark.parametrize(
@@ -199,6 +216,194 @@ def test_post_toggle_add_remove_multiple_groups_and_anonymous_read(public_post, 
     assert removed.data["action"] == "removed"
     assert removed.data["reactions"][1]["count"] == 1
     assert PostReaction.objects.filter(post=public_post, user=user, emoji="🔥").count() == 0
+
+
+def test_post_reaction_batch_requires_one_strict_bounded_unique_ids_parameter(public_post):
+    client = APIClient()
+    url = post_reaction_batch_url()
+
+    missing = client.get(url)
+    repeated = client.get(f"{url}?ids={public_post.pk}&ids={public_post.pk + 1}")
+    assert missing.status_code == 400
+    assert repeated.status_code == 400
+    assert missing.data == {"ids": ["This parameter must be provided exactly once."]}
+    assert repeated.data == missing.data
+
+    malformed_values = (
+        "",
+        "0",
+        "-1",
+        "+1",
+        "01",
+        "1.0",
+        "1,,2",
+        " 1",
+        "1 ",
+        "9223372036854775808",
+    )
+    for value in malformed_values:
+        response = client.get(url, {"ids": value})
+        assert response.status_code == 400
+        assert response.data == {
+            "ids": ["This parameter must be a comma-separated list of positive integers."]
+        }
+
+    duplicate = client.get(url, {"ids": f"{public_post.pk},{public_post.pk}"})
+    assert duplicate.status_code == 400
+    assert duplicate.data == {"ids": ["IDs must be unique."]}
+
+    oversized = client.get(
+        url,
+        {"ids": ",".join(str(value) for value in range(1, 52))},
+    )
+    assert oversized.status_code == 400
+    assert oversized.data == {"ids": ["At most 50 IDs may be requested."]}
+
+    unexpected = client.get(url, {"ids": str(public_post.pk), "cursor": "nope"})
+    assert unexpected.status_code == 400
+    assert unexpected.data == {"detail": "Unexpected query parameter(s): cursor."}
+
+    for response in (missing, repeated, duplicate, oversized, unexpected):
+        assert response["Content-Type"].startswith("application/json")
+        assert response["Cache-Control"] == "private, no-store"
+        assert "Cookie" in response["Vary"]
+
+
+def test_post_reaction_batch_returns_deterministic_groups_and_viewer_state(
+    blog_index,
+    public_post,
+    user,
+    other_user,
+):
+    second = publish_post(blog_index, "batch-second")
+    PostReaction.objects.create(post=public_post, user=user, emoji="👍")
+    PostReaction.objects.create(post=public_post, user=other_user, emoji="👍")
+    PostReaction.objects.create(post=public_post, user=other_user, emoji="🎉")
+    requested = f"{second.pk},{public_post.pk},9223372036854775807"
+
+    anonymous = APIClient().get(post_reaction_batch_url(), {"ids": requested})
+    session_client = Client()
+    session_client.force_login(user)
+    signed_in = session_client.get(
+        post_reaction_batch_url(),
+        {"ids": requested},
+    )
+
+    assert anonymous.status_code == 200
+    assert anonymous["Cache-Control"] == "private, no-store"
+    assert "Cookie" in anonymous["Vary"]
+    assert [item["post_id"] for item in anonymous.data["results"]] == [
+        second.pk,
+        public_post.pk,
+    ]
+    assert anonymous.data["results"][0] == {
+        "post_id": second.pk,
+        "slug": second.slug,
+        "reactions": [],
+    }
+    assert anonymous.data["results"][1]["slug"] == "привет-мир"
+    assert anonymous.data["results"][1]["reactions"] == [
+        {
+            "emoji": "🎉",
+            "count": 1,
+            "viewer_reacted": False,
+            "participants": (
+                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-"
+                "%D0%BC%D0%B8%D1%80/reactions/%F0%9F%8E%89/participants/"
+            ),
+        },
+        {
+            "emoji": "👍",
+            "count": 2,
+            "viewer_reacted": False,
+            "participants": (
+                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-"
+                "%D0%BC%D0%B8%D1%80/reactions/%F0%9F%91%8D/participants/"
+            ),
+        },
+    ]
+    assert [group["viewer_reacted"] for group in signed_in.json()["results"][1]["reactions"]] == [
+        False,
+        True,
+    ]
+
+
+def test_post_reaction_batch_omits_every_non_public_visibility_state(
+    blog_index,
+    public_post,
+    user,
+):
+    now = timezone.now()
+    draft = BlogPostPage(
+        title="batch-draft",
+        slug="batch-draft",
+        excerpt="Draft.",
+        body=[("rich_text", "<p>Body.</p>")],
+        live=False,
+    )
+    blog_index.add_child(instance=draft)
+
+    scheduled = publish_post(blog_index, "batch-scheduled")
+    BlogPostPage.objects.filter(pk=scheduled.pk).update(go_live_at=now + timedelta(hours=1))
+    expired = publish_post(blog_index, "batch-expired")
+    BlogPostPage.objects.filter(pk=expired.pk).update(expire_at=now - timedelta(seconds=1))
+    unpublished = publish_post(blog_index, "batch-unpublished")
+    unpublished.unpublish()
+    restricted = publish_post(blog_index, "batch-restricted")
+    PageViewRestriction.objects.create(
+        page=restricted,
+        restriction_type=PageViewRestriction.PASSWORD,
+        password="test-only",
+    )
+    hidden_posts = [draft, scheduled, expired, unpublished, restricted]
+    for post in hidden_posts:
+        PostReaction.objects.create(post=post, user=user, emoji="🔥")
+
+    response = APIClient().get(
+        post_reaction_batch_url(),
+        {
+            "ids": ",".join(
+                str(post_id)
+                for post_id in [
+                    hidden_posts[0].pk,
+                    public_post.pk,
+                    *(post.pk for post in hidden_posts[1:]),
+                    9_223_372_036_854_775_807,
+                ]
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.data["results"] == [
+        {
+            "post_id": public_post.pk,
+            "slug": public_post.slug,
+            "reactions": [],
+        }
+    ]
+
+
+def test_post_reaction_batch_query_count_is_bounded(
+    blog_index,
+    public_post,
+    user,
+):
+    posts = [public_post]
+    for index in range(11):
+        posts.append(publish_post(blog_index, f"batch-query-{index}"))
+    for post in posts:
+        PostReaction.objects.create(post=post, user=user, emoji="🔥")
+
+    with CaptureQueriesContext(connection) as queries:
+        response = authenticated(user).get(
+            post_reaction_batch_url(),
+            {"ids": ",".join(str(post.pk) for post in reversed(posts))},
+        )
+
+    assert response.status_code == 200
+    assert len(response.data["results"]) == len(posts)
+    assert len(queries) <= 4
 
 
 def test_toggle_payload_authentication_activity_and_csrf(public_post, user, other_user):

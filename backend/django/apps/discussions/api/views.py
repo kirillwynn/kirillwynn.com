@@ -4,6 +4,7 @@ from django.db.models import Count, Max
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils.cache import patch_cache_control, patch_vary_headers
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -15,6 +16,7 @@ from apps.discussions.api.pagination import (
     ThreadReplyPagination,
     TopLevelCommentPagination,
 )
+from apps.discussions.api.query import parse_post_reaction_ids
 from apps.discussions.api.serializers import (
     serialize_comment,
     serialize_reaction_participant,
@@ -31,6 +33,7 @@ from apps.discussions.reactions import (
     ReactionRateLimitExceeded,
     ReactionTargetUnavailable,
     comment_reaction_groups,
+    post_reaction_groups,
     post_reaction_groups_for_post,
     toggle_comment_reaction,
     toggle_post_reaction,
@@ -297,6 +300,38 @@ class PostReactionAPIView(ReactionAPIViewMixin, APIView):
     def get(self, request, slug):
         post = _public_post_or_404(slug)
         return Response({"reactions": post_reaction_groups_for_post(post, viewer=request.user)})
+
+
+class PostReactionBatchAPIView(ReactionAPIViewMixin, APIView):
+    authentication_classes = [SessionAuthentication]
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request):
+        requested_ids = parse_post_reaction_ids(request.query_params)
+        visible_posts = list(
+            public_blog_posts()
+            .filter(pk__in=requested_ids)
+            .select_related(None)
+            .prefetch_related(None)
+            .only("pk", "slug")
+        )
+        posts_by_id = {post.pk: post for post in visible_posts}
+        ordered_posts = [
+            posts_by_id[post_id] for post_id in requested_ids if post_id in posts_by_id
+        ]
+        grouped = post_reaction_groups(ordered_posts, viewer=request.user)
+        return Response(
+            {
+                "results": [
+                    {
+                        "post_id": post.pk,
+                        "slug": post.slug,
+                        "reactions": grouped[post.pk],
+                    }
+                    for post in ordered_posts
+                ]
+            }
+        )
 
 
 class PostReactionToggleAPIView(ReactionAPIViewMixin, APIView):

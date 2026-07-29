@@ -517,6 +517,54 @@ complete authoritative aggregate:
 `action` is `added` or `removed`; clients replace optimistic state with
 `reactions`.
 
+### Feed batch post aggregates
+
+`GET /api/v1/reactions/posts/?ids=42,43,44`
+
+This endpoint supplies the viewer-dependent reaction state for one already
+loaded Feed page. The public `GET /api/v1/posts/` representation remains
+viewer-independent and publicly cacheable; it does not embed
+`viewer_reacted`.
+
+The query string accepts exactly one `ids` parameter and no other parameter.
+Its value must contain between 1 and 50 unique, positive, canonical ASCII
+base-10 integer IDs separated by commas. Signs, whitespace, leading zeroes,
+empty items, values above the signed 64-bit integer range, duplicates,
+repeated or missing `ids`, and more than 50 IDs receive a stable JSON `400`.
+
+The response is:
+
+```json
+{
+  "results": [
+    {
+      "post_id": 42,
+      "slug": "привет-мир",
+      "reactions": [
+        {
+          "emoji": "👍",
+          "count": 1,
+          "viewer_reacted": false,
+          "participants": "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%91%8D/participants/"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Results follow requested-ID order. Unknown IDs and posts rejected by the
+canonical public visibility policy are omitted rather than distinguished, so
+draft, unpublished, future, expired, and restricted posts are not disclosed.
+Visible posts with no aggregate are returned with an empty `reactions` array.
+Post selection, aggregate counts, and authenticated viewer state use bounded
+page-level queries rather than one query per post.
+
+The endpoint uses Django `SessionAuthentication` while allowing anonymous
+reads. Like every reaction response, successes and validation errors include
+`Cache-Control: private, no-store` and `Vary: Cookie`. The frontend reaches it
+through only the exact same-origin `/api/v1/reactions/posts/` rewrite.
+
 ### Comment aggregates and toggle
 
 - `GET /api/v1/comments/<id>/reactions/`

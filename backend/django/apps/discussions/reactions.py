@@ -145,17 +145,23 @@ def _groups(*, model, target_field, target_ids, viewer, participants_path):
     return grouped
 
 
-def post_reaction_groups_for_post(post, *, viewer):
-    grouped = _groups(
+def post_reaction_groups(posts, *, viewer):
+    posts = list(posts)
+    slugs_by_id = {post.pk: post.slug for post in posts}
+    return _groups(
         model=PostReaction,
         target_field="post_id",
-        target_ids=[post.pk],
+        target_ids=slugs_by_id,
         viewer=viewer,
-        participants_path=lambda _post_id, emoji_value: (
-            f"/api/v1/posts/{quote(post.slug)}/reactions/"
+        participants_path=lambda post_id, emoji_value: (
+            f"/api/v1/posts/{quote(slugs_by_id[post_id])}/reactions/"
             f"{quote(emoji_value, safe='')}/participants/"
         ),
     )
+
+
+def post_reaction_groups_for_post(post, *, viewer):
+    grouped = post_reaction_groups([post], viewer=viewer)
     return grouped[post.pk]
 
 

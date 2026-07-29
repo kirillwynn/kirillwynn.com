@@ -35,6 +35,12 @@ export type ReactionConfig = {
     quick_reactions: [string, string, string];
 };
 
+export type PostReactionBatchResult = {
+    post_id: number;
+    slug: string;
+    reactions: ReactionGroup[];
+};
+
 export type ReactionChange = {
     reactions: ReactionGroup[];
     revision: number;
@@ -45,6 +51,12 @@ type ReactionResponse = {
     action?: "added" | "removed";
     reactions: ReactionGroup[];
 };
+
+type PostReactionBatchResponse = {
+    results: PostReactionBatchResult[];
+};
+
+export const MAX_POST_REACTION_BATCH_IDS = 50;
 
 export class ReactionApiError extends Error {
     constructor(
@@ -121,6 +133,29 @@ export async function getPostReactions(
     target: Extract<ReactionTarget, { kind: "post" }>,
 ): Promise<ReactionGroup[]> {
     return (await request<ReactionResponse>(reactionPath(target))).reactions;
+}
+
+export async function getPostReactionBatch(
+    postIds: number[],
+    signal?: AbortSignal,
+): Promise<PostReactionBatchResult[]> {
+    if (
+        postIds.length === 0 ||
+        postIds.length > MAX_POST_REACTION_BATCH_IDS ||
+        new Set(postIds).size !== postIds.length ||
+        postIds.some((postId) => !Number.isSafeInteger(postId) || postId < 1)
+    ) {
+        throw new TypeError(
+            `postIds must contain 1-${String(MAX_POST_REACTION_BATCH_IDS)} unique positive integers`,
+        );
+    }
+    const ids = postIds.join(",");
+    return (
+        await request<PostReactionBatchResponse>(
+            `/api/v1/reactions/posts/?ids=${ids}`,
+            { signal },
+        )
+    ).results;
 }
 
 export async function toggleReaction(

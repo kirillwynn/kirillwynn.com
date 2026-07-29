@@ -263,6 +263,10 @@ createServer(async (request, response) => {
     }
     if (path === "/api/v1/posts/" && request.method === "GET") {
         const query = url.searchParams.get("q")?.toLocaleLowerCase() ?? "";
+        if (query === "force-upstream-error") {
+            json(response, 503, { detail: "Deterministic upstream failure" });
+            return;
+        }
         const tag = url.searchParams.get("tag");
         const page = Number(url.searchParams.get("page") ?? "1");
         const filtered = posts.filter(
@@ -317,6 +321,22 @@ createServer(async (request, response) => {
     }
     if (path === "/api/v1/reactions/config/" && request.method === "GET") {
         json(response, 200, { quick_reactions: ["🔥", "🎉", "👍"] });
+        return;
+    }
+    if (path === "/api/v1/reactions/posts/" && request.method === "GET") {
+        const ids = (url.searchParams.get("ids") ?? "")
+            .split(",")
+            .map((value) => Number(value));
+        json(response, 200, {
+            results: ids
+                .map((id) => posts.find((value) => value.id === id))
+                .filter(Boolean)
+                .map((value) => ({
+                    post_id: value.id,
+                    slug: value.slug,
+                    reactions: value.id === 1 ? [reactionGroup(request)] : [],
+                })),
+        });
         return;
     }
     if (

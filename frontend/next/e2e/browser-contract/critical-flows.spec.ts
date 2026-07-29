@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { THEME_STORAGE_KEY } from "../../lib/theme";
 
@@ -22,6 +22,133 @@ async function expectNoHorizontalOverflow(page: Page) {
             ),
         )
         .toBe(true);
+}
+
+async function expectVisuallyHidden(locator: Locator) {
+    await expect(locator).toHaveClass(/sr-only/);
+    await expect
+        .poll(() =>
+            locator.evaluate((element) => {
+                const style = getComputedStyle(element);
+                return (
+                    style.position === "absolute" &&
+                    Number.parseFloat(style.width) <= 1 &&
+                    Number.parseFloat(style.height) <= 1 &&
+                    style.overflow === "hidden"
+                );
+            }),
+        )
+        .toBe(true);
+}
+
+async function expectSharedContentBounds(page: Page) {
+    const viewport = page.viewportSize();
+    expect(viewport).not.toBeNull();
+    if (!viewport) {
+        return;
+    }
+    const selectors = [
+        ".site-header__inner",
+        "#main-content",
+        ".site-footer__inner",
+    ];
+    const boxes = [];
+    for (const selector of selectors) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box).not.toBeNull();
+        if (!box) {
+            continue;
+        }
+        expect(box.x).toBeGreaterThanOrEqual(15.5);
+        expect(viewport.width - box.x - box.width).toBeGreaterThanOrEqual(15.5);
+        boxes.push(box);
+    }
+    expect(boxes).toHaveLength(selectors.length);
+    for (const box of boxes.slice(1)) {
+        expect(Math.abs(box.x - boxes[0].x)).toBeLessThanOrEqual(0.5);
+        expect(
+            Math.abs(box.x + box.width - (boxes[0].x + boxes[0].width)),
+        ).toBeLessThanOrEqual(0.5);
+    }
+}
+
+async function expectBridgeContent(page: Page) {
+    const heading = page.getByRole("heading", { level: 1, name: "Bridge" });
+    await expectVisuallyHidden(heading);
+    await expect(
+        page.getByText(
+            "Profiles and places where you can find me elsewhere on the internet.",
+            { exact: true },
+        ),
+    ).toHaveCount(0);
+    const links = page.locator(".bridge-link");
+    await expect(links).toHaveCount(8);
+    const names = [
+        "GitHub",
+        "LeetCode",
+        "Reddit",
+        "Telegram",
+        "Instagram",
+        "X",
+        "Steam",
+        "Pulse",
+    ];
+    for (const [index, name] of names.entries()) {
+        const link = links.nth(index);
+        await expect(link).toHaveAttribute(
+            "aria-label",
+            `${name} (opens in a new tab)`,
+        );
+        await expect(link).toHaveText("");
+        await expect(link).toBeVisible();
+        await expect(link).toHaveAttribute("target", "_blank");
+        await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+        const linkBox = await link.boundingBox();
+        const imageBox = await link.locator("img").boundingBox();
+        expect(linkBox).not.toBeNull();
+        expect(imageBox).not.toBeNull();
+        if (linkBox && imageBox) {
+            expect(linkBox.width).toBeGreaterThanOrEqual(44);
+            expect(linkBox.height).toBeGreaterThanOrEqual(44);
+            expect(
+                Math.abs(
+                    linkBox.x +
+                        linkBox.width / 2 -
+                        (imageBox.x + imageBox.width / 2),
+                ),
+            ).toBeLessThanOrEqual(0.5);
+            expect(
+                Math.abs(
+                    linkBox.y +
+                        linkBox.height / 2 -
+                        (imageBox.y + imageBox.height / 2),
+                ),
+            ).toBeLessThanOrEqual(0.5);
+        }
+        expect(
+            await link.locator("img").evaluate((image) => {
+                const element = image as HTMLImageElement;
+                return element.complete && element.naturalWidth > 0;
+            }),
+        ).toBe(true);
+    }
+    const snapshot = await page.locator("#main-content").ariaSnapshot();
+    expect(snapshot).toContain('- heading "Bridge" [level=1]');
+    for (const name of names) {
+        const accessibleName = `${name} (opens in a new tab)`;
+        expect(snapshot.split(`link "${accessibleName}"`)).toHaveLength(2);
+    }
+
+    await links.first().focus();
+    for (let index = 0; index < names.length; index += 1) {
+        await expect(links.nth(index)).toBeFocused();
+        await expect(links.nth(index)).toHaveText("");
+        if (index < names.length - 1) {
+            await page.keyboard.press("Tab");
+        }
+    }
+    await links.last().hover();
+    await expect(links.last()).toHaveText("");
 }
 
 async function expectOrdinaryFooter(page: Page) {
@@ -64,6 +191,15 @@ async function expectBridgeFooter(page: Page) {
     await expect(footer).toHaveText(
         /^\s*Current Team\s*Yandex\s*Previous Team\s*Deeplay\s*$/,
     );
+    const rows = footer.locator(".bridge-team-context > div");
+    await expect(rows).toHaveCount(2);
+    const current = await rows.nth(0).boundingBox();
+    const previous = await rows.nth(1).boundingBox();
+    expect(current).not.toBeNull();
+    expect(previous).not.toBeNull();
+    if (current && previous) {
+        expect(current.y + current.height).toBeLessThanOrEqual(previous.y);
+    }
 }
 
 async function login(page: Page, provider: "Google" | "GitHub" = "Google") {
@@ -85,16 +221,15 @@ test("anonymous reader, feed search, tags, and pagination", async ({
     page,
 }) => {
     await page.goto("/");
-    await expect(
-        page.getByRole("heading", {
-            level: 1,
-            name: "Feed",
-        }),
-    ).toBeVisible();
+    await expectVisuallyHidden(
+        page.getByRole("heading", { level: 1, name: "Feed" }),
+    );
     await expect(
         page.getByRole("link", { name: "Testing secure systems" }),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Login" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Login" })).toBeVisible({
+        timeout: 15_000,
+    });
 
     await page
         .getByRole("searchbox", { name: "Search posts" })
@@ -118,12 +253,76 @@ test("anonymous reader, feed search, tags, and pagination", async ({
     await expectAccessible(page);
 });
 
-test("responsive shell, skip link, and route-specific Bridge footer", async ({
+test("Feed hydrates existing reactions once without card-level requests or picker UI", async ({
     page,
 }) => {
+    const reactionRequests: string[] = [];
+    page.on("request", (request) => {
+        const path = new URL(request.url()).pathname;
+        if (path.includes("/reactions/")) {
+            reactionRequests.push(`${request.method()} ${path}`);
+        }
+    });
+
+    await page.goto("/?tag=django");
+    await expect(page.locator(".feed-entry")).toHaveCount(2);
+    const feedReactions = page
+        .locator(".feed-entry")
+        .first()
+        .getByRole("group", { name: "Reactions" });
+    await expect(
+        feedReactions.getByRole("button", { name: "Add 🔥 reaction" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await expect(
+        feedReactions.getByRole("button", {
+            name: "View 1 participant for 🔥",
+        }),
+    ).toBeVisible();
+    expect(
+        reactionRequests.filter(
+            (request) => request === "GET /api/v1/reactions/posts/",
+        ),
+    ).toHaveLength(1);
+    expect(
+        reactionRequests.filter((request) =>
+            /^GET \/api\/v1\/posts\/.+\/reactions\/$/.test(request),
+        ),
+    ).toHaveLength(0);
+    await expect(
+        page.getByRole("button", { name: "Open full emoji picker" }),
+    ).toHaveCount(0);
+    await expect(page.locator(".feed-entry .quick-reaction")).toHaveCount(0);
+
+    await feedReactions
+        .getByRole("button", { name: "View 1 participant for 🔥" })
+        .click();
+    await expect(
+        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page.route(/\/api\/v1\/reactions\/posts\/\?ids=/, async (route) => {
+        await route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({ detail: "Unavailable" }),
+        });
+    });
+    await page.goto("/?tag=django");
+    await expect(page.locator(".feed-entry")).toHaveCount(2);
+    await expect(page.locator(".feed-entry-reactions")).toHaveCount(0);
+    await expect(page.locator('.feed-entry [role="alert"]')).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+    await expectAccessible(page);
+});
+
+test("responsive shell, skip link, and route-specific Bridge footer", async ({
+    page,
+}, testInfo) => {
     for (const path of [
         "/",
         "/?q=definitely-no-footer-results",
+        "/?q=force-upstream-error",
         "/?page=0",
         "/posts/testing-secure-systems",
         "/login",
@@ -134,6 +333,12 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
     ]) {
         await page.goto(path);
         await expectOrdinaryFooter(page);
+        await expect(
+            page.locator(".site-header").getByText("kirillwynn.com", {
+                exact: true,
+            }),
+        ).toHaveCount(0);
+        await expectSharedContentBounds(page);
         await expectNoHorizontalOverflow(page);
     }
 
@@ -156,9 +361,37 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
         await expect(main.getByText(text, { exact: true })).toHaveCount(0);
     }
 
+    await expectBridgeContent(page);
     await expectBridgeFooter(page);
+    await expectSharedContentBounds(page);
     await expectNoHorizontalOverflow(page);
     await expectAccessible(page);
+
+    if (testInfo.project.name === "mobile-375") {
+        await page.setViewportSize({ width: 320, height: 812 });
+        await page.goto("/");
+        await expectSharedContentBounds(page);
+        await expectNoHorizontalOverflow(page);
+        const headerBounds = await page
+            .locator(".site-header__inner")
+            .boundingBox();
+        expect(headerBounds).not.toBeNull();
+        for (const control of [
+            page.getByRole("link", { name: "Feed", exact: true }),
+            page.getByRole("link", { name: "Bridge", exact: true }),
+            page.locator(".theme-toggle"),
+            page.getByRole("link", { name: "Login", exact: true }),
+        ]) {
+            const box = await control.boundingBox();
+            expect(box?.height).toBeGreaterThanOrEqual(44);
+            if (box && headerBounds) {
+                expect(box.x).toBeGreaterThanOrEqual(headerBounds.x);
+                expect(box.x + box.width).toBeLessThanOrEqual(
+                    headerBounds.x + headerBounds.width + 0.5,
+                );
+            }
+        }
+    }
 });
 
 test("theme follows the system, persists, and remains beside account", async ({
@@ -226,7 +459,7 @@ test("theme follows the system, persists, and remains beside account", async ({
     await page.evaluate(() => {
         (document.activeElement as HTMLElement | null)?.blur();
     });
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
         await page.keyboard.press("Tab");
     }
     await expect(toggle).toBeFocused();
@@ -283,6 +516,7 @@ test("theme follows the system, persists, and remains beside account", async ({
             page.getByRole("button", { name: "Switch to light theme" }),
         ).toBeVisible();
         if (path === "/bridge") {
+            await expectBridgeContent(page);
             await expectBridgeFooter(page);
         } else {
             await expectOrdinaryFooter(page);
@@ -311,6 +545,7 @@ test("theme follows the system, persists, and remains beside account", async ({
     ).toBeNull();
     await expectOrdinaryFooter(lightPage);
     await lightPage.goto("/bridge");
+    await expectBridgeContent(lightPage);
     await expectBridgeFooter(lightPage);
     await expectNoHorizontalOverflow(lightPage);
     await expectAccessible(lightPage);
@@ -447,6 +682,8 @@ test("Draft Mode revision remains isolated from a separate public context", asyn
     await expect(
         page.getByRole("complementary", { name: "Draft preview" }),
     ).toBeVisible();
+    await expectSharedContentBounds(page);
+    await expectNoHorizontalOverflow(page);
     await expect(page.getByRole("heading", { name: "Comments" })).toHaveCount(
         0,
     );
@@ -472,6 +709,8 @@ test("Draft Mode revision remains isolated from a separate public context", asyn
     await expect(
         page.getByRole("complementary", { name: "Draft preview" }),
     ).toBeVisible();
+    await expectSharedContentBounds(page);
+    await expectNoHorizontalOverflow(page);
     await expect(
         page.getByRole("heading", { name: "Get new posts by email" }),
     ).toHaveCount(0);
@@ -483,6 +722,8 @@ test("Draft Mode revision remains isolated from a separate public context", asyn
     await expect(
         page.getByRole("complementary", { name: "Draft preview" }),
     ).toBeVisible();
+    await expectSharedContentBounds(page);
+    await expectNoHorizontalOverflow(page);
     await page.getByRole("link", { name: "Exit preview" }).click();
     await expect(page).toHaveURL("/");
     await expect(

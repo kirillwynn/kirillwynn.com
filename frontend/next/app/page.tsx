@@ -3,8 +3,8 @@ import { draftMode } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { FeedControls } from "@/components/feed-controls";
+import { FeedStream } from "@/components/feed-stream";
 import { Pagination } from "@/components/pagination";
-import { PostCard } from "@/components/post-card";
 import { SubscriptionForm } from "@/components/subscription-form";
 import { parseFeedState } from "@/lib/feed-state";
 import { getAvailableTags, getPublicPosts } from "@/lib/server/django";
@@ -107,9 +107,7 @@ export default async function HomePage({
 
     return (
         <div className="page-shell">
-            <header className="feed-header">
-                <h1 className="feed-title">Feed</h1>
-            </header>
+            <h1 className="sr-only">Feed</h1>
 
             <FeedControls state={state} tags={tagResponse.results} />
 
@@ -134,11 +132,10 @@ export default async function HomePage({
                     New writing will appear here after it is published.
                 </EmptyState>
             ) : (
-                <section className="feed-stream" aria-label="Latest posts">
-                    {feed.results.map((post) => (
-                        <PostCard key={post.id} post={post} />
-                    ))}
-                </section>
+                <FeedStream
+                    loadReactions={!draft.isEnabled}
+                    posts={feed.results}
+                />
             )}
 
             {feed.results.length > 0 &&

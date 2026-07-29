@@ -43,10 +43,26 @@ describe("Bridge configuration", () => {
         expect(JSON.stringify(teams)).not.toContain("http");
     });
 
-    it("keeps team history out of the Bridge main content", () => {
+    it("renders an icon-only grid with unique accessible link names", () => {
         const html = renderToStaticMarkup(createElement(BridgePage));
 
         expect(html).toContain('class="bridge-grid"');
+        expect(html).toContain('<h1 class="sr-only">Bridge</h1>');
+        expect(html).not.toContain(
+            "Profiles and places where you can find me elsewhere on the internet.",
+        );
+        for (const link of bridgeLinks) {
+            expect(html).toContain(
+                `aria-label="${link.name} (opens in a new tab)"`,
+            );
+            expect(html).not.toContain(`>${link.name}<`);
+        }
+        expect(html.match(/target="_blank"/g)).toHaveLength(8);
+        expect(html.match(/rel="noopener noreferrer"/g)).toHaveLength(8);
+        expect(html.match(/alt="" aria-hidden="true"/g)).toHaveLength(8);
+        expect(
+            html.match(/aria-label="[^"]+ \(opens in a new tab\)"/g),
+        ).toHaveLength(8);
         expect(html).not.toContain("Current Team");
         expect(html).not.toContain("Previous Team");
         expect(html).not.toContain("Yandex");

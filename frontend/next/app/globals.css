@@ -176,12 +176,22 @@ img {
 }
 
 .site-container {
-    width: min(calc(100% - 2rem), var(--layout-wide));
-    margin-inline: auto;
+    --site-gutter: var(--space-4);
+    width: auto;
+    max-width: var(--layout-wide);
+    margin-inline-start: max(
+        var(--site-gutter),
+        env(safe-area-inset-left, 0px),
+        calc((100% - var(--layout-wide)) / 2)
+    );
+    margin-inline-end: max(
+        var(--site-gutter),
+        env(safe-area-inset-right, 0px),
+        calc((100% - var(--layout-wide)) / 2)
+    );
 }
 
 .site-main {
-    width: 100%;
     flex: 1;
     padding-block: var(--space-8) var(--space-12);
 }
@@ -225,30 +235,13 @@ img {
     display: flex;
     min-height: 4rem;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-2);
-}
-
-.site-brand {
-    display: inline-flex;
-    min-height: 2.75rem;
-    align-items: center;
-    border-radius: var(--radius-sm);
-    color: var(--color-ink);
-    font-size: var(--type-sm);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.site-brand:hover {
-    color: var(--color-accent-strong);
 }
 
 .site-navigation {
     display: flex;
-    flex: 0 0 auto;
+    width: 100%;
+    flex: 1 1 auto;
     min-width: 0;
     align-items: center;
     gap: 0;
@@ -270,6 +263,7 @@ img {
     transition:
         background-color var(--motion-fast) var(--ease-standard),
         color var(--motion-fast) var(--ease-standard);
+    margin-inline-start: auto;
 }
 
 .theme-toggle:hover {
@@ -436,22 +430,6 @@ img {
     opacity: 1;
 }
 
-.feed-header {
-    display: flex;
-    min-height: 2.75rem;
-    align-items: center;
-    border-bottom: var(--border-thin) solid var(--color-border);
-    padding-bottom: var(--space-4);
-}
-
-.feed-title {
-    margin: 0;
-    font-size: var(--type-xl);
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: var(--leading-tight);
-}
-
 .feed-controls {
     border-bottom: var(--border-thin) solid var(--color-border);
     padding-block: var(--space-4);
@@ -603,6 +581,14 @@ img {
     line-height: var(--leading-copy);
 }
 
+.feed-entry-reactions {
+    margin-top: var(--space-3);
+}
+
+.reaction-bar-compact .reaction-pill {
+    box-shadow: var(--shadow-sm);
+}
+
 .feed-entry-image {
     display: block;
     width: 5.25rem;
@@ -728,31 +714,11 @@ img {
     margin-top: 0;
 }
 
-.bridge-header {
-    max-width: 38rem;
-    border-bottom: var(--border-thin) solid var(--color-border);
-    padding-bottom: var(--space-6);
-}
-
-.bridge-header h1 {
-    margin: 0;
-    font-size: var(--type-2xl);
-    font-weight: 700;
-    letter-spacing: -0.035em;
-    line-height: var(--leading-tight);
-}
-
-.bridge-header p {
-    margin: var(--space-3) 0 0;
-    color: var(--color-muted);
-    line-height: var(--leading-copy);
-}
-
 .bridge-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
-    margin: var(--space-6) 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
 }
@@ -761,14 +727,11 @@ img {
     display: flex;
     min-height: 5.5rem;
     align-items: center;
-    gap: var(--space-3);
+    justify-content: center;
     border: var(--border-thin) solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--color-surface);
     padding: var(--space-4);
-    color: var(--color-ink);
-    font-size: var(--type-sm);
-    font-weight: 650;
     text-decoration: none;
     transition:
         border-color var(--motion-fast) var(--ease-standard),
@@ -807,11 +770,16 @@ img {
     line-height: 1.6;
 }
 
-.site-footer__primary,
-.bridge-team-context {
+.site-footer__primary {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2) var(--space-4);
+    margin: 0;
+}
+
+.bridge-team-context {
+    display: grid;
+    gap: var(--space-1);
     margin: 0;
 }
 
@@ -1227,7 +1195,7 @@ img {
 
 @media (min-width: 40rem) {
     .site-container {
-        width: min(calc(100% - 3rem), var(--layout-wide));
+        --site-gutter: var(--space-6);
     }
 
     .site-main {

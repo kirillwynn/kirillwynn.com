@@ -121,6 +121,8 @@ describe("shell and preview controls", () => {
         const html = renderToStaticMarkup(createElement(SiteHeader));
         expect(html).toContain("Loading account");
         expect(html).toContain("account-placeholder");
+        expect(html).not.toContain("kirillwynn.com");
+        expect(html).toContain('href="/">Feed</a>');
         expect(html).toContain('aria-label="Switch color theme"');
         expect(html.indexOf("theme-toggle")).toBeLessThan(
             html.indexOf("account-slot"),
@@ -164,6 +166,8 @@ describe("shell and preview controls", () => {
             "Writing about software, systems, and the work between.",
         );
         expect(bridge).toContain('aria-label="Team history"');
+        expect(bridge).toContain("<dt>Current Team</dt><dd>Yandex</dd>");
+        expect(bridge).toContain("<dt>Previous Team</dt><dd>Deeplay</dd>");
         expect(bridge).not.toContain("rounded");
         expect(bridge).not.toContain("shadow");
     });

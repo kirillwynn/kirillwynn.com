@@ -302,7 +302,7 @@ describe("Feed response states and metadata", () => {
         });
         const html = renderToStaticMarkup(element);
 
-        expect(html).toContain(">Feed</h1>");
+        expect(html).toContain('<h1 class="sr-only">Feed</h1>');
         expect(html).toContain('aria-label="Latest posts"');
         expect(html).toContain("feed-entry");
         expect(html).not.toContain('aria-label="Feed pagination"');

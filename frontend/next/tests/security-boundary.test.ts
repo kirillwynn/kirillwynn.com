@@ -59,6 +59,7 @@ describe("server-only security boundary", () => {
             "components/comment-card.tsx",
             "components/comments-section.tsx",
             "components/feed-controls.tsx",
+            "components/feed-stream.tsx",
             "components/login-panel.tsx",
             "components/provider-form.tsx",
             "components/site-header.tsx",
@@ -110,6 +111,10 @@ describe("server-only security boundary", () => {
         expect(config).toContain('source: "/api/v1/email/webhooks/resend/"');
         expect(config).toContain('source: "/api/v1/posts/:slug/comments/"');
         expect(config).toContain('source: "/api/v1/reactions/config/"');
+        expect(config).toContain('source: "/api/v1/reactions/posts/"');
+        expect(
+            config.match(/source: "\/api\/v1\/reactions\/posts\/"/g),
+        ).toHaveLength(1);
         expect(config).toContain(
             'source: "/api/v1/posts/:slug/reactions/toggle/"',
         );
@@ -128,6 +133,16 @@ describe("server-only security boundary", () => {
         expect(config).not.toContain("searchParams");
         expect(config).not.toContain("NEXT_PUBLIC_");
         expect(config).not.toContain('source: "/api/:path*"');
+    });
+
+    it("keeps one safe-area-aware shell contract without global overflow masking", () => {
+        const css = source("app/globals.css");
+        const mainRule = css.match(/\.site-main\s*\{[^}]*\}/)?.[0] ?? "";
+
+        expect(css).toContain("env(safe-area-inset-left, 0px)");
+        expect(css).toContain("env(safe-area-inset-right, 0px)");
+        expect(mainRule).not.toContain("width: 100%");
+        expect(css).not.toMatch(/(?:html|body)\s*\{[^}]*overflow-x:\s*hidden/s);
     });
 
     it("does not implement browser-stored auth tokens", () => {

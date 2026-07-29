@@ -49,10 +49,12 @@ function reactionError(error: unknown): string {
 }
 
 export function ReactionBar({
+    compact = false,
     initialReactions,
     onChange,
     target,
 }: {
+    compact?: boolean;
     initialReactions: ReactionGroup[];
     onChange?: (change: ReactionChange) => void;
     target: ReactionTarget;
@@ -185,6 +187,10 @@ export function ReactionBar({
     }, [closeParticipants]);
 
     useEffect(() => {
+        if (compact) {
+            setQuick([]);
+            return;
+        }
         let active = true;
         void getReactionConfig()
             .then((config) => {
@@ -200,7 +206,7 @@ export function ReactionBar({
         return () => {
             active = false;
         };
-    }, []);
+    }, [compact]);
 
     useEffect(() => {
         if (authStatus !== "ready") {
@@ -377,12 +383,16 @@ export function ReactionBar({
         }
     }
 
-    const quickOnly = quick.filter(
-        (emoji) => !reactions.some((group) => group.emoji === emoji),
-    );
+    const quickOnly = compact
+        ? []
+        : quick.filter(
+              (emoji) => !reactions.some((group) => group.emoji === emoji),
+          );
 
     return (
-        <div className="reaction-bar">
+        <div
+            className={`reaction-bar ${compact ? "reaction-bar-compact" : ""}`}
+        >
             <div
                 aria-label="Reactions"
                 className="flex flex-wrap items-center gap-2"
@@ -468,19 +478,21 @@ export function ReactionBar({
                     </button>
                 ))}
 
-                <button
-                    aria-expanded={pickerOpen}
-                    aria-label="Open full emoji picker"
-                    className="quick-reaction"
-                    disabled={busy || interactionDisabled}
-                    onClick={() => {
-                        setPickerOpen((open) => !open);
-                    }}
-                    ref={pickerTrigger}
-                    type="button"
-                >
-                    +
-                </button>
+                {!compact ? (
+                    <button
+                        aria-expanded={pickerOpen}
+                        aria-label="Open full emoji picker"
+                        className="quick-reaction"
+                        disabled={busy || interactionDisabled}
+                        onClick={() => {
+                            setPickerOpen((open) => !open);
+                        }}
+                        ref={pickerTrigger}
+                        type="button"
+                    >
+                        +
+                    </button>
+                ) : null}
             </div>
 
             {pendingEmoji ? (
@@ -536,7 +548,7 @@ export function ReactionBar({
                 </p>
             ) : null}
 
-            {pickerOpen ? (
+            {!compact && pickerOpen ? (
                 <Suspense
                     fallback={
                         <p

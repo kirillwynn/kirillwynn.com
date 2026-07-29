@@ -193,8 +193,9 @@ describe("header auth behavior", () => {
             'a[href^="/login?next="]',
         );
         expect(login?.textContent).toBe("Login");
-        expect(container.querySelector('a[href="/"]')?.textContent).toContain(
-            "kirillwynn.com",
+        expect(container.textContent).not.toContain("kirillwynn.com");
+        expect(container.querySelector('a[href="/"]')?.textContent).toBe(
+            "Feed",
         );
         act(() => {
             root.unmount();

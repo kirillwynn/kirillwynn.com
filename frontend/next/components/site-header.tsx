@@ -82,13 +82,6 @@ export function SiteHeader() {
     return (
         <header className="site-header">
             <div className="site-container site-header__inner">
-                <a
-                    href="/"
-                    className="site-brand"
-                    aria-label="Kirill Wynn home"
-                >
-                    kirillwynn.com
-                </a>
                 <nav
                     className="site-navigation"
                     aria-label="Primary navigation"

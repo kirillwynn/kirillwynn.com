@@ -96,8 +96,8 @@ Milestones 1–10 are available under `backend/django/`, `frontend/next/`, and
   read-only checklists, and server-rendered syntax highlighting with a safe
   plain-text fallback;
 - per-post canonical, SEO, Open Graph article, and Draft Mode noindex metadata;
-- a responsive Bridge page with the eight legacy profile links and reused SVG
-  assets;
+- a responsive icon-only Bridge grid with eight accessible legacy profile
+  links and reused SVG assets;
 - private immutable Draft Mode rendering and HMAC revalidation;
 - classic Google/GitHub OAuth through django-allauth 65.18.0;
 - Django database-backed sessions, same-origin cookies, and standard CSRF;
@@ -315,7 +315,8 @@ The public frontend includes:
 - `/` — the server-rendered URL-driven public Feed with accessible search,
   tag filters, and pagination;
 - `/posts/[slug]` — public and private Draft Mode post rendering;
-- `/bridge` — the eight approved profile links and team labels;
+- `/bridge` — an icon-only grid of eight accessible profile links plus
+  Bridge-only team history in the footer;
 - `/api/draft` and `/api/draft/disable`;
 - signed `POST /api/revalidate`;
 - `/login` and `/account` with Google/GitHub POST initiation and provider

@@ -9,6 +9,7 @@ from apps.discussions.api.views import (
     CommentThreadAPIView,
     PostCommentListCreateAPIView,
     PostReactionAPIView,
+    PostReactionBatchAPIView,
     PostReactionParticipantAPIView,
     PostReactionToggleAPIView,
     ReactionConfigAPIView,
@@ -17,6 +18,11 @@ from apps.discussions.api.views import (
 app_name = "discussions_api"
 
 urlpatterns = [
+    path(
+        "reactions/posts/",
+        PostReactionBatchAPIView.as_view(),
+        name="post-reaction-batch",
+    ),
     path(
         "posts/<str:slug>/comments/",
         PostCommentListCreateAPIView.as_view(),

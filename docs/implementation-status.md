@@ -19,9 +19,13 @@ implemented and accepted on staging as release
 `c9e9cf76db1c5e36601717a528d5b8d2a237a097`: the first public-UI visual
 foundation, route-specific Bridge footer remediation, immutable images,
 release manifest, schema-3 attestation, and live browser QA passed on top of
-the accepted functional contracts. New-stack production deployment,
-production provider configuration, DNS changes, data migration, and promotion
-remain out of scope and unverified.
+the accepted functional contracts. Stage 14B is implemented as a locally
+verified candidate: it repairs the shared mobile shell, simplifies the header,
+Feed, and icon-only Bridge, and adds one private bounded Feed reaction batch
+read without changing the publicly cached post list. Its staging rollout and
+live acceptance are still pending. New-stack production deployment, production
+provider configuration, DNS changes, data migration, and promotion remain out
+of scope and unverified.
 
 ## Current repository state
 
@@ -305,6 +309,85 @@ The first visual-design slice was implemented and deployed to staging on
   `sha256:372f00cfec5b3bf353d517a9801ad9097b7bf518187d57abcf1ca61057d5ae09`.
 - Production, `main`, PR merge, production DNS/providers/storage/database,
   secrets, and preserved legacy containers, mounts, and data were not changed.
+
+## Stage 14B mobile shell and Feed reaction remediation
+
+Stage 14B is implemented as a local candidate on 2026-07-29:
+
+- The shared `.site-container` contract now owns actual inline bounds for
+  header, main, and footer. It preserves the existing desktop maximum, gives
+  mobile content at least 16 CSS pixels on each side, increases the normal
+  gutter from 640px upward, and accounts for left/right safe-area insets
+  without globally masking horizontal overflow. Feed, Bridge, post,
+  login/account, subscription credential routes, preview, loading,
+  error/invalid, and not-found states inherit the same axis.
+- The visible `kirillwynn.com` header brand/link is removed. Feed remains the
+  home link; Feed, Bridge, theme, and login/account controls preserve
+  `aria-current`, keyboard focus, 44px touch targets, and a non-overflowing
+  320px layout.
+- Normal Feed and loading states retain one visually hidden `h1` named
+  `Feed`; the visible heading above search/tags is removed. Invalid URLs keep
+  their own visible `h1`, while empty and filtered states remain subordinate
+  to the Feed heading. Metadata and Open Graph contracts are unchanged.
+- Bridge is deliberately icon-only. Its main content has one visually hidden
+  `h1` named `Bridge`, no description, and no visible social-network labels.
+  Each of the eight external links has one unique accessible name while its
+  decorative SVG is hidden from assistive technology. The links retain
+  `_blank`, `noopener noreferrer`, keyboard focus, at least 44x44 targets, and
+  centered icons in both themes and every required viewport. No label appears
+  after image loading, hover, focus, theme changes, or responsive changes.
+- The Bridge-only semantic `dl` footer now lays out `Current Team — Yandex`
+  and `Previous Team — Deeplay` as two vertical rows. Bridge still omits its
+  copyright and former tagline; every ordinary route retains only the normal
+  copyright without team history.
+- `GET /api/v1/reactions/posts/?ids=...` is a separate private/no-store
+  `SessionAuthentication` read with anonymous access. It accepts exactly one
+  strict list of at most 50 unique positive IDs, applies the canonical public
+  post visibility policy, safely omits unknown/non-public IDs, preserves
+  requested order, emits Unicode-safe participant URLs, and loads selection,
+  aggregate counts, and viewer state in bounded grouped queries. The publicly
+  cacheable post-list representation remains viewer-independent.
+- Next adds only the exact same-origin batch rewrite. Feed issues one request
+  for its current page and progressively adds compact existing reaction pills
+  below excerpts. The pills reuse shared mutation ownership and participant
+  accessibility, show count/viewer state, and deliberately omit quick
+  reactions, the add button, and Emoji Mart. Empty aggregates take no space;
+  one failed batch leaves all cards usable without repeated errors. Draft Mode
+  does not start the private hydration request.
+- The API contract and ADR 0003 record the batch parsing, visibility, query,
+  session, cache, and exact-rewrite decisions. No model or migration changed,
+  and the existing single-post aggregate/toggle/participant endpoints remain
+  unchanged.
+
+Local verification passed before commit:
+
+- `uv lock --check` resolved 74 packages. Ruff format checked 144 files; Ruff
+  lint, Django test-settings check, migration drift, an empty in-memory SQLite
+  migration chain, and the production deploy-check passed.
+- The SQLite CI selection passed 516 tests with seven PostgreSQL-only cases
+  deselected. Docker, PostgreSQL, `psql`, `postgres`, and `pg_isready` are not
+  installed locally; the seven PostgreSQL locking/search/concurrency cases and
+  PostgreSQL migration execution remain mandatory fail-on-skip CI work and are
+  not represented by SQLite.
+- Prettier, ESLint, TypeScript, and full Vitest passed: 164 tests in 18 files.
+  The Next.js 16.2.11 production build, staging/production runtime-origin
+  verifier, browser-static-asset secret/internal-origin scan, and
+  `npm audit --audit-level=high` passed with zero vulnerabilities.
+- Playwright cross-stack passed 5/5 against real Django views, SQLite sessions,
+  standard CSRF, exact Next rewrites, and persistence, including real Feed
+  batch hydration. Browser-contract passed 32/32 across 375x812, 768x1024,
+  1440x900, and 1920x1080, plus a separate 320px header assertion. It covers
+  both themes, persistence, reduced motion, axe, hydration/console diagnostics,
+  keyboard/focus, exact content bounds, horizontal overflow, icon-only Bridge
+  aria snapshots, centered icons, footer rows, Feed batch failure/empty state,
+  participant access, and absence of Feed picker/quick controls.
+- Shell parsing/compilation and all 221 deterministic infrastructure tests
+  passed. Local Compose/Nginx/image/container rehearsal remains unavailable
+  because Docker is absent and is not represented as passed.
+
+No commit, push, staging gate change, deployment, or external content/provider
+mutation is represented by this local-candidate record. Those results must be
+added only after they actually occur.
 
 ## Completed
 
@@ -730,40 +813,46 @@ The first visual-design slice was implemented and deployed to staging on
 ## Milestone transition
 
 Milestone 11, functional Stage 13A acceptance, and Stage 14A part 1 staging
-acceptance are complete. Staging now serves the attested visual foundation for
-the public shell, Feed, Bridge, mandatory light/dark themes, and shared route
-states.
+acceptance are complete. Stage 14B is implemented and locally verified but is
+not yet accepted on staging. The active staging release therefore remains
+`c9e9cf76db1c5e36601717a528d5b8d2a237a097`.
 
 ### Next recommended session
 
-Stage 14B: apply the accepted system to the post reading surface and all 13
-StreamField blocks without changing serialized content or preview/cache
-contracts.
+After Stage 14B staging acceptance, implement local e-mail/password accounts
+and authoritative public nicknames as one separate stage. The owner has
+explicitly selected this as the next scope; Stage 15 and Stage 16 remain
+deferred and were not started by Stage 14B.
 
 Scope:
 
-1. Define the long-form reading measure, post hierarchy, metadata, media, code,
-   quote, list, divider, link, gallery, and rich-text treatments.
-2. Preserve all 13 block contracts and image accessibility semantics.
-3. Cover responsive, keyboard, overflow, Draft Mode, and mixed-content
-   regressions at the four established viewports.
-4. Leave comments/reactions, authentication/account, and subscription-flow
-   detail for their own subsequent slices.
+1. Add e-mail/password signup and login with mandatory e-mail verification,
+   plus reset, set, and change-password flows.
+2. Add one Unicode-safe, case-insensitive unique, changeable public nickname
+   and migrate existing users without changing their IDs, social identities,
+   sessions, staff flags, comments, or reactions.
+3. Require OAuth profile completion before a new OAuth user can interact
+   publicly; provider display names may be suggestions only.
+4. Replace scattered author-name fallbacks with one authoritative helper and
+   use the nickname for post, comment, mention, and reaction-participant
+   authorship.
 
 Out of scope for that session:
 
-- production promotion, deployment, infrastructure, or data migration;
-- Wagtail Admin redesign;
-- API/cache/OAuth/CSRF contract changes;
-- custom emoji or deletion of legacy containers, mounts, data, or references.
+- Stage 15 editorial/archive work and Stage 16 custom animated reaction
+  catalog work unless the owner changes the sequence;
+- JWT, Auth.js, browser-stored authentication tokens, or username-based login;
+- production promotion or deletion of legacy containers, mounts, data, or
+  references.
 
 ### Exit criteria
 
-- Every serialized block retains a usable semantic rendering.
-- Post reading and shared shell states pass accessibility, keyboard, reduced
-  motion, and horizontal-overflow checks.
-- The relevant frontend/component and four-viewport browser suites pass.
-- No functional or external-state boundary expands.
+- Local e-mail remains the login identifier while nickname is the single
+  public author identity.
+- Existing users and their related content survive a reversible migration.
+- Verified-email linking, OAuth completion, password lifecycle, Unicode
+  collision, session/CSRF, return-to, and inactive/banned-user boundaries pass
+  backend, frontend, PostgreSQL, and staging browser verification.
 
 ## Milestone queue
 
@@ -782,14 +871,25 @@ Out of scope for that session:
 - [ ] Milestone 12 — visual design and polish.
   - [x] Stage 14A part 1 — tokens, light/dark themes, shell, Feed, Bridge, and
     shared states.
-  - [ ] Stage 14B — post reading surface and all 13 StreamField blocks.
-  - [ ] Later slices — comments/reactions, auth/account, and subscription UI.
+  - [ ] Stage 14B — mobile shell/gutters, simplified header/Feed/icon-only
+    Bridge, Bridge footer rows, and Feed post reaction hydration; implemented
+    and locally verified, staging acceptance pending.
+  - [ ] Stage 15 and Stage 16 — explicitly deferred, not started.
+  - [ ] Next owner-selected stage — local accounts and public nicknames.
 
 ## Known risks
 
 - Stage 14A is accepted only on staging as
   `c9e9cf76db1c5e36601717a528d5b8d2a237a097`; no production result is
   implied.
+- Stage 14B is not accepted until its required CI, digest-pinned staging
+  rollout, schema-3 attestation, and read-only live Chrome QA pass. Local
+  browser-contract coverage is deterministic but does not represent the
+  staging edge or production.
+- Feed reaction hydration is intentionally progressive: one failed private
+  batch read leaves the public post cards usable and emits no repeated
+  card-level error, so aggregate state can be temporarily absent during a
+  reaction-service failure.
 - Detailed post blocks, comments/threads, reaction/participant surfaces,
   login/account, and the subscription flow intentionally retain their prior
   structure until later visual slices; shared tokens affect their base colors
@@ -854,6 +954,26 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 ## Last verification
 
 2026-07-29:
+
+- Stage 14B began from clean exact local/origin parent
+  `ce6c5b9e786f013d75469caa02488ef46267b3c7` on
+  `rewrite/wagtail-next`; active staging remained
+  `c9e9cf76db1c5e36601717a528d5b8d2a237a097`, `origin/main` remained
+  `1d02912430277cdf5465f856b158a6820bc12be4`, and the deployment gate was
+  false. Repository instructions, architecture/status/testing/deployment
+  documents, relevant ADRs, and the private Obsidian product source were read
+  before editing.
+- The owner's corrected Bridge contract superseded the initial Stage 14B
+  wording before any commit or external mutation. The final candidate is an
+  icon-only eight-link grid with a visually hidden heading and unique
+  accessible link names; it contains no visible heading, description, or
+  network labels.
+- Stage 14B local verification is recorded in its dedicated section above.
+  Required CI, immutable image construction, staging rollout, schema-3
+  attestation, and live Chrome acceptance remain pending and must not be
+  inferred from local results.
+
+Earlier Stage 14A acceptance on the same date:
 
 - Baseline branch, exact parent
   `2c25f48498d0286632ae6707f45c28d75cf17cf8`, clean starting worktree,

@@ -4,6 +4,8 @@ Status: accepted
 
 Date: 2026-07-26
 
+Amended: 2026-07-29 (bounded Feed batch reads)
+
 ## Context
 
 Posts, top-level comments, and thread replies need Slack-style Unicode emoji
@@ -68,6 +70,17 @@ anonymous. Mutations require the existing Django authenticated session, normal
 CSRF, and an active non-banned user. Post and comment lookups reuse the one
 canonical public visibility policy; Draft Mode never renders the client
 reaction components.
+
+The publicly cacheable post-list representation remains viewer-independent.
+Feed obtains post reaction aggregates through one separate
+`GET /api/v1/reactions/posts/?ids=...` request for the current page. The
+endpoint uses `SessionAuthentication`, permits anonymous reads, accepts one
+strict list of at most 50 unique positive integer post IDs, omits unknown and
+non-public targets, preserves requested-ID order, and keeps the same
+`private, no-store` and `Vary: Cookie` response boundary. Public post
+selection, aggregate counts, and authenticated viewer state are loaded with a
+bounded query count. Next exposes only an exact same-origin rewrite for this
+route; no general API proxy is introduced.
 
 Comment pages compute all reaction counts in one grouped query and viewer state
 in at most one additional query for the whole 20-item page. Deterministic Python
@@ -142,7 +155,8 @@ Positive:
   heuristics;
 - toggles have clear PostgreSQL serialization semantics;
 - participant privacy and cursor boundaries are explicit;
-- comment aggregation remains bounded as page size grows;
+- comment and Feed aggregation remain bounded as page size grows;
+- publicly cached post lists remain free of viewer-specific state;
 - duplicate list/thread reaction controls share mutation ownership across
   component lifecycles;
 - picker data never leaves the site or inflates the initial post bundle.
