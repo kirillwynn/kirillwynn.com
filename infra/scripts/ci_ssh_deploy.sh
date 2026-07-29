@@ -20,17 +20,49 @@ esac
 : "${GHCR_USERNAME:?}"
 : "${GHCR_TOKEN:?}"
 : "${RELEASE_SHA:?}"
+resolution_kind=${RESOLUTION_KIND:-}
+failed_operation_id=${FAILED_OPERATION_ID:-}
 case "$RELEASE_SHA" in
     *[!0-9a-f]*|"") exit 2 ;;
 esac
 test "${#RELEASE_SHA}" -eq 40
+case "$resolution_kind" in
+    ""|ordinary)
+        resolution_kind=
+        test -z "$failed_operation_id" || {
+            echo "failed operation ID requires retry or fix-forward" >&2
+            exit 2
+        }
+        ;;
+    retry|fix-forward)
+        case "$failed_operation_id" in
+            *[!A-Za-z0-9._:-]*|"")
+                echo "failed operation ID is invalid" >&2
+                exit 2
+                ;;
+        esac
+        test "${#failed_operation_id}" -ge 8 && \
+            test "${#failed_operation_id}" -le 128 || {
+            echo "failed operation ID must contain 8-128 characters" >&2
+            exit 2
+        }
+        ;;
+    *)
+        echo "resolution kind must be ordinary, retry, or fix-forward" >&2
+        exit 2
+        ;;
+esac
 case "$GHCR_USERNAME" in
     *[!A-Za-z0-9_-]*|"")
         echo "GHCR username contains unsupported characters" >&2
         exit 2
         ;;
 esac
-operation_id="deploy-${GITHUB_RUN_ID:?}-${environment_name}-${RELEASE_SHA}"
+if [ -n "$resolution_kind" ]; then
+    operation_id="${resolution_kind}-${GITHUB_RUN_ID:?}-${environment_name}-${RELEASE_SHA}"
+else
+    operation_id="deploy-${GITHUB_RUN_ID:?}-${environment_name}-${RELEASE_SHA}"
+fi
 
 umask 077
 ssh_dir=${RUNNER_TEMP:?}/kirillwynn-ssh
@@ -75,7 +107,11 @@ ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "cd '$durable_release' && if test -d '$durable_runtime'; then diff -qr '$remote_dir/runtime-input' '$durable_runtime' >/dev/null; else infra/scripts/validate_runtime_env_file.py --environment '$environment_name' --input-dir '$remote_dir/runtime-input' --output-dir '$durable_runtime'; fi"
 
 edge_runtime_env=/srv/kirillwynn/runtime/edge.env
-remote_rollout="infra/scripts/bootstrap_edge_if_absent.sh '$durable_release/release-manifest.json' '$edge_runtime_env' && infra/scripts/deploy_environment.sh '$environment_name' '$durable_runtime' '$durable_release/release-manifest.json' '$operation_id' && infra/scripts/advance_edge_rollout.sh '$environment_name' '$operation_id' '$durable_release/release-manifest.json' '$edge_runtime_env'"
+if [ -n "$resolution_kind" ]; then
+    remote_rollout="infra/scripts/bootstrap_edge_if_absent.sh '$durable_release/release-manifest.json' '$edge_runtime_env' && infra/scripts/resolve_failed_rollout.sh '$environment_name' '$failed_operation_id' '$operation_id' '${DEPLOY_SEQUENCE:?}' '$resolution_kind' '$durable_runtime' '$durable_release/release-manifest.json' '$edge_runtime_env' && infra/scripts/deploy_edge.sh '$durable_release/release-manifest.json' '$edge_runtime_env'"
+else
+    remote_rollout="infra/scripts/bootstrap_edge_if_absent.sh '$durable_release/release-manifest.json' '$edge_runtime_env' && infra/scripts/deploy_environment.sh '$environment_name' '$durable_runtime' '$durable_release/release-manifest.json' '$operation_id' && infra/scripts/advance_edge_rollout.sh '$environment_name' '$operation_id' '$durable_release/release-manifest.json' '$edge_runtime_env'"
+fi
 set +e
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "cd '$durable_release' && mkdir -p /srv/kirillwynn/locks && DOCKER_CONFIG='$remote_docker_config' flock -w 900 /srv/kirillwynn/locks/release.lock sh -c \"$remote_rollout\""

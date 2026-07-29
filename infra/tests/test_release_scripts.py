@@ -431,6 +431,25 @@ def test_ssh_deployment_persists_bundle_and_uses_cross_workflow_lock():
     assert "docker login ghcr.io" in script
     assert "DOCKER_CONFIG='$remote_docker_config'" in script
     assert "--password-stdin" in script
+    assert "RESOLUTION_KIND" in script
+    assert "FAILED_OPERATION_ID" in script
+    assert "resolve_failed_rollout.sh" in script
+    assert script.index("resolve_failed_rollout.sh") < script.index(
+        "deploy_edge.sh '$durable_release/release-manifest.json'"
+    )
+
+
+def test_staging_dispatch_exposes_only_explicit_reviewed_resolution_inputs():
+    workflow = (
+        ROOT / ".github" / "workflows" / "staging-release.yml"
+    ).read_text()
+    assert "resolution_kind:" in workflow
+    assert "failed_operation_id:" in workflow
+    assert "ordinary" in workflow
+    assert "retry" in workflow
+    assert "fix-forward" in workflow
+    assert "RESOLUTION_KIND: ${{ inputs.resolution_kind }}" in workflow
+    assert "FAILED_OPERATION_ID: ${{ inputs.failed_operation_id }}" in workflow
 
 
 def test_edge_bootstrap_binds_manifest_digest_before_compose_inspection():

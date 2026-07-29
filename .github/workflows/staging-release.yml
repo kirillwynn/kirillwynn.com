@@ -3,6 +3,20 @@ name: Staging candidate
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      resolution_kind:
+        description: Reviewed failed-rollout resolution
+        required: true
+        type: choice
+        default: ordinary
+        options:
+          - ordinary
+          - retry
+          - fix-forward
+      failed_operation_id:
+        description: Authoritative failed operation ID for retry/fix-forward
+        required: false
+        type: string
 
 jobs:
   build-images:
@@ -179,6 +193,8 @@ jobs:
       STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
       GHCR_USERNAME: ${{ github.actor }}
       GHCR_TOKEN: ${{ github.token }}
+      RESOLUTION_KIND: ${{ inputs.resolution_kind }}
+      FAILED_OPERATION_ID: ${{ inputs.failed_operation_id }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
