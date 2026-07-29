@@ -30,7 +30,18 @@ describe("server-only security boundary", () => {
         expect(draftRoute).toContain('path: "/posts"');
         expect(draftRoute).not.toContain("searchParams");
         expect(draftRoute).toContain("previewCookieSecure()");
-        expect(draftRoute).not.toContain("request.url).protocol");
+        expect(draftRoute).toContain("publicSiteUrl()");
+        expect(draftRoute).not.toContain("request.url");
+    });
+
+    it("keeps Draft Mode redirects on the configured public origin", () => {
+        const draftRoute = source("app/api/draft/route.ts");
+        const disableRoute = source("app/api/draft/disable/route.ts");
+
+        for (const route of [draftRoute, disableRoute]) {
+            expect(route).toContain("publicSiteUrl()");
+            expect(route).not.toContain("request.url");
+        }
     });
 
     it("percent-encodes slugs in server-to-server content fetches", () => {

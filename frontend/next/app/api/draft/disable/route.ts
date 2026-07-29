@@ -1,17 +1,17 @@
 import { draftMode } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { previewCookieSecure } from "@/lib/server/config";
+import { previewCookieSecure, publicSiteUrl } from "@/lib/server/config";
 import {
     PREVIEW_ENTRY_COOKIE,
     PREVIEW_SNAPSHOT_COOKIE,
 } from "@/lib/server/preview-cookies";
 
-export async function GET(request: Request) {
+export async function GET() {
     const draft = await draftMode();
     draft.disable();
 
-    const response = NextResponse.redirect(new URL("/", request.url), 303);
+    const response = NextResponse.redirect(new URL("/", publicSiteUrl()), 303);
     const secure = previewCookieSecure();
     response.cookies.set(PREVIEW_SNAPSHOT_COOKIE, "", {
         httpOnly: true,

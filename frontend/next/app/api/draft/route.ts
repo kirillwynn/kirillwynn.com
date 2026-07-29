@@ -2,14 +2,18 @@ import { cookies, draftMode } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { enterDraftMode } from "@/lib/draft-entry";
-import { previewCookieSecure, previewTtlSeconds } from "@/lib/server/config";
+import {
+    previewCookieSecure,
+    previewTtlSeconds,
+    publicSiteUrl,
+} from "@/lib/server/config";
 import { resolvePreview } from "@/lib/server/django";
 import {
     PREVIEW_ENTRY_COOKIE,
     PREVIEW_SNAPSHOT_COOKIE,
 } from "@/lib/server/preview-cookies";
 
-export async function GET(request: Request) {
+export async function GET() {
     const draft = await draftMode();
     const cookieStore = await cookies();
     const entryCredential = cookieStore.get(PREVIEW_ENTRY_COOKIE)?.value;
@@ -25,7 +29,7 @@ export async function GET(request: Request) {
     }
 
     const response = NextResponse.redirect(
-        new URL(result.path, request.url),
+        new URL(result.path, publicSiteUrl()),
         303,
     );
     const secure = previewCookieSecure();
