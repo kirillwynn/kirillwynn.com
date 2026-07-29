@@ -92,6 +92,38 @@ Repository and GitHub verification completed on 2026-07-28:
   server preflight. Deployment remained disabled for this preflight run.
   `STAGING_DEPLOY_ENABLED` was then enabled for one fresh build-and-deploy
   candidate; no earlier build is being rerun.
+- Fresh activation run `30410853672` for `96307f2` passed `ci-required`,
+  all three immutable image builds, manifest generation, runtime rendering,
+  and server preflight. Operation
+  `deploy-30410853672-staging-96307f2043d57dbc8f7fb4a7728bacfb027d0d65`
+  durably bootstrapped the new staging PostgreSQL volume, took and verified
+  the one `initial-empty` backup, applied all migrations, and passed
+  PostgreSQL, Django, worker, Next, internal readiness, worker heartbeat and
+  egress, exact-image, and candidate `nginx -t` gates. Public smoke then
+  failed with HTTP 500 before finalize or attestation.
+- Bounded shared-edge logs identified the failure: Docker had created
+  `/etc/nginx/.htpasswd` as a directory during the earlier interrupted
+  bootstrap, while preflight's `install` and `test -s` incorrectly accepted
+  the directory. Nginx therefore failed to read the Basic Auth file before
+  proxying `/api/health/`. The failed operation and its database/backup
+  evidence remain authoritative; no volume, database, or rollout state was
+  deleted or edited.
+- The invalid directory, containing only the generated staging auth file, was
+  moved intact to
+  `/srv/kirillwynn/evidence/staging-htpasswd-directory-30410853672`; the same
+  credential was installed as a regular mode-0600 file without exposing it.
+  Commits `b0e3e77`, `8076dc5`, and `81083ee` add fail-closed regular-file
+  gates, controlled same-digest edge remounting, and an explicit
+  GitHub-Environment-backed reviewed retry/fix-forward transport. Local infra
+  verification passes 221 tests. Push runs `30411672690`, `30427213423`, and
+  `30427640990` each passed the relevant CI/build/server-preflight gates with
+  activation disabled.
+- GitHub Environment staging is now temporarily armed with the exact failed
+  operation pointer and `fix-forward` resolution kind. The next fresh push
+  candidate must build once, claim that failure through
+  `begin-resolution`, take a recovery backup of the existing staging
+  database, repair/re-attest the shared edge, pass public smoke, and finalize
+  before activation is disabled again.
 
 Actual staging verification completed:
 
@@ -112,14 +144,14 @@ Actual staging verification completed:
   `sha256:50cd1383ce0466bd9664f6c6ca4eb6807e82c2178773a2be1434a79532885434`.
 - `STAGING_DEPLOY_ENABLED` was enabled only after all preceding server,
   runtime, provider, storage, OAuth, email, TLS, DNS, free-port, and
-  fail-closed ingress preflight checks passed. It is armed only for the fresh
-  activation candidate and will be disabled immediately after that rollout
-  reaches a terminal result.
+  fail-closed ingress and auth-mount preflight checks passed. It is armed only
+  for the fresh reviewed fix-forward candidate and will be disabled
+  immediately after that resolution reaches a terminal result.
 
 Actual staging verification still open:
 
-- No first application rollout operation, `initial-empty` backup, migration,
-  readiness/worker/exact-image evidence, public authenticated smoke, or
+- The first application rollout reached the pending-public-smoke boundary,
+  but failed public authenticated smoke. No finalized active release or
   schema-3 staging attestation has completed yet.
 - Live authoring/content lifecycle, OAuth consent, discussions/reactions,
   subscriptions and signed webhook, Draft Mode/revalidation, S3 media,
