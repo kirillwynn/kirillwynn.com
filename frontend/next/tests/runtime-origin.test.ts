@@ -26,5 +26,8 @@ describe("promotable runtime origin", () => {
         expect(layout).toContain('dynamic = "force-dynamic"');
         expect(layout).toContain("await connection()");
         expect(layout).not.toContain("NEXT_PUBLIC_");
+        expect(layout).toContain("THEME_INIT_SCRIPT");
+        expect(layout).toContain("suppressHydrationWarning");
+        expect(layout.indexOf("<head>")).toBeLessThan(layout.indexOf("<body"));
     });
 });

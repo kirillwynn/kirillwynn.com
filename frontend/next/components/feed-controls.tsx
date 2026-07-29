@@ -33,48 +33,43 @@ export function FeedControls({
     }
 
     return (
-        <section
-            className="mb-10 rounded-2xl border border-stone-200 bg-white p-5 sm:p-6"
-            aria-label="Search and filter posts"
-        >
-            <form onSubmit={submitSearch} role="search">
-                <label
-                    className="block text-sm font-semibold text-stone-900"
-                    htmlFor="feed-search"
-                >
+        <section className="feed-controls" aria-label="Search and filter posts">
+            <form className="feed-search" onSubmit={submitSearch} role="search">
+                <label className="sr-only" htmlFor="feed-search">
                     Search posts
                 </label>
-                <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-                    <input
-                        id="feed-search"
-                        className="feed-search-input"
-                        name="q"
-                        type="search"
-                        value={query}
-                        onChange={(event) => {
-                            setQuery(event.currentTarget.value);
-                        }}
-                    />
-                    <button className="button-link" type="submit">
-                        Search
-                    </button>
-                    {state.q ? (
-                        <a
-                            className="button-link"
-                            href={feedHref({
-                                page: 1,
-                                ...(state.tag ? { tag: state.tag } : {}),
-                            })}
-                        >
-                            Clear search
-                        </a>
-                    ) : null}
-                </div>
+                <input
+                    id="feed-search"
+                    className="feed-search-input"
+                    name="q"
+                    type="search"
+                    placeholder="Search posts"
+                    value={query}
+                    onChange={(event) => {
+                        setQuery(event.currentTarget.value);
+                    }}
+                />
+                <button
+                    className="button-link button-link-primary"
+                    type="submit"
+                >
+                    Search
+                </button>
+                {state.q ? (
+                    <a
+                        className="feed-clear"
+                        href={feedHref({
+                            page: 1,
+                            ...(state.tag ? { tag: state.tag } : {}),
+                        })}
+                    >
+                        Clear search
+                    </a>
+                ) : null}
             </form>
 
-            <nav className="mt-6" aria-label="Filter posts by tag">
-                <p className="text-sm font-semibold text-stone-900">Tags</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+            <nav className="feed-filter" aria-label="Filter posts by tag">
+                <div className="feed-tag-list">
                     <a
                         className={`feed-tag ${state.tag ? "" : "feed-tag-active"}`}
                         aria-current={state.tag ? undefined : "page"}
@@ -83,7 +78,7 @@ export function FeedControls({
                             ...(state.q ? { q: state.q } : {}),
                         })}
                     >
-                        All posts
+                        All
                     </a>
                     {tags.map((tag) => {
                         const active = state.tag === tag.slug;
@@ -92,15 +87,19 @@ export function FeedControls({
                                 key={tag.slug}
                                 className={`feed-tag ${active ? "feed-tag-active" : ""}`}
                                 aria-current={active ? "page" : undefined}
+                                aria-label={`${tag.name} ${String(tag.count)} posts`}
                                 href={feedHref({
                                     page: 1,
                                     ...(state.q ? { q: state.q } : {}),
                                     tag: tag.slug,
                                 })}
                             >
-                                {tag.name}{" "}
-                                <span aria-label={`${String(tag.count)} posts`}>
-                                    ({tag.count})
+                                <span aria-hidden="true">#{tag.name}</span>
+                                <span
+                                    className="feed-tag-count"
+                                    aria-hidden="true"
+                                >
+                                    {tag.count}
                                 </span>
                             </a>
                         );
@@ -108,7 +107,7 @@ export function FeedControls({
                 </div>
                 {state.tag ? (
                     <a
-                        className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-amber-800 underline underline-offset-4"
+                        className="feed-clear"
                         href={feedHref({
                             page: 1,
                             ...(state.q ? { q: state.q } : {}),

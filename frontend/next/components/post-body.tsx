@@ -102,8 +102,8 @@ function SafeLink({
 function CodeBlock({ language, code }: { language: string; code: string }) {
     const highlighted = highlightCode(language, code);
     return (
-        <figure className="not-prose my-8 min-w-0 overflow-hidden rounded-xl bg-stone-950 text-stone-100">
-            <figcaption className="border-b border-stone-700 px-4 py-2 font-mono text-xs text-stone-300">
+        <figure className="code-block not-prose my-8 min-w-0 overflow-hidden rounded-xl">
+            <figcaption className="code-caption border-b px-4 py-2 font-mono text-xs">
                 {highlighted.language}
                 {!highlighted.supported ? " · plain-text fallback" : ""}
             </figcaption>

@@ -1,10 +1,40 @@
-export function SiteFooter() {
+"use client";
+
+import { usePathname } from "next/navigation";
+
+import { teams } from "@/lib/bridge";
+
+export function FooterContent({
+    showBridgeTeams,
+}: {
+    showBridgeTeams: boolean;
+}) {
     return (
-        <footer className="mt-auto border-t border-stone-200">
-            <div className="site-container flex flex-col gap-2 py-8 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-between">
-                <p>© {new Date().getUTCFullYear()} Kirill Wynn</p>
-                <p>Writing about software, systems, and the work between.</p>
+        <footer className="site-footer">
+            <div className="site-container site-footer__inner">
+                <div className="site-footer__primary">
+                    <p>© {new Date().getUTCFullYear()} Kirill Wynn</p>
+                    {showBridgeTeams ? (
+                        <dl
+                            className="bridge-team-context"
+                            aria-label="Team history"
+                        >
+                            {teams.map((team) => (
+                                <div key={team.label}>
+                                    <dt>{team.label}</dt>
+                                    <dd>{team.name}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    ) : null}
+                </div>
             </div>
         </footer>
     );
+}
+
+export function SiteFooter() {
+    const pathname = usePathname();
+
+    return <FooterContent showBridgeTeams={pathname === "/bridge"} />;
 }

@@ -11,41 +11,35 @@ export function PostCard({ post }: { post: PostListItem }) {
     }
 
     return (
-        <article className="grid gap-5 border-b border-stone-200 pb-10 last:border-0 md:grid-cols-[minmax(0,1fr)_13rem]">
-            <div className="min-w-0">
-                {post.published_at ? (
-                    <p className="mb-3 text-sm text-stone-500">
+        <article className="feed-entry">
+            {post.published_at || post.tags.length > 0 ? (
+                <div className="feed-entry-meta">
+                    {post.published_at ? (
                         <DateTime value={post.published_at} />
-                    </p>
-                ) : null}
-                <h2 className="text-balance text-2xl font-semibold tracking-tight text-stone-950 sm:text-3xl">
+                    ) : null}
+                    <Tags tags={post.tags} variant="feed" />
+                </div>
+            ) : null}
+            <div className="feed-entry-layout">
+                <div className="min-w-0">
+                    <h2 className="feed-entry-title">
+                        <a href={href}>{post.title}</a>
+                    </h2>
+                    <p className="feed-entry-excerpt">{post.excerpt}</p>
+                </div>
+                {post.lead_image ? (
                     <a
                         href={href}
-                        className="rounded-sm decoration-2 underline-offset-4 hover:underline"
+                        aria-label={`Read ${post.title}`}
+                        className="feed-entry-image"
                     >
-                        {post.title}
+                        <ContentImage
+                            image={post.lead_image}
+                            sizes="(min-width: 40rem) 7.5rem, 5.25rem"
+                        />
                     </a>
-                </h2>
-                <p className="mt-3 break-words text-base leading-7 text-stone-700">
-                    {post.excerpt}
-                </p>
-                <div className="mt-5">
-                    <Tags tags={post.tags} />
-                </div>
+                ) : null}
             </div>
-            {post.lead_image ? (
-                <a
-                    href={href}
-                    aria-label={`Read ${post.title}`}
-                    className="order-first overflow-hidden rounded-xl bg-stone-100 md:order-last"
-                >
-                    <ContentImage
-                        image={post.lead_image}
-                        className="aspect-[16/10] h-full w-full object-cover"
-                        sizes="(min-width: 48rem) 13rem, calc(100vw - 2rem)"
-                    />
-                </a>
-            ) : null}
         </article>
     );
 }

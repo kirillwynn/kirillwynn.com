@@ -13,10 +13,7 @@ export function Pagination({
     const nextHref = feedHref({ ...state, page: state.page + 1 });
 
     return (
-        <nav
-            className="mt-12 flex items-center justify-between border-t border-stone-200 pt-6"
-            aria-label="Feed pagination"
-        >
+        <nav className="feed-pagination" aria-label="Feed pagination">
             {hasPrevious ? (
                 <a className="button-link" rel="prev" href={previousHref}>
                     ← Previous
@@ -24,7 +21,7 @@ export function Pagination({
             ) : (
                 <span aria-hidden="true" />
             )}
-            <span className="text-sm text-stone-500">Page {state.page}</span>
+            <span className="feed-page-number">Page {state.page}</span>
             {hasNext ? (
                 <a className="button-link" rel="next" href={nextHref}>
                     Next →

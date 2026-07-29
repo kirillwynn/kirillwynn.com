@@ -44,7 +44,7 @@ export function AccountPanel({ error }: { error?: string }) {
                     {message}
                 </p>
             ) : null}
-            <dl className="grid gap-2 rounded-xl border border-stone-200 bg-white p-5">
+            <dl className="grid gap-2 rounded-xl border border-stone-200 bg-[var(--color-surface)] p-5">
                 <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                         Name
@@ -71,7 +71,7 @@ export function AccountPanel({ error }: { error?: string }) {
                         return (
                             <li
                                 key={provider}
-                                className="flex min-h-14 items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white p-3"
+                                className="flex min-h-14 items-center justify-between gap-4 rounded-xl border border-stone-200 bg-[var(--color-surface)] p-3"
                             >
                                 <span className="font-medium">
                                     {providerLabels[provider]}

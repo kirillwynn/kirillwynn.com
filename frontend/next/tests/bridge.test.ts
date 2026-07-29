@@ -1,5 +1,8 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import BridgePage from "@/app/bridge/page";
 import { bridgeLinks, teams } from "@/lib/bridge";
 
 describe("Bridge configuration", () => {
@@ -38,5 +41,15 @@ describe("Bridge configuration", () => {
             { label: "Previous Team", name: "Deeplay" },
         ]);
         expect(JSON.stringify(teams)).not.toContain("http");
+    });
+
+    it("keeps team history out of the Bridge main content", () => {
+        const html = renderToStaticMarkup(createElement(BridgePage));
+
+        expect(html).toContain('class="bridge-grid"');
+        expect(html).not.toContain("Current Team");
+        expect(html).not.toContain("Previous Team");
+        expect(html).not.toContain("Yandex");
+        expect(html).not.toContain("Deeplay");
     });
 });

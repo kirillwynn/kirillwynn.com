@@ -14,9 +14,12 @@ recovery backup, public smoke, and schema-3 attestation boundaries have passed.
 The owner explicitly accepted retiring the partially working legacy
 application; its preserved containers remain stopped while the new shared edge
 owns ports 80/443. Live content/browser acceptance and the staging
-backup/restore drill have also passed. New-stack production deployment,
-production provider configuration, DNS changes, data migration, and promotion
-remain out of scope and unverified.
+backup/restore drill have also passed. Milestone 12A / Stage 14A has now begun
+locally with the first public-UI visual foundation on top of the accepted
+functional contracts; the active staging release remains
+`a519284551f62258d67fe546801ca01fdc484e2c`. New-stack production deployment,
+production provider configuration, DNS changes, data migration, promotion, and
+deployment of the local visual work remain out of scope and unverified.
 
 ## Current repository state
 
@@ -232,6 +235,50 @@ Actual staging verification completed:
   still does not renew the production certificate, deploy the new production
   application, alter production DNS/providers/storage/database, or promote a
   release to production.
+
+## Milestone 12A / Stage 14A visual foundation
+
+The first visual-design slice was implemented locally on 2026-07-29:
+
+- Baseline `2c25f48498d0286632ae6707f45c28d75cf17cf8` on
+  `rewrite/wagtail-next` matched the requested parent and began from a clean
+  worktree. The repository instructions, architecture/ADR boundaries,
+  implementation status, and private Obsidian product note were reconciled
+  before editing.
+- The selected direction combines a warm, minimal reading canvas with the
+  graphite, gray, and orange signal language of LeetCode's authenticated
+  problem-solving interface. The Feed uses the compact information rhythm of a
+  Slack news channel without a separate topical label; tags carry the topic.
+  Post titles remain deliberately restrained as an experiment rather than a
+  card headline.
+- One semantic token system now owns typography, color, spacing, radii,
+  borders, shadows, focus, and motion. The responsive shell, skip navigation,
+  header/navigation, footer, Feed controls, message-like post entries,
+  pagination, subscription placement, Bridge, and shared loading/empty/error/
+  not-found/Draft Mode states use that foundation.
+- Light and dark themes are mandatory public-site variants. The first visit
+  follows `prefers-color-scheme`; a manual light/dark choice persists in
+  localStorage across routes and reloads. A small pre-paint initializer in the
+  document head prevents a wrong-theme flash, while the hydration-stable
+  semantic icon button remains immediately beside the Login/account slot in
+  either auth state. Both palettes cover all existing public surfaces without
+  a new dependency and inherit the reduced-motion contract.
+- `Current Team — Yandex` and `Previous Team — Deeplay` were removed from the
+  Bridge main content. Only `/bridge` adds them to the footer as semantic
+  definition-list content with the same subdued typography and visual weight
+  as the copyright; Feed, post, login/account, and every other route retain the
+  ordinary footer.
+- A global Draft Mode banner keeps an exit available on Feed and
+  preview-unavailable/not-found states. Existing content, REST, cache,
+  OAuth/session, CSRF, subscription, comment/reaction, and lazy Emoji Mart
+  contracts remain unchanged, and no runtime dependency was added.
+- Detailed restyling of the 13 post blocks, comments/threads, reaction picker
+  and participants, login/account, and subscription flow is intentionally
+  deferred to subsequent visual slices. Wagtail Admin remains a separate
+  editorial interface.
+- No push, deployment, production, `main`, PR merge, DNS, provider, secret,
+  storage, GitHub Environment, server, or preserved legacy-container state was
+  changed.
 
 ## Completed
 
@@ -645,41 +692,53 @@ Actual staging verification completed:
   rewrite, runs the full Compose/Nginx/PostgreSQL/backup-recovery/MinIO/egress/
   restart suite, and exposes one `ci-required` result that fails unless every
   mandatory Milestone 11 job succeeds.
+- [x] Stage 14A part 1 establishes shared visual tokens, responsive shell,
+  mandatory light/dark themes, navigation/footer, compact Feed, Bridge, and
+  their shared UI states.
+- [x] Theme selection follows the first-visit system preference, persists only
+  after a manual choice, initializes before paint without a hydration mismatch,
+  and remains keyboard-accessible beside anonymous and authenticated controls.
+- [x] Bridge team history moved out of main content into a semantic,
+  route-specific footer that is regression-tested against ordinary routes.
 
 ## Milestone transition
 
-Milestone 11 testing and security hardening is complete at the repository
-boundary. It did not activate staging, perform the functional launch, redesign
-the public UI, deploy production, or change server, registry, DNS, TLS, OAuth,
-Resend, GitHub Environment/secret, bucket, or production data state.
+Milestone 11 and functional Stage 13A staging acceptance are complete. Stage
+14A part 1 now supplies the local visual foundation for the public shell, Feed,
+Bridge, mandatory light/dark themes, and shared route states. It has not been
+pushed or deployed, so staging continues to serve the accepted Stage 13A
+release.
 
 ### Next recommended session
 
-Functional staging acceptance (product checklist Stage 13), only after the
-external staging activation checklist is completed.
+Stage 14B: apply the accepted system to the post reading surface and all 13
+StreamField blocks without changing serialized content or preview/cache
+contracts.
 
 Scope:
 
-1. Activate the protected staging environment and required external namespaces.
-2. Run the repository container/PostgreSQL/Nginx smoke checks on the target
-   runtime.
-3. Complete real staging OAuth, Resend, S3, authoring, scheduled publication,
-   backup/restore-drill, and rollback rehearsal.
-4. Reconcile every failed or unavailable check before considering production.
+1. Define the long-form reading measure, post hierarchy, metadata, media, code,
+   quote, list, divider, link, gallery, and rich-text treatments.
+2. Preserve all 13 block contracts and image accessibility semantics.
+3. Cover responsive, keyboard, overflow, Draft Mode, and mixed-content
+   regressions at the four established viewports.
+4. Leave comments/reactions, authentication/account, and subscription-flow
+   detail for their own subsequent slices.
 
 Out of scope for that session:
 
-- production promotion or data migration;
-- search/reaction redesign or custom emoji;
-- deletion of legacy reference files.
+- production promotion, deployment, infrastructure, or data migration;
+- Wagtail Admin redesign;
+- API/cache/OAuth/CSRF contract changes;
+- custom emoji or deletion of legacy containers, mounts, data, or references.
 
 ### Exit criteria
 
-- Staging runtime passes all container and PostgreSQL checks.
-- OAuth, Resend, S3, media, Draft Mode, and signed revalidation pass on staging.
-- Backup/restore and compatible image rollback are rehearsed.
-- The same release SHA passes the already-required 375x812, 768x1024,
-  1440x900, and 1920x1080 browser matrix in CI.
+- Every serialized block retains a usable semantic rendering.
+- Post reading and shared shell states pass accessibility, keyboard, reduced
+  motion, and horizontal-overflow checks.
+- The relevant frontend/component and four-viewport browser suites pass.
+- No functional or external-state boundary expands.
 
 ## Milestone queue
 
@@ -696,9 +755,23 @@ Out of scope for that session:
 - [x] Milestone 11 — testing and security hardening.
 - [x] Functional staging acceptance and launch.
 - [ ] Milestone 12 — visual design and polish.
+  - [x] Stage 14A part 1 — tokens, light/dark themes, shell, Feed, Bridge, and
+    shared states.
+  - [ ] Stage 14B — post reading surface and all 13 StreamField blocks.
+  - [ ] Later slices — comments/reactions, auth/account, and subscription UI.
 
 ## Known risks
 
+- The Stage 14A visual foundation is local only. Active staging still serves
+  `a519284551f62258d67fe546801ca01fdc484e2c`, so post-change staging visual
+  acceptance has not run and no production result is implied.
+- Detailed post blocks, comments/threads, reaction/participant surfaces,
+  login/account, and the subscription flow intentionally retain their prior
+  structure until later visual slices; shared tokens affect their base colors
+  but do not constitute detailed redesign acceptance.
+- Feed titles are a deliberately restrained experiment. The owner may remove
+  them after judging real content density against the intended Slack-channel
+  rhythm.
 - The Next.js duplicate-event registry is process-local. Duplicate invalidation
   remains safe across processes because tag/path invalidation is idempotent.
 - Preview snapshot and delivered revalidation event retention are currently
@@ -754,6 +827,60 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 - a deliberately deferred dependency.
 
 ## Last verification
+
+2026-07-29:
+
+- Baseline branch, exact parent
+  `2c25f48498d0286632ae6707f45c28d75cf17cf8`, clean starting worktree,
+  repository instructions, architecture/ADR boundaries, implementation status,
+  and the private Obsidian note were verified before editing. No history was
+  rewritten.
+- Before code changes, read-only Chrome QA audited the accepted live staging
+  release across Feed search/tag/pagination/empty/error states, Bridge, post
+  and all 13 blocks, login/account, subscription, comments/mobile and desktop
+  threads, reactions/participants/picker, loading/error/not-found, and Draft
+  Mode at 375x812, 768x1024, 1440x900, and 1920x1080. No real content or
+  account data was mutated.
+- After implementation, Chrome visually checked the local light Feed and
+  Bridge on desktop. Local Playwright screenshots inspected the dark Feed at
+  375x812, 768x1024, 1440x900, and 1920x1080, the light Feed at 375x812 and
+  1440x900, and dark Bridge and post/comments at 375x812 and 1440x900. This
+  found and corrected light-canvas contrast defects in three legacy social
+  SVGs and a transient mobile auth-placeholder header wrap. The development
+  indicator visible over some screenshot corners is absent from production.
+  Post-change staging screenshots were not possible without the explicitly
+  excluded deployment.
+- `npm run format:check`, `npm run lint`, and `npm run typecheck` passed.
+  Full Vitest passed 159 tests in 17 files. `npm ci` was not rerun because
+  neither dependency manifest nor lockfile changed and the installed lock was
+  exercised by every frontend command.
+- The Next.js 16.2.11 production build passed. Standalone servers resolved both
+  staging and production public origins at runtime, and the post-build
+  `.next/static` scan found no internal mock/Django origin, sensitive
+  credential names, or `X-Session-Token`.
+- Playwright browser-contract passed 28/28: seven flows at each of 375x812,
+  768x1024, 1440x900, and 1920x1080. The light matrix and the mandatory dark
+  surface loop include axe, skip-link focus, keyboard interaction, no
+  horizontal overflow, route-specific footer isolation, Draft Mode isolation,
+  a globally available exit from an unavailable preview, auth safety,
+  comments/threads/reactions, and subscription confirmation/unsubscribe.
+  Theme coverage verifies dark and light first-visit system preferences,
+  pre-body initialization, no hydration diagnostics, 44px keyboard activation,
+  reduced motion, manual persistence across route/reload and later system
+  changes, and stable placement beside both Login and an authenticated account.
+  The first expanded run also found the standalone invalid-Feed state lacked an
+  `h1`; the semantic heading was corrected before the final passing matrix.
+- The existing cross-stack suite passed 4/4 during this session against real
+  Django API views, SQLite sessions, standard CSRF, Next rewrites, and
+  persistence; the Django system check also passed. Later edits were limited to
+  public presentation, client-only theme selection, semantic headings, and
+  browser assertions, with no API or backend integration change, so those two
+  integration checks were not rerun after the final frontend-only changes.
+- Docker/Compose, PostgreSQL, Nginx, real provider flows, and email delivery
+  were not rerun for this frontend-only slice. Their accepted Stage 13A staging
+  evidence remains historical evidence, not a claim about the local visual
+  commit. No push, deployment, production, `main`, PR, DNS, OAuth, Resend, S3,
+  GitHub secret/Environment, server, or legacy-container state was changed.
 
 2026-07-28:
 

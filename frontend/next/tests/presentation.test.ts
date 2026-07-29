@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Pagination } from "@/components/pagination";
 import { PostCard } from "@/components/post-card";
 import { PreviewBanner } from "@/components/preview-banner";
+import { FooterContent } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import type { ContentImage, PostListItem } from "@/lib/content-contract";
 import { parsePageParam } from "@/lib/pagination";
@@ -76,6 +77,8 @@ describe("feed presentation", () => {
             'href="/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80"',
         );
         expect(html).not.toContain("%25D0");
+        expect(html).toContain('class="feed-entry"');
+        expect(html).toContain("#Django");
     });
 
     it("renders accessible previous and next controls", () => {
@@ -117,7 +120,11 @@ describe("shell and preview controls", () => {
     it("reserves a stable account control while auth state loads", () => {
         const html = renderToStaticMarkup(createElement(SiteHeader));
         expect(html).toContain("Loading account");
-        expect(html).toContain("min-w-20");
+        expect(html).toContain("account-placeholder");
+        expect(html).toContain('aria-label="Switch color theme"');
+        expect(html.indexOf("theme-toggle")).toBeLessThan(
+            html.indexOf("account-slot"),
+        );
         expect(html).not.toContain('href="/accounts');
     });
 
@@ -126,5 +133,27 @@ describe("shell and preview controls", () => {
         expect(html).toContain('aria-label="Draft preview"');
         expect(html).toContain("immutable snapshot");
         expect(html).toContain('href="/api/draft/disable"');
+    });
+
+    it("renders team history only in the Bridge footer variant", () => {
+        const ordinary = renderToStaticMarkup(
+            createElement(FooterContent, { showBridgeTeams: false }),
+        );
+        const bridge = renderToStaticMarkup(
+            createElement(FooterContent, { showBridgeTeams: true }),
+        );
+
+        for (const value of [
+            "Current Team",
+            "Yandex",
+            "Previous Team",
+            "Deeplay",
+        ]) {
+            expect(ordinary).not.toContain(value);
+            expect(bridge).toContain(value);
+        }
+        expect(bridge).toContain('aria-label="Team history"');
+        expect(bridge).not.toContain("rounded");
+        expect(bridge).not.toContain("shadow");
     });
 });

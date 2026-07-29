@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { safeReturnTo } from "@/lib/auth";
 
 export function SiteHeader() {
@@ -79,32 +80,40 @@ export function SiteHeader() {
     const authenticated = Boolean(me?.authenticated && me.user);
 
     return (
-        <header className="border-b border-stone-200 bg-white/95">
-            <div className="site-container flex min-h-16 items-center justify-between gap-3">
+        <header className="site-header">
+            <div className="site-container site-header__inner">
                 <a
                     href="/"
-                    className="rounded-sm text-base font-semibold tracking-tight text-stone-950"
+                    className="site-brand"
                     aria-label="Kirill Wynn home"
                 >
                     kirillwynn.com
                 </a>
                 <nav
-                    className="flex items-center gap-0 sm:gap-3"
+                    className="site-navigation"
                     aria-label="Primary navigation"
                 >
-                    <a className="nav-link" href="/">
+                    <a
+                        className="nav-link"
+                        aria-current={pathname === "/" ? "page" : undefined}
+                        href="/"
+                    >
                         Feed
                     </a>
-                    <a className="nav-link" href="/bridge">
+                    <a
+                        className="nav-link"
+                        aria-current={
+                            pathname === "/bridge" ? "page" : undefined
+                        }
+                        href="/bridge"
+                    >
                         Bridge
                     </a>
-                    <div
-                        className="relative flex min-w-20 justify-end"
-                        ref={menuRef}
-                    >
+                    <ThemeToggle />
+                    <div className="account-slot" ref={menuRef}>
                         {status === "loading" ? (
                             <span
-                                className="inline-flex min-h-11 min-w-20 items-center justify-center text-sm text-stone-500"
+                                className="account-placeholder"
                                 role="status"
                                 aria-label="Loading account"
                             >
@@ -115,7 +124,7 @@ export function SiteHeader() {
                                 <button
                                     ref={triggerRef}
                                     type="button"
-                                    className="inline-flex min-h-11 max-w-36 items-center rounded-lg px-3 text-sm font-semibold text-stone-800 hover:bg-stone-100"
+                                    className="account-trigger"
                                     aria-expanded={menuOpen}
                                     aria-haspopup="menu"
                                     onClick={() => {
@@ -128,12 +137,17 @@ export function SiteHeader() {
                                 </button>
                                 {menuOpen ? (
                                     <div
-                                        className="absolute right-0 top-12 z-40 grid min-w-48 gap-1 rounded-xl border border-stone-200 bg-white p-2 shadow-lg"
+                                        className="account-menu"
                                         role="menu"
                                         aria-label="User menu"
                                     >
                                         <a
                                             className="nav-link"
+                                            aria-current={
+                                                pathname === "/account"
+                                                    ? "page"
+                                                    : undefined
+                                            }
                                             href="/account"
                                             role="menuitem"
                                         >
@@ -160,7 +174,10 @@ export function SiteHeader() {
                             </>
                         ) : (
                             <a
-                                className="nav-link min-w-20 justify-center font-semibold"
+                                className="nav-link justify-center font-semibold"
+                                aria-current={
+                                    pathname === "/login" ? "page" : undefined
+                                }
                                 href={`/login?next=${encodeURIComponent(returnTo)}`}
                             >
                                 Login

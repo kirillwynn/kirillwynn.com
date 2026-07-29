@@ -1,8 +1,24 @@
 import type { ContentTag } from "@/lib/content-contract";
 
-export function Tags({ tags }: { tags: ContentTag[] }) {
+export function Tags({
+    tags,
+    variant = "default",
+}: {
+    tags: ContentTag[];
+    variant?: "default" | "feed";
+}) {
     if (tags.length === 0) {
         return null;
+    }
+
+    if (variant === "feed") {
+        return (
+            <ul className="feed-entry-tags" aria-label="Tags">
+                {tags.map((tag) => (
+                    <li key={`${tag.slug}:${tag.name}`}>#{tag.name}</li>
+                ))}
+            </ul>
+        );
     }
 
     return (

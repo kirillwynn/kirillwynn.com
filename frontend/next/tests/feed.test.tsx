@@ -9,6 +9,7 @@ import HomePage, { generateMetadata } from "@/app/page";
 import { FeedControls } from "@/components/feed-controls";
 import type {
     AvailableTagResponse,
+    PostListItem,
     PostListResponse,
 } from "@/lib/content-contract";
 import {
@@ -64,6 +65,32 @@ function feed(overrides: Partial<PostListResponse> = {}): PostListResponse {
         next: null,
         previous: null,
         results: [],
+        ...overrides,
+    };
+}
+
+function postSummary(overrides: Partial<PostListItem> = {}): PostListItem {
+    return {
+        api_version: "1.0",
+        id: 42,
+        slug: "quiet-feed",
+        title: "A quiet Feed entry",
+        excerpt: "A compact message-like summary.",
+        published_at: "2026-07-29T12:00:00Z",
+        updated_at: "2026-07-29T12:00:00Z",
+        tags: [{ name: "Notes", slug: "notes" }],
+        canonical_path: "/posts/quiet-feed",
+        canonical_url: "https://example.com/posts/quiet-feed",
+        seo: {
+            title: "A quiet Feed entry",
+            description: "A compact message-like summary.",
+        },
+        open_graph: {
+            title: "A quiet Feed entry",
+            description: "A compact message-like summary.",
+            image: null,
+        },
+        lead_image: null,
         ...overrides,
     };
 }
@@ -223,7 +250,11 @@ describe("Feed response states and metadata", () => {
             searchParams: Promise.resolve({ q: ["one", "two"] }),
         });
 
-        expect(renderToStaticMarkup(element)).toContain("Invalid Feed URL");
+        const html = renderToStaticMarkup(element);
+        expect(html).toContain("Invalid Feed URL");
+        expect(html).toContain('<h1 id="empty-feed-title">');
+        expect(html).toContain('href="/"');
+        expect(html).toContain("Return to Feed");
         expect(getPublicPosts).not.toHaveBeenCalled();
         expect(getAvailableTags).not.toHaveBeenCalled();
     });
@@ -254,6 +285,29 @@ describe("Feed response states and metadata", () => {
 
         expect(renderToStaticMarkup(element)).not.toContain(
             "Get new posts by email",
+        );
+    });
+
+    it("renders a compact stream before subscription and omits dead pagination", async () => {
+        vi.mocked(getAvailableTags).mockResolvedValue(availableTags);
+        vi.mocked(getPublicPosts).mockResolvedValue(
+            feed({
+                count: 1,
+                results: [postSummary()],
+            }),
+        );
+
+        const element = await HomePage({
+            searchParams: Promise.resolve({}),
+        });
+        const html = renderToStaticMarkup(element);
+
+        expect(html).toContain(">Feed</h1>");
+        expect(html).toContain('aria-label="Latest posts"');
+        expect(html).toContain("feed-entry");
+        expect(html).not.toContain('aria-label="Feed pagination"');
+        expect(html.indexOf("A quiet Feed entry")).toBeLessThan(
+            html.indexOf("Get new posts by email"),
         );
     });
 

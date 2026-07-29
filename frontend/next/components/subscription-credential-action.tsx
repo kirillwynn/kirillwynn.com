@@ -97,7 +97,7 @@ export function SubscriptionCredentialAction({ kind }: { kind: ActionKind }) {
 
     return (
         <section
-            className="mx-auto max-w-xl rounded-2xl border border-stone-200 bg-white p-7 shadow-sm sm:p-10"
+            className="mx-auto max-w-xl rounded-2xl border border-stone-200 bg-[var(--color-surface)] p-7 shadow-sm sm:p-10"
             aria-labelledby="subscription-action-title"
         >
             <p className="eyebrow">Email subscription</p>

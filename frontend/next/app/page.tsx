@@ -38,19 +38,33 @@ export async function generateMetadata({
     };
 }
 
-function EmptyState({ title, children }: { title: string; children: string }) {
+function EmptyState({
+    title,
+    children,
+    actionHref,
+    actionLabel,
+    headingLevel = "h2",
+}: {
+    title: string;
+    children: string;
+    actionHref?: string;
+    actionLabel?: string;
+    headingLevel?: "h1" | "h2";
+}) {
+    const Heading = headingLevel;
+
     return (
         <section
-            className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center"
+            className="state-panel feed-empty"
             aria-labelledby="empty-feed-title"
         >
-            <h2
-                id="empty-feed-title"
-                className="text-xl font-semibold text-stone-950"
-            >
-                {title}
-            </h2>
-            <p className="mt-2 text-stone-600">{children}</p>
+            <Heading id="empty-feed-title">{title}</Heading>
+            <p>{children}</p>
+            {actionHref && actionLabel ? (
+                <a className="button-link" href={actionHref}>
+                    {actionLabel}
+                </a>
+            ) : null}
         </section>
     );
 }
@@ -63,8 +77,13 @@ export default async function HomePage({
     const parsed = parseFeedState(await searchParams);
     if (!parsed.valid) {
         return (
-            <div className="mx-auto max-w-4xl">
-                <EmptyState title="Invalid Feed URL">
+            <div className="state-page">
+                <EmptyState
+                    title="Invalid Feed URL"
+                    actionHref="/"
+                    actionLabel="Return to Feed"
+                    headingLevel="h1"
+                >
                     Check the search, tag, and page parameters and try again.
                 </EmptyState>
             </div>
@@ -87,27 +106,27 @@ export default async function HomePage({
     const filtered = Boolean(state.q || state.tag);
 
     return (
-        <div className="mx-auto max-w-4xl">
-            <header className="mb-10 max-w-2xl">
-                <p className="eyebrow">Personal publishing</p>
-                <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-stone-950 sm:text-5xl">
-                    Notes from building software and systems.
-                </h1>
-                <p className="mt-5 text-lg leading-8 text-stone-600">
-                    Long-form writing by Kirill Wynn. Latest posts first.
-                </p>
+        <div className="page-shell">
+            <header className="feed-header">
+                <h1 className="feed-title">Feed</h1>
             </header>
-
-            {!draft.isEnabled ? <SubscriptionForm /> : null}
 
             <FeedControls state={state} tags={tagResponse.results} />
 
             {unknownTag ? (
-                <EmptyState title="Unknown tag">
+                <EmptyState
+                    title="Unknown tag"
+                    actionHref="/"
+                    actionLabel="View all posts"
+                >
                     This tag is not attached to any published post.
                 </EmptyState>
             ) : feed.results.length === 0 && filtered ? (
-                <EmptyState title="No posts found">
+                <EmptyState
+                    title="No posts found"
+                    actionHref="/"
+                    actionLabel="Clear filters"
+                >
                     No published posts match the active search and tag filters.
                 </EmptyState>
             ) : feed.results.length === 0 ? (
@@ -115,20 +134,23 @@ export default async function HomePage({
                     New writing will appear here after it is published.
                 </EmptyState>
             ) : (
-                <div className="space-y-10">
+                <section className="feed-stream" aria-label="Latest posts">
                     {feed.results.map((post) => (
                         <PostCard key={post.id} post={post} />
                     ))}
-                </div>
+                </section>
             )}
 
-            {feed.count > 0 && feed.results.length > 0 ? (
+            {feed.results.length > 0 &&
+            (feed.previous !== null || feed.next !== null) ? (
                 <Pagination
                     state={state}
                     hasPrevious={feed.previous !== null}
                     hasNext={feed.next !== null}
                 />
             ) : null}
+
+            {!draft.isEnabled ? <SubscriptionForm /> : null}
         </div>
     );
 }

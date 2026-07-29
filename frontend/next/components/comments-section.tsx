@@ -276,7 +276,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                 </div>
             </div>
 
-            <div className="mt-6 rounded-xl border border-stone-200 bg-white p-4 sm:p-5">
+            <div className="mt-6 rounded-xl border border-stone-200 bg-[var(--color-surface)] p-4 sm:p-5">
                 {authStatus === "loading" ? (
                     <p className="text-sm text-stone-500">Loading account…</p>
                 ) : user && !user.can_interact ? (

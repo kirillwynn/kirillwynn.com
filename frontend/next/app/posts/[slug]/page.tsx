@@ -5,7 +5,6 @@ import { DateTime } from "@/components/date-time";
 import { CommentsSection } from "@/components/comments-section";
 import { PostBody } from "@/components/post-body";
 import { PostReactions } from "@/components/post-reactions";
-import { PreviewBanner } from "@/components/preview-banner";
 import { Tags } from "@/components/tags";
 import { SubscriptionForm } from "@/components/subscription-form";
 import { postMetadata } from "@/lib/metadata";
@@ -37,8 +36,6 @@ export default async function PostPage({ params }: PostPageProps) {
 
     return (
         <article className="mx-auto max-w-3xl">
-            {preview ? <PreviewBanner /> : null}
-
             <header className="border-b border-stone-200 pb-9">
                 <p className="eyebrow">Post</p>
                 <h1 className="mt-3 break-words text-balance text-4xl font-semibold tracking-tight text-stone-950 sm:text-5xl">
