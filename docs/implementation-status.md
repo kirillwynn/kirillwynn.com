@@ -19,13 +19,14 @@ implemented and accepted on staging as release
 `c9e9cf76db1c5e36601717a528d5b8d2a237a097`: the first public-UI visual
 foundation, route-specific Bridge footer remediation, immutable images,
 release manifest, schema-3 attestation, and live browser QA passed on top of
-the accepted functional contracts. Stage 14B is implemented as a locally
-verified candidate: it repairs the shared mobile shell, simplifies the header,
-Feed, and icon-only Bridge, and adds one private bounded Feed reaction batch
-read without changing the publicly cached post list. Its staging rollout and
-live acceptance are still pending. New-stack production deployment, production
-provider configuration, DNS changes, data migration, and promotion remain out
-of scope and unverified.
+the accepted functional contracts. Stage 14B is implemented and accepted on
+staging as release `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`: it repairs
+the shared mobile shell, simplifies the header, Feed, and icon-only Bridge, and
+adds one private bounded Feed reaction batch read without changing the publicly
+cached post list. Required CI, immutable images, the ordinary staging rollout,
+schema-3 attestation, and read-only live Chrome QA passed. New-stack production
+deployment, production provider configuration, DNS changes, data migration,
+and promotion remain out of scope and unverified.
 
 ## Current repository state
 
@@ -312,7 +313,7 @@ The first visual-design slice was implemented and deployed to staging on
 
 ## Stage 14B mobile shell and Feed reaction remediation
 
-Stage 14B is implemented as a local candidate on 2026-07-29:
+Stage 14B is implemented and accepted on staging on 2026-07-29:
 
 - The shared `.site-container` contract now owns actual inline bounds for
   header, main, and footer. It preserves the existing desktop maximum, gives
@@ -385,9 +386,63 @@ Local verification passed before commit:
   passed. Local Compose/Nginx/image/container rehearsal remains unavailable
   because Docker is absent and is not represented as passed.
 
-No commit, push, staging gate change, deployment, or external content/provider
-mutation is represented by this local-candidate record. Those results must be
-added only after they actually occur.
+CI, deployment, and live acceptance passed:
+
+- Feature commit `39b1b20d45f9179afa9cacc60e46de8bd98d15c8` has exact
+  parent `ce6c5b9e786f013d75469caa02488ef46267b3c7`. Push CI run
+  `30481008202` attempt 1 passed all required jobs, including the mandatory
+  PostgreSQL suite, and produced a gate-disabled green candidate. The
+  docs-only activation commit
+  `5dfd2d17d52972a188cd9d156d219fe229bfbb1a` is its direct child and does
+  not change the Stage 14B runtime tree.
+- Fresh push CI/rollout run `30481995267` attempt 1 passed backend SQLite and
+  PostgreSQL, frontend, browser-contract, cross-stack, infrastructure,
+  `ci-required`, three immutable image builds, server preflight, manifest,
+  ordinary staging deployment, and complete attestation. The gate was enabled
+  only for this fresh build-and-deploy candidate and returned to `false`
+  immediately after the terminal success.
+- Release-manifest artifact `8736177640` has GitHub SHA-256
+  `c12669fdaaf0bbfc2b1e216be4be9185e4503539e20c44c773c450e5b6175b20`
+  and independently validates for the deployed SHA. Active image digests are
+  Django
+  `sha256:c0cf317773a283fa9b8f606872ed875692ed463b5680acae51d9b4c75da062f9`,
+  Next
+  `sha256:08af73f6469282009b55fa2429474b5a29ffa1351b6bf5ffa83909863a3022fe`,
+  and edge
+  `sha256:8ad5da3d093bd3894a84275da8c451393cb0817b572958de4fd4971ffedaceef`.
+- Ordinary operation
+  `deploy-30481995267-staging-5dfd2d17d52972a188cd9d156d219fe229bfbb1a`
+  took the isolated pre-migration backup
+  `20260729T185946Z_c9e9cf76db1c5e36601717a528d5b8d2a237a097_pre-migration_deploy-30481995267-staging-5dfd2d17d52972a188cd9d156d219fe229bfbb1a.dump`;
+  Django reported no migrations to apply. PostgreSQL, Django, worker, Next,
+  exact-image, candidate/active edge configuration, worker heartbeat/egress,
+  and authenticated public smoke gates passed before finalize.
+- Schema-3 attestation artifact `8736318071` has GitHub SHA-256
+  `9a3a775b6e25ac21dd2885600ad453088bd67cfecd6f2861cd79492ac895ddb6`,
+  status `passed`, the exact release/operation/images, and every required check
+  true. It independently validates against the release manifest.
+- Read-only live Chrome QA passed icon-only Bridge and hydrated Feed in light
+  and dark themes at 375x812, 768x1024, 1440x900, and 1920x1080, plus the
+  320px header/layout check. Bridge exposed only its sr-only heading and eight
+  unique link names to accessibility, kept every icon centered and loaded,
+  kept 88px targets and two vertical team rows, and never rendered the
+  forbidden heading, description, or network labels. Feed retained one
+  sr-only `h1`, displayed the existing `Stage 13A newsletter delivery` 👍 1
+  with pressed viewer state, preserved the named participant dialog and
+  focus return, and rendered no picker/quick/add controls.
+- Feed, Bridge, the known post, login/account, confirm/unsubscribe, empty and
+  invalid Feed, and not-found routes had at least 16px mobile bounds, a shared
+  header/main/footer axis, and no root horizontal overflow. `aria-current`,
+  44px header targets, theme persistence, visible keyboard focus, skip-link
+  focus transfer, hover/focus icon-only behavior, and zero captured
+  console/hydration warnings or errors passed. Loading, preview, reduced
+  motion, batch failure/empty behavior, and axe remain covered by the green
+  deterministic local and CI Playwright matrix rather than inferred from a
+  transient live state.
+- Production, `main`, production credentials/providers/database/S3/Resend/
+  OAuth/DNS, content, comments, reactions, and e-mail state were not mutated.
+  The repository rollout stayed within the isolated staging projects; the
+  preserved legacy containers, mounts, and data were not targeted or changed.
 
 ## Completed
 
@@ -812,17 +867,15 @@ added only after they actually occur.
 
 ## Milestone transition
 
-Milestone 11, functional Stage 13A acceptance, and Stage 14A part 1 staging
-acceptance are complete. Stage 14B is implemented and locally verified but is
-not yet accepted on staging. The active staging release therefore remains
-`c9e9cf76db1c5e36601717a528d5b8d2a237a097`.
+Milestone 11, functional Stage 13A acceptance, Stage 14A part 1, and Stage 14B
+staging acceptance are complete. The active staging release is
+`5dfd2d17d52972a188cd9d156d219fe229bfbb1a`.
 
 ### Next recommended session
 
-After Stage 14B staging acceptance, implement local e-mail/password accounts
-and authoritative public nicknames as one separate stage. The owner has
-explicitly selected this as the next scope; Stage 15 and Stage 16 remain
-deferred and were not started by Stage 14B.
+Implement local e-mail/password accounts and authoritative public nicknames as
+one separate next stage. The owner has explicitly selected this as the next
+scope; Stage 15 and Stage 16 remain deferred and were not started by Stage 14B.
 
 Scope:
 
@@ -871,21 +924,17 @@ Out of scope for that session:
 - [ ] Milestone 12 — visual design and polish.
   - [x] Stage 14A part 1 — tokens, light/dark themes, shell, Feed, Bridge, and
     shared states.
-  - [ ] Stage 14B — mobile shell/gutters, simplified header/Feed/icon-only
-    Bridge, Bridge footer rows, and Feed post reaction hydration; implemented
-    and locally verified, staging acceptance pending.
+  - [x] Stage 14B — mobile shell/gutters, simplified header/Feed/icon-only
+    Bridge, Bridge footer rows, and Feed post reaction hydration; accepted on
+    staging.
   - [ ] Stage 15 and Stage 16 — explicitly deferred, not started.
   - [ ] Next owner-selected stage — local accounts and public nicknames.
 
 ## Known risks
 
-- Stage 14A is accepted only on staging as
-  `c9e9cf76db1c5e36601717a528d5b8d2a237a097`; no production result is
+- Stage 14B is accepted only on staging as
+  `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`; no production result is
   implied.
-- Stage 14B is not accepted until its required CI, digest-pinned staging
-  rollout, schema-3 attestation, and read-only live Chrome QA pass. Local
-  browser-contract coverage is deterministic but does not represent the
-  staging edge or production.
 - Feed reaction hydration is intentionally progressive: one failed private
   batch read leaves the public post cards usable and emits no repeated
   card-level error, so aggregate state can be temporarily absent during a
@@ -978,9 +1027,14 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   activation occurred because `STAGING_DEPLOY_ENABLED` remained false for the
   run.
 - Stage 14B local verification is recorded in its dedicated section above.
-  A fresh ordinary staging activation candidate, schema-3 attestation, and
-  live Chrome acceptance remain pending and must not be inferred from the
-  green gate-disabled candidate.
+  Docs-only direct child `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`
+  triggered fresh run `30481995267` attempt 1 after the gate was enabled.
+  Required CI, immutable builds, server preflight, manifest, ordinary operation
+  `deploy-30481995267-staging-5dfd2d17d52972a188cd9d156d219fe229bfbb1a`,
+  schema-3 attestation, and read-only live Chrome acceptance all passed. The
+  active staging release is `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`
+  and the gate is back to `false`; exact image/artifact evidence is recorded in
+  the dedicated Stage 14B section.
 
 Earlier Stage 14A acceptance on the same date:
 
