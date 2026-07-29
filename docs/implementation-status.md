@@ -14,12 +14,14 @@ recovery backup, public smoke, and schema-3 attestation boundaries have passed.
 The owner explicitly accepted retiring the partially working legacy
 application; its preserved containers remain stopped while the new shared edge
 owns ports 80/443. Live content/browser acceptance and the staging
-backup/restore drill have also passed. Milestone 12A / Stage 14A has now begun
-locally with the first public-UI visual foundation on top of the accepted
-functional contracts; the active staging release remains
-`a519284551f62258d67fe546801ca01fdc484e2c`. New-stack production deployment,
-production provider configuration, DNS changes, data migration, promotion, and
-deployment of the local visual work remain out of scope and unverified.
+backup/restore drill have also passed. Milestone 12A / Stage 14A part 1 is now
+implemented and accepted on staging as release
+`c9e9cf76db1c5e36601717a528d5b8d2a237a097`: the first public-UI visual
+foundation, route-specific Bridge footer remediation, immutable images,
+release manifest, schema-3 attestation, and live browser QA passed on top of
+the accepted functional contracts. New-stack production deployment,
+production provider configuration, DNS changes, data migration, and promotion
+remain out of scope and unverified.
 
 ## Current repository state
 
@@ -238,7 +240,8 @@ Actual staging verification completed:
 
 ## Milestone 12A / Stage 14A visual foundation
 
-The first visual-design slice was implemented locally on 2026-07-29:
+The first visual-design slice was implemented and deployed to staging on
+2026-07-29:
 
 - Baseline `2c25f48498d0286632ae6707f45c28d75cf17cf8` on
   `rewrite/wagtail-next` matched the requested parent and began from a clean
@@ -265,9 +268,10 @@ The first visual-design slice was implemented locally on 2026-07-29:
   a new dependency and inherit the reduced-motion contract.
 - `Current Team — Yandex` and `Previous Team — Deeplay` were removed from the
   Bridge main content. Only `/bridge` adds them to the footer as semantic
-  definition-list content with the same subdued typography and visual weight
-  as the copyright; Feed, post, login/account, and every other route retain the
-  ordinary footer.
+  definition-list content with subdued typography; its copyright and the
+  former tagline are absent. Feed, post, login/account, subscription, service
+  states, and every other route retain the ordinary copyright footer without
+  team history.
 - A global Draft Mode banner keeps an exit available on Feed and
   preview-unavailable/not-found states. Existing content, REST, cache,
   OAuth/session, CSRF, subscription, comment/reaction, and lazy Emoji Mart
@@ -276,9 +280,31 @@ The first visual-design slice was implemented locally on 2026-07-29:
   and participants, login/account, and subscription flow is intentionally
   deferred to subsequent visual slices. Wagtail Admin remains a separate
   editorial interface.
-- No push, deployment, production, `main`, PR merge, DNS, provider, secret,
-  storage, GitHub Environment, server, or preserved legacy-container state was
-  changed.
+- Visual commit `60f4f02ff64c446223497f2c9334bc906bc284be` was preserved
+  without amend or history rewriting. Remediation commit
+  `14c5458c6368902ef67690c509240539ed6ca4d2` isolated the exact Bridge footer
+  contract. Push CI run `30470270475` attempt 1 failed before any staging
+  mutation because Linux font metrics exposed a mobile-header overflow; fix
+  commit `c9e9cf76db1c5e36601717a528d5b8d2a237a097` corrected the constrained
+  mobile account slot without changing desktop layout.
+- Push CI run `30471177757` attempt 1 passed every required repository job,
+  three immutable image builds, server preflight, release manifest,
+  deployment, and schema-3 attestation. Ordinary operation
+  `deploy-30471177757-staging-c9e9cf76db1c5e36601717a528d5b8d2a237a097`
+  completed successfully. `STAGING_DEPLOY_ENABLED` was immediately returned
+  to `false`; resolution variables remained empty/absent.
+- Active images are Django
+  `sha256:19e96cc33ed27990d2ffef74d10fb6c8154613bd2bfb2411e0772b39fd9e6dd9`,
+  Next
+  `sha256:a84de51f9b6b26e72d60560d21bd49f899255103d557c402301c693367be6504`,
+  and edge
+  `sha256:0c78fadaf1fa5fb8f54fddd126d3ab9c951f6c13a73d9d027f12f1ffd4c828df`.
+  The release-manifest artifact passed with ZIP digest
+  `sha256:bd48e6847620344d7302be2965be8fb921e2875bf80689275895111572cf68a3`;
+  the schema-3 staging attestation passed every required check with ZIP digest
+  `sha256:372f00cfec5b3bf353d517a9801ad9097b7bf518187d57abcf1ca61057d5ae09`.
+- Production, `main`, PR merge, production DNS/providers/storage/database,
+  secrets, and preserved legacy containers, mounts, and data were not changed.
 
 ## Completed
 
@@ -703,11 +729,10 @@ The first visual-design slice was implemented locally on 2026-07-29:
 
 ## Milestone transition
 
-Milestone 11 and functional Stage 13A staging acceptance are complete. Stage
-14A part 1 now supplies the local visual foundation for the public shell, Feed,
-Bridge, mandatory light/dark themes, and shared route states. It has not been
-pushed or deployed, so staging continues to serve the accepted Stage 13A
-release.
+Milestone 11, functional Stage 13A acceptance, and Stage 14A part 1 staging
+acceptance are complete. Staging now serves the attested visual foundation for
+the public shell, Feed, Bridge, mandatory light/dark themes, and shared route
+states.
 
 ### Next recommended session
 
@@ -762,9 +787,9 @@ Out of scope for that session:
 
 ## Known risks
 
-- The Stage 14A visual foundation is local only. Active staging still serves
-  `a519284551f62258d67fe546801ca01fdc484e2c`, so post-change staging visual
-  acceptance has not run and no production result is implied.
+- Stage 14A is accepted only on staging as
+  `c9e9cf76db1c5e36601717a528d5b8d2a237a097`; no production result is
+  implied.
 - Detailed post blocks, comments/threads, reaction/participant surfaces,
   login/account, and the subscription flow intentionally retain their prior
   structure until later visual slices; shared tokens affect their base colors
@@ -835,6 +860,18 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   repository instructions, architecture/ADR boundaries, implementation status,
   and the private Obsidian note were verified before editing. No history was
   rewritten.
+- Commit `60f4f02ff64c446223497f2c9334bc906bc284be` remained intact.
+  Bridge footer remediation was committed separately as
+  `14c5458c6368902ef67690c509240539ed6ca4d2`; the CI-discovered mobile-header
+  correction was committed separately as
+  `c9e9cf76db1c5e36601717a528d5b8d2a237a097`.
+- Push CI run `30470270475` attempt 1 failed before mutation on two 375px
+  browser overflow assertions. Push CI run `30471177757` attempt 1 for
+  `c9e9cf76db1c5e36601717a528d5b8d2a237a097` then passed
+  `backend-sqlite`, `backend-postgresql`, `frontend`, `infrastructure`,
+  `browser-contract`, `cross-stack`, `ci-required`, all three immutable image
+  builds, release manifest, server preflight, staging deployment, and schema-3
+  attestation without a rerun or manual deploy.
 - Before code changes, read-only Chrome QA audited the accepted live staging
   release across Feed search/tag/pagination/empty/error states, Bridge, post
   and all 13 blocks, login/account, subscription, comments/mobile and desktop
@@ -848,8 +885,6 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   found and corrected light-canvas contrast defects in three legacy social
   SVGs and a transient mobile auth-placeholder header wrap. The development
   indicator visible over some screenshot corners is absent from production.
-  Post-change staging screenshots were not possible without the explicitly
-  excluded deployment.
 - `npm run format:check`, `npm run lint`, and `npm run typecheck` passed.
   Full Vitest passed 159 tests in 17 files. `npm ci` was not rerun because
   neither dependency manifest nor lockfile changed and the installed lock was
@@ -876,11 +911,25 @@ Implementation-level choices should be recorded in a new ADR when they affect:
   public presentation, client-only theme selection, semantic headings, and
   browser assertions, with no API or backend integration change, so those two
   integration checks were not rerun after the final frontend-only changes.
-- Docker/Compose, PostgreSQL, Nginx, real provider flows, and email delivery
-  were not rerun for this frontend-only slice. Their accepted Stage 13A staging
-  evidence remains historical evidence, not a claim about the local visual
-  commit. No push, deployment, production, `main`, PR, DNS, OAuth, Resend, S3,
-  GitHub secret/Environment, server, or legacy-container state was changed.
+- After deployment, live Chrome QA passed Feed, search, tags, pagination,
+  Bridge, an ordinary post, light/dark switching and persistence, desktop and
+  375x812 mobile layouts, keyboard/focus behavior, footer isolation, hydration
+  and console diagnostics, horizontal overflow, and DOM internal-origin/secret
+  scans. Bridge main omits team history; its semantic footer contains only
+  `Current Team — Yandex` and `Previous Team — Deeplay`, with no copyright or
+  former tagline. Ordinary routes retain only the approved copyright footer.
+  First-visit system preference could not be independently repeated in the
+  already-persisted live Chrome profile; it passed the local and CI Playwright
+  matrix at all four viewports.
+- Server state after rollout is schema 3 with no in-progress or recovery
+  operation. The active sequence is `30471177757`, the active operation is
+  `deploy-30471177757-staging-c9e9cf76db1c5e36601717a528d5b8d2a237a097`,
+  and Django, Next, worker, PostgreSQL, and shared edge are healthy. The legacy
+  `nginx` and `app` containers remain preserved in `Exited (0)` state.
+- `STAGING_DEPLOY_ENABLED` was false after rollout. Production, `main`, PR,
+  production DNS, OAuth, Resend, S3, database, secrets, and legacy
+  containers/mounts/data were not changed. Real provider and email mutations
+  were intentionally not repeated for this presentation-only slice.
 
 2026-07-28:
 
