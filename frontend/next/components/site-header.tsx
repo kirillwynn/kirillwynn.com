@@ -86,96 +86,100 @@ export function SiteHeader() {
                     className="site-navigation"
                     aria-label="Primary navigation"
                 >
-                    <a
-                        className="nav-link"
-                        aria-current={pathname === "/" ? "page" : undefined}
-                        href="/"
-                    >
-                        Feed
-                    </a>
-                    <a
-                        className="nav-link"
-                        aria-current={
-                            pathname === "/bridge" ? "page" : undefined
-                        }
-                        href="/bridge"
-                    >
-                        Bridge
-                    </a>
-                    <ThemeToggle />
-                    <div className="account-slot" ref={menuRef}>
-                        {status === "loading" ? (
-                            <span
-                                className="account-placeholder"
-                                role="status"
-                                aria-label="Loading account"
-                            >
-                                Account
-                            </span>
-                        ) : authenticated && me?.user ? (
-                            <>
-                                <button
-                                    ref={triggerRef}
-                                    type="button"
-                                    className="account-trigger"
-                                    aria-expanded={menuOpen}
-                                    aria-haspopup="menu"
-                                    onClick={() => {
-                                        setMenuOpen((open) => !open);
-                                    }}
+                    <div className="site-header__controls">
+                        <a
+                            className="nav-link"
+                            aria-current={pathname === "/" ? "page" : undefined}
+                            href="/"
+                        >
+                            Feed
+                        </a>
+                        <a
+                            className="nav-link"
+                            aria-current={
+                                pathname === "/bridge" ? "page" : undefined
+                            }
+                            href="/bridge"
+                        >
+                            Bridge
+                        </a>
+                        <ThemeToggle />
+                        <div className="account-slot" ref={menuRef}>
+                            {status === "loading" ? (
+                                <span
+                                    className="account-placeholder"
+                                    role="status"
+                                    aria-label="Loading account"
                                 >
-                                    <span className="truncate">
-                                        {me.user.display_name}
-                                    </span>
-                                </button>
-                                {menuOpen ? (
-                                    <div
-                                        className="account-menu"
-                                        role="menu"
-                                        aria-label="User menu"
+                                    Account
+                                </span>
+                            ) : authenticated && me?.user ? (
+                                <>
+                                    <button
+                                        ref={triggerRef}
+                                        type="button"
+                                        className="account-trigger"
+                                        aria-expanded={menuOpen}
+                                        aria-haspopup="menu"
+                                        onClick={() => {
+                                            setMenuOpen((open) => !open);
+                                        }}
                                     >
-                                        <a
-                                            className="nav-link"
-                                            aria-current={
-                                                pathname === "/account"
-                                                    ? "page"
-                                                    : undefined
-                                            }
-                                            href="/account"
-                                            role="menuitem"
+                                        <span className="truncate">
+                                            {me.user.display_name}
+                                        </span>
+                                    </button>
+                                    {menuOpen ? (
+                                        <div
+                                            className="account-menu"
+                                            role="menu"
+                                            aria-label="User menu"
                                         >
-                                            Account
-                                        </a>
-                                        <form
-                                            onSubmit={(event) => {
-                                                void submitLogout(event);
-                                            }}
-                                        >
-                                            <button
-                                                className="nav-link w-full justify-start"
-                                                type="submit"
+                                            <a
+                                                className="nav-link"
+                                                aria-current={
+                                                    pathname === "/account"
+                                                        ? "page"
+                                                        : undefined
+                                                }
+                                                href="/account"
                                                 role="menuitem"
-                                                disabled={loggingOut}
                                             >
-                                                {loggingOut
-                                                    ? "Logging out…"
-                                                    : "Logout"}
-                                            </button>
-                                        </form>
-                                    </div>
-                                ) : null}
-                            </>
-                        ) : (
-                            <a
-                                className="nav-link justify-center font-semibold"
-                                aria-current={
-                                    pathname === "/login" ? "page" : undefined
-                                }
-                                href={`/login?next=${encodeURIComponent(returnTo)}`}
-                            >
-                                Login
-                            </a>
-                        )}
+                                                Account
+                                            </a>
+                                            <form
+                                                onSubmit={(event) => {
+                                                    void submitLogout(event);
+                                                }}
+                                            >
+                                                <button
+                                                    className="nav-link w-full justify-start"
+                                                    type="submit"
+                                                    role="menuitem"
+                                                    disabled={loggingOut}
+                                                >
+                                                    {loggingOut
+                                                        ? "Logging out…"
+                                                        : "Logout"}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    ) : null}
+                                </>
+                            ) : (
+                                <a
+                                    className="nav-link justify-center font-semibold"
+                                    aria-current={
+                                        pathname === "/login"
+                                            ? "page"
+                                            : undefined
+                                    }
+                                    href={`/login?next=${encodeURIComponent(returnTo)}`}
+                                >
+                                    Login
+                                </a>
+                            )}
+                        </div>
                     </div>
                 </nav>
             </div>

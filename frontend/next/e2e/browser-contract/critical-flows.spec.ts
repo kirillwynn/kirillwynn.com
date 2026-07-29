@@ -151,25 +151,10 @@ async function expectBridgeContent(page: Page) {
     await expect(links.last()).toHaveText("");
 }
 
-async function expectOrdinaryFooter(page: Page) {
+async function expectTeamFooter(page: Page) {
     const footer = page.getByRole("contentinfo");
 
-    await expect(footer.getByText(/^© \d{4} Kirill Wynn$/)).toBeVisible();
-    for (const text of ["Current Team", "Yandex", "Previous Team", "Deeplay"]) {
-        await expect(footer.getByText(text, { exact: true })).toHaveCount(0);
-    }
-    await expect(
-        footer.getByText(
-            "Writing about software, systems, and the work between.",
-            { exact: true },
-        ),
-    ).toHaveCount(0);
-}
-
-async function expectBridgeFooter(page: Page) {
-    const footer = page.getByRole("contentinfo");
-
-    await expect(footer.getByText(/^© \d{4} Kirill Wynn$/)).toHaveCount(0);
+    await expect(footer.getByText(/©|Kirill Wynn/)).toHaveCount(0);
     await expect(
         footer.getByText(
             "Writing about software, systems, and the work between.",
@@ -191,14 +176,72 @@ async function expectBridgeFooter(page: Page) {
     await expect(footer).toHaveText(
         /^\s*Current Team\s*Yandex\s*Previous Team\s*Deeplay\s*$/,
     );
-    const rows = footer.locator(".bridge-team-context > div");
+    await expect(footer.locator("dl")).toHaveCount(1);
+    await expect(footer.locator("dt")).toHaveCount(2);
+    await expect(footer.locator("dd")).toHaveCount(2);
+    await expect(footer.locator("p, a")).toHaveCount(0);
+    const rows = footer.locator(".site-team-context > div");
     await expect(rows).toHaveCount(2);
+    const inner = await footer.locator(".site-footer__inner").boundingBox();
     const current = await rows.nth(0).boundingBox();
     const previous = await rows.nth(1).boundingBox();
+    expect(inner).not.toBeNull();
     expect(current).not.toBeNull();
     expect(previous).not.toBeNull();
-    if (current && previous) {
+    if (inner && current && previous) {
         expect(current.y + current.height).toBeLessThanOrEqual(previous.y);
+        const innerCenter = inner.x + inner.width / 2;
+        expect(
+            Math.abs(current.x + current.width / 2 - innerCenter),
+        ).toBeLessThanOrEqual(0.75);
+        expect(
+            Math.abs(previous.x + previous.width / 2 - innerCenter),
+        ).toBeLessThanOrEqual(0.75);
+    }
+    await expect
+        .poll(() =>
+            rows
+                .first()
+                .locator("dt")
+                .evaluate((term) => getComputedStyle(term, "::after").content),
+        )
+        .toBe('" —"');
+}
+
+async function expectSlackReactionGeometry(pill: Locator) {
+    await expect(pill).toBeVisible();
+    const geometry = await pill.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const visible = getComputedStyle(element, "::before");
+        const emoji = element.querySelector(".reaction-pill__emoji");
+        const count = element.querySelector(".reaction-pill__count");
+        return {
+            targetHeight: box.height,
+            visibleHeight: Number.parseFloat(visible.height),
+            emojiSize: emoji
+                ? Number.parseFloat(getComputedStyle(emoji).fontSize)
+                : 0,
+            countSize: count
+                ? Number.parseFloat(getComputedStyle(count).fontSize)
+                : 0,
+        };
+    });
+    expect(geometry.targetHeight).toBeGreaterThanOrEqual(44);
+    expect(geometry.visibleHeight).toBeGreaterThanOrEqual(28);
+    expect(geometry.visibleHeight).toBeLessThanOrEqual(32);
+    expect(geometry.emojiSize).toBeGreaterThanOrEqual(15);
+    expect(geometry.emojiSize).toBeLessThanOrEqual(16);
+    expect(geometry.countSize).toBeGreaterThanOrEqual(12);
+    expect(geometry.countSize).toBeLessThanOrEqual(13);
+
+    const targets = pill.getByRole("button");
+    await expect(targets).toHaveCount(2);
+    const first = await targets.nth(0).boundingBox();
+    const second = await targets.nth(1).boundingBox();
+    expect(first?.height).toBeGreaterThanOrEqual(44);
+    expect(second?.height).toBeGreaterThanOrEqual(44);
+    if (first && second) {
+        expect(first.x + first.width).toBeLessThanOrEqual(second.x + 0.5);
     }
 }
 
@@ -242,14 +285,74 @@ test("anonymous reader, feed search, tags, and pagination", async ({
 
     await page.getByRole("link", { name: "Django 2 posts" }).click();
     await expect(page).toHaveURL("/?q=delivery&tag=django");
-    await page.getByRole("link", { name: "Clear search" }).click();
+    const search = page.getByRole("searchbox", { name: "Search posts" });
+    await search.fill("");
     await expect(page).toHaveURL("/?tag=django");
-    await page.getByRole("link", { name: "Clear tag" }).click();
+    await page.getByRole("link", { name: "All", exact: true }).click();
     await page.getByRole("link", { name: "Next →" }).click();
     await expect(page).toHaveURL("/?page=2");
     await expect(
         page.locator("#main-content").getByText("Page 2", { exact: true }),
     ).toBeVisible();
+
+    await search.pressSequentially("delivery", { delay: 25 });
+    await expect(page).toHaveURL("/?q=delivery");
+    await expect(search).toHaveValue("delivery");
+    await expect(page.getByText("Clear search", { exact: true })).toHaveCount(
+        0,
+    );
+    await expect(page.getByText("Clear filters", { exact: true })).toHaveCount(
+        0,
+    );
+    await expect(page.getByText("Clear tag", { exact: true })).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Bridge", exact: true }).click();
+    await page.goBack();
+    await expect(page).toHaveURL("/?q=delivery");
+    await expect(
+        page.getByRole("searchbox", { name: "Search posts" }),
+    ).toHaveValue("delivery");
+    await page.goForward();
+    await expect(page).toHaveURL("/bridge");
+    await page.goBack();
+    await expect(page).toHaveURL("/?q=delivery");
+
+    const compositionInput = page.getByRole("searchbox", {
+        name: "Search posts",
+    });
+    await compositionInput.evaluate((element) => {
+        const input = element as HTMLInputElement;
+        input.dispatchEvent(
+            new CompositionEvent("compositionstart", { bubbles: true }),
+        );
+        const descriptor = Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+        );
+        descriptor?.set?.call(input, "日本");
+        input.dispatchEvent(
+            new InputEvent("input", {
+                bubbles: true,
+                data: "日本",
+                inputType: "insertCompositionText",
+                isComposing: true,
+            }),
+        );
+    });
+    await page.waitForTimeout(400);
+    await expect(page).toHaveURL("/?q=delivery");
+    await compositionInput.evaluate((element) => {
+        element.dispatchEvent(
+            new CompositionEvent("compositionend", {
+                bubbles: true,
+                data: "日本",
+            }),
+        );
+    });
+    await expect(page).toHaveURL("/?q=%E6%97%A5%E6%9C%AC");
+    await expect(
+        page.getByRole("searchbox", { name: "Search posts" }),
+    ).toHaveValue("日本");
     await expectAccessible(page);
 });
 
@@ -278,6 +381,9 @@ test("Feed hydrates existing reactions once without card-level requests or picke
             name: "View 1 participant for 🔥",
         }),
     ).toBeVisible();
+    await expectSlackReactionGeometry(
+        feedReactions.locator(".reaction-pill").first(),
+    );
     expect(
         reactionRequests.filter(
             (request) => request === "GET /api/v1/reactions/posts/",
@@ -293,13 +399,41 @@ test("Feed hydrates existing reactions once without card-level requests or picke
     ).toHaveCount(0);
     await expect(page.locator(".feed-entry .quick-reaction")).toHaveCount(0);
 
-    await feedReactions
-        .getByRole("button", { name: "View 1 participant for 🔥" })
-        .click();
+    const count = feedReactions.getByRole("button", {
+        name: "View 1 participant for 🔥",
+    });
+    const participantRequests = () =>
+        reactionRequests.filter((request) =>
+            request.includes("/participants/"),
+        );
+    await count.hover();
+    await count.focus();
+    await page.waitForTimeout(50);
+    expect(participantRequests()).toHaveLength(0);
+    await expect(
+        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+    ).toHaveCount(0);
+
+    await count.press("Enter");
     await expect(
         page.getByRole("dialog", { name: "🔥 reaction participants" }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(count).toBeFocused();
+    await count.press("Space");
+    await expect(
+        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+    ).toBeVisible();
+    await page
+        .getByRole("button", { name: "Close reaction participants" })
+        .click();
+    await expect(count).toBeFocused();
+    await count.click();
+    await expect(
+        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    expect(participantRequests()).toHaveLength(3);
 
     await page.route(/\/api\/v1\/reactions\/posts\/\?ids=/, async (route) => {
         await route.fulfill({
@@ -316,7 +450,7 @@ test("Feed hydrates existing reactions once without card-level requests or picke
     await expectAccessible(page);
 });
 
-test("responsive shell, skip link, and route-specific Bridge footer", async ({
+test("responsive shell, right header group, skip link, and universal team footer", async ({
     page,
 }, testInfo) => {
     for (const path of [
@@ -332,7 +466,7 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
         "/missing-footer-route",
     ]) {
         await page.goto(path);
-        await expectOrdinaryFooter(page);
+        await expectTeamFooter(page);
         await expect(
             page.locator(".site-header").getByText("kirillwynn.com", {
                 exact: true,
@@ -340,6 +474,19 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
         ).toHaveCount(0);
         await expectSharedContentBounds(page);
         await expectNoHorizontalOverflow(page);
+        const header = await page.locator(".site-header__inner").boundingBox();
+        const controls = await page
+            .locator(".site-header__controls")
+            .boundingBox();
+        expect(header).not.toBeNull();
+        expect(controls).not.toBeNull();
+        if (header && controls) {
+            expect(
+                Math.abs(
+                    controls.x + controls.width - (header.x + header.width),
+                ),
+            ).toBeLessThanOrEqual(0.5);
+        }
     }
 
     await page.goto("/");
@@ -362,7 +509,7 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
     }
 
     await expectBridgeContent(page);
-    await expectBridgeFooter(page);
+    await expectTeamFooter(page);
     await expectSharedContentBounds(page);
     await expectNoHorizontalOverflow(page);
     await expectAccessible(page);
@@ -370,6 +517,7 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
     if (testInfo.project.name === "mobile-375") {
         await page.setViewportSize({ width: 320, height: 812 });
         await page.goto("/");
+        await expectTeamFooter(page);
         await expectSharedContentBounds(page);
         await expectNoHorizontalOverflow(page);
         const headerBounds = await page
@@ -517,10 +665,8 @@ test("theme follows the system, persists, and remains beside account", async ({
         ).toBeVisible();
         if (path === "/bridge") {
             await expectBridgeContent(page);
-            await expectBridgeFooter(page);
-        } else {
-            await expectOrdinaryFooter(page);
         }
+        await expectTeamFooter(page);
         await expectNoHorizontalOverflow(page);
         await expectAccessible(page);
     }
@@ -543,10 +689,10 @@ test("theme follows the system, persists, and remains beside account", async ({
             THEME_STORAGE_KEY,
         ),
     ).toBeNull();
-    await expectOrdinaryFooter(lightPage);
+    await expectTeamFooter(lightPage);
     await lightPage.goto("/bridge");
     await expectBridgeContent(lightPage);
-    await expectBridgeFooter(lightPage);
+    await expectTeamFooter(lightPage);
     await expectNoHorizontalOverflow(lightPage);
     await expectAccessible(lightPage);
     await lightContext.close();
@@ -581,6 +727,9 @@ test("comment, thread, reaction, keyboard trap, Escape, and focus restoration", 
     const postReactions = page
         .getByRole("group", { name: "Reactions" })
         .first();
+    await expectSlackReactionGeometry(
+        postReactions.locator(".reaction-pill").first(),
+    );
     await postReactions
         .getByRole("button", { name: "Add 🔥 reaction" })
         .click();

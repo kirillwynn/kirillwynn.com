@@ -124,6 +124,13 @@ describe("shell and preview controls", () => {
         expect(html).not.toContain("kirillwynn.com");
         expect(html).toContain('href="/">Feed</a>');
         expect(html).toContain('aria-label="Switch color theme"');
+        expect(html).toContain('class="site-header__controls"');
+        expect(html.indexOf('href="/">Feed</a>')).toBeLessThan(
+            html.indexOf('href="/bridge">Bridge</a>'),
+        );
+        expect(html.indexOf('href="/bridge">Bridge</a>')).toBeLessThan(
+            html.indexOf("theme-toggle"),
+        );
         expect(html.indexOf("theme-toggle")).toBeLessThan(
             html.indexOf("account-slot"),
         );
@@ -137,13 +144,8 @@ describe("shell and preview controls", () => {
         expect(html).toContain('href="/api/draft/disable"');
     });
 
-    it("renders team history only in the Bridge footer variant", () => {
-        const ordinary = renderToStaticMarkup(
-            createElement(FooterContent, { showBridgeTeams: false }),
-        );
-        const bridge = renderToStaticMarkup(
-            createElement(FooterContent, { showBridgeTeams: true }),
-        );
+    it("renders the same two-line team-only footer for every route", () => {
+        const html = renderToStaticMarkup(createElement(FooterContent));
 
         for (const value of [
             "Current Team",
@@ -151,24 +153,21 @@ describe("shell and preview controls", () => {
             "Previous Team",
             "Deeplay",
         ]) {
-            expect(ordinary).not.toContain(value);
-            expect(bridge).toContain(value);
+            expect(html).toContain(value);
         }
-        expect(ordinary).toContain(
-            `© ${String(new Date().getUTCFullYear())} Kirill Wynn`,
-        );
-        expect(bridge).not.toContain("©");
-        expect(bridge).not.toContain("Kirill Wynn");
-        expect(ordinary).not.toContain(
+        expect(html).not.toContain("©");
+        expect(html).not.toContain("Kirill Wynn");
+        expect(html).not.toContain(new Date().getUTCFullYear().toString());
+        expect(html).not.toContain(
             "Writing about software, systems, and the work between.",
         );
-        expect(bridge).not.toContain(
-            "Writing about software, systems, and the work between.",
-        );
-        expect(bridge).toContain('aria-label="Team history"');
-        expect(bridge).toContain("<dt>Current Team</dt><dd>Yandex</dd>");
-        expect(bridge).toContain("<dt>Previous Team</dt><dd>Deeplay</dd>");
-        expect(bridge).not.toContain("rounded");
-        expect(bridge).not.toContain("shadow");
+        expect(html).toContain('aria-label="Team history"');
+        expect(html).toContain("<dt>Current Team</dt><dd>Yandex</dd>");
+        expect(html).toContain("<dt>Previous Team</dt><dd>Deeplay</dd>");
+        expect(html).toContain('class="site-team-context"');
+        expect(html.match(/<dt>/g)).toHaveLength(2);
+        expect(html.match(/<dd>/g)).toHaveLength(2);
+        expect(html).not.toContain("rounded");
+        expect(html).not.toContain("shadow");
     });
 });

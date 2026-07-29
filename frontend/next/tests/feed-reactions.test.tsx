@@ -216,6 +216,11 @@ describe("Feed reaction hydration", () => {
             ),
         ).toBeNull();
         expect(container.querySelector(".quick-reaction")).toBeNull();
+        expect(
+            container.querySelector(
+                ".reaction-bar-compact.reaction-bar-slack-pills",
+            ),
+        ).not.toBeNull();
         const toggle = buttonByLabel(container, "Remove 👍 reaction");
         expect(toggle?.getAttribute("aria-pressed")).toBe("true");
 
@@ -223,6 +228,37 @@ describe("Feed reaction hydration", () => {
             container,
             "View 1 participant for 👍",
         );
+        const pill = participants?.closest(".reaction-pill");
+        act(() => {
+            participants?.focus();
+            const touchDown = new Event("pointerdown", { bubbles: true });
+            Object.defineProperty(touchDown, "pointerType", {
+                value: "touch",
+            });
+            pill?.dispatchEvent(touchDown);
+            const touchUp = new Event("pointerup", { bubbles: true });
+            Object.defineProperty(touchUp, "pointerType", {
+                value: "touch",
+            });
+            pill?.dispatchEvent(touchUp);
+            const syntheticMouse = new Event("pointerover", {
+                bubbles: true,
+            });
+            Object.defineProperty(syntheticMouse, "pointerType", {
+                value: "mouse",
+            });
+            pill?.dispatchEvent(syntheticMouse);
+        });
+        await waitFor(() => document.activeElement === participants);
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.filter(([input]) =>
+                    urlOf(input).endsWith("/participants/"),
+                ),
+        ).toHaveLength(0);
+        expect(container.querySelector('[role="dialog"]')).toBeNull();
+
         act(() => {
             participants?.click();
         });

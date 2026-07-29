@@ -52,11 +52,15 @@ export function ReactionBar({
     compact = false,
     initialReactions,
     onChange,
+    participantsRequireActivation = false,
+    slackPills = false,
     target,
 }: {
     compact?: boolean;
     initialReactions: ReactionGroup[];
     onChange?: (change: ReactionChange) => void;
+    participantsRequireActivation?: boolean;
+    slackPills?: boolean;
     target: ReactionTarget;
 }) {
     const { me, refresh, status: authStatus } = useAuth();
@@ -391,11 +395,11 @@ export function ReactionBar({
 
     return (
         <div
-            className={`reaction-bar ${compact ? "reaction-bar-compact" : ""}`}
+            className={`reaction-bar ${compact ? "reaction-bar-compact" : ""} ${slackPills ? "reaction-bar-slack-pills" : ""}`}
         >
             <div
                 aria-label="Reactions"
-                className="flex flex-wrap items-center gap-2"
+                className="reaction-bar__group flex flex-wrap items-center gap-2"
                 role="group"
             >
                 {reactions.map((group) => (
@@ -404,6 +408,7 @@ export function ReactionBar({
                         key={group.emoji}
                         onFocus={(event) => {
                             if (
+                                !participantsRequireActivation &&
                                 pointerTypeRef.current !== "touch" &&
                                 !suppressParticipantFocusRef.current
                             ) {
@@ -421,7 +426,10 @@ export function ReactionBar({
                             pointerDown(event.pointerType);
                         }}
                         onPointerEnter={(event) => {
-                            if (event.pointerType === "mouse") {
+                            if (
+                                !participantsRequireActivation &&
+                                event.pointerType === "mouse"
+                            ) {
                                 hoverParticipants(group);
                             }
                         }}
@@ -434,10 +442,16 @@ export function ReactionBar({
                             onClick={() => void performToggle(group.emoji)}
                             type="button"
                         >
-                            <span aria-hidden="true">{group.emoji}</span>
+                            <span
+                                aria-hidden="true"
+                                className="reaction-pill__emoji"
+                            >
+                                {group.emoji}
+                            </span>
                         </button>
                         <button
                             aria-label={`View ${String(group.count)} participant${group.count === 1 ? "" : "s"} for ${group.emoji}`}
+                            className="reaction-pill__count"
                             disabled={busy}
                             onClick={(event) =>
                                 void openParticipants(

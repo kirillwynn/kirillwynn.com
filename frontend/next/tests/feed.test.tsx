@@ -23,9 +23,9 @@ import {
     getPublicPosts,
 } from "@/lib/server/django";
 
-const { notFound, push, draftState } = vi.hoisted(() => {
+const { notFound, replace, draftState } = vi.hoisted(() => {
     return {
-        push: vi.fn(),
+        replace: vi.fn(),
         draftState: { isEnabled: false },
         notFound: vi.fn(() => {
             throw new Error("NEXT_NOT_FOUND");
@@ -34,7 +34,7 @@ const { notFound, push, draftState } = vi.hoisted(() => {
 });
 
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push }),
+    useRouter: () => ({ replace }),
     notFound,
 }));
 
@@ -98,24 +98,71 @@ function postSummary(overrides: Partial<PostListItem> = {}): PostListItem {
 function renderControls(): {
     container: HTMLDivElement;
     root: Root;
+    render: (state: { page: number; q?: string; tag?: string }) => void;
 } {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
+    const render = (state: { page: number; q?: string; tag?: string }) => {
+        act(() => {
+            root.render(
+                <FeedControls state={state} tags={availableTags.results} />,
+            );
+        });
+    };
+    render({ page: 4, q: "old query", tag: "питон" });
+    return { container, root, render };
+}
+
+function setInputValue(input: HTMLInputElement | null, value: string): void {
     act(() => {
-        root.render(
-            <FeedControls
-                state={{ page: 4, q: "old query", tag: "питон" }}
-                tags={availableTags.results}
-            />,
+        const descriptor = Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+        );
+        if (descriptor?.set && input) {
+            // The native prototype setter intentionally bypasses React's value tracker.
+            // eslint-disable-next-line @typescript-eslint/unbound-method
+            Reflect.apply(descriptor.set, input, [value]);
+        }
+        input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+}
+
+function submit(form: HTMLFormElement | null): void {
+    act(() => {
+        form?.dispatchEvent(
+            new SubmitEvent("submit", {
+                bubbles: true,
+                cancelable: true,
+            }),
         );
     });
-    return { container, root };
+}
+
+function startComposition(input: HTMLInputElement | null): void {
+    act(() => {
+        input?.dispatchEvent(
+            new CompositionEvent("compositionstart", {
+                bubbles: true,
+            }),
+        );
+    });
+}
+
+function endComposition(input: HTMLInputElement | null): void {
+    act(() => {
+        input?.dispatchEvent(
+            new CompositionEvent("compositionend", {
+                bubbles: true,
+            }),
+        );
+    });
 }
 
 beforeEach(() => {
     draftState.isEnabled = false;
-    push.mockReset();
+    replace.mockReset();
     notFound.mockClear();
     vi.mocked(getPublicPosts).mockReset();
     vi.mocked(getAvailableTags).mockReset();
@@ -127,6 +174,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     document.body.replaceChildren();
 });
 
@@ -174,43 +222,173 @@ describe("Feed URL state", () => {
 });
 
 describe("Feed search and tag controls", () => {
-    it("submits a trimmed search, preserves tag, and resets page", () => {
+    it("debounces rapid Unicode input, preserves tag, resets page, and encodes once", () => {
+        vi.useFakeTimers();
         const { container, root } = renderControls();
         const input = container.querySelector<HTMLInputElement>("#feed-search");
-        const form = container.querySelector("form");
         expect(input?.value).toBe("old query");
-        expect(form).not.toBeNull();
 
-        act(() => {
-            const descriptor = Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype,
-                "value",
-            );
-            if (descriptor?.set && input) {
-                // The native prototype setter intentionally bypasses React's value tracker.
-                // eslint-disable-next-line @typescript-eslint/unbound-method
-                Reflect.apply(descriptor.set, input, ["  новый Django  "]);
+        const values = ["н", "но", "нов", "  новый Django  "];
+        for (const [index, value] of values.entries()) {
+            setInputValue(input, value);
+            if (index < values.length - 1) {
+                act(() => {
+                    vi.advanceTimersByTime(100);
+                });
             }
-            input?.dispatchEvent(new Event("input", { bubbles: true }));
-        });
+        }
+        expect(replace).not.toHaveBeenCalled();
         act(() => {
-            form?.dispatchEvent(
-                new SubmitEvent("submit", {
-                    bubbles: true,
-                    cancelable: true,
-                }),
-            );
+            vi.advanceTimersByTime(299);
+        });
+        expect(replace).not.toHaveBeenCalled();
+        act(() => {
+            vi.advanceTimersByTime(1);
         });
 
-        expect(push).toHaveBeenCalledWith(
+        expect(replace).toHaveBeenCalledOnce();
+        expect(replace).toHaveBeenCalledWith(
             "/?q=%D0%BD%D0%BE%D0%B2%D1%8B%D0%B9+Django&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
+        );
+        expect(replace.mock.calls[0]?.[0]).not.toContain("%25D0");
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("submits immediately, cancels a stale timer, and avoids duplicate navigation", () => {
+        vi.useFakeTimers();
+        const { container, root, render } = renderControls();
+        const input = container.querySelector<HTMLInputElement>("#feed-search");
+        const form = container.querySelector<HTMLFormElement>("form");
+
+        setInputValue(input, "stale");
+        setInputValue(input, "  immediate query  ");
+        submit(form);
+
+        expect(replace).toHaveBeenCalledOnce();
+        expect(replace).toHaveBeenCalledWith(
+            "/?q=immediate+query&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
+        );
+        act(() => {
+            vi.advanceTimersByTime(1_000);
+        });
+        expect(replace).toHaveBeenCalledOnce();
+
+        replace.mockClear();
+        render({ page: 1, q: "same", tag: "питон" });
+        setInputValue(input, "same");
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        submit(form);
+        expect(replace).not.toHaveBeenCalled();
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("removes q when the input is erased and keeps the active tag", () => {
+        vi.useFakeTimers();
+        const { container, root } = renderControls();
+        const input = container.querySelector<HTMLInputElement>("#feed-search");
+
+        setInputValue(input, "");
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+
+        expect(replace).toHaveBeenCalledWith(
+            "/?tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
+        );
+        expect(replace.mock.calls[0]?.[0]).not.toContain("q=");
+        expect(replace.mock.calls[0]?.[0]).not.toContain("page=1");
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("lets the latest value supersede a navigation already in flight", () => {
+        vi.useFakeTimers();
+        const { container, root, render } = renderControls();
+        const input = container.querySelector<HTMLInputElement>("#feed-search");
+
+        setInputValue(input, "first navigation");
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(replace).toHaveBeenLastCalledWith(
+            "/?q=first+navigation&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
+        );
+
+        setInputValue(input, "old query");
+        render({ page: 1, q: "first navigation", tag: "питон" });
+        expect(input?.value).toBe("old query");
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        expect(replace).toHaveBeenLastCalledWith(
+            "/?q=old+query&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
+        );
+        expect(replace).toHaveBeenCalledTimes(2);
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("suppresses intermediate IME navigation and starts debounce after composition", () => {
+        vi.useFakeTimers();
+        const { container, root } = renderControls();
+        const input = container.querySelector<HTMLInputElement>("#feed-search");
+
+        startComposition(input);
+        setInputValue(input, "に");
+        setInputValue(input, "日本");
+        act(() => {
+            vi.advanceTimersByTime(1_000);
+        });
+        expect(replace).not.toHaveBeenCalled();
+
+        endComposition(input);
+        act(() => {
+            vi.advanceTimersByTime(299);
+        });
+        expect(replace).not.toHaveBeenCalled();
+        act(() => {
+            vi.advanceTimersByTime(1);
+        });
+        expect(replace).toHaveBeenCalledWith(
+            "/?q=%E6%97%A5%E6%9C%AC&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
         );
         act(() => {
             root.unmount();
         });
     });
 
-    it("builds accessible search-clear, tag-select, and tag-clear links", () => {
+    it("syncs back/forward URL state and cancels the stale pending timer", () => {
+        vi.useFakeTimers();
+        const { container, root, render } = renderControls();
+        const input = container.querySelector<HTMLInputElement>("#feed-search");
+
+        setInputValue(input, "stale pending query");
+        render({ page: 1, q: "back query", tag: "django" });
+        expect(input?.value).toBe("back query");
+        act(() => {
+            vi.advanceTimersByTime(1_000);
+        });
+        expect(replace).not.toHaveBeenCalled();
+
+        render({ page: 2, q: "forward query", tag: "django" });
+        expect(input?.value).toBe("forward query");
+        expect(replace).not.toHaveBeenCalled();
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("builds accessible tag links without separate clear controls", () => {
         const html = renderToStaticMarkup(
             <FeedControls
                 state={{ page: 3, q: "django", tag: "питон" }}
@@ -221,8 +399,9 @@ describe("Feed search and tag controls", () => {
         expect(html).toContain('role="search"');
         expect(html).toContain('for="feed-search"');
         expect(html).toContain('value="django"');
-        expect(html).toContain("Clear search");
-        expect(html).toContain("Clear tag");
+        expect(html).not.toContain("Clear search");
+        expect(html).not.toContain("Clear filters");
+        expect(html).not.toContain("Clear tag");
         expect(html).toContain('aria-current="page"');
         expect(html).toContain('href="/?q=django&amp;tag=django"');
         expect(html).toContain('href="/?q=django"');
@@ -271,7 +450,9 @@ describe("Feed response states and metadata", () => {
         });
 
         expect(renderToStaticMarkup(unknown)).toContain("Unknown tag");
-        expect(renderToStaticMarkup(noResults)).toContain("No posts found");
+        const noResultsHtml = renderToStaticMarkup(noResults);
+        expect(noResultsHtml).toContain("No posts found");
+        expect(noResultsHtml).not.toContain("Clear filters");
     });
 
     it("omits the subscription form while Draft Mode is active", async () => {

@@ -71,6 +71,7 @@ export function PostReactions({ id, slug }: { id: number; slug: string }) {
                         onChange={(change) => {
                             setReactions(change.reactions);
                         }}
+                        slackPills
                         target={target}
                     />
                 </div>

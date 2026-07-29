@@ -61,6 +61,8 @@ function FeedReactionPills({
                 compact
                 initialReactions={state.reactions}
                 onChange={applyChange}
+                participantsRequireActivation
+                slackPills
                 target={target}
             />
         </div>

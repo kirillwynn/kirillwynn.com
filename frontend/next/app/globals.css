@@ -244,6 +244,15 @@ img {
     flex: 1 1 auto;
     min-width: 0;
     align-items: center;
+    justify-content: flex-end;
+}
+
+.site-header__controls {
+    display: flex;
+    max-width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
     gap: 0;
 }
 
@@ -263,7 +272,6 @@ img {
     transition:
         background-color var(--motion-fast) var(--ease-standard),
         color var(--motion-fast) var(--ease-standard);
-    margin-inline-start: auto;
 }
 
 .theme-toggle:hover {
@@ -491,20 +499,6 @@ img {
     font-weight: 500;
 }
 
-.feed-clear {
-    display: inline-flex;
-    min-height: 2.75rem;
-    flex: 0 0 auto;
-    align-items: center;
-    border-radius: var(--radius-md);
-    padding-inline: 0.625rem;
-    color: var(--color-accent-strong);
-    font-size: var(--type-sm);
-    font-weight: 650;
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-}
-
 .feed-stream {
     border-bottom: var(--border-thin) solid var(--color-border);
 }
@@ -583,10 +577,6 @@ img {
 
 .feed-entry-reactions {
     margin-top: var(--space-3);
-}
-
-.reaction-bar-compact .reaction-pill {
-    box-shadow: var(--shadow-sm);
 }
 
 .feed-entry-image {
@@ -763,40 +753,36 @@ img {
 .site-footer__inner {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: var(--space-2);
     padding-block: var(--space-6);
     color: var(--color-muted);
     font-size: var(--type-xs);
     line-height: 1.6;
+    text-align: center;
 }
 
-.site-footer__primary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-4);
-    margin: 0;
-}
-
-.bridge-team-context {
+.site-team-context {
     display: grid;
+    justify-items: center;
     gap: var(--space-1);
     margin: 0;
 }
 
-.site-footer p,
-.bridge-team-context dt,
-.bridge-team-context dd {
+.site-team-context dt,
+.site-team-context dd {
     margin: 0;
     color: inherit;
     font: inherit;
 }
 
-.bridge-team-context > div {
+.site-team-context > div {
     display: flex;
+    justify-content: center;
     gap: var(--space-1);
 }
 
-.bridge-team-context dt::after {
+.site-team-context dt::after {
     content: " —";
 }
 
@@ -973,6 +959,93 @@ img {
 .quick-reaction:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+}
+
+.reaction-bar-slack-pills .reaction-pill {
+    position: relative;
+    isolation: isolate;
+    min-height: 2.75rem;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+}
+
+.reaction-bar-slack-pills .reaction-pill::before {
+    position: absolute;
+    z-index: 0;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 1.875rem;
+    transform: translateY(-50%);
+    border: var(--border-thin) solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    content: "";
+}
+
+.reaction-bar-compact.reaction-bar-slack-pills .reaction-pill::before {
+    box-shadow: var(--shadow-sm);
+}
+
+.reaction-bar-slack-pills .reaction-pill-active {
+    border: 0;
+    background: transparent;
+}
+
+.reaction-bar-slack-pills .reaction-pill-active::before {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+}
+
+.reaction-bar-slack-pills .reaction-pill:hover::before {
+    background: var(--color-surface-subtle);
+}
+
+.reaction-bar-slack-pills .reaction-pill-active:hover::before {
+    background: var(--color-accent-soft);
+}
+
+.reaction-bar-slack-pills .reaction-pill button {
+    position: relative;
+    z-index: 1;
+    min-width: 1.875rem;
+    min-height: 2.75rem;
+    padding-inline: 0.45rem 0.3rem;
+    background: transparent;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+.reaction-bar-slack-pills .reaction-pill button + button {
+    min-width: 1.625rem;
+    border-left: 0;
+    padding-inline: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.reaction-bar-slack-pills .reaction-pill button + button::before {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: 1.125rem;
+    transform: translateY(-50%);
+    border-left: var(--border-thin) solid var(--color-border);
+    content: "";
+}
+
+.reaction-bar-slack-pills .reaction-pill button:hover {
+    background: transparent;
+}
+
+.reaction-bar-slack-pills .reaction-pill__emoji {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.reaction-bar-slack-pills .reaction-pill__count {
+    font-size: 0.75rem;
+    line-height: 1;
 }
 
 .quick-reaction {
@@ -1203,6 +1276,10 @@ img {
     }
 
     .site-navigation {
+        gap: 0;
+    }
+
+    .site-header__controls {
         gap: var(--space-1);
     }
 
@@ -1249,18 +1326,6 @@ img {
     .bridge-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: var(--space-3);
-    }
-
-    .site-footer__inner {
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: var(--space-6);
-    }
-
-    .site-footer__primary {
-        flex: 1;
-        align-items: center;
     }
 
     .preview-banner {

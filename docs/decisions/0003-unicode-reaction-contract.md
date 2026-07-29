@@ -4,7 +4,7 @@ Status: accepted
 
 Date: 2026-07-26
 
-Amended: 2026-07-29 (bounded Feed batch reads)
+Amended: 2026-07-29 (bounded Feed batch reads and explicit Feed participants)
 
 ## Context
 
@@ -135,8 +135,11 @@ Participant reads carry an `AbortController` and monotonically increasing
 request identity. Target/group changes, close, and unmount invalidate the
 active request. Stale success/error and cursor pages are ignored, while accepted
 pages deduplicate public participants by ID. Escape closes and restores trigger
-focus. Pointer hover is limited to fine hover-capable mouse devices and is
-suppressed after touch; focus and explicit count taps remain available.
+focus. Post-detail, comment, and thread pointer hover remains limited to fine
+hover-capable mouse devices and is suppressed after touch. Feed participant
+reads have an explicit-activation-only boundary: hover, pointer entry, focus
+alone, and synthetic post-touch mouse events do not open a surface or start a
+request; click/tap and native Enter/Space activation on the count button do.
 
 Anonymous intent is stored for ten minutes in `sessionStorage`, scoped by
 Unicode slug, target type, target ID, and emoji. Only one current intent is kept

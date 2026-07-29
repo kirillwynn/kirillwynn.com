@@ -120,11 +120,7 @@ export default async function HomePage({
                     This tag is not attached to any published post.
                 </EmptyState>
             ) : feed.results.length === 0 && filtered ? (
-                <EmptyState
-                    title="No posts found"
-                    actionHref="/"
-                    actionLabel="Clear filters"
-                >
+                <EmptyState title="No posts found">
                     No published posts match the active search and tag filters.
                 </EmptyState>
             ) : feed.results.length === 0 ? (

@@ -476,6 +476,11 @@ describe("post, comment, and reply reaction UI", () => {
         expect(
             container.querySelectorAll('[aria-label^="React with"]').length,
         ).toBe(3);
+        expect(
+            container.querySelector(
+                ".post-reactions .reaction-bar-slack-pills",
+            ),
+        ).not.toBeNull();
         act(() => {
             root.unmount();
         });
@@ -531,6 +536,11 @@ describe("post, comment, and reply reaction UI", () => {
             container
                 .querySelector('[data-comment-id="9"]')
                 ?.querySelector(".reaction-bar"),
+        ).toBeNull();
+        expect(
+            container.querySelector(
+                '[data-comment-id="7"] .reaction-bar-slack-pills',
+            ),
         ).toBeNull();
         act(() => {
             root.unmount();

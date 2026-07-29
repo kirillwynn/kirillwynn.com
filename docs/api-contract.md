@@ -625,8 +625,11 @@ Switching target or emoji, closing the surface, or unmounting invalidates the
 previous request; stale successes and failures cannot update the current group.
 Cursor pages are accepted only for the current group and are deduplicated by
 participant ID. Escape closes the participant surface and returns focus to its
-trigger. Hover opens participants only for a fine, hover-capable mouse pointer;
-focus and the explicit count button remain the keyboard/touch paths.
+trigger. Post-detail, comment, and thread surfaces retain their fine-pointer
+hover/focus behavior. The compact Feed surface is stricter: hover,
+`pointerenter`, focus alone, and a synthetic mouse event after touch neither
+open participants nor issue a participant request. Feed participants open only
+after click/tap or the native Enter/Space activation of the count button.
 
 ### Quick reaction config
 
