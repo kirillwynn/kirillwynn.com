@@ -152,6 +152,17 @@ describe("shell and preview controls", () => {
             expect(ordinary).not.toContain(value);
             expect(bridge).toContain(value);
         }
+        expect(ordinary).toContain(
+            `© ${String(new Date().getUTCFullYear())} Kirill Wynn`,
+        );
+        expect(bridge).not.toContain("©");
+        expect(bridge).not.toContain("Kirill Wynn");
+        expect(ordinary).not.toContain(
+            "Writing about software, systems, and the work between.",
+        );
+        expect(bridge).not.toContain(
+            "Writing about software, systems, and the work between.",
+        );
         expect(bridge).toContain('aria-label="Team history"');
         expect(bridge).not.toContain("rounded");
         expect(bridge).not.toContain("shadow");

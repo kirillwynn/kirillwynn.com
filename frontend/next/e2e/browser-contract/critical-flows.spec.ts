@@ -24,6 +24,48 @@ async function expectNoHorizontalOverflow(page: Page) {
         .toBe(true);
 }
 
+async function expectOrdinaryFooter(page: Page) {
+    const footer = page.getByRole("contentinfo");
+
+    await expect(footer.getByText(/^© \d{4} Kirill Wynn$/)).toBeVisible();
+    for (const text of ["Current Team", "Yandex", "Previous Team", "Deeplay"]) {
+        await expect(footer.getByText(text, { exact: true })).toHaveCount(0);
+    }
+    await expect(
+        footer.getByText(
+            "Writing about software, systems, and the work between.",
+            { exact: true },
+        ),
+    ).toHaveCount(0);
+}
+
+async function expectBridgeFooter(page: Page) {
+    const footer = page.getByRole("contentinfo");
+
+    await expect(footer.getByText(/^© \d{4} Kirill Wynn$/)).toHaveCount(0);
+    await expect(
+        footer.getByText(
+            "Writing about software, systems, and the work between.",
+            { exact: true },
+        ),
+    ).toHaveCount(0);
+    await expect(
+        footer.getByText("Current Team", { exact: true }),
+    ).toBeVisible();
+    await expect(footer.getByText("Yandex", { exact: true })).toBeVisible();
+    await expect(
+        footer.getByText("Previous Team", { exact: true }),
+    ).toBeVisible();
+    await expect(footer.getByText("Deeplay", { exact: true })).toBeVisible();
+    await expect(footer.locator("dl")).toHaveAttribute(
+        "aria-label",
+        "Team history",
+    );
+    await expect(footer).toHaveText(
+        /^\s*Current Team\s*Yandex\s*Previous Team\s*Deeplay\s*$/,
+    );
+}
+
 async function login(page: Page, provider: "Google" | "GitHub" = "Google") {
     await page.goto("/login?next=%2Fposts%2Ftesting-secure-systems");
     await page
@@ -81,16 +123,17 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
 }) => {
     for (const path of [
         "/",
+        "/?q=definitely-no-footer-results",
+        "/?page=0",
         "/posts/testing-secure-systems",
         "/login",
         "/account",
+        "/subscriptions/confirm",
+        "/subscriptions/unsubscribe",
+        "/missing-footer-route",
     ]) {
         await page.goto(path);
-        await expect(
-            page
-                .getByRole("contentinfo")
-                .getByText("Current Team", { exact: true }),
-        ).toHaveCount(0);
+        await expectOrdinaryFooter(page);
         await expectNoHorizontalOverflow(page);
     }
 
@@ -109,22 +152,11 @@ test("responsive shell, skip link, and route-specific Bridge footer", async ({
         page.getByRole("link", { name: "Bridge", exact: true }),
     ).toHaveAttribute("aria-current", "page");
     const main = page.locator("#main-content");
-    await expect(main.getByText("Current Team", { exact: true })).toHaveCount(
-        0,
-    );
-    await expect(main.getByText("Previous Team", { exact: true })).toHaveCount(
-        0,
-    );
+    for (const text of ["Current Team", "Yandex", "Previous Team", "Deeplay"]) {
+        await expect(main.getByText(text, { exact: true })).toHaveCount(0);
+    }
 
-    const footer = page.getByRole("contentinfo");
-    await expect(
-        footer.getByText("Current Team", { exact: true }),
-    ).toBeVisible();
-    await expect(footer.getByText("Yandex", { exact: true })).toBeVisible();
-    await expect(
-        footer.getByText("Previous Team", { exact: true }),
-    ).toBeVisible();
-    await expect(footer.getByText("Deeplay", { exact: true })).toBeVisible();
+    await expectBridgeFooter(page);
     await expectNoHorizontalOverflow(page);
     await expectAccessible(page);
 });
@@ -250,6 +282,11 @@ test("theme follows the system, persists, and remains beside account", async ({
         await expect(
             page.getByRole("button", { name: "Switch to light theme" }),
         ).toBeVisible();
+        if (path === "/bridge") {
+            await expectBridgeFooter(page);
+        } else {
+            await expectOrdinaryFooter(page);
+        }
         await expectNoHorizontalOverflow(page);
         await expectAccessible(page);
     }
@@ -272,6 +309,11 @@ test("theme follows the system, persists, and remains beside account", async ({
             THEME_STORAGE_KEY,
         ),
     ).toBeNull();
+    await expectOrdinaryFooter(lightPage);
+    await lightPage.goto("/bridge");
+    await expectBridgeFooter(lightPage);
+    await expectNoHorizontalOverflow(lightPage);
+    await expectAccessible(lightPage);
     await lightContext.close();
 
     expect(hydrationFailures).toEqual([]);

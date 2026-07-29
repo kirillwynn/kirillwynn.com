@@ -13,7 +13,6 @@ export function FooterContent({
         <footer className="site-footer">
             <div className="site-container site-footer__inner">
                 <div className="site-footer__primary">
-                    <p>© {new Date().getUTCFullYear()} Kirill Wynn</p>
                     {showBridgeTeams ? (
                         <dl
                             className="bridge-team-context"
@@ -26,7 +25,9 @@ export function FooterContent({
                                 </div>
                             ))}
                         </dl>
-                    ) : null}
+                    ) : (
+                        <p>© {new Date().getUTCFullYear()} Kirill Wynn</p>
+                    )}
                 </div>
             </div>
         </footer>
