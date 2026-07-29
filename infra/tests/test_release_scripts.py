@@ -615,6 +615,8 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "ports 80/443 are in use" in script
     assert "openssl passwd -apr1 -stdin" in script
     assert "install -m 0600" in script
+    assert "test ! -d /etc/nginx/.htpasswd" in script
+    assert "test -f /etc/nginx/.htpasswd" in script
     assert "/srv/kirillwynn/runtime/edge.env" in script
     assert "edge_runtime=ready" in script
     assert "host_http_listeners" in script
@@ -622,6 +624,20 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "com.docker.compose.service=edge" in script
     assert "reviewed ingress migration is required" in script
     assert "deploy_environment.sh" not in script
+
+
+def test_edge_gates_require_a_regular_staging_htpasswd_mount():
+    candidate = (SCRIPTS / "verify_edge_candidate.sh").read_text()
+    assert "STAGING_HTPASSWD_FILE" in candidate
+    assert 'test -f "$staging_htpasswd_file"' in candidate
+    assert 'test -s "$staging_htpasswd_file"' in candidate
+
+    active = (SCRIPTS / "verify_active_edge.sh").read_text()
+    assert "test -f /etc/nginx/auth/staging.htpasswd" in active
+    assert "test -s /etc/nginx/auth/staging.htpasswd" in active
+
+    deploy = (SCRIPTS / "deploy_edge.sh").read_text()
+    assert "--force-recreate" in deploy
 
 
 def test_staging_runtime_preflight_runs_before_activation_flag():

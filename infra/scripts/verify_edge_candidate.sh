@@ -14,6 +14,12 @@ test -r "$edge_runtime_env" || {
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 python3 "$repository_root/infra/scripts/validate_release_manifest.py" "$release_manifest"
+staging_htpasswd_file=$(python3 "$repository_root/infra/scripts/env_value.py" \
+    "$edge_runtime_env" STAGING_HTPASSWD_FILE)
+test -f "$staging_htpasswd_file" && test -s "$staging_htpasswd_file" || {
+    echo "staging htpasswd mount source is not a non-empty regular file" >&2
+    exit 2
+}
 EDGE_IMAGE=$(python3 "$repository_root/infra/scripts/release_image.py" "$release_manifest" edge)
 export EDGE_IMAGE
 

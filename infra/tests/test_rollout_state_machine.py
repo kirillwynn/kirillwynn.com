@@ -958,7 +958,12 @@ def test_resolve_shell_uses_reviewed_sequence_without_rewriting_failed_runtime(
         "POSTGRES_PASSWORD=test-only\n"
     )
     edge_env = tmp_path / "edge.env"
-    edge_env.write_text("EDGE_TEST_ONLY=1\n")
+    staging_htpasswd = tmp_path / "staging.htpasswd"
+    staging_htpasswd.write_text("staging:test-only\n")
+    edge_env.write_text(
+        "EDGE_TEST_ONLY=1\n"
+        f"STAGING_HTPASSWD_FILE={staging_htpasswd}\n"
+    )
     runtime_before = {
         path.relative_to(operation_b.runtime_directory): path.read_bytes()
         for path in operation_b.runtime_directory.rglob("*")

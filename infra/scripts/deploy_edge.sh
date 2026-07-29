@@ -18,6 +18,7 @@ export EDGE_IMAGE
 docker compose \
     --env-file "$edge_runtime_env" \
     -f "$repository_root/infra/compose/edge.yml" \
-    up -d --no-deps --wait --wait-timeout "${ROLLOUT_WAIT_TIMEOUT_SECONDS:-180}" edge
+    up -d --no-deps --force-recreate --wait \
+    --wait-timeout "${ROLLOUT_WAIT_TIMEOUT_SECONDS:-180}" edge
 "$repository_root/infra/scripts/verify_active_edge.sh" \
     "$release_manifest" "$edge_runtime_env"

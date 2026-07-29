@@ -83,7 +83,7 @@ scp $ssh_options "$local_auth_file" \
     "$SERVER_USER@$SERVER_HOST:$remote_dir/staging.htpasswd"
 rm -f -- "$local_auth_file"
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-    "install -d -m 0755 /etc/nginx && install -m 0600 '$remote_dir/staging.htpasswd' /etc/nginx/.htpasswd"
+    "set -eu; install -d -m 0755 /etc/nginx; test ! -d /etc/nginx/.htpasswd || { echo 'staging htpasswd path is a directory' >&2; exit 2; }; install -m 0600 '$remote_dir/staging.htpasswd' /etc/nginx/.htpasswd; test -f /etc/nginx/.htpasswd"
 
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "DOCKER_CONFIG='$remote_docker_config' docker info >/dev/null"
@@ -150,8 +150,8 @@ do
         exit 2
     }
 done
-test -s /etc/nginx/.htpasswd || {
-    echo "staging htpasswd file is missing" >&2
+test -f /etc/nginx/.htpasswd && test -s /etc/nginx/.htpasswd || {
+    echo "staging htpasswd path is not a non-empty regular file" >&2
     exit 2
 }
 
