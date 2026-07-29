@@ -193,8 +193,8 @@ jobs:
       STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
       GHCR_USERNAME: ${{ github.actor }}
       GHCR_TOKEN: ${{ github.token }}
-      RESOLUTION_KIND: ${{ inputs.resolution_kind }}
-      FAILED_OPERATION_ID: ${{ inputs.failed_operation_id }}
+      RESOLUTION_KIND: ${{ inputs.resolution_kind || vars.STAGING_RESOLUTION_KIND }}
+      FAILED_OPERATION_ID: ${{ inputs.failed_operation_id || vars.STAGING_FAILED_OPERATION_ID }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

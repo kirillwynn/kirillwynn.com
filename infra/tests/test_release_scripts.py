@@ -448,8 +448,15 @@ def test_staging_dispatch_exposes_only_explicit_reviewed_resolution_inputs():
     assert "ordinary" in workflow
     assert "retry" in workflow
     assert "fix-forward" in workflow
-    assert "RESOLUTION_KIND: ${{ inputs.resolution_kind }}" in workflow
-    assert "FAILED_OPERATION_ID: ${{ inputs.failed_operation_id }}" in workflow
+    assert (
+        "RESOLUTION_KIND: "
+        "${{ inputs.resolution_kind || vars.STAGING_RESOLUTION_KIND }}" in workflow
+    )
+    assert (
+        "FAILED_OPERATION_ID: "
+        "${{ inputs.failed_operation_id || vars.STAGING_FAILED_OPERATION_ID }}"
+        in workflow
+    )
 
 
 def test_edge_bootstrap_binds_manifest_digest_before_compose_inspection():
