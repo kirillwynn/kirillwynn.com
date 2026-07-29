@@ -640,9 +640,10 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "--cert-name staging.kirillwynn.com" in script
     assert "ports 80/443 are in use" in script
     assert "openssl passwd -apr1 -stdin" in script
-    assert "install -m 0600" in script
     assert "test ! -d /etc/nginx/.htpasswd" in script
     assert "test -f /etc/nginx/.htpasswd" in script
+    assert "install -m 0640 -o 0 -g 101" in script
+    assert "0:101:640" in script
     assert "/srv/kirillwynn/runtime/edge.env" in script
     assert "edge_runtime=ready" in script
     assert "host_http_listeners" in script
@@ -657,10 +658,12 @@ def test_edge_gates_require_a_regular_staging_htpasswd_mount():
     assert "STAGING_HTPASSWD_FILE" in candidate
     assert 'test -f "$staging_htpasswd_file"' in candidate
     assert 'test -s "$staging_htpasswd_file"' in candidate
+    assert "run --rm --no-deps --user 101:101 --entrypoint test edge" in candidate
 
     active = (SCRIPTS / "verify_active_edge.sh").read_text()
     assert "test -f /etc/nginx/auth/staging.htpasswd" in active
     assert "test -s /etc/nginx/auth/staging.htpasswd" in active
+    assert "exec -T --user 101:101 edge test -r" in active
 
     deploy = (SCRIPTS / "deploy_edge.sh").read_text()
     assert "--force-recreate" in deploy

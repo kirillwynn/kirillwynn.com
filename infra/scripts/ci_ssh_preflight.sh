@@ -83,7 +83,7 @@ scp $ssh_options "$local_auth_file" \
     "$SERVER_USER@$SERVER_HOST:$remote_dir/staging.htpasswd"
 rm -f -- "$local_auth_file"
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
-    "set -eu; install -d -m 0755 /etc/nginx; test ! -d /etc/nginx/.htpasswd || { echo 'staging htpasswd path is a directory' >&2; exit 2; }; install -m 0600 '$remote_dir/staging.htpasswd' /etc/nginx/.htpasswd; test -f /etc/nginx/.htpasswd"
+    "set -eu; install -d -m 0755 /etc/nginx; test ! -d /etc/nginx/.htpasswd || { echo 'staging htpasswd path is a directory' >&2; exit 2; }; install -m 0640 -o 0 -g 101 '$remote_dir/staging.htpasswd' /etc/nginx/.htpasswd; test -f /etc/nginx/.htpasswd; test \"\$(stat -c '%u:%g:%a' /etc/nginx/.htpasswd)\" = '0:101:640'"
 
 ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
     "DOCKER_CONFIG='$remote_docker_config' docker info >/dev/null"

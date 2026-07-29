@@ -19,11 +19,15 @@ docker compose \
 docker compose \
     --env-file "$edge_runtime_env" \
     -f "$repository_root/infra/compose/edge.yml" \
-    exec -T edge test -f /etc/nginx/auth/staging.htpasswd
+    exec -T --user 101:101 edge test -f /etc/nginx/auth/staging.htpasswd
 docker compose \
     --env-file "$edge_runtime_env" \
     -f "$repository_root/infra/compose/edge.yml" \
-    exec -T edge test -s /etc/nginx/auth/staging.htpasswd
+    exec -T --user 101:101 edge test -s /etc/nginx/auth/staging.htpasswd
+docker compose \
+    --env-file "$edge_runtime_env" \
+    -f "$repository_root/infra/compose/edge.yml" \
+    exec -T --user 101:101 edge test -r /etc/nginx/auth/staging.htpasswd
 edge_container=$(docker compose \
     --env-file "$edge_runtime_env" \
     -f "$repository_root/infra/compose/edge.yml" \

@@ -30,4 +30,9 @@ docker compose \
 docker compose \
     --env-file "$edge_runtime_env" \
     -f "$repository_root/infra/compose/edge.yml" \
+    run --rm --no-deps --user 101:101 --entrypoint test edge \
+    -r /etc/nginx/auth/staging.htpasswd
+docker compose \
+    --env-file "$edge_runtime_env" \
+    -f "$repository_root/infra/compose/edge.yml" \
     run --rm --no-deps edge nginx -t
