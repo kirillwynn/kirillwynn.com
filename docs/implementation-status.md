@@ -7,13 +7,13 @@ Integration branch: `rewrite/wagtail-next`
 Overall state: Milestone 11 testing and security hardening is implemented at
 the repository boundary with explicit PostgreSQL/Compose/Playwright CI gates,
 upload and interaction boundary hardening, and deterministic four-viewport
-browser coverage. Stage 13A staging activation is blocked before the first
+browser coverage. Stage 13A staging activation is in progress before the first
 database/application mutation: staging-only storage, OAuth, email/DNS, GitHub
-Environment, TLS, Basic Auth, server, and runtime boundaries are prepared, but
-the legacy production Nginx still owns host ports 80/443. Replacing or changing
-that production ingress requires separate owner approval and is outside the
-staging-only authorization. Live content/browser acceptance and the staging
-restore drill remain pending. Production deployment and production promotion
+Environment, TLS, Basic Auth, server, and runtime boundaries are prepared. The
+owner explicitly accepted retiring the partially working legacy application;
+its preserved containers are stopped and host ports 80/443 are free for the
+new shared edge. Live content/browser acceptance and the staging restore drill
+remain pending. New-stack production deployment and production promotion
 remain out of scope.
 
 ## Current repository state
@@ -120,12 +120,15 @@ Actual staging verification still open:
   They were retained as failure evidence; no automatic cleanup was performed.
 - The staging backup/restore drill into a new `restore_*` database remains
   unverified.
-- The blocking decision is how to migrate the only host ingress from the
-  legacy production Nginx to the shared edge without authorizing a production
-  deployment. Stage 13A has not stopped/reconfigured the legacy containers,
-  renewed the production certificate, deployed/replaced the production
-  application, altered production DNS/providers/storage/database, or promoted
-  a release to production.
+- The ingress decision was resolved by migrating the only host ingress from
+  the legacy production Nginx to the shared edge. On 2026-07-28 the owner
+  explicitly decided that preserving legacy uptime is unnecessary and
+  accepted its retirement risk. The legacy `nginx` and `app` containers were
+  stopped cleanly and retained in `Exited (0)` state; they, their mounts, and
+  their data were not deleted. Ports 80/443 were confirmed free. Stage 13A
+  still does not renew the production certificate, deploy the new production
+  application, alter production DNS/providers/storage/database, or promote a
+  release to production.
 
 ## Completed
 
