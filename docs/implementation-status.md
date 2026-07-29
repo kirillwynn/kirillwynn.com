@@ -1,19 +1,20 @@
 # Implementation status
 
-Last updated: 2026-07-28
+Last updated: 2026-07-29
 
 Integration branch: `rewrite/wagtail-next`
 
 Overall state: Milestone 11 testing and security hardening is implemented at
 the repository boundary with explicit PostgreSQL/Compose/Playwright CI gates,
 upload and interaction boundary hardening, and deterministic four-viewport
-browser coverage. Stage 13A staging activation is in progress before the first
-database/application mutation: staging-only storage, OAuth, email/DNS, GitHub
-Environment, TLS, Basic Auth, server, and runtime boundaries are prepared. The
-owner explicitly accepted retiring the partially working legacy application;
-its preserved containers are stopped and host ports 80/443 are free for the
-new shared edge. Live content/browser acceptance and the staging restore drill
-remain pending. New-stack production deployment and production promotion
+browser coverage. Stage 13A has activated the isolated staging stack through
+the repository rollout state machine: staging-only storage, OAuth, email/DNS,
+GitHub Environment, TLS, Basic Auth, server, runtime, immutable images,
+recovery backup, public smoke, and schema-3 attestation boundaries have passed.
+The owner explicitly accepted retiring the partially working legacy
+application; its preserved containers remain stopped while the new shared edge
+owns ports 80/443. Live content/browser acceptance and the staging restore
+drill remain pending. New-stack production deployment and production promotion
 remain out of scope.
 
 ## Current repository state
@@ -38,8 +39,8 @@ Repository and GitHub verification completed on 2026-07-28:
 
 - Baseline `d6e166d865b0e4d8159ac5d8ee97a3c960ef479e` on
   `rewrite/wagtail-next` matched the requested parent and began from a clean
-  worktree. The latest pushed pre-activation candidate is
-  `2acb08829cd49c04475b0e4480ef765261d94e2f`; no history was rewritten or
+  worktree. The activated staging release is
+  `c59a8c007cd52bf7b538e3a793f6233612c6bbfb`; no history was rewritten or
   squashed.
 - Draft PR #32 targets `main`; no history was rewritten or squashed.
 - GitHub Environment `staging` allows only `main` and
@@ -138,45 +139,50 @@ Repository and GitHub verification completed on 2026-07-28:
   verification remains 221 passing tests. Push run `30429128197` passed the
   complete CI/build/server-preflight path with activation disabled, including
   installation of the corrected host permissions and a worker-readable
-  candidate mount. The exact reviewed resolution pointer now targets the
-  second failed operation; the next fresh candidate will be another
-  `fix-forward`, with a new recovery backup and no volume/database deletion.
+  candidate mount.
+- Reviewed fix-forward run `30429525445` for `c59a8c0` claimed the second
+  failure under operation
+  `fix-forward-30429525445-staging-c59a8c007cd52bf7b538e3a793f6233612c6bbfb`,
+  took and verified recovery backup
+  `20260729T065923Z_16bda3f8b6afc9d0eace182cebfa307f3848d6b6_recovery_fix-forward-30429525445-staging-c59a8c007cd52bf7b538e3a793f6233612c6bbfb.dump`,
+  found no new migrations, passed Django/Next/worker readiness, worker
+  heartbeat and egress, exact-image, candidate and active `nginx -t`, and
+  authenticated public smoke, then finalized the rollout and emitted a
+  schema-3 staging attestation with every required check true. The reviewed
+  resolution variables were removed and `STAGING_DEPLOY_ENABLED` was returned
+  to `false`.
 
 Actual staging verification completed:
 
 - Compose 2.34.0, GHCR authentication, durable restricted directories,
   staging TLS, ACME webroot, generated htpasswd, and edge runtime contract
-  passed the initial server checks. Before and after the failed activation
-  attempts, the staging PostgreSQL volume and rollout state were both absent.
-- Before retirement, `https://staging.kirillwynn.com` presented valid TLS and
-  required Basic Auth through the legacy Compose project's Nginx. After the
-  owner-approved stop, the preserved legacy `nginx` and `app` containers are
-  both `Exited (0)` and ports 80/443 have no listener. The staging URL is
-  intentionally unavailable until the first new shared-edge rollout.
-- Immutable candidate images are Django
-  `sha256:b0f97be11493583c8b9ee3910d8208254fadfdd5fe23bae8a187f96ce713e033`,
+  passed the initial server checks. Before the first activation attempt the
+  staging PostgreSQL volume and rollout state were absent; the first state
+  machine operation then created them durably, and both reviewed fix-forwards
+  reused them without deletion or manual state edits.
+- The preserved legacy `nginx` and `app` containers remain `Exited (0)`. The
+  new shared edge owns ports 80/443, and
+  `https://staging.kirillwynn.com` presents valid TLS and requires Basic Auth.
+  The documented unauthenticated exclusions remain reachable: an absent ACME
+  challenge returns 404 and an unsigned Resend webhook request returns 400,
+  while the site root returns 401 without credentials.
+- Immutable active images are Django
+  `sha256:bdee045c0efbb60ee92db9687a9845fab53af43e4d659a167070705ffc7daa22`,
   Next
-  `sha256:533cd51878919f0707352407c81dbaddf558e3070bffe764c5499f2ea5deaa66`,
+  `sha256:d9e13e367e836202d7ae361f465e4d96cae39453bb091c89bec187a5f6ce5cd3`,
   and edge
-  `sha256:50cd1383ce0466bd9664f6c6ca4eb6807e82c2178773a2be1434a79532885434`.
+  `sha256:5eb0e712c96be2e73a533aaeb95e7646804eab73efc511cc7a54775bfe51c316`.
 - `STAGING_DEPLOY_ENABLED` was enabled only after all preceding server,
   runtime, provider, storage, OAuth, email, TLS, DNS, free-port, and
-  fail-closed ingress and auth-mount preflight checks passed. It is armed only
-  for the fresh reviewed fix-forward candidate and will be disabled
-  immediately after that resolution reaches a terminal result.
+  fail-closed ingress and auth-mount preflight checks passed. It was disabled
+  immediately after the successful reviewed resolution.
 
 Actual staging verification still open:
 
-- The first application rollout reached the pending-public-smoke boundary,
-  but failed public authenticated smoke. No finalized active release or
-  schema-3 staging attestation has completed yet.
 - Live authoring/content lifecycle, OAuth consent, discussions/reactions,
   subscriptions and signed webhook, Draft Mode/revalidation, S3 media,
   scheduler, accessibility/keyboard, and the four requested viewports remain
   unverified.
-- The second failed bootstrap left one stopped `kirillwynn-edge` container in
-  `Created` state and created the isolated staging/production edge networks.
-  They were retained as failure evidence; no automatic cleanup was performed.
 - The staging backup/restore drill into a new `restore_*` database remains
   unverified.
 - The ingress decision was resolved by migrating the only host ingress from
