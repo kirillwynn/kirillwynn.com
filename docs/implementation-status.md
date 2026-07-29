@@ -446,7 +446,7 @@ CI, deployment, and live acceptance passed:
 
 ## Stage 14C shell, reactions, and live-search remediation
 
-Stage 14C is implemented and has a green gate-disabled candidate on
+Stage 14C is implemented, deployed, and accepted on staging from
 `rewrite/wagtail-next` as of 2026-07-29:
 
 - Every public Next.js route and shared loading/error/not-found state now uses
@@ -503,7 +503,7 @@ Local verification passed before the feature commit:
   `pg_isready` are unavailable locally, so local container and PostgreSQL
   execution are not claimed; both remained mandatory in CI.
 
-Green candidate evidence:
+Commit, CI, deployment, and acceptance evidence:
 
 - Feature commit `776ffa80f1f99851078a844bf0da9aa878c53476` has exact
   parent `5ad3f51547e6aa46a31bb374e2c1454b827965d2`. Push CI run
@@ -513,13 +513,66 @@ Green candidate evidence:
   gate-disabled staging job.
 - Release artifact `8739942335` has GitHub SHA-256
   `752e0cfd216192b432ed06cad5e56bad58c50599d8a95fccac4ed358e9c9a156`.
-  `STAGING_DEPLOY_ENABLED` remained `false`, so no activation occurred and the
-  active staging release remained
-  `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`.
-- `origin/main` remained `1d02912430277cdf5465f856b158a6820bc12be4`.
-  Production, production providers/data, and preserved legacy mounts/data were
-  not changed. Staging rollout and read-only live Chrome acceptance remain the
-  next controlled steps.
+  `STAGING_DEPLOY_ENABLED` remained `false` for that run, so it performed no
+  activation.
+- Docs-only activation candidate
+  `3e6b7a46c0ffacdde4bb47d61c942f1142c9e379` has exact parent
+  `776ffa80f1f99851078a844bf0da9aa878c53476` and an unchanged runtime tree.
+  With the staging gate temporarily enabled, fresh CI run `30491882619`
+  attempt 1 passed backend SQLite and PostgreSQL, frontend, browser-contract,
+  cross-stack, infrastructure with Docker/Compose/Nginx/container smoke,
+  `ci-required`, all three immutable image builds, server preflight, manifest,
+  ordinary staging deployment, and complete schema-3 attestation.
+- The accepted operation is
+  `deploy-30491882619-staging-3e6b7a46c0ffacdde4bb47d61c942f1142c9e379`.
+  The pre-migration backup is
+  `/srv/kirillwynn/backups/staging/20260729T212530Z_5dfd2d17d52972a188cd9d156d219fe229bfbb1a_pre-migration_deploy-30491882619-staging-3e6b7a46c0ffacdde4bb47d61c942f1142c9e379.dump`;
+  Django reported no migrations to apply.
+- The active immutable images are Django
+  `sha256:b66e6f1807905027603035935e99ddd3da0976a32d74031938b3cfa52a10fdc9`,
+  Next
+  `sha256:bc5512f1112c22f1e2ffe05e7ae6aef351825422c9e942e55b5750a473b4ac9d`,
+  and edge
+  `sha256:373d9fad09c7cf3d1fb7f66e4996271a5a8865733a2cdf9e1e5aa1cf66c1f22e`.
+  The attestation passed active-digest, Django readiness, Next health, edge
+  candidate config, public smoke, worker egress, and worker heartbeat checks.
+- Manifest artifact `8740149221` has GitHub and independently computed
+  SHA-256
+  `ccfc504cf9a8634341ee62e8ab53315d4fe7028297fb4ebddbb123ff57d6e83e`.
+  Attestation artifact `8740325012` has GitHub and independently computed
+  SHA-256
+  `a854d9e2ea22d88b7639adf7674c3800f190951e4181f404d4728832186541ce`.
+  Both downloaded JSON files passed the repository manifest/attestation
+  validators against the exact release SHA and each other.
+- Read-only live Chrome acceptance passed Feed, known post, Bridge,
+  login/account, confirm/unsubscribe, not-found, ordinary no-results,
+  unknown-tag, and invalid-parameter states. The two semantic centered footer
+  rows were the only visible footer content on desktop and 320px; Bridge kept
+  its hidden `h1`, eight icon-only links, and eight unique accessible names.
+  The right header order, `aria-current`, 44px targets, safe gutters, keyboard
+  order, 3px visible focus, skip-link transfer, and zero root overflow passed
+  at 320, 375x812, 768x1024, 1440x900, and 1920x1080.
+- Live Feed and post pills measured 30px visually with a 16px emoji, 12px
+  count, and adjacent non-overlapping 44px button targets. Feed hover and
+  focus alone opened no dialog; click, Enter, and Space opened the named
+  surface, while Escape and Close restored count focus. Desktop rendered the
+  320px anchored popup and 320px rendered the full-width fixed drawer.
+- Live search preserved tag, removed page, encoded `日本` once, cleared `q`
+  through ordinary keyboard deletion, applied Enter/Search immediately, and
+  synchronized the input through back/forward. Deterministic CI coverage
+  remains the source of truth for exact debounce/request counts, IME event
+  synthesis, stale timers, loading/error injection, Draft Mode, axe, and
+  batch-reaction request cardinality.
+- Light/dark persistence, the live DOM asset/secret/internal-origin scan, and
+  console/hydration inspection passed; no warning or error was captured.
+  Live acceptance created no content, comment, reaction, subscription, or
+  email mutation. The theme was restored to light and the temporary viewport
+  override was removed.
+- `STAGING_DEPLOY_ENABLED` was returned to `false` at
+  `2026-07-29T21:31:51Z`. `origin/main` remained
+  `1d02912430277cdf5465f856b158a6820bc12be4`; production, production
+  providers/database/S3/Resend/OAuth/DNS, preserved legacy containers,
+  mounts/data, and application data were not targeted or changed.
 
 ## Completed
 
@@ -1080,6 +1133,28 @@ Implementation-level choices should be recorded in a new ADR when they affect:
 ## Last verification
 
 2026-07-29:
+
+- Stage 14C began from clean exact local/origin parent
+  `5ad3f51547e6aa46a31bb374e2c1454b827965d2` on
+  `rewrite/wagtail-next`; active staging was
+  `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`, `origin/main` was
+  `1d02912430277cdf5465f856b158a6820bc12be4`, and the deployment gate was
+  false. Repository instructions, product/architecture/status/API/deployment
+  sources, relevant ADRs, and the private Obsidian specification were read
+  before editing; no history was rewritten.
+- Feature commit `776ffa80f1f99851078a844bf0da9aa878c53476`
+  (parent `5ad3f51547e6aa46a31bb374e2c1454b827965d2`) and docs-only activation
+  candidate `3e6b7a46c0ffacdde4bb47d61c942f1142c9e379`
+  (parent `776ffa80f1f99851078a844bf0da9aa878c53476`) are intact. Gate-disabled
+  candidate run `30491324455` and controlled rollout run `30491882619`, both
+  attempt 1, passed the complete required matrix without a fix commit.
+- Staging operation
+  `deploy-30491882619-staging-3e6b7a46c0ffacdde4bb47d61c942f1142c9e379`,
+  schema-3 attestation, independently verified manifest/attestation artifacts,
+  exact active digests, pre-migration backup, and read-only live Chrome
+  acceptance all passed. The active staging release is
+  `3e6b7a46c0ffacdde4bb47d61c942f1142c9e379`, and the gate is back to
+  `false`; exact evidence is recorded in the dedicated Stage 14C section.
 
 - Stage 14B began from clean exact local/origin parent
   `ce6c5b9e786f013d75469caa02488ef46267b3c7` on
