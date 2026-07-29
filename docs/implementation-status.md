@@ -13,9 +13,10 @@ GitHub Environment, TLS, Basic Auth, server, runtime, immutable images,
 recovery backup, public smoke, and schema-3 attestation boundaries have passed.
 The owner explicitly accepted retiring the partially working legacy
 application; its preserved containers remain stopped while the new shared edge
-owns ports 80/443. Live content/browser acceptance and the staging restore
-drill remain pending. New-stack production deployment and production promotion
-remain out of scope.
+owns ports 80/443. Live content/browser acceptance and the staging
+backup/restore drill have also passed. New-stack production deployment,
+production provider configuration, DNS changes, data migration, and promotion
+remain out of scope and unverified.
 
 ## Current repository state
 
@@ -39,9 +40,10 @@ Repository and GitHub verification completed on 2026-07-28:
 
 - Baseline `d6e166d865b0e4d8159ac5d8ee97a3c960ef479e` on
   `rewrite/wagtail-next` matched the requested parent and began from a clean
-  worktree. The activated staging release is
-  `c59a8c007cd52bf7b538e3a793f6233612c6bbfb`; no history was rewritten or
-  squashed.
+  worktree. The first activated release was
+  `c59a8c007cd52bf7b538e3a793f6233612c6bbfb`; the functionally accepted
+  staging release is `a519284551f62258d67fe546801ca01fdc484e2c`. No history
+  was rewritten or squashed.
 - Draft PR #32 targets `main`; no history was rewritten or squashed.
 - GitHub Environment `staging` allows only `main` and
   `rewrite/wagtail-next`. Repository-level server credentials are inherited;
@@ -151,6 +153,17 @@ Repository and GitHub verification completed on 2026-07-28:
   schema-3 staging attestation with every required check true. The reviewed
   resolution variables were removed and `STAGING_DEPLOY_ENABLED` was returned
   to `false`.
+- Live Draft Mode acceptance exposed one repository defect: relative Wagtail
+  preview redirects were being resolved against the internal Django service
+  origin. Commit `a519284551f62258d67fe546801ca01fdc484e2c` preserves the
+  public request origin for Draft Mode entry and exit redirects and adds
+  regression coverage. Push run `30433997967` attempt 2 passed
+  `backend-sqlite`, `backend-postgresql`, `frontend`, `infrastructure`,
+  `browser-contract`, `cross-stack`, `ci-required`, all three immutable image
+  builds, server preflight, manifest, deployment, and attestation. Operation
+  `deploy-30433997967-staging-a519284551f62258d67fe546801ca01fdc484e2c`
+  completed through the repository state machine, and
+  `STAGING_DEPLOY_ENABLED` was disabled again.
 
 Actual staging verification completed:
 
@@ -167,24 +180,49 @@ Actual staging verification completed:
   challenge returns 404 and an unsigned Resend webhook request returns 400,
   while the site root returns 401 without credentials.
 - Immutable active images are Django
-  `sha256:bdee045c0efbb60ee92db9687a9845fab53af43e4d659a167070705ffc7daa22`,
+  `sha256:2ace8750ed59c3216f6b4f82429e777da0bee5e8b56fda9b1c4298822ca79823`,
   Next
-  `sha256:d9e13e367e836202d7ae361f465e4d96cae39453bb091c89bec187a5f6ce5cd3`,
+  `sha256:6daad2bb9b15b12d2d04a5dc45b546a0b5ed147a1b9cfd9cc4e2a05cffeb23b7`,
   and edge
-  `sha256:5eb0e712c96be2e73a533aaeb95e7646804eab73efc511cc7a54775bfe51c316`.
+  `sha256:9557b326814d9bb908464f4835d4ebc977956bfed271bd762a9d31a1110fad4b`.
 - `STAGING_DEPLOY_ENABLED` was enabled only after all preceding server,
   runtime, provider, storage, OAuth, email, TLS, DNS, free-port, and
   fail-closed ingress and auth-mount preflight checks passed. It was disabled
   immediately after the successful reviewed resolution.
-
-Actual staging verification still open:
-
-- Live authoring/content lifecycle, OAuth consent, discussions/reactions,
-  subscriptions and signed webhook, Draft Mode/revalidation, S3 media,
-  scheduler, accessibility/keyboard, and the four requested viewports remain
-  unverified.
-- The staging backup/restore drill into a new `restore_*` database remains
-  unverified.
+- Wagtail authoring passed with a Unicode-slug post containing all 13
+  StreamField blocks, JPEG/PNG/WebP media served through the staging S3/CDN
+  boundary, tags, SEO metadata, an OG image, draft revision, preview, publish,
+  and revision rollback. Scheduled publish and scheduled unpublish both
+  changed public visibility through the staging worker and delivered signed
+  revalidation events.
+- Feed, search, tag filtering, pagination, the Unicode post, Bridge and all
+  eight external links, and the anonymous reader boundary passed. Separate
+  Google and GitHub consent/login callbacks and logout passed with minimal
+  identity scopes.
+- Comments, replies, edit/delete tombstones, the full-screen mobile thread,
+  post reactions, picker search, and participant attribution passed.
+  Subscription double opt-in, the real confirmation message, publication
+  email, unsubscribe, and signed Resend `email.delivered` webhook events with
+  HTTP 200 passed. Basic Auth continued to protect ordinary staging pages;
+  ACME and the signed webhook remained the documented unauthenticated
+  exceptions.
+- Draft Mode remained isolated from public content and cache revalidation
+  followed publish/schedule changes. Keyboard skip navigation, visible focus,
+  Escape dismissal, and horizontal-overflow checks passed at 375x812,
+  768x1024, 1440x900, and 1920x1080. The same release also passed the
+  mandatory 20-case Playwright browser-contract matrix in CI.
+- Manual staging backup
+  `20260729T091251Z_a519284551f62258d67fe546801ca01fdc484e2c_manual_stage13a-drill-20260729.dump`
+  has schema-2 staging metadata and SHA-256
+  `e67de74d60d5928053259ea359ffb8786acc832dd0867353b528c88533a4ca3a`.
+  The repository scripts verified the checksum and `pg_restore --list`, then
+  restored only into `restore_stage13a_20260729_0913`. The restored database
+  had no pending migrations, passed `check --deploy`, and matched the active
+  database for the sampled Page/BlogPostPage/Subscriber/Comment counts
+  (`17/14/1/2`). It did not replace or become the configured staging database.
+- Repository verification and actual staging verification are complete for
+  Stage 13A. Production deployment, production DNS, OAuth, Resend, S3,
+  database migration, smoke tests, and promotion remain explicitly open.
 - The ingress decision was resolved by migrating the only host ingress from
   the legacy production Nginx to the shared edge. On 2026-07-28 the owner
   explicitly decided that preserving legacy uptime is unnecessary and
@@ -656,7 +694,7 @@ Out of scope for that session:
 - [x] Milestone 9 — email subscriptions and durable outbox worker.
 - [x] Milestone 10 — isolated staging/production infrastructure.
 - [x] Milestone 11 — testing and security hardening.
-- [ ] Functional staging acceptance and launch.
+- [x] Functional staging acceptance and launch.
 - [ ] Milestone 12 — visual design and polish.
 
 ## Known risks
@@ -666,17 +704,14 @@ Out of scope for that session:
 - Preview snapshot and delivered revalidation event retention are currently
   bounded only by opportunistic preview cleanup and database operations; a
   formal operations retention command belongs with worker infrastructure.
-- The bounded worker runtime is repository-owned but has not run under Docker
-  or against PostgreSQL locally; operational heartbeat/alerting still needs
-  staging verification.
-- S3-compatible media settings are implemented, but buckets, credentials,
-  public origins, versioning, lifecycle, CORS, and restore behavior remain
-  external activation work.
-- OAuth applications and credentials have not been created or installed.
-  Mocked Google/GitHub callbacks are verified, but live provider consent,
-  cancellation, provider-side configuration, and staging/production callback
-  routing still require external setup and smoke tests. Staging and production
-  must use separate applications.
+- The bounded worker runtime passed Docker/PostgreSQL staging heartbeat,
+  egress, scheduling, and email-delivery checks. Operational alerting and
+  retention policy remain future operations work.
+- Staging S3 media, CDN origin, versioning, lifecycle, CORS, and the isolated
+  prefix passed live checks. Production object storage remains unconfigured.
+- Separate staging OAuth applications and live Google/GitHub consent passed.
+  Production applications, credentials, callbacks, and smoke tests remain
+  unconfigured and must not reuse the staging boundary.
 - Docker build, Docker Compose config, and PostgreSQL-backed migrations remain
   unverified locally because Docker and PostgreSQL server binaries are not
   available. YAML parsing and route-contract tests are not represented as
@@ -686,9 +721,9 @@ Out of scope for that session:
   They run in a dedicated CI selection where any skip fails the job; the
   production model was not weakened or imitated for SQLite.
 - Local Chromium passed the complete deterministic Playwright matrix at all
-  four required viewports. This proves repository browser behavior against
-  mock providers, not live staging OAuth/Resend/S3, target Nginx, or production
-  data.
+  four required viewports. Actual staging Chrome checks also passed live
+  OAuth/Resend/S3, target Nginx, keyboard interaction, mobile threads, and the
+  four viewports. Neither result verifies production.
 - Legacy migrations contain resets and multiple heads and should not be reused
   as the new baseline.
 - The shared edge cannot be replaced independently per application environment;
@@ -697,12 +732,10 @@ Out of scope for that session:
 - A server carrying superseded multi-file
   `active-release.json`/manifest/pending state or schema-2
   `rollout-state.json` must not be auto-adopted. The schema-3 loader fails
-  closed and requires a reviewed one-time migration before any rollout; no
-  external server state was changed in this repository session.
-- Email DNS records, verified Resend sender domains, webhook registrations,
-  provider credentials, GitHub Environment values, and staging activation
-  remain deliberately unconfigured. `docs/email-setup.md` and
-  `docs/staging-activation-checklist.md` are the external checklists.
+  closed and requires a reviewed one-time migration before any rollout.
+- Staging email DNS, verified Resend sender, webhook registration, credentials,
+  and GitHub Environment activation are configured and accepted. Equivalent
+  production boundaries remain deliberately unconfigured.
 - Email history and rate-limit buckets do not yet have an operational retention
   command. This belongs with worker monitoring/retention infrastructure.
 
