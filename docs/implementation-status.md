@@ -38,9 +38,9 @@ Repository and GitHub verification completed on 2026-07-28:
 
 - Baseline `d6e166d865b0e4d8159ac5d8ee97a3c960ef479e` on
   `rewrite/wagtail-next` matched the requested parent and began from a clean
-  worktree. The latest pushed release candidate is
-  `ba99ccfe0ee99b38728b7f6861ff3b197277c6c6`; fail-closed foreign-ingress
-  detection is committed locally as `78eb114`.
+  worktree. The latest pushed pre-activation candidate is
+  `2acb08829cd49c04475b0e4480ef765261d94e2f`; no history was rewritten or
+  squashed.
 - Draft PR #32 targets `main`; no history was rewritten or squashed.
 - GitHub Environment `staging` allows only `main` and
   `rewrite/wagtail-next`. Repository-level server credentials are inherited;
@@ -84,6 +84,14 @@ Repository and GitHub verification completed on 2026-07-28:
   Stage 13A additionally fixed manifest edge-digest binding (`ba99ccf`) and
   added fail-closed foreign-ingress detection before any edge mutation
   (`78eb114`); the full local infrastructure suite passes 219 tests.
+- After the owner-approved legacy retirement freed host ports 80/443, push CI
+  run `30409906601` for `2acb088` passed `backend-postgresql`,
+  `backend-sqlite`, `frontend`, `browser-contract`, `cross-stack`,
+  `infrastructure`, `ci-required`, all three immutable image builds,
+  release-manifest generation, real-secret runtime rendering, and the updated
+  server preflight. Deployment remained disabled for this preflight run.
+  `STAGING_DEPLOY_ENABLED` was then enabled for one fresh build-and-deploy
+  candidate; no earlier build is being rerun.
 
 Actual staging verification completed:
 
@@ -91,10 +99,11 @@ Actual staging verification completed:
   staging TLS, ACME webroot, generated htpasswd, and edge runtime contract
   passed the initial server checks. Before and after the failed activation
   attempts, the staging PostgreSQL volume and rollout state were both absent.
-- `https://staging.kirillwynn.com` presents valid TLS and requires Basic Auth.
-  Read-only server inspection proved that this response comes from the legacy
-  Compose project `kirillwynn`: its `nginx` service owns 80/443 and proxies the
-  staging vhost to the old Flask `app`. The new shared edge is not active.
+- Before retirement, `https://staging.kirillwynn.com` presented valid TLS and
+  required Basic Auth through the legacy Compose project's Nginx. After the
+  owner-approved stop, the preserved legacy `nginx` and `app` containers are
+  both `Exited (0)` and ports 80/443 have no listener. The staging URL is
+  intentionally unavailable until the first new shared-edge rollout.
 - Immutable candidate images are Django
   `sha256:b0f97be11493583c8b9ee3910d8208254fadfdd5fe23bae8a187f96ce713e033`,
   Next
@@ -102,9 +111,10 @@ Actual staging verification completed:
   and edge
   `sha256:50cd1383ce0466bd9664f6c6ca4eb6807e82c2178773a2be1434a79532885434`.
 - `STAGING_DEPLOY_ENABLED` was enabled only after all preceding server,
-  runtime, provider, storage, OAuth, email, TLS, and DNS preflight checks
-  passed. It was set back to `false` immediately after the foreign-ingress
-  blocker was confirmed.
+  runtime, provider, storage, OAuth, email, TLS, DNS, free-port, and
+  fail-closed ingress preflight checks passed. It is armed only for the fresh
+  activation candidate and will be disabled immediately after that rollout
+  reaches a terminal result.
 
 Actual staging verification still open:
 
