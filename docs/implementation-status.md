@@ -111,7 +111,7 @@ Repository and GitHub verification completed on 2026-07-28:
 - The invalid directory, containing only the generated staging auth file, was
   moved intact to
   `/srv/kirillwynn/evidence/staging-htpasswd-directory-30410853672`; the same
-  credential was installed as a regular mode-0600 file without exposing it.
+  credential was installed as a regular file without exposing it.
   Commits `b0e3e77`, `8076dc5`, and `81083ee` add fail-closed regular-file
   gates, controlled same-digest edge remounting, and an explicit
   GitHub-Environment-backed reviewed retry/fix-forward transport. Local infra
@@ -124,6 +124,23 @@ Repository and GitHub verification completed on 2026-07-28:
   `begin-resolution`, take a recovery backup of the existing staging
   database, repair/re-attest the shared edge, pass public smoke, and finalize
   before activation is disabled again.
+- Reviewed fix-forward run `30428026501` for `16bda3f` claimed the first
+  failure under operation
+  `fix-forward-30428026501-staging-16bda3f8b6afc9d0eace182cebfa307f3848d6b6`,
+  took and verified recovery backup
+  `20260729T063021Z_96307f2043d57dbc8f7fb4a7728bacfb027d0d65_recovery_fix-forward-30428026501-staging-16bda3f8b6afc9d0eace182cebfa307f3848d6b6.dump`,
+  found no new migrations, re-attested the application, and force-recreated
+  the edge with a regular auth mount. Public smoke still returned HTTP 500:
+  the regular file was `0600 root:root`, so the pinned Nginx worker
+  (`uid=101`, `gid=101`) could not read it.
+- Commit `1995b70` changes the least-privilege contract to `root:101 0640` and
+  executes candidate and active readability gates as `101:101`. Local infra
+  verification remains 221 passing tests. Push run `30429128197` passed the
+  complete CI/build/server-preflight path with activation disabled, including
+  installation of the corrected host permissions and a worker-readable
+  candidate mount. The exact reviewed resolution pointer now targets the
+  second failed operation; the next fresh candidate will be another
+  `fix-forward`, with a new recovery backup and no volume/database deletion.
 
 Actual staging verification completed:
 
