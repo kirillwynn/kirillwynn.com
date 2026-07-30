@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Max
@@ -21,12 +24,12 @@ from apps.discussions.api.serializers import (
     serialize_comment,
     serialize_reaction_participant,
 )
-from apps.discussions.emoji import normalize_emoji
 from apps.discussions.models import (
     Comment,
     CommentRateLimitBucket,
     CommentReaction,
     PostReaction,
+    ReactionCatalogItem,
     ReactionSettings,
 )
 from apps.discussions.reactions import (
@@ -35,6 +38,7 @@ from apps.discussions.reactions import (
     comment_reaction_groups,
     post_reaction_groups,
     post_reaction_groups_for_post,
+    reaction_descriptor,
     toggle_comment_reaction,
     toggle_post_reaction,
 )
@@ -115,11 +119,11 @@ def _body(request):
     return request.data["body"]
 
 
-def _emoji(request):
-    _validate_payload(request, allowed={"emoji"})
-    if "emoji" not in request.data:
-        raise ValidationError({"emoji": "This field is required."})
-    return normalize_emoji(request.data["emoji"])
+def _reaction_id(request):
+    _validate_payload(request, allowed={"reaction_id"})
+    if "reaction_id" not in request.data:
+        raise ValidationError({"reaction_id": "This field is required."})
+    return request.data["reaction_id"]
 
 
 class CommentAPIViewMixin:
@@ -343,7 +347,7 @@ class PostReactionToggleAPIView(ReactionAPIViewMixin, APIView):
         post, added = toggle_post_reaction(
             post_id=post.pk,
             user=user,
-            emoji=_emoji(request),
+            reaction_id=_reaction_id(request),
         )
         return Response(
             {
@@ -371,7 +375,7 @@ class CommentReactionToggleAPIView(ReactionAPIViewMixin, APIView):
         comment, added = toggle_comment_reaction(
             comment_id=pk,
             user=user,
-            emoji=_emoji(request),
+            reaction_id=_reaction_id(request),
         )
         grouped = comment_reaction_groups([comment], viewer=user)
         return Response(
@@ -390,10 +394,13 @@ class ReactionParticipantAPIView(ReactionAPIViewMixin, APIView):
         raise NotImplementedError
 
     def get(self, request, **kwargs):
-        emoji_value = normalize_emoji(kwargs["emoji"])
+        catalog_item = get_object_or_404(
+            ReactionCatalogItem.objects.filter(enabled=True),
+            catalog_id=kwargs["reaction_id"],
+        )
         queryset = (
             self.reactions(request, **kwargs)
-            .filter(emoji=emoji_value)
+            .filter(catalog_item=catalog_item)
             .select_related("user")
             .order_by("created_at", "id")
         )
@@ -409,7 +416,7 @@ class PostReactionParticipantAPIView(ReactionParticipantAPIView):
 
     def reactions(self, request, **kwargs):
         post = _public_post_or_404(kwargs["slug"])
-        return PostReaction.objects.filter(post=post, catalog_item__isnull=True)
+        return PostReaction.objects.filter(post=post)
 
 
 class CommentReactionParticipantAPIView(ReactionParticipantAPIView):
@@ -419,12 +426,94 @@ class CommentReactionParticipantAPIView(ReactionParticipantAPIView):
         comment = _public_comment_or_404(kwargs["pk"])
         if comment.public_status != "visible":
             raise Http404
-        return CommentReaction.objects.filter(comment=comment, catalog_item__isnull=True)
+        return CommentReaction.objects.filter(comment=comment)
 
 
-class ReactionConfigAPIView(ReactionAPIViewMixin, APIView):
+def _catalog_payload_response(request, payload):
+    body = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    etag = f'"{hashlib.sha256(body).hexdigest()}"'
+    response = (
+        Response(status=304) if request.headers.get("If-None-Match") == etag else Response(payload)
+    )
+    response["ETag"] = etag
+    return response
+
+
+class ReactionCatalogCacheMixin:
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        patch_cache_control(
+            response,
+            public=True,
+            max_age=60,
+            stale_while_revalidate=300,
+        )
+        vary = [
+            value.strip()
+            for value in response.get("Vary", "").split(",")
+            if value.strip() and value.strip().lower() != "cookie"
+        ]
+        if vary:
+            response["Vary"] = ", ".join(vary)
+        elif response.has_header("Vary"):
+            del response["Vary"]
+        return response
+
+
+class ReactionCatalogAPIView(ReactionCatalogCacheMixin, APIView):
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request):
+        items = list(
+            ReactionCatalogItem.objects.filter(enabled=True, selectable=True).order_by(
+                "ordering", "catalog_id"
+            )
+        )
+        descriptors = [reaction_descriptor(item) for item in items]
+        revision = hashlib.sha256(
+            json.dumps(
+                descriptors,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        return _catalog_payload_response(
+            request,
+            {
+                "version": f"sha256-{revision}",
+                "results": descriptors,
+            },
+        )
+
+
+class ReactionConfigAPIView(ReactionCatalogCacheMixin, APIView):
     http_method_names = ["get", "head", "options"]
 
     def get(self, request):
         configured = ReactionSettings.for_request(request)
-        return Response({"quick_reactions": configured.quick_reactions})
+        quick_ids = [
+            configured.quick_reaction_item_one_id,
+            configured.quick_reaction_item_two_id,
+            configured.quick_reaction_item_three_id,
+        ]
+        items = {
+            item.pk: item
+            for item in ReactionCatalogItem.objects.filter(
+                pk__in=[value for value in quick_ids if value],
+                enabled=True,
+                selectable=True,
+            )
+        }
+        descriptors = [
+            reaction_descriptor(items[item_id]) for item_id in quick_ids if item_id in items
+        ]
+        return _catalog_payload_response(request, {"quick_reactions": descriptors})

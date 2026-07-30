@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { useAuth } from "@/components/auth-provider";
+import { ReactionImage } from "@/components/reaction-image";
 import {
     clearPendingReaction,
     loadPendingReaction,
@@ -24,16 +25,18 @@ import {
     subscribeReactionMutation,
 } from "@/lib/reaction-mutation-coordinator";
 import {
+    getReactionCatalog,
     getReactionConfig,
     getReactionParticipants,
     ReactionApiError,
     type ReactionChange,
+    type ReactionDescriptor,
     type ReactionGroup,
     type ReactionParticipant,
     type ReactionTarget,
 } from "@/lib/reactions";
 
-const EmojiPicker = lazy(() => import("@/components/emoji-picker"));
+const ReactionPicker = lazy(() => import("@/components/reaction-picker"));
 
 function reactionError(error: unknown): string {
     if (error instanceof ReactionApiError) {
@@ -65,12 +68,13 @@ export function ReactionBar({
 }) {
     const { me, refresh, status: authStatus } = useAuth();
     const [reactions, setReactions] = useState(initialReactions);
-    const [quick, setQuick] = useState<string[]>([]);
+    const [quick, setQuick] = useState<ReactionDescriptor[]>([]);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
-    const [pendingEmoji, setPendingEmoji] = useState<string | null>(null);
+    const [pendingReaction, setPendingReaction] =
+        useState<ReactionDescriptor | null>(null);
     const [participantGroup, setParticipantGroup] =
         useState<ReactionGroup | null>(null);
     const [participants, setParticipants] = useState<ReactionParticipant[]>([]);
@@ -216,11 +220,47 @@ export function ReactionBar({
         if (authStatus !== "ready") {
             return;
         }
-        setPendingEmoji(loadPendingReaction(target));
-    }, [authStatus, target.id, target.kind, target.slug]);
+        const pendingId = loadPendingReaction(mutationTarget);
+        if (!pendingId) {
+            setPendingReaction(null);
+            return;
+        }
+        const known = [
+            ...reactions.map((group) => group.reaction),
+            ...quick,
+        ].find((reaction) => reaction.id === pendingId);
+        if (known) {
+            setPendingReaction(known);
+            return;
+        }
+        let active = true;
+        void getReactionCatalog()
+            .then((catalog) => {
+                if (!active) {
+                    return;
+                }
+                const reaction = catalog.results.find(
+                    (item) => item.id === pendingId,
+                );
+                if (reaction) {
+                    setPendingReaction(reaction);
+                } else {
+                    clearPendingReaction(mutationTarget);
+                    setPendingReaction(null);
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setError("Your saved reaction could not be restored.");
+                }
+            });
+        return () => {
+            active = false;
+        };
+    }, [authStatus, mutationTarget, quick, reactions]);
 
     async function performToggle(
-        emoji: string,
+        reaction: ReactionDescriptor,
         fromPending = false,
     ): Promise<boolean> {
         if (busyRef.current) {
@@ -233,8 +273,8 @@ export function ReactionBar({
             return false;
         }
         if (!user || !me?.csrf_token) {
-            savePendingReaction(target, emoji);
-            setPendingEmoji(emoji);
+            savePendingReaction(target, reaction.id);
+            setPendingReaction(reaction);
             setNotice(null);
             return false;
         }
@@ -242,7 +282,7 @@ export function ReactionBar({
         const mutation = coordinateReactionMutation(
             mutationTarget,
             reactions,
-            emoji,
+            reaction,
             me.csrf_token,
         );
         if (!mutation.started) {
@@ -250,14 +290,14 @@ export function ReactionBar({
         }
         const outcome = await mutation.outcome;
         if (outcome.status === "authoritative") {
-            rememberReaction(emoji);
+            rememberReaction(reaction.id);
             if (fromPending) {
                 clearPendingReaction(target);
                 if (
                     mountedRef.current &&
                     initiatingTargetKey === latestTargetKeyRef.current
                 ) {
-                    setPendingEmoji(null);
+                    setPendingReaction(null);
                 }
             }
             return true;
@@ -276,19 +316,23 @@ export function ReactionBar({
     }
 
     async function confirmPending(): Promise<void> {
-        if (!pendingEmoji) {
+        if (!pendingReaction) {
             return;
         }
         const alreadyPresent = reactions.some(
-            (group) => group.emoji === pendingEmoji && group.viewer_reacted,
+            (group) =>
+                group.reaction.id === pendingReaction.id &&
+                group.viewer_reacted,
         );
         if (alreadyPresent) {
             clearPendingReaction(target);
-            setNotice(`Your ${pendingEmoji} reaction is already active.`);
-            setPendingEmoji(null);
+            setNotice(
+                `Your ${pendingReaction.name} reaction is already active.`,
+            );
+            setPendingReaction(null);
             return;
         }
-        await performToggle(pendingEmoji, true);
+        await performToggle(pendingReaction, true);
     }
 
     async function openParticipants(
@@ -296,13 +340,13 @@ export function ReactionBar({
         cursor?: string,
         trigger?: HTMLButtonElement | null,
     ): Promise<void> {
-        if (!cursor && participantGroupRef.current === group.emoji) {
+        if (!cursor && participantGroupRef.current === group.reaction.id) {
             if (trigger) {
                 participantTriggerRef.current = trigger;
             }
             return;
         }
-        participantGroupRef.current = group.emoji;
+        participantGroupRef.current = group.reaction.id;
         const requestId = participantRequestRef.current + 1;
         participantRequestRef.current = requestId;
         participantAbortRef.current?.abort();
@@ -320,7 +364,7 @@ export function ReactionBar({
         try {
             const page = await getReactionParticipants(
                 target,
-                group.emoji,
+                group.reaction.id,
                 group.participants,
                 cursor,
                 controller.signal,
@@ -382,7 +426,7 @@ export function ReactionBar({
             void openParticipants(
                 group,
                 undefined,
-                participantButtonRefs.current.get(group.emoji),
+                participantButtonRefs.current.get(group.reaction.id),
             );
         }
     }
@@ -390,7 +434,8 @@ export function ReactionBar({
     const quickOnly = compact
         ? []
         : quick.filter(
-              (emoji) => !reactions.some((group) => group.emoji === emoji),
+              (reaction) =>
+                  !reactions.some((group) => group.reaction.id === reaction.id),
           );
 
     return (
@@ -405,7 +450,7 @@ export function ReactionBar({
                 {reactions.map((group) => (
                     <span
                         className={`reaction-pill ${group.viewer_reacted ? "reaction-pill-active" : ""}`}
-                        key={group.emoji}
+                        key={group.reaction.id}
                         onFocus={(event) => {
                             if (
                                 !participantsRequireActivation &&
@@ -436,21 +481,19 @@ export function ReactionBar({
                         onPointerUpCapture={pointerUp}
                     >
                         <button
-                            aria-label={`${group.viewer_reacted ? "Remove" : "Add"} ${group.emoji} reaction`}
+                            aria-label={`${group.viewer_reacted ? "Remove" : "Add"} ${group.reaction.label} reaction`}
                             aria-pressed={group.viewer_reacted}
                             disabled={busy || interactionDisabled}
-                            onClick={() => void performToggle(group.emoji)}
+                            onClick={() => void performToggle(group.reaction)}
                             type="button"
                         >
-                            <span
-                                aria-hidden="true"
-                                className="reaction-pill__emoji"
-                            >
-                                {group.emoji}
-                            </span>
+                            <ReactionImage
+                                className="reaction-pill__asset"
+                                reaction={group.reaction}
+                            />
                         </button>
                         <button
-                            aria-label={`View ${String(group.count)} participant${group.count === 1 ? "" : "s"} for ${group.emoji}`}
+                            aria-label={`View ${String(group.count)} participant${group.count === 1 ? "" : "s"} for ${group.reaction.label}`}
                             className="reaction-pill__count"
                             disabled={busy}
                             onClick={(event) =>
@@ -463,12 +506,12 @@ export function ReactionBar({
                             ref={(node) => {
                                 if (node) {
                                     participantButtonRefs.current.set(
-                                        group.emoji,
+                                        group.reaction.id,
                                         node,
                                     );
                                 } else {
                                     participantButtonRefs.current.delete(
-                                        group.emoji,
+                                        group.reaction.id,
                                     );
                                 }
                             }}
@@ -479,23 +522,26 @@ export function ReactionBar({
                     </span>
                 ))}
 
-                {quickOnly.map((emoji) => (
+                {quickOnly.map((reaction) => (
                     <button
-                        aria-label={`React with ${emoji}`}
+                        aria-label={`React with ${reaction.label}`}
                         className="quick-reaction"
                         disabled={busy || interactionDisabled}
-                        key={emoji}
-                        onClick={() => void performToggle(emoji)}
+                        key={reaction.id}
+                        onClick={() => void performToggle(reaction)}
                         type="button"
                     >
-                        {emoji}
+                        <ReactionImage
+                            className="quick-reaction__image"
+                            reaction={reaction}
+                        />
                     </button>
                 ))}
 
                 {!compact ? (
                     <button
                         aria-expanded={pickerOpen}
-                        aria-label="Open full emoji picker"
+                        aria-label="Open reaction picker"
                         className="quick-reaction"
                         disabled={busy || interactionDisabled}
                         onClick={() => {
@@ -509,11 +555,13 @@ export function ReactionBar({
                 ) : null}
             </div>
 
-            {pendingEmoji ? (
+            {pendingReaction ? (
                 <div className="reaction-notice" role="status">
                     {canInteract ? (
                         <>
-                            <span>Add your saved {pendingEmoji} reaction?</span>
+                            <span>
+                                Add your saved {pendingReaction.name} reaction?
+                            </span>
                             <button
                                 disabled={busy}
                                 onClick={() => void confirmPending()}
@@ -530,7 +578,8 @@ export function ReactionBar({
                     ) : (
                         <>
                             <span>
-                                Sign in to add your {pendingEmoji} reaction.
+                                Sign in to add your {pendingReaction.name}{" "}
+                                reaction.
                             </span>
                             <a
                                 href={`/login?next=${encodeURIComponent(target.returnTo)}`}
@@ -542,7 +591,7 @@ export function ReactionBar({
                     <button
                         onClick={() => {
                             clearPendingReaction(target);
-                            setPendingEmoji(null);
+                            setPendingReaction(null);
                         }}
                         type="button"
                     >
@@ -569,18 +618,18 @@ export function ReactionBar({
                             className="mt-3 text-sm text-stone-500"
                             role="status"
                         >
-                            Loading emoji picker…
+                            Loading reaction picker…
                         </p>
                     }
                 >
-                    <EmojiPicker
+                    <ReactionPicker
                         onClose={() => {
                             setPickerOpen(false);
                             pickerTrigger.current?.focus();
                         }}
-                        onSelect={(emoji) => {
+                        onSelect={(reaction) => {
                             setPickerOpen(false);
-                            void performToggle(emoji);
+                            void performToggle(reaction);
                             pickerTrigger.current?.focus();
                         }}
                     />
@@ -589,13 +638,14 @@ export function ReactionBar({
 
             {participantGroup ? (
                 <div
-                    aria-label={`${participantGroup.emoji} reaction participants`}
+                    aria-label={`${participantGroup.reaction.label} reaction participants`}
                     className="reaction-participants"
                     role="dialog"
                 >
                     <div className="flex items-center justify-between gap-3">
                         <strong>
-                            {participantGroup.emoji} {participantGroup.count}{" "}
+                            {participantGroup.reaction.name}{" "}
+                            {participantGroup.count}{" "}
                             {participantGroup.count === 1 ? "person" : "people"}
                         </strong>
                         <button

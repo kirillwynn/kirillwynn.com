@@ -14,7 +14,6 @@ dependencies = [
     "django-storages[s3]==1.14.6",
     "django-treebeard==5.2.0",
     "djangorestframework==3.17.1",
-    "emoji==2.15.0",
     "gunicorn==23.0.0",
     "psycopg[binary]==3.2.12",
     "svix==1.99.1",

@@ -111,6 +111,7 @@ describe("server-only security boundary", () => {
         expect(config).toContain('source: "/api/v1/email/webhooks/resend/"');
         expect(config).toContain('source: "/api/v1/posts/:slug/comments/"');
         expect(config).toContain('source: "/api/v1/reactions/config/"');
+        expect(config).toContain('source: "/api/v1/reactions/catalog/"');
         expect(config).toContain('source: "/api/v1/reactions/posts/"');
         expect(
             config.match(/source: "\/api\/v1\/reactions\/posts\/"/g),
@@ -119,13 +120,13 @@ describe("server-only security boundary", () => {
             'source: "/api/v1/posts/:slug/reactions/toggle/"',
         );
         expect(config).toContain(
-            'source: "/api/v1/posts/:slug/reactions/:emoji/participants/"',
+            'source: "/api/v1/posts/:slug/reactions/:reactionId/participants/"',
         );
         expect(config).toContain(
             'source: "/api/v1/comments/:id/reactions/toggle/"',
         );
         expect(config).toContain(
-            'source: "/api/v1/comments/:id/reactions/:emoji/participants/"',
+            'source: "/api/v1/comments/:id/reactions/:reactionId/participants/"',
         );
         expect(config).toContain('source: "/api/v1/comments/:id/thread/"');
         expect(config).toContain('source: "/api/v1/comments/:id/replies/"');
@@ -145,6 +146,37 @@ describe("server-only security boundary", () => {
         expect(css).not.toMatch(/(?:html|body)\s*\{[^}]*overflow-x:\s*hidden/s);
     });
 
+    it("keeps Search and Bridge focus perceptible without contour or border recoloring", () => {
+        const css = source("app/globals.css");
+        const searchStart = css.indexOf(
+            ".feed-search .feed-search-input:focus,",
+        );
+        const searchEnd = css.indexOf(".feed-search-input::placeholder");
+        const searchStates = css.slice(searchStart, searchEnd);
+        expect(searchStart).toBeGreaterThan(0);
+        expect(searchStates).toContain(
+            "border-color: var(--color-border-strong)",
+        );
+        expect(searchStates).toContain("outline: 0");
+        expect(searchStates).toContain("box-shadow: none");
+        expect(searchStates).toContain(
+            "background: var(--color-surface-subtle)",
+        );
+        expect(searchStates).not.toContain("var(--color-accent);");
+
+        const bridgeStart = css.indexOf(".bridge-link:hover,");
+        const bridgeEnd = css.indexOf(".bridge-link img");
+        const bridgeStates = css.slice(bridgeStart, bridgeEnd);
+        expect(bridgeStart).toBeGreaterThan(0);
+        expect(bridgeStates).toContain("outline: 0");
+        expect(bridgeStates).toContain("box-shadow: none");
+        expect(bridgeStates).toContain("border-color: var(--color-border)");
+        expect(bridgeStates).toContain(
+            "background: var(--color-surface-subtle)",
+        );
+        expect(bridgeStates).not.toContain("var(--color-accent)");
+    });
+
     it("does not implement browser-stored auth tokens", () => {
         for (const path of [
             "components/account-panel.tsx",
@@ -162,16 +194,17 @@ describe("server-only security boundary", () => {
         }
     });
 
-    it("keeps the full picker dataset behind the lazy picker boundary", () => {
+    it("keeps the custom catalog behind the lazy picker boundary without Unicode datasets", () => {
         const bar = source("components/reaction-bar.tsx");
-        const picker = source("components/emoji-picker.tsx");
+        const picker = source("components/reaction-picker.tsx");
         const storage = source("lib/reaction-storage.ts");
 
         expect(bar).toContain(
-            'lazy(() => import("@/components/emoji-picker"))',
+            'lazy(() => import("@/components/reaction-picker"))',
         );
-        expect(picker).toContain('await import("@emoji-mart/data")');
-        expect(storage).toContain('from "emoji-regex"');
+        expect(picker).toContain("getReactionCatalog");
+        expect(picker).not.toContain("@emoji-mart/data");
+        expect(storage).not.toContain('from "emoji-regex"');
         expect(storage).not.toContain("@emoji-mart/data");
         expect(bar).not.toContain("@emoji-mart/data");
     });

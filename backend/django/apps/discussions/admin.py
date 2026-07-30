@@ -76,8 +76,9 @@ class CommentRateLimitBucketAdmin(admin.ModelAdmin):
 
 
 class ReactionAdmin(admin.ModelAdmin):
-    list_display = ("id", "target", "user", "emoji", "created_at")
-    readonly_fields = ("user", "emoji", "created_at")
+    list_display = ("id", "target", "user", "catalog_item", "emoji", "created_at")
+    list_select_related = ("user", "catalog_item")
+    readonly_fields = ("user", "catalog_item", "emoji", "created_at")
 
     @admin.display(description="Target")
     def target(self, obj):

@@ -147,11 +147,23 @@ describe("Feed reaction hydration", () => {
                                 slug: "привет-мир",
                                 reactions: [
                                     {
-                                        emoji: "👍",
+                                        reaction: {
+                                            id: "pepeclap",
+                                            name: "Pepe clap",
+                                            label: "Clapping",
+                                            kind: "animated",
+                                            asset_url:
+                                                "/media/reactions/pepeclap/hash/animation.gif",
+                                            poster_url:
+                                                "/media/reactions/pepeclap/hash/poster.webp",
+                                            width: 64,
+                                            height: 64,
+                                            version: "sha256-clap",
+                                        },
                                         count: 1,
                                         viewer_reacted: true,
                                         participants:
-                                            "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%91%8D/participants/",
+                                            "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/pepeclap/participants/",
                                     },
                                 ],
                             },
@@ -188,7 +200,9 @@ describe("Feed reaction hydration", () => {
             ]),
         );
         await waitFor(
-            () => buttonByLabel(container, "Remove 👍 reaction") !== undefined,
+            () =>
+                buttonByLabel(container, "Remove Clapping reaction") !==
+                undefined,
         );
 
         const calls = vi.mocked(fetch).mock.calls;
@@ -212,7 +226,7 @@ describe("Feed reaction hydration", () => {
         ).toBe(false);
         expect(
             container.querySelector(
-                'button[aria-label="Open full emoji picker"]',
+                'button[aria-label="Open reaction picker"]',
             ),
         ).toBeNull();
         expect(container.querySelector(".quick-reaction")).toBeNull();
@@ -221,12 +235,12 @@ describe("Feed reaction hydration", () => {
                 ".reaction-bar-compact.reaction-bar-slack-pills",
             ),
         ).not.toBeNull();
-        const toggle = buttonByLabel(container, "Remove 👍 reaction");
+        const toggle = buttonByLabel(container, "Remove Clapping reaction");
         expect(toggle?.getAttribute("aria-pressed")).toBe("true");
 
         const participants = buttonByLabel(
             container,
-            "View 1 participant for 👍",
+            "View 1 participant for Clapping",
         );
         const pill = participants?.closest(".reaction-pill");
         act(() => {
@@ -266,7 +280,7 @@ describe("Feed reaction hydration", () => {
             const dialog = container.querySelector('[role="dialog"]');
             return (
                 dialog?.getAttribute("aria-label") ===
-                "👍 reaction participants"
+                "Clapping reaction participants"
             );
         });
         expect(container.textContent).toContain("Reader");

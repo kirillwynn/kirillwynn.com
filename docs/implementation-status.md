@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 Integration branch: `rewrite/wagtail-next`
 
@@ -33,25 +33,33 @@ and promotion remain out of scope and unverified.
 Stage 16 is being delivered before Stage 15 through a two-release
 expand/activate rollout. Stage 15 and Stage 17 remain untouched.
 
-The expansion candidate now contains:
+The owner approved all 228 supplied files for controlled staging evaluation,
+with no catalog exclusions and quick IDs `pepeclap`, `pepehmm`, and
+`pepelove`. Because the corpus has no source, author, attribution, or license
+material, every item remains `staging-only/unverified`; search-engine
+availability and noncommercial use are not treated as a production rights
+basis. There is no active new-stack production deployment or production
+catalog/data. The production gate is a future fail-closed safety contract, not
+a statement that production currently exists.
 
-- accepted ADR 0006 and a checked-in manifest-only allowlist for all 228
-  owner-selected assets, with stable ASCII IDs, 180 static / 48 animated
-  kinds, `staging-only/unverified` rights status, and quick IDs `pepeclap`,
-  `pepehmm`, and `pepelove`;
-- additive `discussions.0003_reaction_catalog_expansion`, which preserves the
-  deployed Unicode columns/rows and adds a catalog model, nullable `PROTECT`
-  relations, side-by-side identity checks, custom unique constraints and
-  aggregation indexes, plus an explicit empty legacy mapping table;
-- manifest-managed Wagtail controls that allow label/order/enabled/selectable
-  curation and exactly three quick selections while denying add/delete/copy,
-  upload, key/hash/version, and binary-replacement actions;
-- deterministic prepare/sync commands with explicit allowlisting, source
-  hashes, byte-detected formats, exact-container validation, full-frame decode,
-  hard resource limits, sRGB/metadata normalization, animation posters,
-  immutable content-addressed S3 keys, upload-before-activation, read-back
-  verification, prefix isolation, idempotence, and production fail-closed
-  approval checks.
+Expansion commit `61112e61e0d0a88ed9125bc441ec4e06a516289a` and release
+marker `2d3c04faa08835e2b1d8cadb4eb1649870633f17` are active on
+staging. CI runs `30498087049`, `30498090525`, and `30564257262`
+passed. Operation
+`deploy-30564257262-staging-2d3c04faa08835e2b1d8cadb4eb1649870633f17`
+applied additive migration `discussions.0003_reaction_catalog_expansion`,
+preserved all Unicode rows/columns, and activated the manifest/Wagtail/import
+architecture without switching the public Unicode application contract. Its
+release manifest SHA-256 is
+`62b2574db6f46c0bc8913bb7c5b384769d4b071395cf3355e0bb46b44f51708c`;
+staging attestation SHA-256 is
+`083355eaf4824d3f95887f9c1df4ac0391ef41e4b70b2d9373513ccdbe4b28e7`.
+Active expansion image digests are Django
+`sha256:4285c95a7626727c1cada4cee0eef90d11a661f8a4f1355ed057d1e56e554ada`,
+Next
+`sha256:74135f621788d88304270b995bd3e3b36a80f66dc25b55f59ea10a53b5f9f485`,
+and edge
+`sha256:423218089d47e374ecf37018dce880b17ee4b2d3780d4aedc7b7063669f621a7`.
 
 The real corpus was read locally without copying binaries into Git, a container
 image, S3, or the public API. Two prepare runs produced the same 228-item /
@@ -62,12 +70,60 @@ GIF. The largest normalized object was 200,832 bytes, below the fixed 512 KiB
 limit. The manifest SHA-256 is
 `1b0a409b80ddb46eed4059a19210eec82f5444530eb268a33d5cb0945e08c018`.
 
-Expansion local verification passed `uv lock --check`, Ruff format/lint,
-Django checks, migration drift, 537 full SQLite tests with seven expected
-PostgreSQL-only skips, 99 discussion tests with four PostgreSQL skips, and 24
-focused catalog/admin/migration tests. Required PostgreSQL, infrastructure,
-container, and cross-stack execution remains a CI gate. No staging or
-production object/database/application state has yet changed in this phase.
+The activation candidate now switches API/frontend identity to stable catalog
+IDs while retaining the legacy column and rows. Migration
+`discussions.0004_activate_catalog_reaction_identity` makes the named legacy
+uniqueness partial on non-empty Unicode values, keeps custom `PROTECT`
+uniqueness/indexes, and supports populated `0004 → 0003 → 0004` testing without
+destroying custom or legacy rows. The API accepts only
+`{"reaction_id":"<catalog-id>"}`, returns descriptors and catalog-ID
+participant paths, hides disabled and unmapped legacy rows, and preserves
+session/CSRF, visibility, locking, rate-limit, cache, pagination, and bounded
+Feed-query boundaries. Catalog/config have user-independent ETags and public
+60-second revalidation.
+
+The Next client removes Emoji Mart, Unicode picker/quick/recent/pending values,
+and the `@emoji-mart/data`, `emoji-regex`, and Python `emoji` dependencies. It
+uses a lazy searchable keyboard/touch picker, version-2 catalog-ID storage,
+explicit OAuth confirm/discard, lazy poster/static images, intersection-gated
+animation, a code-level reduced-motion poster boundary, and accessible broken
+image fallback. Search focus and Bridge hover/focus no longer receive an
+outline, ring, glow, or border recoloring; both retain perceptible,
+non-contour keyboard focus and reduced-motion behavior.
+
+Current local activation verification passes:
+
+- `uv 0.11.32 lock --check`, Ruff format/lint, Django checks, migration drift,
+  521 SQLite tests with seven PostgreSQL-only tests deselected, 26 focused
+  admin/catalog/migration tests, and the 229-test infrastructure/container/
+  MinIO suite;
+- `npm ci`, Prettier, ESLint, TypeScript, 174 Vitest tests, production Next
+  build, standalone runtime-origin verification, browser secret/storage-key
+  scans, lazy-chunk inspection, and `npm audit` with zero vulnerabilities;
+- five real-Django cross-stack tests and 45 browser-contract tests across
+  320×812, 375×812, 768×1024, 1440×900, and 1920×1080, including both themes,
+  axe, keyboard/touch/Escape/focus restoration, Search/Bridge polish, reduced
+  motion, overflow, hydration, and console boundaries.
+
+Staging catalog transfer remains pending. A first gated sync run
+`30579002338` failed before SSH/S3 because a draft release asset could not be
+downloaded; a temporary private prerelease fixed that transport without
+widening token permissions. Run `30580190051` passed all required CI but failed
+before S3 on an unreadable read-only bind mount. Commit
+`8b677d1143bb768e19a12f099f0d2ced1a506416` fixes the mount permissions and
+passes 229 local infrastructure tests, but its fresh push/PR runs
+`30581189092` and `30581196760` could not start jobs because GitHub Actions
+reported an account billing/spending-limit block. Therefore no failed sync
+attempt changed staging S3 or catalog database rows. Both staging deployment
+gates are `false`; the temporary prerelease/tag must be removed after a
+successful attested sync.
+
+Remaining Stage 16 work is to restore GitHub Actions capacity, pass fresh
+required CI, run and attest the verify/upload/activate/idempotence sync, take
+the rollout backup, deploy the activation digest only to staging, complete live
+static/animated/reduced-motion/CDN QA, remove the temporary transfer release
+and tag, and record the final operation/digests. No production, `main`, DNS,
+OAuth/Resend provider, or legacy-data state has been changed.
 
 ## Current repository state
 

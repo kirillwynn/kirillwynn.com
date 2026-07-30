@@ -54,16 +54,18 @@ test("real batch reaction endpoint hydrates the cached Feed with one private rea
         .locator(".feed-entry")
         .getByRole("group", { name: "Reactions" });
     await expect(
-        feedReactions.getByRole("button", { name: "Add 🔥 reaction" }),
+        feedReactions.getByRole("button", {
+            name: "Add Clapping reaction",
+        }),
     ).toHaveAttribute("aria-pressed", "false");
     await expect(
         feedReactions.getByRole("button", {
-            name: "View 1 participant for 🔥",
+            name: "View 1 participant for Clapping",
         }),
     ).toBeVisible();
     expect(batchRequests).toHaveLength(1);
     await expect(
-        page.getByRole("button", { name: "Open full emoji picker" }),
+        page.getByRole("button", { name: "Open reaction picker" }),
     ).toHaveCount(0);
 });
 
@@ -127,30 +129,41 @@ test("real CSRF, API views, rewrites, and database persistence cover comments, r
         name: "Thread for comment by Site Author",
     });
     const reply = `Persisted reply ${String(testInfo.retry)}`;
-    await dialog.getByPlaceholder("Write a reply").fill(reply);
+    const replyInput = dialog.getByRole("textbox", {
+        name: "Reply to thread",
+    });
+    await replyInput.fill(reply);
     await dialog
         .locator("footer")
         .getByRole("button", { name: "Reply", exact: true })
         .click();
-    await expect(dialog.getByText(reply)).toBeVisible();
-    await page.keyboard.press("Escape");
-    await root.getByRole("button", { name: "Reply" }).click();
     await expect(
-        page
-            .getByRole("dialog", { name: "Thread for comment by Site Author" })
-            .getByText(reply),
+        dialog.locator("article").getByText(reply, { exact: true }),
     ).toBeVisible();
+    await expect(replyInput).toHaveValue("");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await root.getByRole("button", { name: "Reply" }).click();
+    const reopenedDialog = page.getByRole("dialog", {
+        name: "Thread for comment by Site Author",
+    });
+    await expect(
+        reopenedDialog.locator("article").getByText(reply, { exact: true }),
+    ).toBeVisible();
+    await expect(
+        reopenedDialog.getByRole("textbox", { name: "Reply to thread" }),
+    ).toHaveValue("");
     await page.keyboard.press("Escape");
 
     const postReactions = page
         .getByRole("group", { name: "Reactions" })
         .first();
-    const fire = postReactions.getByRole("button", {
-        name: /(?:Add|Remove) 🔥 reaction/,
+    const clap = postReactions.getByRole("button", {
+        name: /(?:Add|Remove) Clapping reaction/,
     });
-    const before = await fire.getAttribute("aria-pressed");
-    await fire.click();
-    await expect(fire).toHaveAttribute(
+    const before = await clap.getAttribute("aria-pressed");
+    await clap.click();
+    await expect(clap).toHaveAttribute(
         "aria-pressed",
         before === "true" ? "false" : "true",
     );
@@ -159,7 +172,9 @@ test("real CSRF, API views, rewrites, and database persistence cover comments, r
         page
             .getByRole("group", { name: "Reactions" })
             .first()
-            .getByRole("button", { name: /(?:Add|Remove) 🔥 reaction/ }),
+            .getByRole("button", {
+                name: /(?:Add|Remove) Clapping reaction/,
+            }),
     ).toHaveAttribute("aria-pressed", before === "true" ? "false" : "true");
 });
 

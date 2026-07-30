@@ -213,13 +213,13 @@ async function expectSlackReactionGeometry(pill: Locator) {
     const geometry = await pill.evaluate((element) => {
         const box = element.getBoundingClientRect();
         const visible = getComputedStyle(element, "::before");
-        const emoji = element.querySelector(".reaction-pill__emoji");
+        const asset = element.querySelector(".reaction-pill__asset");
         const count = element.querySelector(".reaction-pill__count");
         return {
             targetHeight: box.height,
             visibleHeight: Number.parseFloat(visible.height),
-            emojiSize: emoji
-                ? Number.parseFloat(getComputedStyle(emoji).fontSize)
+            assetSize: asset
+                ? Number.parseFloat(getComputedStyle(asset).width)
                 : 0,
             countSize: count
                 ? Number.parseFloat(getComputedStyle(count).fontSize)
@@ -229,8 +229,8 @@ async function expectSlackReactionGeometry(pill: Locator) {
     expect(geometry.targetHeight).toBeGreaterThanOrEqual(44);
     expect(geometry.visibleHeight).toBeGreaterThanOrEqual(28);
     expect(geometry.visibleHeight).toBeLessThanOrEqual(32);
-    expect(geometry.emojiSize).toBeGreaterThanOrEqual(15);
-    expect(geometry.emojiSize).toBeLessThanOrEqual(16);
+    expect(geometry.assetSize).toBeGreaterThanOrEqual(15);
+    expect(geometry.assetSize).toBeLessThanOrEqual(16);
     expect(geometry.countSize).toBeGreaterThanOrEqual(12);
     expect(geometry.countSize).toBeLessThanOrEqual(13);
 
@@ -356,6 +356,112 @@ test("anonymous reader, feed search, tags, and pagination", async ({
     await expectAccessible(page);
 });
 
+test("Search and Bridge use perceptible contourless focus in both themes", async ({
+    page,
+}) => {
+    const styles = (locator: Locator) =>
+        locator.evaluate((element) => {
+            const style = getComputedStyle(element);
+            return {
+                backgroundColor: style.backgroundColor,
+                borderColor: style.borderColor,
+                borderStyle: style.borderStyle,
+                borderWidth: style.borderWidth,
+                boxShadow: style.boxShadow,
+                filter: style.filter,
+                outlineStyle: style.outlineStyle,
+                outlineWidth: style.outlineWidth,
+                transform: style.transform,
+            };
+        });
+
+    for (const colorScheme of ["light", "dark"] as const) {
+        await page.emulateMedia({
+            colorScheme,
+            reducedMotion: "no-preference",
+        });
+        await page.goto("/");
+        const search = page.getByRole("searchbox", { name: "Search posts" });
+        const searchRest = await styles(search);
+        await page.keyboard.press("Tab");
+        await search.focus();
+        const searchFocus = await styles(search);
+        expect(searchFocus.borderColor).toBe(searchRest.borderColor);
+        expect(searchFocus.borderStyle).toBe(searchRest.borderStyle);
+        expect(searchFocus.borderWidth).toBe(searchRest.borderWidth);
+        expect(searchFocus.outlineStyle).toBe("none");
+        expect(searchFocus.outlineWidth).toBe("0px");
+        expect(searchFocus.boxShadow).toBe("none");
+        expect(searchFocus.backgroundColor).not.toBe(
+            searchRest.backgroundColor,
+        );
+        await search.fill("delivery");
+        const searchTyping = await styles(search);
+        expect(searchTyping.borderColor).toBe(searchRest.borderColor);
+        expect(searchTyping.outlineWidth).toBe("0px");
+        expect(searchTyping.boxShadow).toBe("none");
+
+        await page.goto("/bridge");
+        const tile = page.locator(".bridge-link").first();
+        const tileRest = await styles(tile);
+        await tile.hover();
+        const tileHover = await styles(tile);
+        expect(tileHover.borderColor).toBe(tileRest.borderColor);
+        expect(tileHover.borderStyle).toBe(tileRest.borderStyle);
+        expect(tileHover.borderWidth).toBe(tileRest.borderWidth);
+        expect(tileHover.outlineWidth).toBe("0px");
+        expect(tileHover.boxShadow).toBe("none");
+        expect(tileHover.transform).not.toBe("none");
+
+        const box = await tile.boundingBox();
+        expect(box).not.toBeNull();
+        if (box) {
+            await page.mouse.move(
+                box.x + box.width / 2,
+                box.y + box.height / 2,
+            );
+            await page.mouse.down();
+            const tileActive = await styles(tile);
+            expect(tileActive.borderColor).toBe(tileRest.borderColor);
+            expect(tileActive.outlineWidth).toBe("0px");
+            expect(tileActive.boxShadow).toBe("none");
+            await page.mouse.up();
+        }
+
+        await page.keyboard.press("Tab");
+        await tile.focus();
+        const tileFocus = await styles(tile);
+        expect(tileFocus.borderColor).toBe(tileRest.borderColor);
+        expect(tileFocus.borderStyle).toBe(tileRest.borderStyle);
+        expect(tileFocus.borderWidth).toBe(tileRest.borderWidth);
+        expect(tileFocus.outlineStyle).toBe("none");
+        expect(tileFocus.outlineWidth).toBe("0px");
+        expect(tileFocus.boxShadow).toBe("none");
+        expect(
+            tileFocus.backgroundColor !== tileRest.backgroundColor ||
+                tileFocus.filter !== tileRest.filter ||
+                tileFocus.transform !== tileRest.transform,
+        ).toBe(true);
+    }
+
+    await page.emulateMedia({
+        colorScheme: "light",
+        reducedMotion: "reduce",
+    });
+    await page.goto("/bridge");
+    const reducedTile = page.locator(".bridge-link").first();
+    const reducedRest = await styles(reducedTile);
+    await reducedTile.hover();
+    const reducedHover = await styles(reducedTile);
+    expect(reducedHover.transform).toBe("none");
+    expect(reducedHover.borderColor).toBe(reducedRest.borderColor);
+    expect(reducedHover.outlineWidth).toBe("0px");
+    expect(
+        reducedHover.backgroundColor !== reducedRest.backgroundColor ||
+            reducedHover.filter !== reducedRest.filter,
+    ).toBe(true);
+});
+
 test("Feed hydrates existing reactions once without card-level requests or picker UI", async ({
     page,
 }) => {
@@ -374,11 +480,13 @@ test("Feed hydrates existing reactions once without card-level requests or picke
         .first()
         .getByRole("group", { name: "Reactions" });
     await expect(
-        feedReactions.getByRole("button", { name: "Add 🔥 reaction" }),
+        feedReactions.getByRole("button", {
+            name: "Add Clapping reaction",
+        }),
     ).toHaveAttribute("aria-pressed", "false");
     await expect(
         feedReactions.getByRole("button", {
-            name: "View 1 participant for 🔥",
+            name: "View 1 participant for Clapping",
         }),
     ).toBeVisible();
     await expectSlackReactionGeometry(
@@ -395,12 +503,12 @@ test("Feed hydrates existing reactions once without card-level requests or picke
         ),
     ).toHaveLength(0);
     await expect(
-        page.getByRole("button", { name: "Open full emoji picker" }),
+        page.getByRole("button", { name: "Open reaction picker" }),
     ).toHaveCount(0);
     await expect(page.locator(".feed-entry .quick-reaction")).toHaveCount(0);
 
     const count = feedReactions.getByRole("button", {
-        name: "View 1 participant for 🔥",
+        name: "View 1 participant for Clapping",
     });
     const participantRequests = () =>
         reactionRequests.filter((request) =>
@@ -411,18 +519,24 @@ test("Feed hydrates existing reactions once without card-level requests or picke
     await page.waitForTimeout(50);
     expect(participantRequests()).toHaveLength(0);
     await expect(
-        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+        page.getByRole("dialog", {
+            name: "Clapping reaction participants",
+        }),
     ).toHaveCount(0);
 
     await count.press("Enter");
     await expect(
-        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+        page.getByRole("dialog", {
+            name: "Clapping reaction participants",
+        }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(count).toBeFocused();
     await count.press("Space");
     await expect(
-        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+        page.getByRole("dialog", {
+            name: "Clapping reaction participants",
+        }),
     ).toBeVisible();
     await page
         .getByRole("button", { name: "Close reaction participants" })
@@ -430,7 +544,9 @@ test("Feed hydrates existing reactions once without card-level requests or picke
     await expect(count).toBeFocused();
     await count.click();
     await expect(
-        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+        page.getByRole("dialog", {
+            name: "Clapping reaction participants",
+        }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     expect(participantRequests()).toHaveLength(3);
@@ -731,16 +847,18 @@ test("comment, thread, reaction, keyboard trap, Escape, and focus restoration", 
         postReactions.locator(".reaction-pill").first(),
     );
     await postReactions
-        .getByRole("button", { name: "Add 🔥 reaction" })
+        .getByRole("button", { name: "Add Clapping reaction" })
         .click();
     await expect(
         postReactions.getByRole("button", {
-            name: "View 2 participants for 🔥",
+            name: "View 2 participants for Clapping",
         }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(
-        page.getByRole("dialog", { name: "🔥 reaction participants" }),
+        page.getByRole("dialog", {
+            name: "Clapping reaction participants",
+        }),
     ).toBeHidden();
 
     const root = page.locator('article[data-comment-id="10"]');

@@ -46,8 +46,10 @@ column and add nullable `catalog_item` foreign keys with `PROTECT`. A database
 check requires exactly one identity representation. New custom rows use an
 empty legacy value plus a catalog relation. Conditional unique constraints use
 `(target, user, catalog_item)` and aggregate indexes use
-`(target, catalog_item, created_at, id)`. Existing Unicode constraints and
-indexes remain until a separately reviewed contract migration.
+`(target, catalog_item, created_at, id)`. The legacy aggregation indexes
+remain. During activation, the existing named Unicode uniqueness constraints
+become partial on non-empty `emoji` values so multiple side-by-side custom
+identities can coexist without weakening legacy duplicate protection.
 
 The immutable migration contains an explicit Unicode-to-catalog mapping table.
 It is empty because no semantic equivalence has been approved. Thus all legacy
@@ -62,12 +64,22 @@ The rollout has two application releases:
 1. expansion adds the side-by-side schema, Wagtail controls, prepare/sync
    pipeline, and filters the legacy API to legacy rows;
 2. after expansion is live, the catalog objects and rows are verified and
-   activated, then a second release switches API and frontend to catalog IDs.
+   activated, then migration `0004` makes the retained legacy uniqueness
+   conditional on a non-empty legacy value and a second release switches API
+   and frontend to catalog IDs.
 
 The expansion digest is the rollback target for activation. It is compatible
 with catalog rows and ignores them. No custom row is inserted before expansion
 is confirmed. Migrations `0001` and `0002` and existing Git history are never
 rewritten.
+
+Migration `0004` has a state-reversing, physical no-op reverse operation. This
+is deliberate: recreating the former unconditional `(target, user, emoji)`
+constraint would reject valid custom rows that all retain an empty legacy
+column. A subsequent forward application explicitly replaces either the old
+constraint or the partial index, so `0004 → 0003 → 0004` is safe and preserves
+populated legacy and custom rows. Removing the legacy column, legacy index, or
+rollback compatibility remains a separate contract/cleanup migration.
 
 ### Manifest and preparation
 
@@ -169,9 +181,11 @@ participant endpoint keyed by catalog ID:
 }
 ```
 
-Catalog and quick config are user-independent and may use a separately
-revalidated public cache. Viewer-dependent aggregates, toggles, and
-participants remain `private, no-store` and `Vary: Cookie`. ADR 0003's
+Catalog and quick config are user-independent and use
+`Cache-Control: public, max-age=60, stale-while-revalidate=300` plus a
+payload-derived ETag, with no `Cookie` variance. Viewer-dependent aggregates,
+toggles, and participants remain `private, no-store` and `Vary: Cookie`. ADR
+0003's
 anonymous reads, Django session/CSRF mutation boundary, active/non-banned
 policy, canonical visibility, hidden/deleted behavior, rate limit,
 target-row locking, bounded Feed batch, and participant pagination continue.

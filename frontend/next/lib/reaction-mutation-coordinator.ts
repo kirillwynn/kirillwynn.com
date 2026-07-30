@@ -2,6 +2,7 @@ import {
     reactionParticipantPath,
     toggleReaction,
     type ReactionChange,
+    type ReactionDescriptor,
     type ReactionGroup,
     type ReactionTarget,
 } from "@/lib/reactions";
@@ -105,28 +106,32 @@ function removeUnusedEntry(key: string, entry: TargetEntry): void {
 function optimisticGroups(
     current: ReactionGroup[],
     target: ReactionTarget,
-    emoji: string,
+    reaction: ReactionDescriptor,
 ): ReactionGroup[] {
-    const existing = current.find((group) => group.emoji === emoji);
+    const existing = current.find((group) => group.reaction.id === reaction.id);
     if (!existing) {
         return [
             ...current,
             {
-                emoji,
+                reaction,
                 count: 1,
                 viewer_reacted: true,
-                participants: reactionParticipantPath(target, emoji),
+                participants: reactionParticipantPath(target, reaction.id),
             },
         ].sort((left, right) =>
-            left.emoji < right.emoji ? -1 : left.emoji > right.emoji ? 1 : 0,
+            left.reaction.id < right.reaction.id
+                ? -1
+                : left.reaction.id > right.reaction.id
+                  ? 1
+                  : 0,
         );
     }
     const count = existing.count + (existing.viewer_reacted ? -1 : 1);
     if (count === 0) {
-        return current.filter((group) => group.emoji !== emoji);
+        return current.filter((group) => group.reaction.id !== reaction.id);
     }
     return current.map((group) =>
-        group.emoji === emoji
+        group.reaction.id === reaction.id
             ? {
                   ...group,
                   count,
@@ -166,7 +171,7 @@ export function hydrateReactionMutation(
 export function coordinateReactionMutation(
     target: ReactionTarget,
     initialReactions: ReactionGroup[],
-    emoji: string,
+    reaction: ReactionDescriptor,
     csrfToken: string,
 ):
     | {
@@ -187,14 +192,14 @@ export function coordinateReactionMutation(
     const revision = nextMutationRevision + 1;
     nextMutationRevision = revision;
     entry.active = { revision };
-    entry.reactions = optimisticGroups(previous, target, emoji);
+    entry.reactions = optimisticGroups(previous, target, reaction);
     notify(entry, {
         reactions: entry.reactions,
         revision,
         source: "optimistic",
     });
 
-    const outcome = toggleReaction(target, emoji, csrfToken)
+    const outcome = toggleReaction(target, reaction.id, csrfToken)
         .then((authoritative): ReactionMutationOutcome => {
             if (
                 entries.get(key) !== entry ||

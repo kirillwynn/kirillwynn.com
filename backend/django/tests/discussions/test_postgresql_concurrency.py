@@ -113,24 +113,53 @@ def test_edit_delete_race_serializes_to_deleted_state(public_post, user):
     assert set(results) <= {"deleted", "edited", "ValidationError"}
 
 
-def test_parallel_post_and_comment_toggles_return_to_original_state(public_post, user):
+def test_parallel_post_and_comment_toggles_return_to_original_state(
+    public_post,
+    user,
+    reaction_catalog_items,
+):
     from apps.discussions.services import create_top_level_comment
 
+    post_item, comment_item, _ = reaction_catalog_items
     comment = create_top_level_comment(post=public_post, author=user, body="Root")
     post_results = _run_concurrently(
         [
-            lambda: toggle_post_reaction(post_id=public_post.pk, user=user, emoji="🔥")[1],
-            lambda: toggle_post_reaction(post_id=public_post.pk, user=user, emoji="🔥")[1],
+            lambda: toggle_post_reaction(
+                post_id=public_post.pk,
+                user=user,
+                reaction_id=post_item.catalog_id,
+            )[1],
+            lambda: toggle_post_reaction(
+                post_id=public_post.pk,
+                user=user,
+                reaction_id=post_item.catalog_id,
+            )[1],
         ]
     )
     comment_results = _run_concurrently(
         [
-            lambda: toggle_comment_reaction(comment_id=comment.pk, user=user, emoji="🎉")[1],
-            lambda: toggle_comment_reaction(comment_id=comment.pk, user=user, emoji="🎉")[1],
+            lambda: toggle_comment_reaction(
+                comment_id=comment.pk,
+                user=user,
+                reaction_id=comment_item.catalog_id,
+            )[1],
+            lambda: toggle_comment_reaction(
+                comment_id=comment.pk,
+                user=user,
+                reaction_id=comment_item.catalog_id,
+            )[1],
         ]
     )
 
     assert sorted(post_results) == [False, True]
     assert sorted(comment_results) == [False, True]
-    assert not PostReaction.objects.filter(post=public_post, user=user, emoji="🔥").exists()
-    assert not CommentReaction.objects.filter(comment=comment, user=user, emoji="🎉").exists()
+    assert not PostReaction.objects.filter(
+        post=public_post,
+        user=user,
+        catalog_item=post_item,
+    ).exists()
+    assert not CommentReaction.objects.filter(
+        comment=comment,
+        user=user,
+        catalog_item=comment_item,
+    ).exists()

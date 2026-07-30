@@ -2,7 +2,7 @@
 
 Status: accepted
 
-Last updated: 2026-07-27
+Last updated: 2026-07-30
 
 ## System context
 
@@ -13,7 +13,7 @@ Last updated: 2026-07-27
 - desktop content authoring;
 - Google and GitHub authentication;
 - Slack-style comment threads;
-- Unicode emoji reactions;
+- a manifest-managed static/animated reaction catalog;
 - search, tags, media, and email subscriptions;
 - isolated staging and production environments.
 
@@ -200,20 +200,28 @@ the cross-process and non-atomic behavior of DRF's local-memory throttle.
 
 ## Reactions
 
-Unicode emoji reactions are supported on posts and comments, including replies.
+Manifest-managed custom reactions are supported on posts and comments,
+including replies. ADR 0006 supersedes ADR 0003's public Unicode identity;
+legacy Unicode rows remain side-by-side for rollback and retention.
 
 Use two concrete tables:
 
 - `PostReaction`;
 - `CommentReaction`.
 
-Each table has a unique constraint on target, user, and normalized emoji key.
-Concrete relations preserve foreign-key integrity and predictable queries.
+Each table has a unique constraint on target, user, and stable catalog item.
+Concrete `PROTECT` relations preserve foreign-key integrity and predictable
+queries. Aggregation indexes begin with target and catalog item.
 
 Users may add several different reactions to the same target. Repeating the same
 reaction toggles it off. Reactions do not rank content.
 
-Custom uploaded emoji are deferred.
+`ReactionCatalogItem.catalog_id` is the public identity. It is independent of
+filename, URL, label, ordering, and Wagtail database state. Binary assets,
+hashes, immutable versions, and content-addressed S3 keys can be created only
+by the explicit manifest/attestation importer. Wagtail may curate safe labels,
+ordering, enabled/selectable state, and exactly three quick reactions; browser
+uploads and binary replacement are prohibited.
 
 ## Email subscriptions
 
@@ -441,7 +449,7 @@ End-to-end:
 ## Deliberately deferred
 
 - visual redesign beyond functional responsive foundations;
-- custom emoji;
+- arbitrary browser/user uploads to the reaction catalog;
 - push notifications;
 - Activity / Notification Center;
 - native mobile applications;

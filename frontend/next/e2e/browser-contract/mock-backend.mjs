@@ -171,13 +171,49 @@ function withViewer(request, value) {
     return { ...value, viewer: viewer(request, owner) };
 }
 
+const reactionCatalog = [
+    {
+        id: "pepeclap",
+        name: "Pepe clap",
+        label: "Clapping",
+        kind: "animated",
+        asset_url: "/media/reactions/pepeclap/hash/animation.gif",
+        poster_url: "/media/reactions/pepeclap/hash/poster.webp",
+        width: 64,
+        height: 64,
+        version: "sha256-clap",
+    },
+    {
+        id: "pepehmm",
+        name: "Pepe hmm",
+        label: "Thinking",
+        kind: "static",
+        asset_url: "/media/reactions/pepehmm/hash/asset.webp",
+        poster_url: "/media/reactions/pepehmm/hash/asset.webp",
+        width: 64,
+        height: 64,
+        version: "sha256-hmm",
+    },
+    {
+        id: "pepelove",
+        name: "Pepe love",
+        label: "Sending love",
+        kind: "static",
+        asset_url: "/media/reactions/pepelove/hash/asset.webp",
+        poster_url: "/media/reactions/pepelove/hash/asset.webp",
+        width: 64,
+        height: 64,
+        version: "sha256-love",
+    },
+];
+
 function reactionGroup(request) {
     return {
-        emoji: "🔥",
+        reaction: reactionCatalog[0],
         count: state.postReactionCount,
         viewer_reacted: isAuthenticated(request) && state.postReactionCount > 1,
         participants:
-            "/api/v1/posts/testing-secure-systems/reactions/%F0%9F%94%A5/participants/",
+            "/api/v1/posts/testing-secure-systems/reactions/pepeclap/participants/",
     };
 }
 
@@ -320,7 +356,14 @@ createServer(async (request, response) => {
         return;
     }
     if (path === "/api/v1/reactions/config/" && request.method === "GET") {
-        json(response, 200, { quick_reactions: ["🔥", "🎉", "👍"] });
+        json(response, 200, { quick_reactions: reactionCatalog });
+        return;
+    }
+    if (path === "/api/v1/reactions/catalog/" && request.method === "GET") {
+        json(response, 200, {
+            version: "sha256-browser-contract",
+            results: reactionCatalog,
+        });
         return;
     }
     if (path === "/api/v1/reactions/posts/" && request.method === "GET") {
@@ -350,6 +393,14 @@ createServer(async (request, response) => {
         path === "/api/v1/posts/testing-secure-systems/reactions/toggle/" &&
         request.method === "POST"
     ) {
+        const payload = JSON.parse(await body(request));
+        if (
+            Object.keys(payload).length !== 1 ||
+            payload.reaction_id !== "pepeclap"
+        ) {
+            json(response, 400, { reaction_id: ["Unknown reaction ID."] });
+            return;
+        }
         state.postReactionCount = state.postReactionCount > 1 ? 1 : 2;
         json(response, 200, {
             action: state.postReactionCount > 1 ? "added" : "removed",

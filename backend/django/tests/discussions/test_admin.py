@@ -2,8 +2,8 @@ import pytest
 from django.contrib.admin.sites import site
 from django.test import RequestFactory
 
-from apps.discussions.admin import CommentAdmin
-from apps.discussions.models import Comment, ReactionCatalogItem
+from apps.discussions.admin import CommentAdmin, ReactionAdmin
+from apps.discussions.models import Comment, PostReaction, ReactionCatalogItem
 from apps.discussions.services import create_top_level_comment
 from apps.discussions.wagtail_hooks import ReactionCatalogItemViewSet
 from apps.users.admin import ProjectUserAdmin
@@ -59,3 +59,14 @@ def test_reaction_catalog_wagtail_viewset_is_manifest_managed(admin_user):
         "immutable_asset_version",
     }.isdisjoint(viewset.get_form_fields())
     assert viewset.model is ReactionCatalogItem
+
+
+def test_reaction_admin_keeps_both_identity_fields_read_only(admin_user):
+    request = RequestFactory().post("/django-admin/discussions/postreaction/")
+    request.user = admin_user
+    model_admin = ReactionAdmin(PostReaction, site)
+
+    assert model_admin.has_add_permission(request) is False
+    assert model_admin.has_change_permission(request) is False
+    assert model_admin.has_delete_permission(request) is False
+    assert {"catalog_item", "emoji"}.issubset(model_admin.readonly_fields)

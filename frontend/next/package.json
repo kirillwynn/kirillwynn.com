@@ -20,8 +20,6 @@
     "test:e2e": "npm run test:browser-contract && npm run test:cross-stack"
   },
   "dependencies": {
-    "@emoji-mart/data": "1.2.1",
-    "emoji-regex": "10.6.0",
     "next": "16.2.11",
     "react": "19.2.8",
     "react-dom": "19.2.8",

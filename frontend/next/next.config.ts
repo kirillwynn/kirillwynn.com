@@ -74,6 +74,10 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/v1/reactions/config/`,
             },
             {
+                source: "/api/v1/reactions/catalog/",
+                destination: `${django}/api/v1/reactions/catalog/`,
+            },
+            {
                 source: "/api/v1/reactions/posts/",
                 destination: `${django}/api/v1/reactions/posts/`,
             },
@@ -86,8 +90,8 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/v1/posts/:slug/reactions/toggle/`,
             },
             {
-                source: "/api/v1/posts/:slug/reactions/:emoji/participants/",
-                destination: `${django}/api/v1/posts/:slug/reactions/:emoji/participants/`,
+                source: "/api/v1/posts/:slug/reactions/:reactionId/participants/",
+                destination: `${django}/api/v1/posts/:slug/reactions/:reactionId/participants/`,
             },
             {
                 source: "/api/v1/comments/:id/reactions/",
@@ -98,8 +102,8 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/v1/comments/:id/reactions/toggle/`,
             },
             {
-                source: "/api/v1/comments/:id/reactions/:emoji/participants/",
-                destination: `${django}/api/v1/comments/:id/reactions/:emoji/participants/`,
+                source: "/api/v1/comments/:id/reactions/:reactionId/participants/",
+                destination: `${django}/api/v1/comments/:id/reactions/:reactionId/participants/`,
             },
             {
                 source: "/api/v1/comments/:id/thread/",

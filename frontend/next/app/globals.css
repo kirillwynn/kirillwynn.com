@@ -427,10 +427,16 @@ img {
     font: inherit;
 }
 
-.feed-search-input:focus-visible {
-    border-color: var(--color-accent-strong);
-    outline: 3px solid var(--color-accent);
-    outline-offset: 1px;
+.feed-search .feed-search-input:focus,
+.feed-search .feed-search-input:focus-visible {
+    border-color: var(--color-border-strong);
+    outline: 0;
+    box-shadow: none;
+}
+
+.feed-search .feed-search-input:focus-visible {
+    background: var(--color-surface-subtle);
+    caret-color: var(--color-accent-strong);
 }
 
 .feed-search-input::placeholder {
@@ -724,13 +730,28 @@ img {
     padding: var(--space-4);
     text-decoration: none;
     transition:
-        border-color var(--motion-fast) var(--ease-standard),
-        background-color var(--motion-fast) var(--ease-standard);
+        transform var(--motion-fast) var(--ease-standard),
+        background-color var(--motion-fast) var(--ease-standard),
+        filter var(--motion-fast) var(--ease-standard);
 }
 
 .bridge-link:hover {
-    border-color: var(--color-accent);
-    background: var(--color-accent-soft);
+    transform: translateY(-2px);
+}
+
+.bridge-link:hover,
+.bridge-link:active,
+.bridge-link:focus,
+.bridge-link:focus-visible {
+    border-color: var(--color-border);
+    outline: 0;
+    box-shadow: none;
+}
+
+.bridge-link:focus-visible {
+    transform: translateY(-2px);
+    background: var(--color-surface-subtle);
+    filter: brightness(0.97);
 }
 
 .bridge-link img {
@@ -1038,9 +1059,36 @@ img {
     background: transparent;
 }
 
-.reaction-bar-slack-pills .reaction-pill__emoji {
-    font-size: 1rem;
+.reaction-image {
+    display: inline-flex;
+    width: 1.25rem;
+    height: 1.25rem;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.reaction-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.reaction-image__fallback {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--color-ink-soft);
+    font-size: 0.5rem;
     line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.reaction-bar-slack-pills .reaction-pill__asset {
+    width: 1rem;
+    height: 1rem;
 }
 
 .reaction-bar-slack-pills .reaction-pill__count {
@@ -1053,6 +1101,11 @@ img {
     border-radius: 999px;
     background: var(--color-surface);
     font-size: 1.125rem;
+}
+
+.quick-reaction__image {
+    width: 1.125rem;
+    height: 1.125rem;
 }
 
 .reaction-notice {
@@ -1078,7 +1131,7 @@ img {
     text-decoration: underline;
 }
 
-.emoji-picker {
+.reaction-picker {
     position: absolute;
     z-index: 30;
     top: calc(100% + 0.5rem);
@@ -1093,7 +1146,7 @@ img {
     box-shadow: var(--shadow-menu);
 }
 
-.emoji-search {
+.reaction-picker__search {
     min-height: 2.75rem;
     min-width: 0;
     flex: 1;
@@ -1102,47 +1155,29 @@ img {
     padding-inline: 0.75rem;
 }
 
-.emoji-categories {
-    display: flex;
-    margin-top: 0.75rem;
-    gap: 0.25rem;
-    overflow-x: auto;
-    padding-bottom: 0.25rem;
-}
-
-.emoji-categories button {
-    min-height: 2.75rem;
-    border-radius: var(--radius-md);
-    padding-inline: 0.625rem;
-    color: var(--color-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.emoji-categories button[aria-selected="true"] {
-    background: var(--color-accent-soft);
-    color: var(--color-accent-strong);
-}
-
-.emoji-grid {
+.reaction-picker__grid {
     display: grid;
-    grid-template-columns: repeat(8, minmax(2.5rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr));
     gap: 0.125rem;
 }
 
-.emoji-grid button {
+.reaction-picker__grid button {
     display: inline-flex;
     min-width: 2.75rem;
     min-height: 2.75rem;
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-md);
-    font-size: 1.35rem;
 }
 
-.emoji-grid button:hover,
-.emoji-grid button:focus-visible {
+.reaction-picker__grid button:hover,
+.reaction-picker__grid button:focus-visible {
     background: var(--color-accent-soft);
+}
+
+.reaction-picker__image {
+    width: 2rem;
+    height: 2rem;
 }
 
 .reaction-participants {
@@ -1370,5 +1405,13 @@ img {
         animation-iteration-count: 1 !important;
         scroll-behavior: auto !important;
         transition-duration: 0.01ms !important;
+    }
+
+    .bridge-link:hover,
+    .bridge-link:active,
+    .bridge-link:focus-visible {
+        transform: none;
+        background: var(--color-surface-subtle);
+        filter: brightness(0.96);
     }
 }

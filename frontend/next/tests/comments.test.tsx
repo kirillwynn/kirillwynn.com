@@ -33,7 +33,11 @@ import {
     type ThreadPage,
 } from "@/lib/comments";
 import { resetReactionMutationCoordinatorForTests } from "@/lib/reaction-mutation-coordinator";
-import { resetReactionConfigForTests } from "@/lib/reactions";
+import {
+    resetReactionConfigForTests,
+    type ReactionDescriptor,
+    type ReactionGroup,
+} from "@/lib/reactions";
 
 const anonymous: MeResponse = {
     authenticated: false,
@@ -91,12 +95,45 @@ function comment(overrides: Partial<PublicComment> = {}): PublicComment {
     };
 }
 
-function reaction(count: number, viewerReacted = false) {
+const clap: ReactionDescriptor = {
+    id: "pepeclap",
+    name: "Pepe clap",
+    label: "Clapping",
+    kind: "animated",
+    asset_url: "/media/reactions/pepeclap/hash/animation.gif",
+    poster_url: "/media/reactions/pepeclap/hash/poster.webp",
+    width: 64,
+    height: 64,
+    version: "sha256-clap",
+};
+
+const hmm: ReactionDescriptor = {
+    ...clap,
+    id: "pepehmm",
+    name: "Pepe hmm",
+    label: "Thinking",
+    kind: "static",
+    asset_url: "/media/reactions/pepehmm/hash/asset.webp",
+    poster_url: "/media/reactions/pepehmm/hash/asset.webp",
+    version: "sha256-hmm",
+};
+
+const love: ReactionDescriptor = {
+    ...hmm,
+    id: "pepelove",
+    name: "Pepe love",
+    label: "Sending love",
+    asset_url: "/media/reactions/pepelove/hash/asset.webp",
+    poster_url: "/media/reactions/pepelove/hash/asset.webp",
+    version: "sha256-love",
+};
+
+function reaction(count: number, viewerReacted = false): ReactionGroup {
     return {
-        emoji: "🔥",
+        reaction: clap,
         count,
         viewer_reacted: viewerReacted,
-        participants: "/api/v1/comments/7/reactions/%F0%9F%94%A5/participants/",
+        participants: "/api/v1/comments/7/reactions/pepeclap/participants/",
     };
 }
 
@@ -210,7 +247,7 @@ async function renderComments(
         }
         if (url === "/api/v1/reactions/config/") {
             return Promise.resolve(
-                response({ quick_reactions: ["👍", "❤️", "🎉"] }),
+                response({ quick_reactions: [clap, hmm, love] }),
             );
         }
         if (url.includes("/thread/") && thread) {
@@ -1278,20 +1315,23 @@ describe("comments and Slack-style thread UI", () => {
             expect(dialog).not.toBeNull();
 
             act(() => {
-                buttonByLabel(dialog ?? container, "Add 🔥 reaction")?.click();
+                buttonByLabel(
+                    dialog ?? container,
+                    "Add Clapping reaction",
+                )?.click();
             });
             await flush();
             const parentDuringMutation = mainCommentCard(container, 7);
             expect(
                 buttonByLabel(
                     parentDuringMutation ?? container,
-                    "Remove 🔥 reaction",
+                    "Remove Clapping reaction",
                 )?.disabled,
             ).toBe(true);
             expect(
                 buttonByLabel(
                     parentDuringMutation ?? container,
-                    "View 2 participants for 🔥",
+                    "View 2 participants for Clapping",
                 ),
             ).toBeDefined();
 
@@ -1322,26 +1362,26 @@ describe("comments and Slack-style thread UI", () => {
                 expect(
                     buttonByLabel(
                         parentAfterSettlement ?? container,
-                        "View 5 participants for 🔥",
+                        "View 5 participants for Clapping",
                     ),
                 ).toBeDefined();
                 expect(
                     buttonByLabel(
                         parentAfterSettlement ?? container,
-                        "Remove 🔥 reaction",
+                        "Remove Clapping reaction",
                     )?.disabled,
                 ).toBe(false);
             } else {
                 expect(
                     buttonByLabel(
                         parentAfterSettlement ?? container,
-                        "View 1 participant for 🔥",
+                        "View 1 participant for Clapping",
                     ),
                 ).toBeDefined();
                 expect(
                     buttonByLabel(
                         parentAfterSettlement ?? container,
-                        "Add 🔥 reaction",
+                        "Add Clapping reaction",
                     )?.disabled,
                 ).toBe(false);
             }
@@ -1357,7 +1397,7 @@ describe("comments and Slack-style thread UI", () => {
             expect(
                 buttonByLabel(
                     mainCommentCard(container, 7) ?? container,
-                    "View 9 participants for 🔥",
+                    "View 9 participants for Clapping",
                 ),
             ).toBeDefined();
             expect(

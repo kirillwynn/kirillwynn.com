@@ -2,18 +2,20 @@ import math
 from urllib.parse import quote
 
 from django.conf import settings
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.db.models import Count
 from django.utils import timezone
 
 from apps.blog.models import BlogPostPage
 from apps.blog.services.visibility import public_blog_posts
-from apps.discussions.emoji import normalize_emoji
 from apps.discussions.models import (
+    CATALOG_ID_VALIDATOR,
     Comment,
     CommentReaction,
     PostReaction,
+    ReactionCatalogItem,
     ReactionRateLimitBucket,
 )
 from apps.discussions.services import ensure_can_interact
@@ -74,26 +76,39 @@ def _toggle(*, model, lookup, create):
     return True
 
 
+def _catalog_item(reaction_id):
+    if not isinstance(reaction_id, str) or len(reaction_id) > 80:
+        raise ValidationError({"reaction_id": "A catalog ID string is required."})
+    try:
+        CATALOG_ID_VALIDATOR(reaction_id)
+        return ReactionCatalogItem.objects.get(
+            catalog_id=reaction_id,
+            enabled=True,
+            selectable=True,
+        )
+    except (ReactionCatalogItem.DoesNotExist, ValidationError):
+        raise ValidationError({"reaction_id": "Unknown or unavailable reaction ID."}) from None
+
+
 @transaction.atomic
-def toggle_post_reaction(*, post_id, user, emoji):
+def toggle_post_reaction(*, post_id, user, reaction_id):
     ensure_can_interact(user)
-    normalized = normalize_emoji(emoji)
     post = BlogPostPage.objects.select_for_update().get(pk=post_id)
     if not public_blog_posts().filter(pk=post.pk).exists():
         raise ReactionTargetUnavailable
+    item = _catalog_item(reaction_id)
     consume_reaction_rate_limit(user=user)
     added = _toggle(
         model=PostReaction,
-        lookup={"post": post, "user": user, "emoji": normalized},
-        create={"post": post, "user": user, "emoji": normalized},
+        lookup={"post": post, "user": user, "catalog_item": item},
+        create={"post": post, "user": user, "catalog_item": item},
     )
     return post, added
 
 
 @transaction.atomic
-def toggle_comment_reaction(*, comment_id, user, emoji):
+def toggle_comment_reaction(*, comment_id, user, reaction_id):
     ensure_can_interact(user)
-    normalized = normalize_emoji(emoji)
     comment = (
         Comment.objects.select_for_update(of=("self",)).select_related("post").get(pk=comment_id)
     )
@@ -101,13 +116,54 @@ def toggle_comment_reaction(*, comment_id, user, emoji):
         raise ReactionTargetUnavailable
     if comment.public_status != "visible":
         raise PermissionDenied("Deleted or hidden comments cannot receive reactions.")
+    item = _catalog_item(reaction_id)
     consume_reaction_rate_limit(user=user)
     added = _toggle(
         model=CommentReaction,
-        lookup={"comment": comment, "user": user, "emoji": normalized},
-        create={"comment": comment, "user": user, "emoji": normalized},
+        lookup={"comment": comment, "user": user, "catalog_item": item},
+        create={"comment": comment, "user": user, "catalog_item": item},
     )
     return comment, added
+
+
+def reaction_descriptor(item):
+    if isinstance(item, dict):
+
+        def value(field):
+            return item[f"catalog_item__{field}"]
+
+    else:
+
+        def value(field):
+            return getattr(item, field)
+
+    asset_url = default_storage.url(value("asset_storage_key"))
+    poster_key = value("poster_storage_key")
+    return {
+        "id": value("catalog_id"),
+        "name": value("display_name"),
+        "label": value("accessibility_label"),
+        "kind": value("kind"),
+        "asset_url": asset_url,
+        "poster_url": default_storage.url(poster_key) if poster_key else asset_url,
+        "width": value("intrinsic_width"),
+        "height": value("intrinsic_height"),
+        "version": value("immutable_asset_version"),
+    }
+
+
+CATALOG_GROUP_FIELDS = (
+    "catalog_item__catalog_id",
+    "catalog_item__display_name",
+    "catalog_item__accessibility_label",
+    "catalog_item__kind",
+    "catalog_item__asset_storage_key",
+    "catalog_item__poster_storage_key",
+    "catalog_item__intrinsic_width",
+    "catalog_item__intrinsic_height",
+    "catalog_item__immutable_asset_version",
+    "catalog_item__ordering",
+)
 
 
 def _groups(*, model, target_field, target_ids, viewer, participants_path):
@@ -118,34 +174,36 @@ def _groups(*, model, target_field, target_ids, viewer, participants_path):
     rows = (
         model.objects.filter(
             **{f"{target_field}__in": grouped},
-            catalog_item__isnull=True,
+            catalog_item__enabled=True,
         )
-        .values(target_field, "emoji")
+        .values(target_field, *CATALOG_GROUP_FIELDS)
         .annotate(count=Count("id"))
-        .order_by(target_field)
+        .order_by(
+            target_field,
+            "catalog_item__ordering",
+            "catalog_item__catalog_id",
+        )
     )
     viewer_reactions = set()
     if viewer.is_authenticated:
         viewer_reactions = set(
             model.objects.filter(
                 **{f"{target_field}__in": grouped},
-                catalog_item__isnull=True,
+                catalog_item__enabled=True,
                 user=viewer,
-            ).values_list(target_field, "emoji")
+            ).values_list(target_field, "catalog_item__catalog_id")
         )
     for row in rows:
         target_id = row[target_field]
-        emoji_value = row["emoji"]
+        reaction_id = row["catalog_item__catalog_id"]
         grouped[target_id].append(
             {
-                "emoji": emoji_value,
+                "reaction": reaction_descriptor(row),
                 "count": row["count"],
-                "viewer_reacted": (target_id, emoji_value) in viewer_reactions,
-                "participants": participants_path(target_id, emoji_value),
+                "viewer_reacted": (target_id, reaction_id) in viewer_reactions,
+                "participants": participants_path(target_id, reaction_id),
             }
         )
-    for groups in grouped.values():
-        groups.sort(key=lambda group: group["emoji"])
     return grouped
 
 
@@ -157,9 +215,8 @@ def post_reaction_groups(posts, *, viewer):
         target_field="post_id",
         target_ids=slugs_by_id,
         viewer=viewer,
-        participants_path=lambda post_id, emoji_value: (
-            f"/api/v1/posts/{quote(slugs_by_id[post_id])}/reactions/"
-            f"{quote(emoji_value, safe='')}/participants/"
+        participants_path=lambda post_id, reaction_id: (
+            f"/api/v1/posts/{quote(slugs_by_id[post_id])}/reactions/{reaction_id}/participants/"
         ),
     )
 
@@ -176,8 +233,8 @@ def comment_reaction_groups(comments, *, viewer):
         target_field="comment_id",
         target_ids=visible_ids,
         viewer=viewer,
-        participants_path=lambda comment_id, emoji_value: (
-            f"/api/v1/comments/{comment_id}/reactions/{quote(emoji_value, safe='')}/participants/"
+        participants_path=lambda comment_id, reaction_id: (
+            f"/api/v1/comments/{comment_id}/reactions/{reaction_id}/participants/"
         ),
     )
     return {comment.pk: grouped.get(comment.pk, []) for comment in comments}

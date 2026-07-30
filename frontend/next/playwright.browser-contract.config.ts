@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 const viewports = [
+    { name: "mobile-320", viewport: { width: 320, height: 812 } },
     { name: "mobile-375", viewport: { width: 375, height: 812 } },
     { name: "tablet-768", viewport: { width: 768, height: 1024 } },
     { name: "desktop-1440", viewport: { width: 1440, height: 900 } },

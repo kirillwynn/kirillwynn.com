@@ -35,12 +35,10 @@ def test_reaction_catalog_expansion_preserves_populated_unicode_rows_forward_and
     user,
 ):
     comment = create_top_level_comment(post=public_post, author=user, body="Legacy")
-    post_reaction = PostReaction.objects.create(post=public_post, user=user, emoji="🔥")
-    comment_reaction = CommentReaction.objects.create(
-        comment=comment,
-        user=user,
-        emoji="👩‍💻",
-    )
+    PostReaction.objects.bulk_create([PostReaction(post=public_post, user=user, emoji="🔥")])
+    CommentReaction.objects.bulk_create([CommentReaction(comment=comment, user=user, emoji="👩‍💻")])
+    post_reaction = PostReaction.objects.get(post=public_post, user=user)
+    comment_reaction = CommentReaction.objects.get(comment=comment, user=user)
     expansion = ("discussions", "0003_reaction_catalog_expansion")
     legacy = ("discussions", "0002_reactionratelimitbucket_reactionsettings_and_more")
 
@@ -78,6 +76,131 @@ def test_reaction_catalog_expansion_preserves_populated_unicode_rows_forward_and
             .objects.get(pk=comment_reaction.pk)
             .emoji
             == "👩‍💻"
+        )
+    finally:
+        MigrationExecutor(connection).migrate(leaf)
+
+
+def test_catalog_identity_activation_constraint_reverses_with_populated_rows(
+    public_post,
+    user,
+    reaction_catalog_items,
+):
+    first_item, second_item, _ = reaction_catalog_items
+    comment = create_top_level_comment(post=public_post, author=user, body="Mixed")
+    PostReaction.objects.bulk_create([PostReaction(post=public_post, user=user, emoji="🔥")])
+    CommentReaction.objects.bulk_create([CommentReaction(comment=comment, user=user, emoji="👩‍💻")])
+    custom_post = PostReaction.objects.create(
+        post=public_post,
+        user=user,
+        catalog_item=first_item,
+    )
+    second_custom_post = PostReaction.objects.create(
+        post=public_post,
+        user=user,
+        catalog_item=second_item,
+    )
+    custom_comment = CommentReaction.objects.create(
+        comment=comment,
+        user=user,
+        catalog_item=first_item,
+    )
+    second_custom_comment = CommentReaction.objects.create(
+        comment=comment,
+        user=user,
+        catalog_item=second_item,
+    )
+    expansion = ("discussions", "0003_reaction_catalog_expansion")
+    activation = ("discussions", "0004_activate_catalog_reaction_identity")
+
+    executor = MigrationExecutor(connection)
+    leaf = executor.loader.graph.leaf_nodes("discussions")
+    try:
+        executor.migrate([expansion])
+        expanded_apps = executor.loader.project_state([expansion]).apps
+        ExpandedPostReaction = expanded_apps.get_model(
+            "discussions",
+            "PostReaction",
+        )
+        assert ExpandedPostReaction.objects.get(pk=custom_post.pk).emoji == ""
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([activation])
+        activated_apps = executor.loader.project_state([activation]).apps
+        ActivatedPostReaction = activated_apps.get_model(
+            "discussions",
+            "PostReaction",
+        )
+        ActivatedCommentReaction = activated_apps.get_model(
+            "discussions",
+            "CommentReaction",
+        )
+        assert (
+            ActivatedPostReaction.objects.filter(
+                post_id=public_post.pk,
+                user_id=user.pk,
+            ).count()
+            == 3
+        )
+        assert (
+            ActivatedCommentReaction.objects.filter(
+                comment_id=comment.pk,
+                user_id=user.pk,
+            ).count()
+            == 3
+        )
+        assert ActivatedPostReaction.objects.get(pk=custom_post.pk).catalog_item_id
+        assert ActivatedPostReaction.objects.get(pk=second_custom_post.pk).catalog_item_id
+        assert ActivatedCommentReaction.objects.get(pk=custom_comment.pk).catalog_item_id
+        assert ActivatedCommentReaction.objects.get(pk=second_custom_comment.pk).catalog_item_id
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([expansion])
+        reversed_apps = executor.loader.project_state([expansion]).apps
+        ReversedPostReaction = reversed_apps.get_model(
+            "discussions",
+            "PostReaction",
+        )
+        ReversedCommentReaction = reversed_apps.get_model(
+            "discussions",
+            "CommentReaction",
+        )
+        reversed_posts = ReversedPostReaction.objects.filter(
+            post_id=public_post.pk,
+            user_id=user.pk,
+        )
+        reversed_comments = ReversedCommentReaction.objects.filter(
+            comment_id=comment.pk,
+            user_id=user.pk,
+        )
+        assert reversed_posts.count() == reversed_comments.count() == 3
+        assert list(reversed_posts.values_list("emoji", flat=True)).count("") == 2
+        assert list(reversed_comments.values_list("emoji", flat=True)).count("") == 2
+        assert set(reversed_posts.values_list("catalog_item_id", flat=True)) == {
+            None,
+            first_item.catalog_id,
+            second_item.catalog_id,
+        }
+        assert set(reversed_comments.values_list("catalog_item_id", flat=True)) == {
+            None,
+            first_item.catalog_id,
+            second_item.catalog_id,
+        }
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([activation])
+        reapplied_apps = executor.loader.project_state([activation]).apps
+        assert (
+            reapplied_apps.get_model("discussions", "PostReaction")
+            .objects.filter(post_id=public_post.pk, user_id=user.pk)
+            .count()
+            == 3
+        )
+        assert (
+            reapplied_apps.get_model("discussions", "CommentReaction")
+            .objects.filter(comment_id=comment.pk, user_id=user.pk)
+            .count()
+            == 3
         )
     finally:
         MigrationExecutor(connection).migrate(leaf)

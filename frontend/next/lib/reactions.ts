@@ -1,5 +1,17 @@
+export type ReactionDescriptor = {
+    id: string;
+    name: string;
+    label: string;
+    kind: "static" | "animated";
+    asset_url: string;
+    poster_url: string;
+    width: number;
+    height: number;
+    version: string;
+};
+
 export type ReactionGroup = {
-    emoji: string;
+    reaction: ReactionDescriptor;
     count: number;
     viewer_reacted: boolean;
     participants: string;
@@ -32,7 +44,12 @@ export type ReactionParticipantPage = {
 };
 
 export type ReactionConfig = {
-    quick_reactions: [string, string, string];
+    quick_reactions: ReactionDescriptor[];
+};
+
+export type ReactionCatalog = {
+    version: string;
+    results: ReactionDescriptor[];
 };
 
 export type PostReactionBatchResult = {
@@ -81,9 +98,9 @@ function togglePath(target: ReactionTarget): string {
 
 export function reactionParticipantPath(
     target: ReactionTarget,
-    emoji: string,
+    reactionId: string,
 ): string {
-    return `${reactionPath(target)}${encodeURIComponent(emoji)}/participants/`;
+    return `${reactionPath(target)}${encodeURIComponent(reactionId)}/participants/`;
 }
 
 async function responseMessage(response: Response): Promise<string> {
@@ -94,9 +111,13 @@ async function responseMessage(response: Response): Promise<string> {
             if (typeof detail === "string") {
                 return detail;
             }
-            const emoji = (payload as { emoji?: unknown }).emoji;
-            if (Array.isArray(emoji) && typeof emoji[0] === "string") {
-                return emoji[0];
+            const reactionId = (payload as { reaction_id?: unknown })
+                .reaction_id;
+            if (
+                Array.isArray(reactionId) &&
+                typeof reactionId[0] === "string"
+            ) {
+                return reactionId[0];
             }
         }
     } catch {
@@ -107,14 +128,18 @@ async function responseMessage(response: Response): Promise<string> {
         : "The reaction request could not be completed.";
 }
 
-async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+    url: string,
+    options: RequestInit = {},
+    viewerDependent = true,
+): Promise<T> {
     const headers = new Headers(options.headers);
     if (!headers.has("Accept")) {
         headers.set("Accept", "application/json");
     }
     const response = await fetch(url, {
         ...options,
-        cache: "no-store",
+        cache: viewerDependent ? "no-store" : "default",
         credentials: "same-origin",
         headers,
     });
@@ -160,7 +185,7 @@ export async function getPostReactionBatch(
 
 export async function toggleReaction(
     target: ReactionTarget,
-    emoji: string,
+    reactionId: string,
     csrfToken: string,
 ): Promise<ReactionGroup[]> {
     const response = await request<ReactionResponse>(togglePath(target), {
@@ -169,7 +194,7 @@ export async function toggleReaction(
             "Content-Type": "application/json",
             "X-CSRFToken": csrfToken,
         },
-        body: JSON.stringify({ emoji }),
+        body: JSON.stringify({ reaction_id: reactionId }),
     });
     return response.reactions;
 }
@@ -191,12 +216,12 @@ function checkedRelativePath(value: string, expectedPath: string): string {
 
 export function getReactionParticipants(
     target: ReactionTarget,
-    emoji: string,
+    reactionId: string,
     endpoint: string,
     cursor?: string,
     signal?: AbortSignal,
 ): Promise<ReactionParticipantPage> {
-    const expected = reactionParticipantPath(target, emoji);
+    const expected = reactionParticipantPath(target, reactionId);
     const initial = checkedRelativePath(endpoint, expected);
     return request<ReactionParticipantPage>(
         cursor ? checkedRelativePath(cursor, expected) : initial,
@@ -205,10 +230,13 @@ export function getReactionParticipants(
 }
 
 let configPromise: Promise<ReactionConfig> | null = null;
+let catalogPromise: Promise<ReactionCatalog> | null = null;
 
 export function getReactionConfig(): Promise<ReactionConfig> {
     configPromise ??= request<ReactionConfig>(
         "/api/v1/reactions/config/",
+        {},
+        false,
     ).catch((error: unknown) => {
         configPromise = null;
         throw error;
@@ -216,6 +244,19 @@ export function getReactionConfig(): Promise<ReactionConfig> {
     return configPromise;
 }
 
+export function getReactionCatalog(): Promise<ReactionCatalog> {
+    catalogPromise ??= request<ReactionCatalog>(
+        "/api/v1/reactions/catalog/",
+        {},
+        false,
+    ).catch((error: unknown) => {
+        catalogPromise = null;
+        throw error;
+    });
+    return catalogPromise;
+}
+
 export function resetReactionConfigForTests(): void {
     configPromise = null;
+    catalogPromise = null;
 }

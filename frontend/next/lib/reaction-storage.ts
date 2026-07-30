@@ -1,52 +1,37 @@
-import emojiRegex from "emoji-regex";
-
 import type { ReactionTarget } from "@/lib/reactions";
 
-const INTENT_PREFIX = "kw:reaction-intent:v1";
+const STORAGE_VERSION = 2;
+const INTENT_PREFIX = "kw:reaction-intent:v2";
+const LEGACY_INTENT_PREFIX = "kw:reaction-intent:v1";
 const INTENT_TTL_MS = 10 * 60 * 1000;
-const RECENT_KEY = "kw:reaction-recent:v1";
+const RECENT_KEY = "kw:reaction-recent:v2";
+const LEGACY_RECENT_KEY = "kw:reaction-recent:v1";
 const RECENT_LIMIT = 12;
+const REACTION_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 type PendingReaction = {
-    emoji: string;
+    version: 2;
+    reactionId: string;
     createdAt: number;
 };
 
-export function isValidStoredEmoji(value: unknown): value is string {
-    if (typeof value !== "string" || !value || value.includes(":")) {
-        return false;
-    }
-    const codePoints = Array.from(value);
-    if (
-        codePoints.length > 32 ||
-        new TextEncoder().encode(value).length > 128 ||
-        value.normalize("NFC") !== value
-    ) {
-        return false;
-    }
-    if (
-        codePoints.some((character) => {
-            const codePoint = character.codePointAt(0) ?? 0;
-            return (
-                /\s/u.test(character) ||
-                codePoint <= 31 ||
-                codePoint === 127 ||
-                (codePoint >= 0xd800 && codePoint <= 0xdfff) ||
-                (codePoint >= 0x202a && codePoint <= 0x202e) ||
-                (codePoint >= 0x2066 && codePoint <= 0x2069)
-            );
-        }) ||
-        /\p{Emoji_Presentation}\ufe0f/u.test(value)
-    ) {
-        return false;
-    }
-    const matches = value.match(emojiRegex());
-    return matches?.length === 1 && matches[0] === value;
+type RecentReactions = {
+    version: 2;
+    reactionIds: string[];
+};
+
+export function isValidReactionId(value: unknown): value is string {
+    return (
+        typeof value === "string" &&
+        value.length > 0 &&
+        value.length <= 80 &&
+        REACTION_ID.test(value)
+    );
 }
 
-function intentPrefix(target: ReactionTarget): string {
+function intentPrefix(target: ReactionTarget, prefix = INTENT_PREFIX): string {
     return [
-        INTENT_PREFIX,
+        prefix,
         encodeURIComponent(target.slug),
         target.kind,
         String(target.id),
@@ -54,37 +39,48 @@ function intentPrefix(target: ReactionTarget): string {
     ].join(":");
 }
 
-function intentKey(target: ReactionTarget, emoji: string): string {
-    return `${intentPrefix(target)}${encodeURIComponent(emoji)}`;
+function intentKey(target: ReactionTarget, reactionId: string): string {
+    return `${intentPrefix(target)}${encodeURIComponent(reactionId)}`;
 }
 
-function intentKeys(target: ReactionTarget): string[] {
-    const prefix = intentPrefix(target);
+function intentKeys(target: ReactionTarget, prefix = INTENT_PREFIX): string[] {
+    const targetPrefix = intentPrefix(target, prefix);
     const keys: string[] = [];
     for (let index = 0; index < sessionStorage.length; index += 1) {
         const key = sessionStorage.key(index);
-        if (key?.startsWith(prefix)) {
+        if (key?.startsWith(targetPrefix)) {
             keys.push(key);
         }
     }
     return keys;
 }
 
+function clearLegacyIntents(target: ReactionTarget): void {
+    for (const key of intentKeys(target, LEGACY_INTENT_PREFIX)) {
+        sessionStorage.removeItem(key);
+    }
+}
+
 export function savePendingReaction(
     target: ReactionTarget,
-    emoji: string,
+    reactionId: string,
     now = Date.now(),
 ): void {
-    if (!isValidStoredEmoji(emoji) || !Number.isFinite(now)) {
+    if (!isValidReactionId(reactionId) || !Number.isFinite(now)) {
         return;
     }
     try {
+        clearLegacyIntents(target);
         for (const key of intentKeys(target)) {
             sessionStorage.removeItem(key);
         }
         sessionStorage.setItem(
-            intentKey(target, emoji),
-            JSON.stringify({ emoji, createdAt: now } satisfies PendingReaction),
+            intentKey(target, reactionId),
+            JSON.stringify({
+                version: STORAGE_VERSION,
+                reactionId,
+                createdAt: now,
+            } satisfies PendingReaction),
         );
     } catch {
         // Storage can be unavailable in private or constrained browser modes.
@@ -96,6 +92,7 @@ export function loadPendingReaction(
     now = Date.now(),
 ): string | null {
     try {
+        clearLegacyIntents(target);
         let newest: (PendingReaction & { key: string }) | null = null;
         for (const key of intentKeys(target)) {
             let parsed: unknown;
@@ -113,9 +110,10 @@ export function loadPendingReaction(
             }
             const candidate = parsed as Partial<PendingReaction>;
             if (
-                !isValidStoredEmoji(candidate.emoji) ||
+                candidate.version !== STORAGE_VERSION ||
+                !isValidReactionId(candidate.reactionId) ||
                 !Number.isFinite(candidate.createdAt) ||
-                key !== intentKey(target, candidate.emoji) ||
+                key !== intentKey(target, candidate.reactionId) ||
                 now - (candidate.createdAt ?? 0) > INTENT_TTL_MS ||
                 now < (candidate.createdAt ?? 0)
             ) {
@@ -137,7 +135,7 @@ export function loadPendingReaction(
                     sessionStorage.removeItem(key);
                 }
             }
-            return newest.emoji;
+            return newest.reactionId;
         }
     } catch {
         return null;
@@ -147,6 +145,7 @@ export function loadPendingReaction(
 
 export function clearPendingReaction(target: ReactionTarget): void {
     try {
+        clearLegacyIntents(target);
         for (const key of intentKeys(target)) {
             sessionStorage.removeItem(key);
         }
@@ -157,20 +156,29 @@ export function clearPendingReaction(target: ReactionTarget): void {
 
 export function loadRecentReactions(): string[] {
     try {
+        localStorage.removeItem(LEGACY_RECENT_KEY);
         const parsed: unknown = JSON.parse(
-            localStorage.getItem(RECENT_KEY) ?? "[]",
+            localStorage.getItem(RECENT_KEY) ?? "",
         );
-        if (!Array.isArray(parsed)) {
+        if (!parsed || typeof parsed !== "object") {
             localStorage.removeItem(RECENT_KEY);
             return [];
         }
-        return Array.from(new Set(parsed.filter(isValidStoredEmoji))).slice(
-            0,
-            RECENT_LIMIT,
-        );
+        const candidate = parsed as Partial<RecentReactions>;
+        if (
+            candidate.version !== STORAGE_VERSION ||
+            !Array.isArray(candidate.reactionIds)
+        ) {
+            localStorage.removeItem(RECENT_KEY);
+            return [];
+        }
+        return Array.from(
+            new Set(candidate.reactionIds.filter(isValidReactionId)),
+        ).slice(0, RECENT_LIMIT);
     } catch {
         try {
             localStorage.removeItem(RECENT_KEY);
+            localStorage.removeItem(LEGACY_RECENT_KEY);
         } catch {
             // Ignore unavailable storage.
         }
@@ -178,16 +186,22 @@ export function loadRecentReactions(): string[] {
     }
 }
 
-export function rememberReaction(emoji: string): string[] {
-    if (!isValidStoredEmoji(emoji)) {
+export function rememberReaction(reactionId: string): string[] {
+    if (!isValidReactionId(reactionId)) {
         return loadRecentReactions();
     }
     const recent = [
-        emoji,
-        ...loadRecentReactions().filter((value) => value !== emoji),
+        reactionId,
+        ...loadRecentReactions().filter((value) => value !== reactionId),
     ].slice(0, RECENT_LIMIT);
     try {
-        localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+        localStorage.setItem(
+            RECENT_KEY,
+            JSON.stringify({
+                version: STORAGE_VERSION,
+                reactionIds: recent,
+            } satisfies RecentReactions),
+        );
     } catch {
         // The in-memory result still updates the current picker.
     }
@@ -197,4 +211,5 @@ export function rememberReaction(emoji: string): string[] {
 export const reactionStorageLimits = {
     intentTtlMs: INTENT_TTL_MS,
     recentLimit: RECENT_LIMIT,
+    version: STORAGE_VERSION,
 };

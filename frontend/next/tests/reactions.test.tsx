@@ -8,13 +8,14 @@ import { AuthProvider } from "@/components/auth-provider";
 import { CommentCard } from "@/components/comment-card";
 import { PostReactions } from "@/components/post-reactions";
 import { ReactionBar } from "@/components/reaction-bar";
+import { ReactionImage } from "@/components/reaction-image";
 import type { MeResponse } from "@/lib/auth";
 import { applyCommentReactionChange } from "@/lib/comment-reconciliation";
 import type { PublicComment } from "@/lib/comments";
 import { resetReactionMutationCoordinatorForTests } from "@/lib/reaction-mutation-coordinator";
 import {
     clearPendingReaction,
-    isValidStoredEmoji,
+    isValidReactionId,
     loadPendingReaction,
     loadRecentReactions,
     reactionStorageLimits,
@@ -26,6 +27,7 @@ import {
     resetReactionConfigForTests,
     toggleReaction,
     type ReactionChange,
+    type ReactionDescriptor,
     type ReactionGroup,
     type ReactionTarget,
 } from "@/lib/reactions";
@@ -71,13 +73,73 @@ const commentTarget: Extract<ReactionTarget, { kind: "comment" }> = {
     returnTo: "/posts/привет-мир?thread=7",
 };
 
+const clap: ReactionDescriptor = {
+    id: "pepeclap",
+    name: "Pepe clap",
+    label: "Clapping",
+    kind: "animated",
+    asset_url: "/media/reactions/pepeclap/hash/animation.gif",
+    poster_url: "/media/reactions/pepeclap/hash/poster.webp",
+    width: 64,
+    height: 64,
+    version: "sha256-clap",
+};
+
+const hmm: ReactionDescriptor = {
+    id: "pepehmm",
+    name: "Pepe hmm",
+    label: "Thinking",
+    kind: "static",
+    asset_url: "/media/reactions/pepehmm/hash/asset.webp",
+    poster_url: "/media/reactions/pepehmm/hash/asset.webp",
+    width: 64,
+    height: 64,
+    version: "sha256-hmm",
+};
+
+const love: ReactionDescriptor = {
+    id: "pepelove",
+    name: "Pepe love",
+    label: "Sending love",
+    kind: "static",
+    asset_url: "/media/reactions/pepelove/hash/asset.webp",
+    poster_url: "/media/reactions/pepelove/hash/asset.webp",
+    width: 64,
+    height: 64,
+    version: "sha256-love",
+};
+
+const rocket: ReactionDescriptor = {
+    id: "peperocket",
+    name: "Pepe rocket",
+    label: "Launching a rocket",
+    kind: "animated",
+    asset_url: "/media/reactions/peperocket/hash/animation.gif",
+    poster_url: "/media/reactions/peperocket/hash/poster.webp",
+    width: 64,
+    height: 64,
+    version: "sha256-rocket",
+};
+
+const partyReaction: ReactionDescriptor = {
+    id: "pepeparty",
+    name: "Pepe party",
+    label: "Celebrating",
+    kind: "static",
+    asset_url: "/media/reactions/pepeparty/hash/asset.webp",
+    poster_url: "/media/reactions/pepeparty/hash/asset.webp",
+    width: 64,
+    height: 64,
+    version: "sha256-party",
+};
+
 function group(overrides: Partial<ReactionGroup> = {}): ReactionGroup {
     return {
-        emoji: "🔥",
+        reaction: clap,
         count: 1,
         viewer_reacted: false,
         participants:
-            "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%94%A5/participants/",
+            "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/pepeclap/participants/",
         ...overrides,
     };
 }
@@ -144,7 +206,15 @@ function defaultFetch(
         }
         if (url === "/api/v1/reactions/config/") {
             return Promise.resolve(
-                response({ quick_reactions: ["👍", "❤️", "🎉"] }),
+                response({ quick_reactions: [clap, hmm, love] }),
+            );
+        }
+        if (url === "/api/v1/reactions/catalog/") {
+            return Promise.resolve(
+                response({
+                    version: "sha256-test",
+                    results: [clap, hmm, love, partyReaction, rocket],
+                }),
             );
         }
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -186,7 +256,7 @@ async function render(
     });
     await waitFor(
         () =>
-            container.querySelector('[aria-label="Open full emoji picker"]') !==
+            container.querySelector('[aria-label="Open reaction picker"]') !==
             null,
     );
     return { container, root };
@@ -243,7 +313,7 @@ function DuplicateReactionBars({
             reactions: [
                 group({
                     participants:
-                        "/api/v1/comments/7/reactions/%F0%9F%94%A5/participants/",
+                        "/api/v1/comments/7/reactions/pepeclap/participants/",
                 }),
             ],
         }),
@@ -315,12 +385,12 @@ afterEach(() => {
 });
 
 describe("reaction API and local storage boundaries", () => {
-    it("encodes Unicode slug and compound emoji once and sends session CSRF", async () => {
+    it("encodes the Unicode slug once and sends only a catalog ID with session CSRF", async () => {
         vi.mocked(fetch).mockResolvedValueOnce(
             response({ action: "added", reactions: [] }),
         );
 
-        await toggleReaction(postTarget, "👩‍💻", "csrf");
+        await toggleReaction(postTarget, clap.id, "csrf");
 
         expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe(
             "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/toggle/",
@@ -329,14 +399,16 @@ describe("reaction API and local storage boundaries", () => {
         expect(options.credentials).toBe("same-origin");
         expect(options.cache).toBe("no-store");
         expect((options.headers as Headers).get("X-CSRFToken")).toBe("csrf");
-        expect(JSON.parse(options.body as string)).toEqual({ emoji: "👩‍💻" });
+        expect(JSON.parse(options.body as string) as unknown).toEqual({
+            reaction_id: clap.id,
+        });
     });
 
     it("rejects external and cross-reaction participant cursors", () => {
         expect(() =>
             getReactionParticipants(
                 postTarget,
-                "🔥",
+                clap.id,
                 group().participants,
                 "https://evil.example/cursor",
             ),
@@ -344,66 +416,73 @@ describe("reaction API and local storage boundaries", () => {
         expect(() =>
             getReactionParticipants(
                 postTarget,
-                "🔥",
-                "/api/v1/comments/7/reactions/%F0%9F%94%A5/participants/",
+                clap.id,
+                "/api/v1/comments/7/reactions/pepeclap/participants/",
             ),
         ).toThrow("participants cursor is invalid");
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it("strictly validates recent and pending emoji without the picker dataset", async () => {
+    it("strictly validates versioned catalog-ID storage and clears Unicode v1 entries", () => {
         for (let index = 0; index < 20; index += 1) {
-            rememberReaction(index % 2 ? "🔥" : `🎉`);
+            rememberReaction(index % 2 ? clap.id : hmm.id);
         }
-        expect(loadRecentReactions()).toEqual(["🔥", "🎉"]);
+        expect(loadRecentReactions()).toEqual([clap.id, hmm.id]);
 
         localStorage.setItem(
-            "kw:reaction-recent:v1",
-            JSON.stringify([
-                "🔥",
-                "hello",
-                ":custom:",
-                7,
-                "🔥\u202e",
-                "👩‍",
-                "🔥‍",
-                "🔥️",
-                "☕️",
-                "🇺",
-                "🇺🇸🇨",
-                "🏳️‍",
-            ]),
+            "kw:reaction-recent:v2",
+            JSON.stringify({
+                version: 2,
+                reactionIds: [
+                    clap.id,
+                    "🔥",
+                    "PepeClap",
+                    "pepeclap.png",
+                    "https://media.example/reaction.gif",
+                    7,
+                ],
+            }),
         );
-        expect(loadRecentReactions()).toEqual(["🔥"]);
+        expect(loadRecentReactions()).toEqual([clap.id]);
 
-        for (const malformed of ["👩‍", "🔥‍", "🔥️", "☕️", "🇺", "🇺🇸🇨", "🏳️‍"]) {
-            expect(isValidStoredEmoji(malformed)).toBe(false);
+        for (const malformed of [
+            "🔥",
+            ":pepeclap:",
+            "pepeclap.png",
+            "PepeClap",
+            "../pepeclap",
+            "https://media.example/reaction.gif",
+        ]) {
+            expect(isValidReactionId(malformed)).toBe(false);
             savePendingReaction(postTarget, malformed, 90);
             expect(loadPendingReaction(postTarget, 91)).toBeNull();
         }
 
         const pendingKey =
-            "kw:reaction-intent:v1:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:%F0%9F%94%A5";
+            "kw:reaction-intent:v2:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:pepeclap";
         for (const malformedJson of [
             "null",
             "[]",
             "{}",
-            '{"emoji":"👩‍","createdAt":90}',
-            '{"emoji":"🔥","createdAt":"90"}',
+            '{"version":2,"reactionId":"🔥","createdAt":90}',
+            '{"version":2,"reactionId":"pepeclap","createdAt":"90"}',
+            '{"version":1,"reactionId":"pepeclap","createdAt":90}',
         ]) {
             sessionStorage.setItem(pendingKey, malformedJson);
             expect(loadPendingReaction(postTarget, 91)).toBeNull();
             expect(sessionStorage.getItem(pendingKey)).toBeNull();
         }
 
-        const data = (await import("@emoji-mart/data")).default as {
-            emojis: Record<string, { skins: Array<{ native: string }> }>;
-        };
-        for (const item of Object.values(data.emojis)) {
-            for (const skin of item.skins) {
-                expect(isValidStoredEmoji(skin.native)).toBe(true);
-            }
-        }
+        localStorage.removeItem("kw:reaction-recent:v2");
+        localStorage.setItem("kw:reaction-recent:v1", JSON.stringify(["🔥"]));
+        sessionStorage.setItem(
+            "kw:reaction-intent:v1:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:%F0%9F%94%A5",
+            JSON.stringify({ emoji: "🔥", createdAt: 90 }),
+        );
+        expect(loadRecentReactions()).toEqual([]);
+        expect(loadPendingReaction(postTarget, 91)).toBeNull();
+        expect(localStorage.getItem("kw:reaction-recent:v1")).toBeNull();
+        expect(sessionStorage.length).toBe(0);
     });
 
     it("keeps one newest pending intent per target and clears the whole target", () => {
@@ -411,12 +490,12 @@ describe("reaction API and local storage boundaries", () => {
             ...postTarget,
             id: 10,
         };
-        savePendingReaction(otherTarget, "❤️", 50);
-        savePendingReaction(postTarget, "🔥", 100);
-        savePendingReaction(postTarget, "🎉", 200);
+        savePendingReaction(otherTarget, love.id, 50);
+        savePendingReaction(postTarget, clap.id, 100);
+        savePendingReaction(postTarget, hmm.id, 200);
 
-        expect(loadPendingReaction(postTarget, 201)).toBe("🎉");
-        expect(loadPendingReaction(otherTarget, 201)).toBe("❤️");
+        expect(loadPendingReaction(postTarget, 201)).toBe(hmm.id);
+        expect(loadPendingReaction(otherTarget, 201)).toBe(love.id);
         expect(
             Array.from({ length: sessionStorage.length }, (_, index) =>
                 sessionStorage.key(index),
@@ -425,22 +504,30 @@ describe("reaction API and local storage boundaries", () => {
 
         clearPendingReaction(postTarget);
         expect(loadPendingReaction(postTarget, 202)).toBeNull();
-        expect(loadPendingReaction(otherTarget, 202)).toBe("❤️");
+        expect(loadPendingReaction(otherTarget, 202)).toBe(love.id);
     });
 
-    it("chooses legacy duplicate intents by createdAt and preserves TTL", () => {
+    it("chooses duplicate v2 intents by createdAt and preserves TTL", () => {
         const prefix =
-            "kw:reaction-intent:v1:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:";
+            "kw:reaction-intent:v2:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:";
         sessionStorage.setItem(
-            `${prefix}${encodeURIComponent("🎉")}`,
-            JSON.stringify({ emoji: "🎉", createdAt: 200 }),
+            `${prefix}${hmm.id}`,
+            JSON.stringify({
+                version: 2,
+                reactionId: hmm.id,
+                createdAt: 200,
+            }),
         );
         sessionStorage.setItem(
-            `${prefix}${encodeURIComponent("🔥")}`,
-            JSON.stringify({ emoji: "🔥", createdAt: 100 }),
+            `${prefix}${clap.id}`,
+            JSON.stringify({
+                version: 2,
+                reactionId: clap.id,
+                createdAt: 100,
+            }),
         );
 
-        expect(loadPendingReaction(postTarget, 201)).toBe("🎉");
+        expect(loadPendingReaction(postTarget, 201)).toBe(hmm.id);
         expect(sessionStorage.length).toBe(1);
         expect(
             loadPendingReaction(
@@ -451,8 +538,146 @@ describe("reaction API and local storage boundaries", () => {
     });
 });
 
+describe("reaction asset loading boundaries", () => {
+    it("uses static assets and falls back from a broken animation to poster and text", async () => {
+        const container = document.createElement("div");
+        document.body.append(container);
+        const root = createRoot(container);
+        act(() => {
+            root.render(
+                <>
+                    <button aria-label="Clapping" type="button">
+                        <ReactionImage reaction={clap} />
+                    </button>
+                    <button aria-label="Thinking" type="button">
+                        <ReactionImage reaction={hmm} />
+                    </button>
+                </>,
+            );
+        });
+        await flush();
+
+        const images = container.querySelectorAll("img");
+        expect(images[0].getAttribute("src")).toBe(clap.asset_url);
+        expect(images[0].getAttribute("alt")).toBe("");
+        expect(images[1].getAttribute("src")).toBe(hmm.asset_url);
+
+        act(() => {
+            images[0].dispatchEvent(new Event("error", { bubbles: true }));
+        });
+        await flush();
+        const poster = container.querySelectorAll("img")[0];
+        expect(poster.getAttribute("src")).toBe(clap.poster_url);
+        act(() => {
+            poster.dispatchEvent(new Event("error", { bubbles: true }));
+        });
+        await flush();
+        expect(container.textContent).toContain(clap.name);
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("never selects an animation URL in reduced motion", async () => {
+        vi.mocked(matchMedia).mockReturnValue({
+            matches: true,
+            media: "(prefers-reduced-motion: reduce)",
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        });
+        const container = document.createElement("div");
+        document.body.append(container);
+        const root = createRoot(container);
+        act(() => {
+            root.render(
+                <button aria-label="Clapping" type="button">
+                    <ReactionImage reaction={clap} />
+                </button>,
+            );
+        });
+        await flush();
+
+        const image = container.querySelector("img");
+        expect(image?.getAttribute("src")).toBe(clap.poster_url);
+        expect(container.innerHTML).not.toContain(clap.asset_url);
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("loads animation only while intersecting and restores the poster offscreen", async () => {
+        let observerCallback: IntersectionObserverCallback | null = null;
+        let observerOptions: IntersectionObserverInit | undefined;
+        class TestIntersectionObserver implements IntersectionObserver {
+            readonly root = null;
+            readonly rootMargin = "0px";
+            readonly thresholds = [0];
+
+            constructor(
+                callback: IntersectionObserverCallback,
+                options?: IntersectionObserverInit,
+            ) {
+                observerCallback = callback;
+                observerOptions = options;
+            }
+
+            disconnect = vi.fn();
+            observe = vi.fn();
+            takeRecords(): IntersectionObserverEntry[] {
+                return [];
+            }
+            unobserve = vi.fn();
+        }
+        vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+        const container = document.createElement("div");
+        document.body.append(container);
+        const root = createRoot(container);
+        act(() => {
+            root.render(
+                <button aria-label="Clapping" type="button">
+                    <ReactionImage reaction={clap} />
+                </button>,
+            );
+        });
+        await flush();
+        expect(observerOptions?.rootMargin).toBe("0px");
+        expect(container.querySelector("img")?.getAttribute("src")).toBe(
+            clap.poster_url,
+        );
+
+        act(() => {
+            observerCallback?.(
+                [{ isIntersecting: true } as IntersectionObserverEntry],
+                {} as IntersectionObserver,
+            );
+        });
+        expect(container.querySelector("img")?.getAttribute("src")).toBe(
+            clap.asset_url,
+        );
+        act(() => {
+            observerCallback?.(
+                [{ isIntersecting: false } as IntersectionObserverEntry],
+                {} as IntersectionObserver,
+            );
+        });
+        expect(container.querySelector("img")?.getAttribute("src")).toBe(
+            clap.poster_url,
+        );
+
+        act(() => {
+            root.unmount();
+        });
+    });
+});
+
 describe("post, comment, and reply reaction UI", () => {
-    it("loads post pills, viewer highlight, and three quick reactions", async () => {
+    it("loads post pills, viewer highlight, and hides a duplicate quick reaction", async () => {
         defaultFetch(signedIn, (url) =>
             url.endsWith("/reactions/")
                 ? Promise.resolve(
@@ -469,13 +694,13 @@ describe("post, comment, and reply reaction UI", () => {
         );
 
         expect(
-            buttonByLabel(container, "Remove 🔥 reaction")?.getAttribute(
+            buttonByLabel(container, "Remove Clapping reaction")?.getAttribute(
                 "aria-pressed",
             ),
         ).toBe("true");
         expect(
             container.querySelectorAll('[aria-label^="React with"]').length,
-        ).toBe(3);
+        ).toBe(2);
         expect(
             container.querySelector(
                 ".post-reactions .reaction-bar-slack-pills",
@@ -575,20 +800,22 @@ describe("reaction mutation state", () => {
                 target={postTarget}
             />,
         );
-        const add = buttonByLabel(container, "Add 🔥 reaction");
+        const add = buttonByLabel(container, "Add Clapping reaction");
         act(() => {
             add?.click();
             add?.click();
         });
-        expect(buttonByLabel(container, "Remove 🔥 reaction")).toBeDefined();
+        expect(
+            buttonByLabel(container, "Remove Clapping reaction"),
+        ).toBeDefined();
         expect(
             vi
                 .mocked(fetch)
                 .mock.calls.filter((call) => call[1]?.method === "POST"),
         ).toHaveLength(1);
-        expect(buttonByLabel(container, "Remove 🔥 reaction")?.disabled).toBe(
-            true,
-        );
+        expect(
+            buttonByLabel(container, "Remove Clapping reaction")?.disabled,
+        ).toBe(true);
 
         await act(async () => {
             resolveToggle?.(
@@ -600,7 +827,7 @@ describe("reaction mutation state", () => {
             await pending;
         });
         expect(
-            buttonByLabel(container, "View 3 participants for 🔥"),
+            buttonByLabel(container, "View 3 participants for Clapping"),
         ).toBeDefined();
         expect(changes.map((change) => change.source)).toEqual([
             "optimistic",
@@ -639,15 +866,15 @@ describe("reaction mutation state", () => {
             />,
         );
         act(() => {
-            buttonByLabel(container, "Add 🔥 reaction")?.click();
+            buttonByLabel(container, "Add Clapping reaction")?.click();
         });
         await flush();
-        expect(buttonByLabel(container, "Add 🔥 reaction")).toBeDefined();
+        expect(buttonByLabel(container, "Add Clapping reaction")).toBeDefined();
         expect(container.textContent).toContain("previous state was restored");
         expect(sources.slice(0, 2)).toEqual(["optimistic", "rollback"]);
 
         act(() => {
-            buttonByLabel(container, "Add 🔥 reaction")?.click();
+            buttonByLabel(container, "Add Clapping reaction")?.click();
         });
         await flush();
         expect(container.textContent).toContain("Retry in about 19 seconds");
@@ -671,12 +898,12 @@ describe("reaction mutation state", () => {
             <ReactionBar initialReactions={[group()]} target={postTarget} />,
         );
         act(() => {
-            buttonByLabel(container, "Add 🔥 reaction")?.click();
+            buttonByLabel(container, "Add Clapping reaction")?.click();
         });
         await flush();
         expect(meCalls).toBe(2);
         expect(container.textContent).toContain("session expired");
-        expect(buttonByLabel(container, "Add 🔥 reaction")).toBeDefined();
+        expect(buttonByLabel(container, "Add Clapping reaction")).toBeDefined();
         act(() => {
             root.unmount();
         });
@@ -706,17 +933,21 @@ describe("reaction mutation state", () => {
         const second = container.querySelector('[data-instance="thread"]');
 
         act(() => {
-            buttonByLabel(first ?? container, "Add 🔥 reaction")?.click();
+            buttonByLabel(first ?? container, "Add Clapping reaction")?.click();
         });
         await flush();
         expect(
             container.querySelector("output")?.getAttribute("data-pending"),
         ).not.toBe("none");
         expect(
-            buttonByLabel(second ?? container, "Remove 🔥 reaction")?.disabled,
+            buttonByLabel(second ?? container, "Remove Clapping reaction")
+                ?.disabled,
         ).toBe(true);
         act(() => {
-            buttonByLabel(second ?? container, "Remove 🔥 reaction")?.click();
+            buttonByLabel(
+                second ?? container,
+                "Remove Clapping reaction",
+            )?.click();
         });
         expect(toggleCalls).toBe(1);
 
@@ -743,7 +974,10 @@ describe("reaction mutation state", () => {
         ).toBe("true");
 
         act(() => {
-            buttonByLabel(second ?? container, "Remove 🔥 reaction")?.click();
+            buttonByLabel(
+                second ?? container,
+                "Remove Clapping reaction",
+            )?.click();
         });
         expect(toggleCalls).toBe(2);
         await act(async () => {
@@ -769,10 +1003,10 @@ describe("reaction mutation state", () => {
             container.querySelector("output")?.getAttribute("data-pending"),
         ).toBe("none");
         expect(
-            buttonByLabel(first ?? container, "Add 🔥 reaction"),
+            buttonByLabel(first ?? container, "Add Clapping reaction"),
         ).toBeDefined();
         expect(
-            buttonByLabel(second ?? container, "Add 🔥 reaction"),
+            buttonByLabel(second ?? container, "Add Clapping reaction"),
         ).toBeDefined();
         act(() => {
             root.unmount();
@@ -821,8 +1055,8 @@ describe("reaction mutation state", () => {
         const post = container.querySelector('[data-target="post"]');
         const other = container.querySelector('[data-target="comment"]');
         act(() => {
-            buttonByLabel(post ?? container, "Add 🔥 reaction")?.click();
-            buttonByLabel(other ?? container, "Add 🔥 reaction")?.click();
+            buttonByLabel(post ?? container, "Add Clapping reaction")?.click();
+            buttonByLabel(other ?? container, "Add Clapping reaction")?.click();
         });
         await flush();
         expect(
@@ -831,10 +1065,14 @@ describe("reaction mutation state", () => {
                 .mock.calls.filter((call) => call[1]?.method === "POST"),
         ).toHaveLength(2);
         expect(
-            buttonByLabel(other ?? container, "View 8 participants for 🔥"),
+            buttonByLabel(
+                other ?? container,
+                "View 8 participants for Clapping",
+            ),
         ).toBeDefined();
         expect(
-            buttonByLabel(post ?? container, "Remove 🔥 reaction")?.disabled,
+            buttonByLabel(post ?? container, "Remove Clapping reaction")
+                ?.disabled,
         ).toBe(true);
 
         await act(async () => {
@@ -848,10 +1086,16 @@ describe("reaction mutation state", () => {
         });
         await flush();
         expect(
-            buttonByLabel(post ?? container, "View 5 participants for 🔥"),
+            buttonByLabel(
+                post ?? container,
+                "View 5 participants for Clapping",
+            ),
         ).toBeDefined();
         expect(
-            buttonByLabel(other ?? container, "View 8 participants for 🔥"),
+            buttonByLabel(
+                other ?? container,
+                "View 8 participants for Clapping",
+            ),
         ).toBeDefined();
         act(() => {
             root.unmount();
@@ -882,7 +1126,7 @@ describe("participants, picker, and OAuth continuation", () => {
             <ReactionBar initialReactions={[group()]} target={postTarget} />,
         );
         act(() => {
-            buttonByLabel(container, "Add 🔥 reaction")?.focus();
+            buttonByLabel(container, "Add Clapping reaction")?.focus();
         });
         await flush();
         expect(container.textContent).toContain("Kirill · Author");
@@ -896,7 +1140,7 @@ describe("participants, picker, and OAuth continuation", () => {
         await flush();
         const countTrigger = buttonByLabel(
             container,
-            "View 1 participant for 🔥",
+            "View 1 participant for Clapping",
         );
         act(() => {
             countTrigger?.click();
@@ -905,14 +1149,14 @@ describe("participants, picker, and OAuth continuation", () => {
             Array.from(container.querySelectorAll('[role="dialog"]')).some(
                 (dialog) =>
                     dialog.getAttribute("aria-label") ===
-                    "🔥 reaction participants",
+                    "Clapping reaction participants",
             ),
         );
         expect(
             Array.from(container.querySelectorAll('[role="dialog"]')).find(
                 (dialog) =>
                     dialog.getAttribute("aria-label") ===
-                    "🔥 reaction participants",
+                    "Clapping reaction participants",
             ),
         ).toBeDefined();
         act(() => {
@@ -924,7 +1168,9 @@ describe("participants, picker, and OAuth continuation", () => {
             );
         });
         expect(
-            container.querySelector('[aria-label="🔥 reaction participants"]'),
+            container.querySelector(
+                '[aria-label="Clapping reaction participants"]',
+            ),
         ).toBeNull();
         expect(document.activeElement).toBe(countTrigger);
         act(() => {
@@ -932,22 +1178,22 @@ describe("participants, picker, and OAuth continuation", () => {
         });
     });
 
-    it("ignores stale participant success and error responses after switching emoji", async () => {
+    it("ignores stale participant success and error responses after switching reactions", async () => {
         const fire = deferred<Response>();
         const party = deferred<Response>();
         defaultFetch(signedIn, (url) => {
-            if (url.includes("%F0%9F%94%A5/participants/")) {
+            if (url.includes("/pepeclap/participants/")) {
                 return fire.promise;
             }
-            if (url.includes("%F0%9F%8E%89/participants/")) {
+            if (url.includes("/pepeparty/participants/")) {
                 return party.promise;
             }
             return null;
         });
         const partyGroup = group({
-            emoji: "🎉",
+            reaction: partyReaction,
             participants:
-                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%8E%89/participants/",
+                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/pepeparty/participants/",
         });
         const { container, root } = await render(
             <ReactionBar
@@ -957,11 +1203,11 @@ describe("participants, picker, and OAuth continuation", () => {
         );
 
         act(() => {
-            buttonByLabel(container, "Add 🔥 reaction")?.focus();
+            buttonByLabel(container, "Add Clapping reaction")?.focus();
         });
         await flush();
         act(() => {
-            buttonByLabel(container, "Add 🎉 reaction")?.focus();
+            buttonByLabel(container, "Add Celebrating reaction")?.focus();
         });
         await flush();
         expect(
@@ -992,7 +1238,7 @@ describe("participants, picker, and OAuth continuation", () => {
             Array.from(
                 container.querySelectorAll(".reaction-participants"),
             ).map((dialog) => dialog.getAttribute("aria-label")),
-        ).toEqual(["🎉 reaction participants"]);
+        ).toEqual(["Celebrating reaction participants"]);
         expect(container.textContent).toContain("Party participant");
 
         await act(async () => {
@@ -1016,7 +1262,7 @@ describe("participants, picker, and OAuth continuation", () => {
             Array.from(
                 container.querySelectorAll(".reaction-participants"),
             ).map((dialog) => dialog.getAttribute("aria-label")),
-        ).toEqual(["🎉 reaction participants"]);
+        ).toEqual(["Celebrating reaction participants"]);
         expect(container.textContent).toContain("Party participant");
         expect(container.textContent).not.toContain("Stale fire participant");
 
@@ -1028,10 +1274,10 @@ describe("participants, picker, and OAuth continuation", () => {
     it("ignores a stale participant error after a newer group succeeds", async () => {
         const fire = deferred<Response>();
         defaultFetch(signedIn, (url) => {
-            if (url.includes("%F0%9F%94%A5/participants/")) {
+            if (url.includes("/pepeclap/participants/")) {
                 return fire.promise;
             }
-            if (url.includes("%F0%9F%8E%89/participants/")) {
+            if (url.includes("/pepeparty/participants/")) {
                 return Promise.resolve(
                     response({
                         next: null,
@@ -1049,9 +1295,9 @@ describe("participants, picker, and OAuth continuation", () => {
             return null;
         });
         const partyGroup = group({
-            emoji: "🎉",
+            reaction: partyReaction,
             participants:
-                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%8E%89/participants/",
+                "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/pepeparty/participants/",
         });
         const { container, root } = await render(
             <ReactionBar
@@ -1060,11 +1306,11 @@ describe("participants, picker, and OAuth continuation", () => {
             />,
         );
         act(() => {
-            buttonByLabel(container, "Add 🔥 reaction")?.focus();
+            buttonByLabel(container, "Add Clapping reaction")?.focus();
         });
         await flush();
         act(() => {
-            buttonByLabel(container, "Add 🎉 reaction")?.focus();
+            buttonByLabel(container, "Add Celebrating reaction")?.focus();
         });
         await flush();
         await act(async () => {
@@ -1115,7 +1361,10 @@ describe("participants, picker, and OAuth continuation", () => {
             <ReactionBar initialReactions={[group()]} target={postTarget} />,
         );
         await flush();
-        const trigger = buttonByLabel(container, "View 1 participant for 🔥");
+        const trigger = buttonByLabel(
+            container,
+            "View 1 participant for Clapping",
+        );
         expect(trigger).toBeDefined();
         act(() => {
             trigger?.click();
@@ -1178,7 +1427,7 @@ describe("participants, picker, and OAuth continuation", () => {
         act(() => {
             buttonByLabel(
                 rendered.container,
-                "View 1 participant for 🔥",
+                "View 1 participant for Clapping",
             )?.click();
         });
         const otherTarget: ReactionTarget = {
@@ -1262,7 +1511,10 @@ describe("participants, picker, and OAuth continuation", () => {
             <ReactionBar initialReactions={[group()]} target={postTarget} />,
         );
         act(() => {
-            buttonByLabel(container, "View 1 participant for 🔥")?.click();
+            buttonByLabel(
+                container,
+                "View 1 participant for Clapping",
+            )?.click();
         });
         await flush();
         act(() => {
@@ -1307,7 +1559,7 @@ describe("participants, picker, and OAuth continuation", () => {
             <ReactionBar initialReactions={[group()]} target={postTarget} />,
         );
         const pill = container.querySelector(".reaction-pill");
-        const toggle = buttonByLabel(container, "Add 🔥 reaction");
+        const toggle = buttonByLabel(container, "Add Clapping reaction");
         const now = vi.spyOn(Date, "now").mockReturnValue(1000);
 
         act(() => {
@@ -1339,46 +1591,25 @@ describe("participants, picker, and OAuth continuation", () => {
         });
     });
 
-    it("lazy-loads searchable picker, recent emoji, arrows, and Escape", async () => {
-        rememberReaction("🔥");
+    it("lazy-loads searchable custom picker, recent IDs, arrows, and Escape", async () => {
+        rememberReaction(clap.id);
         defaultFetch(signedIn);
         const { container, root } = await render(
             <ReactionBar initialReactions={[]} target={postTarget} />,
         );
+        const trigger = buttonByLabel(container, "Open reaction picker");
         act(() => {
-            container
-                .querySelector<HTMLButtonElement>(
-                    '[aria-label="Open full emoji picker"]',
-                )
-                ?.click();
+            trigger?.click();
         });
         await waitFor(
             () =>
                 container.querySelector<HTMLInputElement>(
-                    'input[placeholder="Search emoji"]',
+                    'input[placeholder="Search reactions"]',
                 ) !== null,
         );
-        expect(buttonByLabel(container, "React with 🔥")).toBeDefined();
-        const search = container.querySelector<HTMLInputElement>(
-            'input[placeholder="Search emoji"]',
-        );
-        act(() => {
-            if (search) {
-                inputValue(search, "rocket");
-            }
-        });
-        await waitFor(
-            () =>
-                container.querySelector<HTMLButtonElement>(
-                    '[aria-label="Rocket"]',
-                ) !== null,
-        );
-        const rocket = container.querySelector<HTMLButtonElement>(
-            '[aria-label="Rocket"]',
-        );
-        expect(rocket).not.toBeNull();
+        expect(buttonByLabel(container, "React with Clapping")).toBeDefined();
         const gridButtons = container.querySelectorAll<HTMLButtonElement>(
-            '[role="grid"] button',
+            '.reaction-picker__grid[role="group"] button',
         );
         act(() => {
             gridButtons[0].focus();
@@ -1390,9 +1621,26 @@ describe("participants, picker, and OAuth continuation", () => {
             );
         });
         expect(document.activeElement).toBe(gridButtons[1]);
+
+        const search = container.querySelector<HTMLInputElement>(
+            'input[placeholder="Search reactions"]',
+        );
+        act(() => {
+            if (search) {
+                inputValue(search, "rocket");
+            }
+        });
+        await waitFor(
+            () =>
+                buttonByLabel(container, "React with Launching a rocket") !==
+                undefined,
+        );
+        expect(
+            buttonByLabel(container, "React with Launching a rocket"),
+        ).toBeDefined();
         act(() => {
             container
-                .querySelector('[aria-label="Choose an emoji"]')
+                .querySelector('[aria-label="Choose a reaction"]')
                 ?.dispatchEvent(
                     new KeyboardEvent("keydown", {
                         key: "Escape",
@@ -1401,20 +1649,88 @@ describe("participants, picker, and OAuth continuation", () => {
                 );
         });
         expect(
-            container.querySelector('[aria-label="Choose an emoji"]'),
+            container.querySelector('[aria-label="Choose a reaction"]'),
         ).toBeNull();
+        expect(document.activeElement).toBe(trigger);
         act(() => {
             root.unmount();
         });
     });
 
-    it("restores Unicode pending intent after OAuth but waits for confirmation", async () => {
+    it("selects a custom picker item through a touch interaction", async () => {
+        defaultFetch(signedIn, (url, options) => {
+            if (options?.method === "POST" && url.includes("/toggle/")) {
+                return Promise.resolve(
+                    response({
+                        action: "added",
+                        reactions: [
+                            group({
+                                reaction: hmm,
+                                viewer_reacted: true,
+                                participants:
+                                    "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/pepehmm/participants/",
+                            }),
+                        ],
+                    }),
+                );
+            }
+            return null;
+        });
+        const { container, root } = await render(
+            <ReactionBar initialReactions={[]} target={postTarget} />,
+        );
+        act(() => {
+            buttonByLabel(container, "Open reaction picker")?.click();
+        });
+        await waitFor(
+            () =>
+                container.querySelector('[aria-label="Choose a reaction"]') !==
+                null,
+        );
+        const picker = container.querySelector(
+            '[aria-label="Choose a reaction"]',
+        );
+        const option = buttonByLabel(
+            picker ?? container,
+            "React with Thinking",
+        );
+        act(() => {
+            option?.dispatchEvent(pointerEvent("pointerdown", "touch"));
+            option?.dispatchEvent(pointerEvent("pointerup", "touch"));
+            option?.click();
+        });
+        await waitFor(() =>
+            vi
+                .mocked(fetch)
+                .mock.calls.some(
+                    ([, options]) =>
+                        options?.method === "POST" &&
+                        options.body ===
+                            JSON.stringify({ reaction_id: hmm.id }),
+                ),
+        );
+        expect(
+            container.querySelector('[aria-label="Choose a reaction"]'),
+        ).toBeNull();
+        expect(
+            buttonByLabel(container, "Remove Thinking reaction"),
+        ).toBeDefined();
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("restores a catalog-ID pending intent after OAuth but waits for confirmation", async () => {
         defaultFetch(anonymous);
         const anonymousRender = await render(
             <ReactionBar initialReactions={[]} target={postTarget} />,
         );
         act(() => {
-            buttonByLabel(anonymousRender.container, "React with 👍")?.click();
+            buttonByLabel(
+                anonymousRender.container,
+                "React with Clapping",
+            )?.click();
         });
         const login =
             anonymousRender.container.querySelector<HTMLAnchorElement>(
@@ -1423,7 +1739,7 @@ describe("participants, picker, and OAuth continuation", () => {
         expect(login?.href).toContain(
             "next=%2Fposts%2F%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80",
         );
-        expect(loadPendingReaction(postTarget)).toBe("👍");
+        expect(loadPendingReaction(postTarget)).toBe(clap.id);
         act(() => {
             anonymousRender.root.unmount();
         });
@@ -1439,10 +1755,7 @@ describe("participants, picker, and OAuth continuation", () => {
                         action: "added",
                         reactions: [
                             group({
-                                emoji: "👍",
                                 viewer_reacted: true,
-                                participants:
-                                    "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%91%8D/participants/",
                             }),
                         ],
                     }),
@@ -1455,7 +1768,7 @@ describe("participants, picker, and OAuth continuation", () => {
         );
         expect(postCalls).toBe(0);
         expect(authenticatedRender.container.textContent).toContain(
-            "Add your saved 👍 reaction?",
+            "Add your saved Pepe clap reaction?",
         );
         act(() => {
             Array.from(authenticatedRender.container.querySelectorAll("button"))
@@ -1470,16 +1783,16 @@ describe("participants, picker, and OAuth continuation", () => {
         });
     });
 
-    it("discards the entire latest target intent without reviving an older emoji", async () => {
+    it("discards the latest target intent without reviving an older catalog ID", async () => {
         const now = Date.now();
-        savePendingReaction(postTarget, "🔥", now - 1);
-        savePendingReaction(postTarget, "🎉", now);
+        savePendingReaction(postTarget, clap.id, now - 1);
+        savePendingReaction(postTarget, hmm.id, now);
         defaultFetch(signedIn);
         const first = await render(
             <ReactionBar initialReactions={[]} target={postTarget} />,
         );
         expect(first.container.textContent).toContain(
-            "Add your saved 🎉 reaction?",
+            "Add your saved Pepe hmm reaction?",
         );
         act(() => {
             Array.from(first.container.querySelectorAll("button"))

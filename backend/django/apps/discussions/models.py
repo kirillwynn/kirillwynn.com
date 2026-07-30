@@ -6,8 +6,6 @@ from django.db.models import F, Q
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.contrib.settings.models import BaseSiteSetting
 
-from apps.discussions.emoji import normalize_emoji
-
 CATALOG_ID_VALIDATOR = RegexValidator(
     regex=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
     message="Use lowercase ASCII letters, numbers, and single hyphens.",
@@ -333,7 +331,10 @@ class ReactionModel(models.Model):
     def clean(self):
         super().clean()
         if self.catalog_item_id is None:
-            self.emoji = normalize_emoji(self.emoji)
+            if self._state.adding:
+                raise ValidationError(
+                    {"emoji": "Legacy Unicode reaction identities are read-only."}
+                )
         elif self.emoji:
             raise ValidationError(
                 {"emoji": "Catalog reactions cannot also carry a legacy Unicode value."}
@@ -341,7 +342,10 @@ class ReactionModel(models.Model):
 
     def save(self, *args, **kwargs):
         if self.catalog_item_id is None:
-            self.emoji = normalize_emoji(self.emoji)
+            if self._state.adding:
+                raise ValidationError(
+                    {"emoji": "Legacy Unicode reaction identities are read-only."}
+                )
         else:
             self.emoji = ""
         return super().save(*args, **kwargs)
@@ -363,6 +367,7 @@ class PostReaction(ReactionModel):
         constraints = [
             models.UniqueConstraint(
                 fields=("post", "user", "emoji"),
+                condition=~Q(emoji=""),
                 name="discussion_unique_post_reaction",
             ),
             models.UniqueConstraint(
@@ -404,6 +409,7 @@ class CommentReaction(ReactionModel):
         constraints = [
             models.UniqueConstraint(
                 fields=("comment", "user", "emoji"),
+                condition=~Q(emoji=""),
                 name="discussion_unique_comment_reaction",
             ),
             models.UniqueConstraint(
@@ -477,11 +483,7 @@ class ReactionSettings(BaseSiteSetting):
 
     @property
     def quick_reactions(self):
-        return [
-            self.quick_reaction_one,
-            self.quick_reaction_two,
-            self.quick_reaction_three,
-        ]
+        return self.quick_reaction_items
 
     @property
     def quick_reaction_items(self):
@@ -493,20 +495,23 @@ class ReactionSettings(BaseSiteSetting):
 
     def clean(self):
         super().clean()
-        normalized = [normalize_emoji(value) for value in self.quick_reactions]
-        if len(set(normalized)) != 3:
-            raise ValidationError("Quick reactions must be distinct after normalization.")
-        (
-            self.quick_reaction_one,
-            self.quick_reaction_two,
-            self.quick_reaction_three,
-        ) = normalized
         custom_ids = [
             self.quick_reaction_item_one_id,
             self.quick_reaction_item_two_id,
             self.quick_reaction_item_three_id,
         ]
-        if any(custom_ids):
+        was_configured = (
+            self.pk is not None
+            and type(self)
+            .objects.filter(
+                pk=self.pk,
+                quick_reaction_item_one__isnull=False,
+                quick_reaction_item_two__isnull=False,
+                quick_reaction_item_three__isnull=False,
+            )
+            .exists()
+        )
+        if any(custom_ids) or was_configured:
             if any(value is None for value in custom_ids):
                 raise ValidationError("Choose exactly three custom quick reactions.")
             if len(set(custom_ids)) != 3:

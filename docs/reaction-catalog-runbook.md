@@ -114,9 +114,14 @@ source bytes into a fresh encoder.
 ## Rollback and cleanup
 
 During activation, roll application code back only to the verified expansion
-release. Do not roll back the expansion migration while custom reaction rows
-exist. The expansion digest ignores catalog rows and continues serving
-preserved Unicode rows.
+release. The activation migration's reverse changes Django's migration state
+but deliberately leaves the partial legacy uniqueness indexes in place:
+recreating the former unconditional uniqueness would reject multiple custom
+rows whose retained legacy value is empty. Reapplying activation explicitly
+replaces either prior physical form and is safe with populated legacy and
+custom rows. Do not roll back the expansion migration while catalog or custom
+reaction rows exist. The expansion digest ignores catalog rows and continues
+serving preserved Unicode rows.
 
 Never delete old Unicode rows or immutable S3 objects during a rollback.
 Removing the legacy columns, archiving unmapped Unicode data, or garbage

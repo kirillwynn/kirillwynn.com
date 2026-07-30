@@ -314,10 +314,20 @@ mutation returns `403`.
   "last_reply_at": "2026-07-26T20:05:00.000000Z",
   "reactions": [
     {
-      "emoji": "🔥",
+      "reaction": {
+        "id": "pepeclap",
+        "name": "Pepe clap",
+        "label": "Clapping",
+        "kind": "animated",
+        "asset_url": "https://media.example/reactions/pepeclap/abc/animation.gif",
+        "poster_url": "https://media.example/reactions/pepeclap/abc/poster.webp",
+        "width": 128,
+        "height": 128,
+        "version": "sha256-abc"
+      },
       "count": 2,
       "viewer_reacted": false,
-      "participants": "/api/v1/comments/123/reactions/%F0%9F%94%A5/participants/"
+      "participants": "/api/v1/comments/123/reactions/pepeclap/participants/"
     }
   ],
   "viewer": {
@@ -447,50 +457,60 @@ application abuse protection, not future edge/DDoS protection.
 ## Reactions
 
 Reaction reads are anonymous; mutations use the same Django session,
-active/non-banned user, and CSRF boundary as comments. Every reaction response,
-including config, errors, aggregates, toggles, and participant pages, has:
+active/non-banned user, and CSRF boundary as comments. Viewer-dependent
+aggregates, errors, toggles, and participant pages have:
 
 ```text
 Cache-Control: private, no-store
 Vary: Cookie
 ```
 
+The user-independent catalog and quick config use the separate public cache
+contract documented below. They never vary on session or cookie state.
+
 Post reaction routes reuse the canonical public post policy. Comment routes
 also require a post accepted by that policy. Draft, unpublished, future,
 expired, restricted, and unknown targets return 404.
 
-### Canonical emoji key
+### Canonical catalog identity
 
 Toggle payloads accept exactly:
 
 ```json
-{"emoji": "👩‍💻"}
+{"reaction_id": "pepeclap"}
 ```
 
-Unexpected fields are rejected. Django requires a string, normalizes it to NFC,
-limits it to 32 Unicode code points and 128 UTF-8 bytes, and accepts exactly one
-standard RGI Unicode emoji sequence through `emoji` 2.15.0. ZWJ sequences,
-skin-tone modifiers, flags, keycaps, gender variants, and meaningful variation
-selectors are preserved. Text, multiple emoji, shortcode/custom emoji,
-whitespace, controls/bidi formatting, lone components, and malformed sequences
-are rejected. Surrogate code points are rejected before UTF-8 encoding, with a
-defensive encoding-error conversion at the same boundary. Raw JSON such as
-`{"emoji":"\ud800"}` therefore receives the normal JSON 400 validation
-response rather than an HTML or Unicode encoding 500. Model saves and Wagtail
-quick-reaction saves use the same boundary.
+Unexpected or missing fields are rejected. `reaction_id` must be the exact
+lowercase ASCII ID of one enabled/selectable manifest-managed catalog item.
+Unicode, shortcode, source filename, URL, storage key, Wagtail/database ID,
+display label, and arbitrary client objects are never accepted as identity.
 
-Groups are ordered by canonical emoji key and have:
+Groups are ordered by catalog ordering, then stable catalog ID, and have:
 
 ```json
 {
-  "emoji": "🔥",
+  "reaction": {
+    "id": "pepeclap",
+    "name": "Pepe clap",
+    "label": "Clapping",
+    "kind": "animated",
+    "asset_url": "https://media.example/reactions/pepeclap/abc/animation.gif",
+    "poster_url": "https://media.example/reactions/pepeclap/abc/poster.webp",
+    "width": 128,
+    "height": 128,
+    "version": "sha256-abc"
+  },
   "count": 12,
   "viewer_reacted": true,
-  "participants": "/api/v1/posts/post/reactions/%F0%9F%94%A5/participants/"
+  "participants": "/api/v1/posts/post/reactions/pepeclap/participants/"
 }
 ```
 
-`participants` is an exact relative endpoint for that target and emoji.
+`asset_url` is the static WebP or animated GIF; `poster_url` is always safe to
+render as a static fallback. Neither exposes an internal S3 key.
+`participants` is the exact relative endpoint for that target and catalog ID.
+Disabled catalog items and unmapped legacy Unicode rows are omitted from new
+public aggregates without deleting their database rows.
 
 ### Post aggregates and toggle
 
@@ -503,9 +523,9 @@ The GET response is:
 {"reactions": []}
 ```
 
-Toggle adds the viewer's `(post, emoji)` row when absent and removes it when
-present. A user may hold several different emoji on one post. It returns the
-complete authoritative aggregate:
+Toggle adds the viewer's `(post, catalog item)` row when absent and removes it
+when present. A user may hold several different catalog reactions on one post.
+It returns the complete authoritative aggregate:
 
 ```json
 {
@@ -542,10 +562,20 @@ The response is:
       "slug": "привет-мир",
       "reactions": [
         {
-          "emoji": "👍",
+          "reaction": {
+            "id": "pepeclap",
+            "name": "Pepe clap",
+            "label": "Clapping",
+            "kind": "animated",
+            "asset_url": "https://media.example/reactions/pepeclap/abc/animation.gif",
+            "poster_url": "https://media.example/reactions/pepeclap/abc/poster.webp",
+            "width": 128,
+            "height": 128,
+            "version": "sha256-abc"
+          },
           "count": 1,
           "viewer_reacted": false,
-          "participants": "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/%F0%9F%91%8D/participants/"
+          "participants": "/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/reactions/pepeclap/participants/"
         }
       ]
     }
@@ -596,12 +626,12 @@ mutation result.
 
 ### Participants
 
-- `GET /api/v1/posts/<unicode-slug>/reactions/<emoji>/participants/`
-- `GET /api/v1/comments/<id>/reactions/<emoji>/participants/`
+- `GET /api/v1/posts/<unicode-slug>/reactions/<reaction-id>/participants/`
+- `GET /api/v1/comments/<id>/reactions/<reaction-id>/participants/`
 
 Participants use a fixed page size of 20 and stable `(created_at, id)` cursor
 ordering. `next` and `previous` are relative and must match the same exact
-target/emoji endpoint.
+target/catalog-ID endpoint.
 
 ```json
 {
@@ -621,8 +651,9 @@ Email, OAuth/provider identity, tokens, session information, and moderation
 metadata are never present.
 
 The client gives each participant request an identity and abort signal.
-Switching target or emoji, closing the surface, or unmounting invalidates the
-previous request; stale successes and failures cannot update the current group.
+Switching target or reaction ID, closing the surface, or unmounting invalidates
+the previous request; stale successes and failures cannot update the current
+group.
 Cursor pages are accepted only for the current group and are deduplicated by
 participant ID. Escape closes the participant surface and returns focus to its
 trigger. Post-detail, comment, and thread surfaces retain their fine-pointer
@@ -631,38 +662,96 @@ hover/focus behavior. The compact Feed surface is stricter: hover,
 open participants nor issue a participant request. Feed participants open only
 after click/tap or the native Enter/Space activation of the count button.
 
-### Quick reaction config
+### Public catalog and quick config
+
+`GET /api/v1/reactions/catalog/`
+
+```json
+{
+  "version": "sha256-catalog-payload-digest",
+  "results": [
+    {
+      "id": "pepeclap",
+      "name": "Pepe clap",
+      "label": "Clapping",
+      "kind": "animated",
+      "asset_url": "https://media.example/reactions/pepeclap/abc/animation.gif",
+      "poster_url": "https://media.example/reactions/pepeclap/abc/poster.webp",
+      "width": 128,
+      "height": 128,
+      "version": "sha256-abc"
+    }
+  ]
+}
+```
+
+Only enabled/selectable allowlisted items appear, in deterministic catalog
+order. The endpoint contains descriptors, not source paths, provenance,
+storage keys, hashes other than public immutable versions, or viewer state.
 
 `GET /api/v1/reactions/config/`
 
 ```json
-{"quick_reactions": ["👍", "❤️", "🎉"]}
+{
+  "quick_reactions": [
+    {
+      "id": "pepeclap",
+      "name": "Pepe clap",
+      "label": "Clapping",
+      "kind": "animated",
+      "asset_url": "https://media.example/reactions/pepeclap/abc/animation.gif",
+      "poster_url": "https://media.example/reactions/pepeclap/abc/poster.webp",
+      "width": 128,
+      "height": 128,
+      "version": "sha256-abc"
+    }
+  ]
+}
 ```
 
-The three distinct canonical values come from the Wagtail
-`ReactionSettings` Site Setting. No Wagtail model IDs or internal metadata are
-returned.
+The response contains the three distinct enabled/selectable descriptors chosen
+in the Wagtail `ReactionSettings` Site Setting. No Wagtail model IDs or
+internal metadata are returned.
 
-The browser uses the compact deterministic `emoji-regex` 10.6.0 sequence data
-for storage hygiene, plus NFC/control/limit checks and rejection of redundant
-variation selector 16 after a default emoji-presentation code point. The full
-Emoji Mart dataset remains behind the lazy picker import. Recent and pending
-storage therefore reject incomplete ZWJ/flag sequences and overqualified
-values such as `🔥️` and `☕️` without adding the picker dataset to the initial
-post bundle. Django remains authoritative.
+Both endpoints are fully user-independent and return:
+
+```text
+Cache-Control: public, max-age=60, stale-while-revalidate=300
+ETag: "<sha256>"
+```
+
+They do not vary on `Cookie`; an exact `If-None-Match` receives `304`.
+
+The picker is lazy-loaded and fetches the catalog only when needed (or when a
+valid pending catalog ID is not already present in current groups/config).
+Search uses display and accessibility labels. Posters and static assets are
+lazy images; the animation URL is selected only for an intersecting active
+item. With `prefers-reduced-motion: reduce`, the animation URL is never
+assigned. Leaving the viewport restores the poster. An image failure falls
+back from animation to poster and then to accessible text.
+
+Recent and pending reaction storage is schema version 2 and stores catalog IDs
+only. IDs use the same bounded lowercase ASCII shape as the API. Asset URLs and
+internal storage keys are never persisted. Version-1 Unicode recent/pending
+entries are removed or ignored without an implicit mapping.
 
 At most one pending reaction intent exists for one
-`(slug, target kind, target ID)`. Saving another emoji removes older intents
-for that target. Legacy duplicates are selected by greatest `createdAt` and
-compacted to one entry; confirm and discard clear the whole target namespace.
-Other targets remain isolated and the ten-minute TTL is unchanged.
+`(slug, target kind, target ID)`. Saving another catalog ID removes older
+intents for that target. Valid version-2 duplicates are selected by greatest
+`createdAt` and compacted to one entry; confirm and discard clear the whole
+target namespace. Other targets remain isolated and the ten-minute TTL is
+unchanged. OAuth never auto-submits a restored intent.
 
 ### Concurrency and rate limit
 
 Toggles lock the concrete post or comment row in one database transaction.
 This serializes all competing toggles for a target; the unique
-`(target, user, emoji)` constraint is the final duplicate boundary. Two
-sequential same-user/same-emoji toggles return to the original state.
+`(target, user, catalog item)` constraint is the final duplicate boundary. Two
+sequential same-user/same-catalog-ID toggles return to the original state.
+
+Legacy rows retain their Unicode column and the old conditional uniqueness.
+They are not returned by the custom catalog API, and no automatic mapping is
+performed. The legacy column is not removed in this release.
 
 One database-backed fixed-window bucket is locked per user. Defaults are 60
 toggle requests per 60 seconds, configured through

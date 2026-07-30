@@ -653,3 +653,8 @@ def test_reaction_settings_requires_three_distinct_enabled_catalog_items(blog_in
     assert list(
         ReactionCatalogItem.objects.order_by("quick_order").values_list("catalog_id", "quick_order")
     ) == [("item-1", 1), ("item-2", 2), ("item-3", 3)]
+    settings.quick_reaction_item_one = None
+    settings.quick_reaction_item_two = None
+    settings.quick_reaction_item_three = None
+    with pytest.raises(ValidationError, match="exactly three"):
+        settings.save()

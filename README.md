@@ -49,6 +49,8 @@ Do not copy that note into the repository.
 - [ADR 0003: Concrete Unicode reaction contract](docs/decisions/0003-unicode-reaction-contract.md)
 - [ADR 0004: Email subscriptions, outbox, and Resend](docs/decisions/0004-email-subscriptions-outbox-resend.md)
 - [ADR 0005: Isolated Compose deployment](docs/decisions/0005-isolated-compose-deployment.md)
+- [ADR 0006: Manifest-managed custom reaction catalog](docs/decisions/0006-manifest-managed-reaction-catalog.md)
+- [Reaction catalog asset runbook](docs/reaction-catalog-runbook.md)
 - [Email provider and DNS setup](docs/email-setup.md)
 - [Deployment and rollback](docs/deployment-runbook.md)
 - [Runtime environment matrix](docs/environment-matrix.md)
@@ -107,11 +109,12 @@ Milestones 1–10 are available under `backend/django/`, `frontend/next/`, and
 - plain-text post comments and one-level Slack-style threads with cursor
   pagination, soft deletion, moderation tombstones, protected identities, and
   database-backed per-user mutation limits;
-- concrete post/comment Unicode reactions with transactional target locks,
-  grouped viewer state, private cursor-paginated participants, and Wagtail
-  quick-reaction settings;
-- accessible post/comment/reply reaction pills, a lazy local Unicode picker,
-  bounded recent emoji, optimistic rollback, and confirmation-based OAuth
+- concrete post/comment catalog reactions with transactional target locks,
+  grouped descriptors/viewer state, private cursor-paginated participants,
+  preserved legacy Unicode rows, and Wagtail quick-reaction settings;
+- accessible post/comment/reply reaction pills, lazy static/animated assets, a
+  lazy searchable custom picker, bounded catalog-ID recents, reduced-motion
+  poster enforcement, optimistic rollback, and confirmation-based OAuth
   continuation;
 - an accessible desktop thread drawer and mobile full-screen thread layer with
   pinned root/composer, focus restoration, query-string navigation, and
@@ -326,7 +329,7 @@ The public frontend includes:
 - client-side comments below public posts and a responsive Slack-style thread
   layer; comments are deliberately omitted from Draft Mode;
 - post, comment, and reply reactions with quick actions, local lazy picker,
-  participants, recent emoji, and no Draft Mode reaction UI;
+  participants, recent catalog reactions, and no Draft Mode reaction UI;
 - a keyboard/touch accessible current-user menu and CSRF-protected logout;
 - loading, upstream error, empty, and not-found states.
 

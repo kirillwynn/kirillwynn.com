@@ -12,6 +12,7 @@ from apps.discussions.api.views import (
     PostReactionBatchAPIView,
     PostReactionParticipantAPIView,
     PostReactionToggleAPIView,
+    ReactionCatalogAPIView,
     ReactionConfigAPIView,
 )
 
@@ -41,7 +42,7 @@ urlpatterns = [
         name="post-reaction-toggle",
     ),
     path(
-        "posts/<str:slug>/reactions/<path:emoji>/participants/",
+        "posts/<str:slug>/reactions/<slug:reaction_id>/participants/",
         PostReactionParticipantAPIView.as_view(),
         name="post-reaction-participants",
     ),
@@ -56,10 +57,11 @@ urlpatterns = [
         name="comment-reaction-toggle",
     ),
     path(
-        "comments/<int:pk>/reactions/<path:emoji>/participants/",
+        "comments/<int:pk>/reactions/<slug:reaction_id>/participants/",
         CommentReactionParticipantAPIView.as_view(),
         name="comment-reaction-participants",
     ),
+    path("reactions/catalog/", ReactionCatalogAPIView.as_view(), name="reaction-catalog"),
     path("reactions/config/", ReactionConfigAPIView.as_view(), name="reaction-config"),
     path("comments/<int:pk>/", CommentDetailAPIView.as_view(), name="comment-detail"),
 ]
