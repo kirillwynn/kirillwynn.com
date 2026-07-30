@@ -115,15 +115,25 @@ passes 229 local infrastructure tests, but its fresh push/PR runs
 `30581189092` and `30581196760` could not start jobs because GitHub Actions
 reported an account billing/spending-limit block. Therefore no failed sync
 attempt changed staging S3 or catalog database rows. Both staging deployment
-gates are `false`; the temporary prerelease/tag must be removed after a
-successful attested sync.
+gates are `false`. After the owner made the repository public and CI capacity
+returned, the plaintext temporary prerelease/tag was removed before retrying
+the transfer. Public-repository transport now requires an ephemeral
+AES-256-CTR/PBKDF2 encrypted release asset, independently pinned ciphertext and
+attested plaintext hashes, and a one-use protected staging Environment secret;
+all transport state is deleted after a successful attested sync.
 
-Remaining Stage 16 work is to restore GitHub Actions capacity, pass fresh
-required CI, run and attest the verify/upload/activate/idempotence sync, take
-the rollout backup, deploy the activation digest only to staging, complete live
-static/animated/reduced-motion/CDN QA, remove the temporary transfer release
-and tag, and record the final operation/digests. No production, `main`, DNS,
-OAuth/Resend provider, or legacy-data state has been changed.
+Activation commit `f00a7d4b922b0027155bf1e7cce4e8358748134a` passed the
+complete required push CI on rerun `30583244134` after repository visibility
+changed, including mandatory PostgreSQL, browser, cross-stack, infrastructure,
+immutable image builds, preflight, release-manifest, and disabled-deploy
+boundaries.
+
+Remaining Stage 16 work is to pass fresh required CI for the encrypted
+transport hardening, run and attest the verify/upload/activate/idempotence
+sync, take the rollout backup, deploy the activation digest only to staging,
+complete live static/animated/reduced-motion/CDN QA, remove all temporary
+transfer state, and record the final operation/digests. No production, `main`,
+DNS, OAuth/Resend provider, or legacy-data state has been changed.
 
 ## Current repository state
 

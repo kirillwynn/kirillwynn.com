@@ -179,6 +179,13 @@ def test_catalog_sync_workflow_is_staging_only_and_fail_closed():
     assert 'test "$DEPLOY_GATE" = false' in workflow
     assert "refs/heads/rewrite/wagtail-next" in workflow
     assert "releases/assets/$CATALOG_ASSET_ID" in workflow
+    assert "STAGING_REACTION_CATALOG_TRANSFER_KEY" in workflow
+    assert "STAGING_REACTION_CATALOG_ENCRYPTED_SHA256" in workflow
+    assert "reaction-catalog-transfer.tar.gz.enc" in workflow
+    assert "openssl enc -d -aes-256-ctr -pbkdf2 -iter 200000" in workflow
+    assert 'test "$(sha256sum "$cipher_path"' in workflow
+    assert 'test "$(sha256sum "$archive_path"' in workflow
+    assert 'trap \'rm -f "$cipher_path" "$key_path"\' EXIT' in workflow
     assert "extract_catalog_transfer.py" in workflow
     assert "contents: read" in workflow
     assert "STAGING_REACTION_CATALOG_SYNC_ENABLED == 'true'" in ci

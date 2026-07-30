@@ -54,6 +54,18 @@ private prepared directory and exact manifest available to a one-off Django
 process using the staging runtime and existing S3 credentials; do not bake them
 into an image.
 
+When the repository is public, a release used only as transport must contain
+the encrypted archive, never the plaintext prepared directory. Generate a
+one-time 256-bit lowercase-hex key, encrypt with AES-256-CTR plus PBKDF2-SHA256
+at 200,000 iterations and a fresh OpenSSL salt, and pin both the ciphertext and
+plaintext SHA-256 values. Store the key only as the temporary protected staging
+Environment secret `STAGING_REACTION_CATALOG_TRANSFER_KEY`; the workflow keeps
+`contents: read`, verifies the ciphertext before decryption, verifies the
+attested archive after decryption, and extracts through the bounded safe
+extractor. The public prerelease/tag, transfer secret, ciphertext digest, and
+asset ID are one-operation transport state and must be deleted immediately
+after the attested sync. Never reuse the key or publish the plaintext archive.
+
 First verify/upload without database activation:
 
 ```bash

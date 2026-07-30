@@ -18,10 +18,12 @@ jobs:
       SYNC_GATE: ${{ vars.STAGING_REACTION_CATALOG_SYNC_ENABLED }}
       DEPLOY_GATE: ${{ vars.STAGING_DEPLOY_ENABLED }}
       CATALOG_ASSET_ID: ${{ vars.STAGING_REACTION_CATALOG_ASSET_ID }}
+      EXPECTED_ENCRYPTED_ARCHIVE_SHA256: ${{ vars.STAGING_REACTION_CATALOG_ENCRYPTED_SHA256 }}
       EXPECTED_ARCHIVE_SHA256: ${{ vars.STAGING_REACTION_CATALOG_ARCHIVE_SHA256 }}
       EXPECTED_MANIFEST_SHA256: ${{ vars.STAGING_REACTION_CATALOG_MANIFEST_SHA256 }}
       EXPECTED_ATTESTATION_SHA256: ${{ vars.STAGING_REACTION_CATALOG_ATTESTATION_SHA256 }}
       EXPECTED_ACTIVE_RELEASE_SHA: ${{ vars.STAGING_REACTION_CATALOG_BASE_RELEASE_SHA }}
+      TRANSFER_KEY: ${{ secrets.STAGING_REACTION_CATALOG_TRANSFER_KEY }}
       SERVER_HOST: ${{ secrets.SERVER_IP }}
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -45,6 +47,7 @@ jobs:
           esac
           test "${#EXPECTED_ACTIVE_RELEASE_SHA}" -eq 40
           for digest in \
+            "$EXPECTED_ENCRYPTED_ARCHIVE_SHA256" \
             "$EXPECTED_ARCHIVE_SHA256" \
             "$EXPECTED_MANIFEST_SHA256" \
             "$EXPECTED_ATTESTATION_SHA256"
@@ -54,16 +57,32 @@ jobs:
             esac
             test "${#digest}" -eq 64
           done
-      - name: Download and safely extract the private attested transfer
+          case "$TRANSFER_KEY" in
+            *[!0-9a-f]*|"") exit 2 ;;
+          esac
+          test "${#TRANSFER_KEY}" -eq 64
+      - name: Download, decrypt, and safely extract the attested transfer
         run: |
+          cipher_path="$RUNNER_TEMP/reaction-catalog-transfer.tar.gz.enc"
+          archive_path="$RUNNER_TEMP/reaction-catalog-transfer.tar.gz"
+          key_path="$RUNNER_TEMP/reaction-catalog-transfer.key"
+          trap 'rm -f "$cipher_path" "$key_path"' EXIT
+          umask 077
+          printf '%s' "$TRANSFER_KEY" > "$key_path"
           gh api \
             -H "Accept: application/octet-stream" \
             "repos/$GITHUB_REPOSITORY/releases/assets/$CATALOG_ASSET_ID" \
-            > "$RUNNER_TEMP/reaction-catalog-transfer.tar.gz"
-          test "$(sha256sum "$RUNNER_TEMP/reaction-catalog-transfer.tar.gz" | cut -d ' ' -f 1)" = \
+            > "$cipher_path"
+          test "$(sha256sum "$cipher_path" | cut -d ' ' -f 1)" = \
+            "$EXPECTED_ENCRYPTED_ARCHIVE_SHA256"
+          openssl enc -d -aes-256-ctr -pbkdf2 -iter 200000 -md sha256 \
+            -pass file:"$key_path" \
+            -in "$cipher_path" \
+            -out "$archive_path"
+          test "$(sha256sum "$archive_path" | cut -d ' ' -f 1)" = \
             "$EXPECTED_ARCHIVE_SHA256"
           python infra/scripts/extract_catalog_transfer.py \
-            "$RUNNER_TEMP/reaction-catalog-transfer.tar.gz" \
+            "$archive_path" \
             "$RUNNER_TEMP/reaction-catalog-input"
           install -m 0600 \
             docs/reaction-catalog/stage16-staging-v1.json \
