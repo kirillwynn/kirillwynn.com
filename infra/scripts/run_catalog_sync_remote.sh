@@ -31,6 +31,10 @@ test -f "$input_dir/stage16-staging-v1.json"
 test -f "$input_dir/reaction-catalog-attestation.json"
 test -d "$input_dir/objects"
 mkdir -p "$result_dir" /srv/kirillwynn/locks
+# The transfer parent remains mode 0700, while the read-only bind-mount root
+# must be traversable by the non-root Django container user.
+find "$input_dir" -type d -exec chmod 0755 {} +
+find "$input_dir" -type f -exec chmod 0444 {} +
 
 active_release_sha=$(
     python3 "$state_tool" inspect \

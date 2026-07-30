@@ -186,6 +186,8 @@ def test_catalog_sync_workflow_is_staging_only_and_fail_closed():
     assert "uses: ./.github/workflows/staging-reaction-catalog.yml" in ci
     assert "production" not in workflow.lower()
     assert "flock -w 900 9" in remote
+    assert 'find "$input_dir" -type d -exec chmod 0755 {} +' in remote
+    assert 'find "$input_dir" -type f -exec chmod 0444 {} +' in remote
     assert remote.index("run_sync upload.txt") < remote.index(
         "run_sync activate.txt --activate"
     )
