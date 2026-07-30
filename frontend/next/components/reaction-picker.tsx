@@ -141,6 +141,7 @@ export default function ReactionPicker({
                 <ReactionImage
                     animate={activeId === item.id}
                     className="reaction-picker__image"
+                    deferUntilVisible
                     reaction={item}
                 />
             </button>

@@ -51,6 +51,13 @@ function reactionError(error: unknown): string {
     return "The reaction could not be saved. Your previous state was restored.";
 }
 
+function reactionControlLabel(label: string): string {
+    const trimmed = label.trim();
+    return trimmed.toLowerCase().endsWith(" reaction")
+        ? trimmed
+        : `${trimmed} reaction`;
+}
+
 export function ReactionBar({
     compact = false,
     initialReactions,
@@ -156,6 +163,9 @@ export function ReactionBar({
                     }
                     busyRef.current = snapshot.busy;
                     setBusy(snapshot.busy);
+                    if (change && participantGroupRef.current !== null) {
+                        closeParticipants(false);
+                    }
                     setReactions(snapshot.reactions);
                     if (change) {
                         if (change.source === "optimistic") {
@@ -171,7 +181,7 @@ export function ReactionBar({
                     }
                 },
             ),
-        [instanceTargetKey, mutationTarget],
+        [closeParticipants, instanceTargetKey, mutationTarget],
     );
 
     useEffect(() => {
@@ -481,7 +491,7 @@ export function ReactionBar({
                         onPointerUpCapture={pointerUp}
                     >
                         <button
-                            aria-label={`${group.viewer_reacted ? "Remove" : "Add"} ${group.reaction.label} reaction`}
+                            aria-label={`${group.viewer_reacted ? "Remove" : "Add"} ${reactionControlLabel(group.reaction.label)}`}
                             aria-pressed={group.viewer_reacted}
                             disabled={busy || interactionDisabled}
                             onClick={() => void performToggle(group.reaction)}
@@ -638,7 +648,7 @@ export function ReactionBar({
 
             {participantGroup ? (
                 <div
-                    aria-label={`${participantGroup.reaction.label} reaction participants`}
+                    aria-label={`${reactionControlLabel(participantGroup.reaction.label)} participants`}
                     className="reaction-participants"
                     role="dialog"
                 >

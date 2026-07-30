@@ -7,10 +7,12 @@ import type { ReactionDescriptor } from "@/lib/reactions";
 export function ReactionImage({
     animate = true,
     className,
+    deferUntilVisible = false,
     reaction,
 }: {
     animate?: boolean;
     className?: string;
+    deferUntilVisible?: boolean;
     reaction: ReactionDescriptor;
 }) {
     const rootRef = useRef<HTMLSpanElement>(null);
@@ -58,11 +60,16 @@ export function ReactionImage({
         setFailedSources(new Set());
     }, [reaction.version]);
 
-    const preferredSource =
-        reaction.kind === "animated" && animate && visible && !reducedMotion
+    const shouldLoad = !deferUntilVisible || visible;
+    const preferredSource = shouldLoad
+        ? reaction.kind === "animated" && animate && visible && !reducedMotion
             ? reaction.asset_url
-            : reaction.poster_url;
+            : reaction.poster_url
+        : null;
     const source = useMemo(() => {
+        if (!preferredSource) {
+            return null;
+        }
         if (!failedSources.has(preferredSource)) {
             return preferredSource;
         }
@@ -82,7 +89,7 @@ export function ReactionImage({
             }
             ref={rootRef}
         >
-            {source ? (
+            {!shouldLoad ? null : source ? (
                 // The containing button owns the accessible reaction name.
                 <img
                     alt=""

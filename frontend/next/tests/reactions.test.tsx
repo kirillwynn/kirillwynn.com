@@ -611,7 +611,7 @@ describe("reaction asset loading boundaries", () => {
         });
     });
 
-    it("loads animation only while intersecting and restores the poster offscreen", async () => {
+    it("defers picker assets until intersecting and removes them offscreen", async () => {
         let observerCallback: IntersectionObserverCallback | null = null;
         let observerOptions: IntersectionObserverInit | undefined;
         class TestIntersectionObserver implements IntersectionObserver {
@@ -641,15 +641,13 @@ describe("reaction asset loading boundaries", () => {
         act(() => {
             root.render(
                 <button aria-label="Clapping" type="button">
-                    <ReactionImage reaction={clap} />
+                    <ReactionImage deferUntilVisible reaction={clap} />
                 </button>,
             );
         });
         await flush();
         expect(observerOptions?.rootMargin).toBe("0px");
-        expect(container.querySelector("img")?.getAttribute("src")).toBe(
-            clap.poster_url,
-        );
+        expect(container.querySelector("img")).toBeNull();
 
         act(() => {
             observerCallback?.(
@@ -666,9 +664,7 @@ describe("reaction asset loading boundaries", () => {
                 {} as IntersectionObserver,
             );
         });
-        expect(container.querySelector("img")?.getAttribute("src")).toBe(
-            clap.poster_url,
-        );
+        expect(container.querySelector("img")).toBeNull();
 
         act(() => {
             root.unmount();
@@ -1104,6 +1100,99 @@ describe("reaction mutation state", () => {
 });
 
 describe("participants, picker, and OAuth continuation", () => {
+    it("keeps reaction accessibility labels singular", async () => {
+        const labeledReaction = {
+            ...clap,
+            label: "Clapping reaction",
+        };
+        defaultFetch(signedIn);
+        const { container, root } = await render(
+            <ReactionBar
+                initialReactions={[
+                    group({
+                        reaction: labeledReaction,
+                    }),
+                ]}
+                target={postTarget}
+            />,
+        );
+
+        expect(buttonByLabel(container, "Add Clapping reaction")).toBeDefined();
+        expect(container.innerHTML).not.toContain("reaction reaction");
+        act(() => {
+            buttonByLabel(container, "Add Clapping reaction")?.focus();
+        });
+        await flush();
+        expect(
+            container.querySelector(
+                '[aria-label="Clapping reaction participants"]',
+            ),
+        ).not.toBeNull();
+        expect(container.innerHTML).not.toContain("reaction reaction");
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("closes an open participant view when a mutation changes reactions", async () => {
+        defaultFetch(signedIn, (url, options) => {
+            if (url.includes("/participants/")) {
+                return Promise.resolve(
+                    response({
+                        next: null,
+                        previous: null,
+                        results: [],
+                    }),
+                );
+            }
+            if (options?.method === "POST" && url.includes("/toggle/")) {
+                return Promise.resolve(
+                    response({
+                        action: "removed",
+                        reactions: [],
+                    }),
+                );
+            }
+            return null;
+        });
+        const { container, root } = await render(
+            <ReactionBar
+                initialReactions={[
+                    group({
+                        count: 1,
+                        viewer_reacted: true,
+                    }),
+                ]}
+                target={postTarget}
+            />,
+        );
+        const toggle = buttonByLabel(container, "Remove Clapping reaction");
+        act(() => {
+            toggle?.focus();
+        });
+        await waitFor(
+            () =>
+                container.querySelector(
+                    '[aria-label="Clapping reaction participants"]',
+                ) !== null,
+        );
+        act(() => {
+            toggle?.click();
+        });
+        await waitFor(
+            () =>
+                container.querySelector(
+                    '[aria-label="Clapping reaction participants"]',
+                ) === null,
+        );
+        expect(buttonByLabel(container, "React with Clapping")).toBeDefined();
+
+        act(() => {
+            root.unmount();
+        });
+    });
+
     it("opens minimal participants on focus and mobile count tap", async () => {
         defaultFetch(signedIn, (url) =>
             url.includes("/participants/")
