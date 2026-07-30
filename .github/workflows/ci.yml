@@ -306,3 +306,14 @@ jobs:
       packages: write
     uses: ./.github/workflows/staging-release.yml
     secrets: inherit
+
+  staging-reaction-catalog:
+    needs: ci-required
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/rewrite/wagtail-next' &&
+      vars.STAGING_REACTION_CATALOG_SYNC_ENABLED == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/staging-reaction-catalog.yml
+    secrets: inherit
