@@ -100,6 +100,15 @@ x-amz-meta-catalog-id: <stable ID>
 x-amz-meta-asset-version: sha256-<normalized asset digest>
 ```
 
+The automated staging sync serializes against deployment operations. On the
+current bounded staging host it records a non-sensitive memory snapshot, checks
+that catalog rows are either absent or the complete 228-item allowlist, and
+temporarily stops only the outbox worker before starting the one-off Django
+container. An EXIT trap always restarts the worker and waits for healthy state.
+Post/comment web traffic remains active. The sync then requires exactly 228
+catalog rows and an unchanged count of preserved legacy Unicode post/comment
+rows before it can produce an attestation.
+
 ## Production promotion
 
 The current manifest must fail before any production write. Promotion requires

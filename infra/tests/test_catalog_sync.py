@@ -195,6 +195,21 @@ def test_catalog_sync_workflow_is_staging_only_and_fail_closed():
     assert "flock -w 900 9" in remote
     assert 'find "$input_dir" -type d -exec chmod 0755 {} +' in remote
     assert 'find "$input_dir" -type f -exec chmod 0444 {} +' in remote
+    assert "catalog_database_snapshot" in remote
+    assert 'case "$catalog_count_before" in' in remote
+    assert "0|228)" in remote
+    assert "compose stop --timeout 60 worker" in remote
+    assert remote.index("worker_stopped=true") < remote.index(
+        "compose stop --timeout 60 worker"
+    )
+    assert "trap restore_worker EXIT" in remote
+    assert "compose up -d --no-deps worker" in remote
+    assert 'test "$worker_health" != unhealthy' in remote
+    assert 'test "$catalog_count_after" = 228' in remote
+    assert (
+        'test "${database_snapshot_after#*:}" = "${database_snapshot_before#*:}"'
+        in remote
+    )
     assert remote.index("run_sync upload.txt") < remote.index(
         "run_sync activate.txt --activate"
     )

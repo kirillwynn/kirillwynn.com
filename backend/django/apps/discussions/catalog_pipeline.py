@@ -954,7 +954,7 @@ def sync_catalog(
         )
     attestation = load_attestation(attestation_path, expected_manifest=manifest)
     attested_by_id = {item["catalog_id"]: item for item in attestation["items"]}
-    verified_objects: list[PreparedObject] = []
+    verified_object_count = 0
     for manifest_item in manifest.items:
         attested = attested_by_id[manifest_item.catalog_id]
         for prepared in load_prepared_objects(attestation_path=attestation_path, item=attested):
@@ -968,7 +968,7 @@ def sync_catalog(
                 catalog_id=manifest_item.catalog_id,
                 version=attested["immutable_asset_version"],
             )
-            verified_objects.append(prepared)
+            verified_object_count += 1
 
     imported = 0
     updated = 0
@@ -1064,7 +1064,7 @@ def sync_catalog(
         "manifest_sha256": manifest.sha256,
         "attestation_sha256": _sha256(attestation_path.read_bytes()),
         "items": len(manifest.items),
-        "objects": len(verified_objects),
+        "objects": verified_object_count,
         "created": imported,
         "updated": updated,
         "activated": activate,
