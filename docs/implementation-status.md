@@ -476,7 +476,50 @@ push produced release artifact
 `sha256:a178d942dbf0c37b3c0deeb9d9fc5ab0783dab551bfea15b10d1e356579851e8`),
 passed server preflight, explicitly skipped activation with both deploy gates
 false, and skipped reaction-catalog sync. A fresh documentation/evidence
-commit will be the staging-only acceptance candidate.
+commit was reserved for the staging-only acceptance candidate.
+
+The second gated rollout candidate was
+`a9eef40df327c8cc7ddafae7b439780ed1efee06` (parent
+`c4866f53c0e60aa96f63f3c02cdbac8d2ebebdd4`). Push/deploy run
+`30664087997` and pull-request run `30664090973` passed, operation
+`deploy-30664087997-staging-a9eef40df327c8cc7ddafae7b439780ed1efee06`
+completed, and the release/attestation artifacts were `8806383343` and
+`8806472726`. Live Chrome verified selection focus restoration on a post, then
+rejected the candidate after finding the corresponding thread-only gap: a
+duplicate reaction update changed the `ThreadPanel` callback identity, reran
+the combined focus-trap effect, and moved focus from the settled picker trigger
+to `Close thread`. The controlled `pepelove` toggle was removed immediately,
+restoring both duplicate aggregates; both deploy gates were returned to false.
+
+Separate fix commit `b7f43d873dd7c5d24cb837799c82835fde65a67b`
+(parent `a9eef40df327c8cc7ddafae7b439780ed1efee06`) isolates initial drawer focus
+from focus-trap listener registration. Initial focus now runs only for a new
+thread root, while reaction updates retain focus on the enabled picker trigger.
+A real-browser duplicate comment/thread regression settles a controlled
+selection and requires the thread trigger, rather than the drawer close button,
+to win focus; the complete local browser matrix increased to `60` passing cases
+across all five viewports. Pull-request run `30665260938` passed every required
+job. Push run `30665258531` passed the backend, frontend, 60-case browser, and
+infrastructure/container jobs but failed `cross-stack` for an unrelated Stage
+15 CMS timing race: the first attempt had already published the page while the
+isolated state reader still reported `live=false` inside the default five-second
+poll, and its retry then collided with the first attempt's slug.
+
+CI-hardening commit `f9f87dc98ef720e753be37b4279f5acfa8ebd48d`
+(parent `b7f43d873dd7c5d24cb837799c82835fde65a67b`) makes that isolated CMS retry
+use a unique title/slug and allows 15 seconds for commit-to-read visibility; it
+does not change product or Stage 15 runtime code. Prettier, ESLint, TypeScript,
+and the full local real-Django cross-stack suite passed. Pull-request run
+`30666009475` and push run `30666007558` then passed every required job,
+including mandatory PostgreSQL, all 60 browser cases, cross-stack, immutable
+image builds, server preflight, Compose/Nginx/container coverage, and
+`ci-required`. The push emitted
+`release-f9f87dc98ef720e753be37b4279f5acfa8ebd48d` (artifact `8807117397`,
+GitHub archive digest
+`sha256:22f4b91aa057e211c3bf1a0cb4ebc3752b54c6149f5836ff14ed7aa9f0746a18`).
+With both deploy gates false, activation was a verified no-op; catalog sync was
+skipped. A fresh documentation commit after this green baseline is the
+staging-only acceptance candidate.
 
 ## Current repository state
 
