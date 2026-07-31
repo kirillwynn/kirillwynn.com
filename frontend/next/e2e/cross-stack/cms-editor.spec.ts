@@ -78,7 +78,11 @@ test("editorial dashboard follows Wagtail's explicit dark preference", async ({
 
 test("Wagtail writing-first editor creates a suppressed archive through normal revisions", async ({
     page,
-}) => {
+}, testInfo) => {
+    const retrySuffix =
+        testInfo.retry === 0 ? "" : ` retry ${String(testInfo.retry)}`;
+    const postTitle = `CMS archive QA${retrySuffix}`;
+    const postSlug = `cms-archive-qa${retrySuffix.replaceAll(" ", "-")}`;
     const pageErrors: Error[] = [];
     page.on("pageerror", (error) => pageErrors.push(error));
     await page.emulateMedia({
@@ -124,7 +128,7 @@ test("Wagtail writing-first editor creates a suppressed archive through normal r
     await expect(title).toBeVisible();
     await expect(excerpt).toBeVisible();
     await expect(bodyPanel).toBeVisible();
-    await title.fill("CMS archive QA");
+    await title.fill(postTitle);
     await excerpt.fill(
         "A controlled archive created by cross-stack browser QA.",
     );
@@ -164,7 +168,7 @@ test("Wagtail writing-first editor creates a suppressed archive through normal r
     await expect(
         page
             .frameLocator("#w-preview-iframe")
-            .getByRole("heading", { name: "CMS archive QA" }),
+            .getByRole("heading", { name: postTitle }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Toggle preview" }).click();
 
@@ -209,23 +213,23 @@ test("Wagtail writing-first editor creates a suppressed archive through normal r
     await page.getByRole("button", { name: "More actions" }).click();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByRole("status")).toContainText(
-        "Page 'CMS archive QA' has been published.",
+        `Page '${postTitle}' has been published.`,
     );
 
     await expect
-        .poll(() => readCmsState("cms-archive-qa"))
+        .poll(() => readCmsState(postSlug), { timeout: 15_000 })
         .toMatchObject({
             decision: "suppressed",
             publication_outbox: 0,
             deliveries: 0,
             live: true,
         });
-    expect(readCmsState("cms-archive-qa").original_published_at).toContain(
+    expect(readCmsState(postSlug).original_published_at).toContain(
         "2014-03-02",
     );
 
     const detail = await page.request.get(
-        `${cmsOrigin}/api/v1/posts/cms-archive-qa/`,
+        `${cmsOrigin}/api/v1/posts/${postSlug}/`,
     );
     expect(detail.ok()).toBe(true);
     const payload = (await detail.json()) as {
