@@ -4,8 +4,9 @@ from threading import Barrier
 import pytest
 from django.db import close_old_connections, connection
 from django.utils import timezone
+from wagtail.models import Locale, Page
 
-from apps.blog.models import BlogPostPage
+from apps.blog.models import BlogIndexPage, BlogPostPage
 from apps.subscriptions.models import (
     EmailOutbox,
     PostPublicationEmailDecision,
@@ -79,7 +80,19 @@ def test_parallel_rate_limit_creation_keeps_one_hashed_bucket():
     assert bucket.request_count == 2
 
 
-def test_parallel_first_publication_decision_creates_one_event(blog_index):
+def test_parallel_first_publication_decision_creates_one_event():
+    locale, _ = Locale.objects.get_or_create(language_code="en")
+    root = Page.get_first_root_node()
+    if root is None:
+        root = Page.add_root(
+            instance=Page(
+                title="Root",
+                slug="root",
+                locale=locale,
+            )
+        )
+    blog_index = BlogIndexPage(title="Blog", slug="blog", live=False)
+    root.add_child(instance=blog_index)
     post = BlogPostPage(
         title="Concurrent publication",
         slug="concurrent-publication",
