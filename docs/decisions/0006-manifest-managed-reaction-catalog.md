@@ -4,6 +4,8 @@ Status: accepted
 
 Date: 2026-07-29
 
+Amended: 2026-07-30 (recorded two-phase staging activation)
+
 Supersedes: ADR 0003's public Unicode identity, picker, and storage contract.
 ADR 0003 remains the historical contract for preserved legacy rows and the
 concurrency, privacy, visibility, pagination, and OAuth safeguards retained
@@ -210,6 +212,22 @@ target isolation, explicit confirm/discard, no automatic replay, optimistic
 rollback, shared target coordinator, stale settlement defense, duplicate
 instances, participant abort/dedupe/focus, Feed explicit activation,
 tombstones, and Draft Mode suppression remain.
+
+### Staging activation outcome
+
+The two-phase decision was exercised on staging. Expansion release
+`2d3c04faa08835e2b1d8cadb4eb1649870633f17` applied `0003`; attested sync
+operation
+`catalog-sync-30588326706-staging-2d3c04faa08835e2b1d8cadb4eb1649870633f17`
+activated the explicit 228-item allowlist and verified 276 immutable objects;
+activation release `9c2f6d4e6e1ae39cd1dbf72e7affc55b9c50dd03` applied `0004`.
+The final live-QA fix release is
+`43f5a05213f13d7c5129ddebd05955fc3186de82`.
+
+Two historical post Unicode rows and the legacy columns remain intact and are
+not exposed through the catalog contract. The allowlist remains
+`staging-only/unverified`, so this successful staging activation does not
+authorize or imply a production catalog.
 
 ## Consequences
 

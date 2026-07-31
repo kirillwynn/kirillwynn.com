@@ -24,14 +24,19 @@ staging as release `5dfd2d17d52972a188cd9d156d219fe229bfbb1a`: it repairs
 the shared mobile shell, simplifies the header, Feed, and icon-only Bridge, and
 adds one private bounded Feed reaction batch read without changing the publicly
 cached post list. Required CI, immutable images, the ordinary staging rollout,
-schema-3 attestation, and read-only live Chrome QA passed. New-stack production
+schema-3 attestation, and read-only live Chrome QA passed. Stage 16 is also
+accepted on staging as release
+`43f5a05213f13d7c5129ddebd05955fc3186de82`: the explicit custom reaction
+catalog, two-phase legacy-safe migration, immutable asset sync, picker/API/UI,
+and Search/Bridge polish passed required CI and live QA. New-stack production
 deployment, production provider configuration, DNS changes, data migration,
 and promotion remain out of scope and unverified.
 
 ## Stage 16 custom reaction catalog
 
-Stage 16 is being delivered before Stage 15 through a two-release
-expand/activate rollout. Stage 15 and Stage 17 remain untouched.
+Stage 16 was delivered before Stage 15 through the planned two-release
+expand/activate rollout and accepted on staging on 2026-07-30. Stage 15 and
+Stage 17 remain untouched.
 
 The owner approved all 228 supplied files for controlled staging evaluation,
 with no catalog exclusions and quick IDs `pepeclap`, `pepehmm`, and
@@ -39,101 +44,123 @@ with no catalog exclusions and quick IDs `pepeclap`, `pepehmm`, and
 material, every item remains `staging-only/unverified`; search-engine
 availability and noncommercial use are not treated as a production rights
 basis. There is no active new-stack production deployment or production
-catalog/data. The production gate is a future fail-closed safety contract, not
-a statement that production currently exists.
+catalog/data. The production check is a future fail-closed safety contract,
+not a statement that production currently exists.
 
-Expansion commit `61112e61e0d0a88ed9125bc441ec4e06a516289a` and release
-marker `2d3c04faa08835e2b1d8cadb4eb1649870633f17` are active on
-staging. CI runs `30498087049`, `30498090525`, and `30564257262`
-passed. Operation
+The expansion release marker
+`2d3c04faa08835e2b1d8cadb4eb1649870633f17` deployed commit
+`61112e61e0d0a88ed9125bc441ec4e06a516289a` through CI/deploy run
+`30564257262`. Operation
 `deploy-30564257262-staging-2d3c04faa08835e2b1d8cadb4eb1649870633f17`
 applied additive migration `discussions.0003_reaction_catalog_expansion`,
 preserved all Unicode rows/columns, and activated the manifest/Wagtail/import
-architecture without switching the public Unicode application contract. Its
-release manifest SHA-256 is
-`62b2574db6f46c0bc8913bb7c5b384769d4b071395cf3355e0bb46b44f51708c`;
-staging attestation SHA-256 is
+architecture while the prior Unicode application contract remained live. Its
+release-manifest JSON SHA-256 is
+`62b2574db6f46c0bc8913bb7c5b384769d4b071395cf3355e0bb46b44f51708c`
+and staging-attestation JSON SHA-256 is
 `083355eaf4824d3f95887f9c1df4ac0391ef41e4b70b2d9373513ccdbe4b28e7`.
-Active expansion image digests are Django
-`sha256:4285c95a7626727c1cada4cee0eef90d11a661f8a4f1355ed057d1e56e554ada`,
-Next
-`sha256:74135f621788d88304270b995bd3e3b36a80f66dc25b55f59ea10a53b5f9f485`,
-and edge
-`sha256:423218089d47e374ecf37018dce880b17ee4b2d3780d4aedc7b7063669f621a7`.
 
-The real corpus was read locally without copying binaries into Git, a container
-image, S3, or the public API. Two prepare runs produced the same 228-item /
-276-object attestation SHA-256
-`c9b1eaee39db47dc4725aaa5604e873a9fad154f95ba4b45bdb468bc54c16914`.
-Detected input formats were 128 PNG, 52 WebP (despite `.png` names), and 48
-GIF. The largest normalized object was 200,832 bytes, below the fixed 512 KiB
-limit. The manifest SHA-256 is
+The explicit manifest is `stage16-staging-v1`, SHA-256
 `1b0a409b80ddb46eed4059a19210eec82f5444530eb268a33d5cb0945e08c018`.
+Two local prepare runs were byte-identical and produced the same 228-item /
+276-object attestation JSON SHA-256
+`c9b1eaee39db47dc4725aaa5604e873a9fad154f95ba4b45bdb468bc54c16914`.
+The allowlist contains 180 static and 48 animated items. Detected source
+formats were 128 PNG, 52 WebP despite `.png` names, and 48 GIF. The largest
+normalized object is 200,832 bytes, below the fixed 512 KiB limit. Real source
+and normalized binaries were never added to Git, browser bundles, or images.
 
-The activation candidate now switches API/frontend identity to stable catalog
-IDs while retaining the legacy column and rows. Migration
-`discussions.0004_activate_catalog_reaction_identity` makes the named legacy
-uniqueness partial on non-empty Unicode values, keeps custom `PROTECT`
-uniqueness/indexes, and supports populated `0004 → 0003 → 0004` testing without
-destroying custom or legacy rows. The API accepts only
-`{"reaction_id":"<catalog-id>"}`, returns descriptors and catalog-ID
-participant paths, hides disabled and unmapped legacy rows, and preserves
-session/CSRF, visibility, locking, rate-limit, cache, pagination, and bounded
-Feed-query boundaries. Catalog/config have user-independent ETags and public
-60-second revalidation.
+Bounded encrypted sync run `30588326706` completed verification, upload,
+activation, and an idempotent repeat under operation
+`catalog-sync-30588326706-staging-2d3c04faa08835e2b1d8cadb4eb1649870633f17`.
+Catalog attestation artifact `8777666567` has JSON SHA-256
+`ca6452ef8a0bb995cdb21ab7771484a6677cec9ba5955913fff3d0c921d94a61`.
+It verified 228 rows and 276 immutable objects under `staging/media`, with
+`created=0` during upload, `created=228` during activation, and
+`created=0, updated=0` during the idempotent repeat. Database counts changed
+from `0 catalog / 2 legacy post / 0 legacy comment` to
+`228 catalog / 2 legacy post / 0 legacy comment`; the historical Unicode rows
+remain intact and hidden from the new contract. The worker was restored
+healthy by the bounded cleanup trap. The public encrypted prerelease/tag,
+asset, one-use Environment secret, transfer variables, key, plaintext archive,
+and ciphertext were deleted after attestation. Catalog sync and both deploy
+gates are `false`.
 
-The Next client removes Emoji Mart, Unicode picker/quick/recent/pending values,
-and the `@emoji-mart/data`, `emoji-regex`, and Python `emoji` dependencies. It
-uses a lazy searchable keyboard/touch picker, version-2 catalog-ID storage,
-explicit OAuth confirm/discard, lazy poster/static images, intersection-gated
-animation, a code-level reduced-motion poster boundary, and accessible broken
-image fallback. Search focus and Bridge hover/focus no longer receive an
-outline, ring, glow, or border recoloring; both retain perceptible,
-non-contour keyboard focus and reduced-motion behavior.
+Activation release `9c2f6d4e6e1ae39cd1dbf72e7affc55b9c50dd03` applied
+`discussions.0004_activate_catalog_reaction_identity` through run
+`30589404234`, operation
+`deploy-30589404234-staging-9c2f6d4e6e1ae39cd1dbf72e7affc55b9c50dd03`.
+The migration makes legacy uniqueness partial on non-empty Unicode values,
+retains the legacy columns and rows, keeps custom `PROTECT` uniqueness/indexes,
+and supports populated `0004 → 0003 → 0004` tests without destroying either
+identity. The API accepts only `{"reaction_id":"<catalog-id>"}`, returns
+catalog descriptors and catalog-ID participant paths, and omits disabled and
+unmapped legacy rows.
 
-Current local activation verification passes:
+Live QA found and fixed three client defects: the picker initially assigned
+all 228 poster sources despite `loading=lazy`, accessibility text could append
+“reaction” twice, and a participant dialog could remain stale after a
+mutation. Fix commit `c249666eb0f51ca186e2359bd60d12f3a8059c5b` passed full
+required CI run `30591122641`. Final rollout marker
+`43f5a05213f13d7c5129ddebd05955fc3186de82` deployed it through run
+`30591503850`, operation
+`deploy-30591503850-staging-43f5a05213f13d7c5129ddebd05955fc3186de82`.
+The rollout created backup
+`/srv/kirillwynn/backups/staging/20260730T235218Z_9c2f6d4e6e1ae39cd1dbf72e7affc55b9c50dd03_pre-migration_deploy-30591503850-staging-43f5a05213f13d7c5129ddebd05955fc3186de82.dump`;
+there were no new migrations after already-applied `0004`.
+
+Final release artifact `8778617590` has GitHub archive digest
+`sha256:a0fab4ad988eb68d19800c30df1c954fde5a34ec3714bd7b550e4e5b4141f343`
+and release-manifest JSON SHA-256
+`1bc7a1350cf231a7d01d1742dd30aca82666f8e61fb7d23b941e35070f03f316`.
+Staging attestation artifact `8778654379` has archive digest
+`sha256:ec57e1a2889ba40f5decc5d9977d71de259d7a7ea4e7acb9d595cf70f910587a`
+and JSON SHA-256
+`45657ec2ec8d07830f6f80a68f69f3b0aaf24ae98998c17f5afe7535373b0b82`.
+All seven attestation checks passed. Active image digests are Django
+`sha256:8953a6a6851f5eeacfb4863da55826beb6d37d724160159ef02a09999b410eee`,
+Next
+`sha256:3e318976ab28c65684188e999dc5c1080add0be67cd38bbd9b9fcb3f796e09eb`,
+and edge
+`sha256:3e90e20fe656ab613dbf5cc118487f794e83b9ba5de6bc39de9270a47c96b1f0`.
+
+Verification passed:
 
 - `uv 0.11.32 lock --check`, Ruff format/lint, Django checks, migration drift,
-  521 SQLite tests with seven PostgreSQL-only tests deselected, 26 focused
-  admin/catalog/migration tests, and the 229-test infrastructure/container/
-  MinIO suite;
-- `npm ci`, Prettier, ESLint, TypeScript, 174 Vitest tests, production Next
+  521 SQLite tests with seven PostgreSQL-only tests deselected, mandatory
+  PostgreSQL migration/concurrency coverage, 27 focused catalog tests, and the
+  229-test infrastructure/container/MinIO suite;
+- `npm ci`, Prettier, ESLint, TypeScript, 176 Vitest tests, production Next
   build, standalone runtime-origin verification, browser secret/storage-key
   scans, lazy-chunk inspection, and `npm audit` with zero vulnerabilities;
 - five real-Django cross-stack tests and 45 browser-contract tests across
   320×812, 375×812, 768×1024, 1440×900, and 1920×1080, including both themes,
   axe, keyboard/touch/Escape/focus restoration, Search/Bridge polish, reduced
-  motion, overflow, hydration, and console boundaries.
+  motion, overflow, hydration, and console boundaries;
+- live authenticated Chrome QA for static and animated reactions in post,
+  comment/thread duplicate instances, Feed, participants, and picker. The
+  picker exposes 228 buttons but initially creates only 50 visible images,
+  requests no GIF until an animated result receives keyboard focus, and then
+  requests exactly one. Escape restores focus, offscreen animation uses the
+  poster, controlled mutations were removed afterward, and no console or
+  hydration errors remained;
+- live Search and Bridge checks in both themes found no focus/hover outline,
+  ring, shadow, or border recoloring while preserving a perceptible surface
+  change. Reaction buttons remain 44×44 px;
+- sampled static WebP, animated GIF, and poster objects returned exact MIME,
+  `public, max-age=31536000, immutable`, catalog/version/hash metadata, and
+  bytes matching SHA-256
+  `f47ae26cbae8833345a59b8fa848bac75420a3e3ba9f78fde5640968974b52d9`,
+  `604f8ccd2ac6dd164adf48245e1e31dc929ef0e3d29083f8561a5403739c11fc`,
+  and
+  `7a0c548502d98dd97b644088d17f6bb82956869a47f531fa6b6b0e526072066f`.
 
-Staging catalog transfer remains pending. A first gated sync run
-`30579002338` failed before SSH/S3 because a draft release asset could not be
-downloaded; a temporary private prerelease fixed that transport without
-widening token permissions. Run `30580190051` passed all required CI but failed
-before S3 on an unreadable read-only bind mount. Commit
-`8b677d1143bb768e19a12f099f0d2ced1a506416` fixes the mount permissions and
-passes 229 local infrastructure tests, but its fresh push/PR runs
-`30581189092` and `30581196760` could not start jobs because GitHub Actions
-reported an account billing/spending-limit block. Therefore no failed sync
-attempt changed staging S3 or catalog database rows. Both staging deployment
-gates are `false`. After the owner made the repository public and CI capacity
-returned, the plaintext temporary prerelease/tag was removed before retrying
-the transfer. Public-repository transport now requires an ephemeral
-AES-256-CTR/PBKDF2 encrypted release asset, independently pinned ciphertext and
-attested plaintext hashes, and a one-use protected staging Environment secret;
-all transport state is deleted after a successful attested sync.
-
-Activation commit `f00a7d4b922b0027155bf1e7cce4e8358748134a` passed the
-complete required push CI on rerun `30583244134` after repository visibility
-changed, including mandatory PostgreSQL, browser, cross-stack, infrastructure,
-immutable image builds, preflight, release-manifest, and disabled-deploy
-boundaries.
-
-Remaining Stage 16 work is to pass fresh required CI for the encrypted
-transport hardening, run and attest the verify/upload/activate/idempotence
-sync, take the rollout backup, deploy the activation digest only to staging,
-complete live static/animated/reduced-motion/CDN QA, remove all temporary
-transfer state, and record the final operation/digests. No production, `main`,
-DNS, OAuth/Resend provider, or legacy-data state has been changed.
+Stage 16 is complete for staging. A future production promotion remains
+prohibited until a separately reviewed `production-approved` manifest records
+an acceptable rights basis for every item. Removing the legacy columns,
+archiving unmapped Unicode rows, or collecting old immutable objects remains a
+separate contract/cleanup scope. No production, `main`, DNS, OAuth/Resend
+provider, or legacy-data state was changed.
 
 ## Current repository state
 

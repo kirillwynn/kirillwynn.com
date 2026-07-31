@@ -512,6 +512,12 @@ render as a static fallback. Neither exposes an internal S3 key.
 Disabled catalog items and unmapped legacy Unicode rows are omitted from new
 public aggregates without deleting their database rows.
 
+`label` is the complete human-readable accessibility label supplied by the
+catalog. A client may add surrounding control grammar such as `React with …`,
+but it must not blindly append a second `reaction` suffix when the label
+already contains one. Images inside those labelled controls remain decorative
+with `alt=""`.
+
 ### Post aggregates and toggle
 
 - `GET /api/v1/posts/<unicode-slug>/reactions/`
@@ -661,6 +667,9 @@ hover/focus behavior. The compact Feed surface is stricter: hover,
 `pointerenter`, focus alone, and a synthetic mouse event after touch neither
 open participants nor issue a participant request. Feed participants open only
 after click/tap or the native Enter/Space activation of the count button.
+Any reaction mutation event for the displayed target closes the current
+participant surface before applying the optimistic or authoritative snapshot,
+so a removed or replaced aggregate cannot leave a stale participant dialog.
 
 ### Public catalog and quick config
 
@@ -725,10 +734,12 @@ They do not vary on `Cookie`; an exact `If-None-Match` receives `304`.
 The picker is lazy-loaded and fetches the catalog only when needed (or when a
 valid pending catalog ID is not already present in current groups/config).
 Search uses display and accessibility labels. Posters and static assets are
-lazy images; the animation URL is selected only for an intersecting active
-item. With `prefers-reduced-motion: reduce`, the animation URL is never
-assigned. Leaving the viewport restores the poster. An image failure falls
-back from animation to poster and then to accessible text.
+intersection-gated: an offscreen picker item has no image element or `src`,
+rather than relying only on browser `loading=lazy`. The animation URL is
+selected only for an intersecting active item. With
+`prefers-reduced-motion: reduce`, the animation URL is never assigned. Leaving
+the viewport restores the poster. An image failure falls back from animation
+to poster and then to accessible text.
 
 Recent and pending reaction storage is schema version 2 and stores catalog IDs
 only. IDs use the same bounded lowercase ASCII shape as the API. Asset URLs and

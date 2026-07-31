@@ -109,6 +109,42 @@ Post/comment web traffic remains active. The sync then requires exactly 228
 catalog rows and an unchanged count of preserved legacy Unicode post/comment
 rows before it can produce an attestation.
 
+## Recorded staging activation
+
+The `stage16-staging-v1` catalog was synchronized on 2026-07-30 by run
+`30588326706`, operation
+`catalog-sync-30588326706-staging-2d3c04faa08835e2b1d8cadb4eb1649870633f17`.
+Artifact `8777666567` contains the successful sync attestation; its canonical
+JSON SHA-256 is
+`ca6452ef8a0bb995cdb21ab7771484a6677cec9ba5955913fff3d0c921d94a61`.
+The attestation records:
+
+- 228 activated rows: 180 static and 48 animated;
+- 276 verified immutable objects under `staging/media`;
+- upload `created=0`, activation `created=228, updated=0`, and idempotent repeat
+  `created=0, updated=0`;
+- preserved legacy counts of two post Unicode rows and zero comment Unicode
+  rows before and after activation;
+- worker restart and healthy state after the bounded one-off importer.
+
+The encrypted transport prerelease/tag and asset, transfer key secret,
+temporary variables, local key, plaintext archive, and ciphertext were deleted
+after that attestation. `STAGING_REACTION_CATALOG_SYNC_ENABLED=false` is the
+recorded final gate state.
+
+Application activation migration
+`discussions.0004_activate_catalog_reaction_identity` was applied by run
+`30589404234`. The final live-QA fix release was deployed by run
+`30591503850`, operation
+`deploy-30591503850-staging-43f5a05213f13d7c5129ddebd05955fc3186de82`.
+Release artifact `8778617590` contains `release-manifest.json` with SHA-256
+`1bc7a1350cf231a7d01d1742dd30aca82666f8e61fb7d23b941e35070f03f316`;
+attestation artifact `8778654379` contains `staging-attestation.json` with
+SHA-256
+`45657ec2ec8d07830f6f80a68f69f3b0aaf24ae98998c17f5afe7535373b0b82`.
+Both repository and staging Environment deployment gates were restored to
+`false`.
+
 ## Production promotion
 
 The current manifest must fail before any production write. Promotion requires
