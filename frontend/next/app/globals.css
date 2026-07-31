@@ -953,8 +953,7 @@ img {
     background: var(--color-accent-soft);
 }
 
-.reaction-pill button,
-.quick-reaction {
+.reaction-pill button {
     display: inline-flex;
     min-width: 2.75rem;
     min-height: 2.75rem;
@@ -971,13 +970,11 @@ img {
     font-size: 0.8125rem;
 }
 
-.reaction-pill button:hover,
-.quick-reaction:hover {
+.reaction-pill button:hover {
     background: var(--color-surface-subtle);
 }
 
-.reaction-pill button:disabled,
-.quick-reaction:disabled {
+.reaction-pill button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
 }
@@ -1096,16 +1093,46 @@ img {
     line-height: 1;
 }
 
-.quick-reaction {
+.reaction-picker-trigger {
+    position: relative;
+    display: inline-flex;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--color-ink-soft);
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.reaction-picker-trigger::before {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 1.875rem;
+    height: 1.875rem;
+    transform: translate(-50%, -50%);
     border: var(--border-thin) solid var(--color-border);
     border-radius: 999px;
     background: var(--color-surface);
-    font-size: 1.125rem;
+    content: "";
 }
 
-.quick-reaction__image {
-    width: 1.125rem;
-    height: 1.125rem;
+.reaction-picker-trigger:hover::before,
+.reaction-picker-trigger:active::before {
+    background: var(--color-surface-subtle);
+}
+
+.reaction-picker-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.reaction-picker-trigger__icon {
+    position: relative;
+    z-index: 1;
 }
 
 .reaction-notice {

@@ -351,6 +351,81 @@ archiving unmapped Unicode rows, or collecting old immutable objects remains a
 separate contract/cleanup scope. No production, `main`, DNS, OAuth/Resend
 provider, or legacy-data state was changed.
 
+## Stage 16 suggested-reaction remediation
+
+This narrow remediation began from clean exact local/origin parent
+`0c1f2643625995c5d37274ac1184384daaf4f60c` on
+`rewrite/wagtail-next`, with active staging release
+`750c0366b777da252729f7cddf601f418daf50eb` and unchanged `origin/main`
+`1d02912430277cdf5465f856b158a6820bc12be4`.
+
+The new public contract removes suggested/quick reaction presentation and its
+frontend config consumption. Post detail, top-level comments, replies, and
+thread copies render only existing aggregate pills plus exactly one compact
+`Choose reaction` trigger; empty surfaces render only that trigger. Feed keeps
+its aggregate-only compact contract and has no picker. The trigger retains a
+44×44 interactive target around a quiet 30px visual control, native
+click/Enter/Space activation, truthful `aria-expanded`, Escape/close/selection
+focus restoration, and the existing busy/read-only boundary.
+
+`ReactionBar` no longer owns quick state, computes `quickOnly`, calls
+`getReactionConfig`, renders suggested buttons/images, reserves their layout,
+or reports quick-config load errors. The browser client contains no config
+fetch function or path. The catalog remains lazy after explicit picker opening;
+the only pre-open exception is restoration of a valid pending reaction ID that
+is absent from current aggregates, which uses the catalog endpoint. Mutation,
+coordinator, duplicate-instance, participants, OAuth confirm/discard,
+tombstone, Draft Mode, 403, 429, and rollback behavior are unchanged.
+
+Rollback compatibility is deliberately retained: the backend config endpoint,
+`ReactionSettings`, its three catalog foreign keys, existing selected values,
+catalog `quick_order`, importer, manifest `stage16-staging-v1`, 228 catalog
+rows, identity, hashes, asset versions, and immutable S3/CDN objects remain
+unchanged. Only the Wagtail registration of the active quick-selection form is
+removed, so the owner navigation no longer advertises the retired feature.
+There is no migration, data migration, catalog sync, or asset operation. A
+future separately reviewed cleanup migration may remove the deprecated schema
+and endpoint only after the frontend rollback window closes.
+
+Regression coverage asserts the one-trigger contract with empty and populated
+post aggregates, ordinary aggregate rendering of `pepeclap`, comment/reply and
+duplicate thread surfaces, absence of pre-open suggested buttons/assets and
+config/catalog requests, lazy picker keyboard/touch/focus behavior, pending
+OAuth restoration through catalog, Feed exclusion, unchanged mutation and
+participant behavior, and the hidden Wagtail settings registration. Full local,
+CI, rollout, artifact, and live Chrome evidence will be recorded here after
+staging-only acceptance.
+
+Local verification passed before the implementation commit:
+
+- exact `uv 0.11.32` lock check, Ruff format/lint for 161 files, Django system
+  and production deploy checks, migration drift, a complete empty-SQLite
+  migration chain through unchanged `discussions.0004`, and the full SQLite
+  suite (`547 passed`, `9` PostgreSQL-only tests deselected);
+- Prettier, ESLint, TypeScript, all `180` Vitest cases, the production Next
+  build, standalone runtime-origin verification, `npm audit` with zero
+  vulnerabilities, browser secret/internal-origin scans, and a production
+  static scan finding no quick-config path, quick state/error symbols, or the
+  three suggested catalog IDs; the 3,209-byte picker implementation remains a
+  dynamic chunk and the current Next rewrite table no longer advertises the
+  rollback-only route;
+- all `50` browser-contract cases across 320×812, 375×812, 768×1024,
+  1440×900, and 1920×1080, including both themes, axe, 44×44 non-overlapping
+  targets around the 30px trigger visual, click/Enter/Space, repeated close,
+  Escape/focus restoration, touch, Feed, Search/Bridge, reduced motion,
+  overflow, hydration, and console boundaries;
+- all `7` real-Django cross-stack cases and all `231`
+  infrastructure/script/state-machine tests, plus shell syntax, Python
+  compilation, and sanitized browser-artifact scans.
+
+Package manifests and lockfiles did not change, so local `npm ci` was
+intentionally not repeated. Docker and a local PostgreSQL server/client remain
+unavailable on this workstation; required CI remains authoritative for the
+no-skip PostgreSQL suite, populated migration directions, Compose/image/Nginx,
+container smoke, S3 isolation, and immutable release builds. The manifest still
+hashes to `1b0a409b80ddb46eed4059a19210eec82f5444530eb268a33d5cb0945e08c018`;
+no migration, catalog sync, or object-store operation occurred locally.
+
 ## Current repository state
 
 - The `main` branch contains the deployed legacy Flask/React implementation.

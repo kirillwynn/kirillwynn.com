@@ -503,9 +503,11 @@ test("Feed hydrates existing reactions once without card-level requests or picke
         ),
     ).toHaveLength(0);
     await expect(
-        page.getByRole("button", { name: "Open reaction picker" }),
+        page.getByRole("button", { name: "Choose reaction" }),
     ).toHaveCount(0);
-    await expect(page.locator(".feed-entry .quick-reaction")).toHaveCount(0);
+    await expect(
+        page.locator(".feed-entry .reaction-picker-trigger"),
+    ).toHaveCount(0);
 
     const count = feedReactions.getByRole("button", {
         name: "View 1 participant for Clapping",
@@ -564,6 +566,123 @@ test("Feed hydrates existing reactions once without card-level requests or picke
     await expect(page.locator('.feed-entry [role="alert"]')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await expectAccessible(page);
+});
+
+test("reaction surfaces expose only aggregates and one lazy picker trigger", async ({
+    page,
+}) => {
+    const requests: string[] = [];
+    page.on("request", (request) => {
+        requests.push(new URL(request.url()).pathname);
+    });
+
+    await page.goto("/posts/testing-secure-systems");
+    const postGroup = page.getByRole("group", { name: "Reactions" }).first();
+    const postTrigger = postGroup.getByRole("button", {
+        name: "Choose reaction",
+    });
+    await expect(postGroup.locator(".reaction-pill")).toHaveCount(1);
+    await expect(postTrigger).toHaveCount(1);
+    await expect(postTrigger).toHaveAttribute("aria-expanded", "false");
+
+    const comment = page.locator('article[data-comment-id="10"]').first();
+    const commentGroup = comment.getByRole("group", { name: "Reactions" });
+    await expect(commentGroup.locator(".reaction-pill")).toHaveCount(0);
+    await expect(
+        commentGroup.getByRole("button", { name: "Choose reaction" }),
+    ).toHaveCount(1);
+    await expect(
+        page.getByRole("button", { name: /^React with / }),
+    ).toHaveCount(0);
+    expect(
+        requests.filter((path) => path === "/api/v1/reactions/config/"),
+    ).toHaveLength(0);
+    expect(
+        requests.filter((path) => path === "/api/v1/reactions/catalog/"),
+    ).toHaveLength(0);
+    expect(requests.some((path) => path.includes("/pepehmm/"))).toBe(false);
+    expect(requests.some((path) => path.includes("/pepelove/"))).toBe(false);
+
+    const triggerGeometry = await postTrigger.evaluate((element) => {
+        const target = element.getBoundingClientRect();
+        const visual = getComputedStyle(element, "::before");
+        return {
+            targetHeight: target.height,
+            targetWidth: target.width,
+            visualHeight: visual.height,
+            visualWidth: visual.width,
+        };
+    });
+    expect(triggerGeometry).toEqual({
+        targetHeight: 44,
+        targetWidth: 44,
+        visualHeight: "30px",
+        visualWidth: "30px",
+    });
+    expect(
+        await postGroup.evaluate((group) => {
+            const pill = group.querySelector(".reaction-pill");
+            const trigger = group.querySelector(".reaction-picker-trigger");
+            if (!pill || !trigger) {
+                return true;
+            }
+            const pillBox = pill.getBoundingClientRect();
+            const triggerBox = trigger.getBoundingClientRect();
+            return !(
+                pillBox.right <= triggerBox.left ||
+                triggerBox.right <= pillBox.left ||
+                pillBox.bottom <= triggerBox.top ||
+                triggerBox.bottom <= pillBox.top
+            );
+        }),
+    ).toBe(false);
+
+    await postTrigger.press("Enter");
+    const picker = page.getByRole("dialog", { name: "Choose a reaction" });
+    await expect(picker).toBeVisible();
+    await expect(postTrigger).toHaveAttribute("aria-expanded", "true");
+    await expect(
+        picker.getByRole("button", { name: "React with Clapping" }),
+    ).toBeVisible();
+    expect(
+        requests.filter((path) => path === "/api/v1/reactions/catalog/"),
+    ).toHaveLength(1);
+    expect(
+        requests.filter((path) => path === "/api/v1/reactions/config/"),
+    ).toHaveLength(0);
+    await page.keyboard.press("Escape");
+    await expect(picker).toBeHidden();
+    await expect(postTrigger).toBeFocused();
+
+    await postTrigger.press("Space");
+    await expect(picker).toBeVisible();
+    await picker.getByRole("button", { name: "Close reaction picker" }).click();
+    await expect(postTrigger).toBeFocused();
+
+    await postTrigger.click();
+    await expect(picker).toBeVisible();
+    await postTrigger.click();
+    await expect(picker).toBeHidden();
+    await expect(postTrigger).toHaveAttribute("aria-expanded", "false");
+
+    const threadTrigger = comment
+        .getByRole("button", { name: /^(Reply|View thread)$/ })
+        .first();
+    await threadTrigger.click();
+    const thread = page.getByRole("dialog", {
+        name: "Thread for comment by Site Author",
+    });
+    await expect(thread).toBeVisible();
+    await expect(
+        thread.getByRole("button", { name: "Choose reaction" }),
+    ).toHaveCount(2);
+    await expect(
+        thread.getByRole("button", { name: /^React with / }),
+    ).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+    await expectAccessible(page);
+    await page.keyboard.press("Escape");
+    await expect(thread).toBeHidden();
 });
 
 test("responsive shell, right header group, skip link, and universal team footer", async ({

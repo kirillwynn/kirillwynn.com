@@ -1,9 +1,8 @@
-from wagtail.contrib.settings.registry import register_setting
 from wagtail.permissions import ModelPermissionPolicy
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 
-from apps.discussions.models import ReactionCatalogItem, ReactionSettings
+from apps.discussions.models import ReactionCatalogItem
 
 
 class ManifestManagedCatalogPermissionPolicy(ModelPermissionPolicy):
@@ -76,5 +75,4 @@ class ReactionCatalogItemViewSet(SnippetViewSet):
         return ManifestManagedCatalogPermissionPolicy(self.model)
 
 
-register_setting(ReactionSettings, icon="pick")
 register_snippet(ReactionCatalogItemViewSet)

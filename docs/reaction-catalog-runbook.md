@@ -11,6 +11,8 @@ container images.
 - catalog version: `stage16-staging-v1`;
 - allowlist: 228 explicit items (180 static, 48 animated);
 - quick reactions: `pepeclap`, `pepehmm`, `pepelove`;
+- public UI: suggested/quick reactions are retired; these values are retained
+  only for rollback compatibility and are not fetched by the current frontend;
 - approval: `staging-only/unverified`;
 - production: prohibited by the sync command.
 
@@ -145,6 +147,21 @@ SHA-256
 Both repository and staging Environment deployment gates were restored to
 `false`.
 
+## Suggested-reaction remediation
+
+The current public contract renders existing aggregate pills and one compact
+picker trigger on post, comment, reply, and thread surfaces. Feed renders only
+existing aggregates. No surface renders the three manifest quick items as
+suggestions, and the catalog remains lazy until explicit picker activation or
+restoration of a valid pending ID absent from current aggregates.
+
+Do not clear or reorder the three stored quick values during the rollback
+window. `GET /api/v1/reactions/config/`, `ReactionSettings`, its three catalog
+foreign keys, and `ReactionCatalogItem.quick_order` are deprecated,
+rollback-only state. The Wagtail quick-selection form is deliberately hidden,
+but the model and importer contract remain intact. This remediation requires
+no catalog preparation, sync, S3/CDN write, manifest update, or migration.
+
 ## Production promotion
 
 The current manifest must fail before any production write. Promotion requires
@@ -184,3 +201,8 @@ Never delete old Unicode rows or immutable S3 objects during a rollback.
 Removing the legacy columns, archiving unmapped Unicode data, or garbage
 collecting unreferenced content-addressed objects is a separate contract
 migration/runbook change.
+
+After the frontend rollback window closes, remove the deprecated config route,
+settings fields/model surface, and `quick_order` only through a separately
+reviewed cleanup migration and contract update. Do not combine that cleanup
+with catalog asset garbage collection or legacy Unicode retention work.

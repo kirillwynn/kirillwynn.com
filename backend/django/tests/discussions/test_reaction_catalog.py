@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from PIL import Image, ImageSequence, PngImagePlugin
+from wagtail.contrib.settings.registry import registry as wagtail_settings_registry
 from wagtail.models import Site
 
 from apps.discussions import catalog_pipeline
@@ -658,3 +659,12 @@ def test_reaction_settings_requires_three_distinct_enabled_catalog_items(blog_in
     settings.quick_reaction_item_three = None
     with pytest.raises(ValidationError, match="exactly three"):
         settings.save()
+
+
+def test_quick_reaction_settings_are_retained_but_hidden_from_wagtail_navigation():
+    assert ReactionSettings not in wagtail_settings_registry
+    assert {
+        "quick_reaction_item_one",
+        "quick_reaction_item_two",
+        "quick_reaction_item_three",
+    }.issubset({field.name for field in ReactionSettings._meta.fields})

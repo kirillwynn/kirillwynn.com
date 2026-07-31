@@ -26,7 +26,6 @@ import {
 } from "@/lib/reaction-mutation-coordinator";
 import {
     getReactionCatalog,
-    getReactionConfig,
     getReactionParticipants,
     ReactionApiError,
     type ReactionChange,
@@ -75,7 +74,6 @@ export function ReactionBar({
 }) {
     const { me, refresh, status: authStatus } = useAuth();
     const [reactions, setReactions] = useState(initialReactions);
-    const [quick, setQuick] = useState<ReactionDescriptor[]>([]);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -205,28 +203,6 @@ export function ReactionBar({
     }, [closeParticipants]);
 
     useEffect(() => {
-        if (compact) {
-            setQuick([]);
-            return;
-        }
-        let active = true;
-        void getReactionConfig()
-            .then((config) => {
-                if (active) {
-                    setQuick(config.quick_reactions);
-                }
-            })
-            .catch(() => {
-                if (active) {
-                    setError("Quick reactions could not be loaded.");
-                }
-            });
-        return () => {
-            active = false;
-        };
-    }, [compact]);
-
-    useEffect(() => {
         if (authStatus !== "ready") {
             return;
         }
@@ -235,10 +211,9 @@ export function ReactionBar({
             setPendingReaction(null);
             return;
         }
-        const known = [
-            ...reactions.map((group) => group.reaction),
-            ...quick,
-        ].find((reaction) => reaction.id === pendingId);
+        const known = reactions
+            .map((group) => group.reaction)
+            .find((reaction) => reaction.id === pendingId);
         if (known) {
             setPendingReaction(known);
             return;
@@ -267,7 +242,7 @@ export function ReactionBar({
         return () => {
             active = false;
         };
-    }, [authStatus, mutationTarget, quick, reactions]);
+    }, [authStatus, mutationTarget, reactions]);
 
     async function performToggle(
         reaction: ReactionDescriptor,
@@ -441,13 +416,6 @@ export function ReactionBar({
         }
     }
 
-    const quickOnly = compact
-        ? []
-        : quick.filter(
-              (reaction) =>
-                  !reactions.some((group) => group.reaction.id === reaction.id),
-          );
-
     return (
         <div
             className={`reaction-bar ${compact ? "reaction-bar-compact" : ""} ${slackPills ? "reaction-bar-slack-pills" : ""}`}
@@ -532,35 +500,32 @@ export function ReactionBar({
                     </span>
                 ))}
 
-                {quickOnly.map((reaction) => (
-                    <button
-                        aria-label={`React with ${reaction.label}`}
-                        className="quick-reaction"
-                        disabled={busy || interactionDisabled}
-                        key={reaction.id}
-                        onClick={() => void performToggle(reaction)}
-                        type="button"
-                    >
-                        <ReactionImage
-                            className="quick-reaction__image"
-                            reaction={reaction}
-                        />
-                    </button>
-                ))}
-
                 {!compact ? (
                     <button
                         aria-expanded={pickerOpen}
-                        aria-label="Open reaction picker"
-                        className="quick-reaction"
+                        aria-haspopup="dialog"
+                        aria-label="Choose reaction"
+                        className="reaction-picker-trigger"
                         disabled={busy || interactionDisabled}
                         onClick={() => {
                             setPickerOpen((open) => !open);
                         }}
+                        onKeyDown={(event) => {
+                            if (event.key === "Escape" && pickerOpen) {
+                                event.preventDefault();
+                                setPickerOpen(false);
+                                pickerTrigger.current?.focus();
+                            }
+                        }}
                         ref={pickerTrigger}
                         type="button"
                     >
-                        +
+                        <span
+                            aria-hidden="true"
+                            className="reaction-picker-trigger__icon"
+                        >
+                            +
+                        </span>
                     </button>
                 ) : null}
             </div>

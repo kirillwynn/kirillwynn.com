@@ -24,7 +24,7 @@ import {
 } from "@/lib/reaction-storage";
 import {
     getReactionParticipants,
-    resetReactionConfigForTests,
+    resetReactionCatalogForTests,
     toggleReaction,
     type ReactionChange,
     type ReactionDescriptor,
@@ -204,11 +204,6 @@ function defaultFetch(
         if (url === "/api/me/") {
             return Promise.resolve(response(me));
         }
-        if (url === "/api/v1/reactions/config/") {
-            return Promise.resolve(
-                response({ quick_reactions: [clap, hmm, love] }),
-            );
-        }
         if (url === "/api/v1/reactions/catalog/") {
             return Promise.resolve(
                 response({
@@ -256,8 +251,7 @@ async function render(
     });
     await waitFor(
         () =>
-            container.querySelector('[aria-label="Open reaction picker"]') !==
-            null,
+            container.querySelector('[aria-label="Choose reaction"]') !== null,
     );
     return { container, root };
 }
@@ -369,7 +363,7 @@ beforeEach(() => {
     );
     window.sessionStorage.clear();
     window.localStorage.clear();
-    resetReactionConfigForTests();
+    resetReactionCatalogForTests();
     resetReactionMutationCoordinatorForTests();
     (
         globalThis as typeof globalThis & {
@@ -673,7 +667,38 @@ describe("reaction asset loading boundaries", () => {
 });
 
 describe("post, comment, and reply reaction UI", () => {
-    it("loads post pills, viewer highlight, and hides a duplicate quick reaction", async () => {
+    it("shows exactly one picker trigger for a post without aggregates and preloads nothing", async () => {
+        defaultFetch(signedIn, (url) =>
+            url.endsWith("/reactions/")
+                ? Promise.resolve(response({ reactions: [] }))
+                : null,
+        );
+        const { container, root } = await render(
+            <PostReactions id={9} slug="привет-мир" />,
+        );
+
+        const group = container.querySelector(
+            '[role="group"][aria-label="Reactions"]',
+        );
+        expect(group?.querySelectorAll("button")).toHaveLength(1);
+        expect(
+            buttonByLabel(group ?? container, "Choose reaction"),
+        ).toBeDefined();
+        expect(group?.querySelector("img")).toBeNull();
+        expect(container.textContent).not.toContain(
+            "Quick reactions could not be loaded",
+        );
+        const requested = vi
+            .mocked(fetch)
+            .mock.calls.map(([input]) => urlOf(input));
+        expect(requested).not.toContain("/api/v1/reactions/config/");
+        expect(requested).not.toContain("/api/v1/reactions/catalog/");
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("shows aggregates as ordinary pills plus exactly one picker trigger", async () => {
         defaultFetch(signedIn, (url) =>
             url.endsWith("/reactions/")
                 ? Promise.resolve(
@@ -695,8 +720,24 @@ describe("post, comment, and reply reaction UI", () => {
             ),
         ).toBe("true");
         expect(
-            container.querySelectorAll('[aria-label^="React with"]').length,
-        ).toBe(2);
+            container.querySelectorAll('[aria-label^="React with"]'),
+        ).toHaveLength(0);
+        expect(buttonByLabel(container, "Choose reaction")).toBeDefined();
+        expect(
+            container.querySelectorAll('button[aria-label="Choose reaction"]'),
+        ).toHaveLength(1);
+        expect(container.querySelectorAll(".reaction-pill")).toHaveLength(1);
+        expect(container.innerHTML).not.toContain(hmm.asset_url);
+        expect(container.innerHTML).not.toContain(love.asset_url);
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.some(
+                    ([input]) =>
+                        urlOf(input) === "/api/v1/reactions/config/" ||
+                        urlOf(input) === "/api/v1/reactions/catalog/",
+                ),
+        ).toBe(false);
         expect(
             container.querySelector(
                 ".post-reactions .reaction-bar-slack-pills",
@@ -753,6 +794,12 @@ describe("post, comment, and reply reaction UI", () => {
         expect(
             Array.from(container.querySelectorAll('[aria-pressed="false"]')),
         ).toHaveLength(2);
+        expect(
+            container.querySelectorAll('button[aria-label="Choose reaction"]'),
+        ).toHaveLength(2);
+        expect(
+            container.querySelectorAll('[aria-label^="React with"]'),
+        ).toHaveLength(0);
         expect(
             container
                 .querySelector('[data-comment-id="9"]')
@@ -1186,7 +1233,8 @@ describe("participants, picker, and OAuth continuation", () => {
                     '[aria-label="Clapping reaction participants"]',
                 ) === null,
         );
-        expect(buttonByLabel(container, "React with Clapping")).toBeDefined();
+        expect(buttonByLabel(container, "Choose reaction")).toBeDefined();
+        expect(container.querySelector(".reaction-pill")).toBeNull();
 
         act(() => {
             root.unmount();
@@ -1680,13 +1728,21 @@ describe("participants, picker, and OAuth continuation", () => {
         });
     });
 
-    it("lazy-loads searchable custom picker, recent IDs, arrows, and Escape", async () => {
+    it("lazy-loads the picker, toggles it, searches, navigates, and restores focus", async () => {
         rememberReaction(clap.id);
         defaultFetch(signedIn);
         const { container, root } = await render(
             <ReactionBar initialReactions={[]} target={postTarget} />,
         );
-        const trigger = buttonByLabel(container, "Open reaction picker");
+        const trigger = buttonByLabel(container, "Choose reaction");
+        expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.some(
+                    ([input]) => urlOf(input) === "/api/v1/reactions/catalog/",
+                ),
+        ).toBe(false);
         act(() => {
             trigger?.click();
         });
@@ -1695,6 +1751,34 @@ describe("participants, picker, and OAuth continuation", () => {
                 container.querySelector<HTMLInputElement>(
                     'input[placeholder="Search reactions"]',
                 ) !== null,
+        );
+        expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+        act(() => {
+            trigger?.click();
+        });
+        expect(
+            container.querySelector('[aria-label="Choose a reaction"]'),
+        ).toBeNull();
+        expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+        act(() => {
+            trigger?.click();
+        });
+        await waitFor(
+            () =>
+                container.querySelector('[aria-label="Choose a reaction"]') !==
+                null,
+        );
+        act(() => {
+            buttonByLabel(container, "Close reaction picker")?.click();
+        });
+        expect(document.activeElement).toBe(trigger);
+        act(() => {
+            trigger?.click();
+        });
+        await waitFor(
+            () =>
+                container.querySelector('[aria-label="Choose a reaction"]') !==
+                null,
         );
         expect(buttonByLabel(container, "React with Clapping")).toBeDefined();
         const gridButtons = container.querySelectorAll<HTMLButtonElement>(
@@ -1768,8 +1852,9 @@ describe("participants, picker, and OAuth continuation", () => {
         const { container, root } = await render(
             <ReactionBar initialReactions={[]} target={postTarget} />,
         );
+        const trigger = buttonByLabel(container, "Choose reaction");
         act(() => {
-            buttonByLabel(container, "Open reaction picker")?.click();
+            trigger?.click();
         });
         await waitFor(
             () =>
@@ -1804,6 +1889,7 @@ describe("participants, picker, and OAuth continuation", () => {
         expect(
             buttonByLabel(container, "Remove Thinking reaction"),
         ).toBeDefined();
+        expect(document.activeElement).toBe(trigger);
 
         act(() => {
             root.unmount();
@@ -1814,6 +1900,19 @@ describe("participants, picker, and OAuth continuation", () => {
         defaultFetch(anonymous);
         const anonymousRender = await render(
             <ReactionBar initialReactions={[]} target={postTarget} />,
+        );
+        act(() => {
+            buttonByLabel(
+                anonymousRender.container,
+                "Choose reaction",
+            )?.click();
+        });
+        await waitFor(
+            () =>
+                buttonByLabel(
+                    anonymousRender.container,
+                    "React with Clapping",
+                ) !== undefined,
         );
         act(() => {
             buttonByLabel(
@@ -1835,6 +1934,7 @@ describe("participants, picker, and OAuth continuation", () => {
 
         document.body.replaceChildren();
         vi.mocked(fetch).mockReset();
+        resetReactionCatalogForTests();
         let postCalls = 0;
         defaultFetch(signedIn, (url, options) => {
             if (options?.method === "POST" && url.includes("/toggle/")) {
@@ -1856,6 +1956,20 @@ describe("participants, picker, and OAuth continuation", () => {
             <ReactionBar initialReactions={[]} target={postTarget} />,
         );
         expect(postCalls).toBe(0);
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.some(
+                    ([input]) => urlOf(input) === "/api/v1/reactions/config/",
+                ),
+        ).toBe(false);
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.some(
+                    ([input]) => urlOf(input) === "/api/v1/reactions/catalog/",
+                ),
+        ).toBe(true);
         expect(authenticatedRender.container.textContent).toContain(
             "Add your saved Pepe clap reaction?",
         );
@@ -1895,7 +2009,7 @@ describe("participants, picker, and OAuth continuation", () => {
 
         document.body.replaceChildren();
         vi.mocked(fetch).mockReset();
-        resetReactionConfigForTests();
+        resetReactionCatalogForTests();
         defaultFetch(signedIn);
         const reloaded = await render(
             <ReactionBar initialReactions={[]} target={postTarget} />,

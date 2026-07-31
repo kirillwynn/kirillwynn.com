@@ -4,7 +4,8 @@ Status: accepted
 
 Date: 2026-07-29
 
-Amended: 2026-07-30 (recorded two-phase staging activation)
+Amended: 2026-07-31 (retired suggested reactions from the public UI while
+retaining rollback compatibility)
 
 Supersedes: ADR 0003's public Unicode identity, picker, and storage contract.
 ADR 0003 remains the historical contract for preserved legacy rows and the
@@ -193,6 +194,21 @@ policy, canonical visibility, hidden/deleted behavior, rate limit,
 target-row locking, bounded Feed batch, and participant pagination continue.
 
 ### Frontend and browser storage
+
+The public reaction bar exposes no suggested/quick reactions. Post detail,
+top-level comments, replies, and thread copies show only existing aggregate
+pills plus one compact picker trigger; an empty group shows only the trigger.
+Feed remains aggregate-only and does not gain a picker. The new frontend does
+not fetch quick config on mount, does not render quick assets, and restores an
+unknown valid pending catalog ID through the catalog endpoint.
+
+`GET /api/v1/reactions/config/`, `ReactionSettings`, its three catalog foreign
+keys, catalog `quick_order`, and the existing three selected values remain
+temporarily byte/schema compatible for rollback to the preceding staging
+frontend digest. The Wagtail settings form is removed from owner navigation so
+it cannot present an active feature. Physical removal is deferred to a
+separate cleanup migration after the rollback window; this amendment performs
+no data migration or catalog sync.
 
 The picker is a lazy application chunk and fetches only the enabled catalog.
 Search uses names/labels; keyboard, touch, Escape, and focus restoration are

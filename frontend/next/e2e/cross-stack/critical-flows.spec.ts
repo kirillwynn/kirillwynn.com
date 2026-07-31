@@ -73,7 +73,7 @@ test("real batch reaction endpoint hydrates the cached Feed with one private rea
     ).toBeVisible();
     expect(batchRequests).toHaveLength(1);
     await expect(
-        page.getByRole("button", { name: "Open reaction picker" }),
+        page.getByRole("button", { name: "Choose reaction" }),
     ).toHaveCount(0);
 });
 

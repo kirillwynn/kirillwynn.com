@@ -484,8 +484,9 @@ Cache-Control: private, no-store
 Vary: Cookie
 ```
 
-The user-independent catalog and quick config use the separate public cache
-contract documented below. They never vary on session or cookie state.
+The user-independent catalog and deprecated rollback-only quick config use the
+separate public cache contract documented below. They never vary on session or
+cookie state. New public clients consume only the catalog.
 
 Post reaction routes reuse the canonical public post policy. Comment routes
 also require a post accepted by that policy. Draft, unpublished, future,
@@ -690,7 +691,7 @@ Any reaction mutation event for the displayed target closes the current
 participant surface before applying the optimistic or authoritative snapshot,
 so a removed or replaced aggregate cannot leave a stale participant dialog.
 
-### Public catalog and quick config
+### Public catalog and rollback-only quick config
 
 `GET /api/v1/reactions/catalog/`
 
@@ -719,6 +720,11 @@ storage keys, hashes other than public immutable versions, or viewer state.
 
 `GET /api/v1/reactions/config/`
 
+This endpoint is deprecated and retained only so the previous staging frontend
+digest remains a safe rollback target. The current public UI does not request
+it, does not expose suggested/quick reactions, and does not use it to restore
+OAuth pending intents.
+
 ```json
 {
   "quick_reactions": [
@@ -737,9 +743,12 @@ storage keys, hashes other than public immutable versions, or viewer state.
 }
 ```
 
-The response contains the three distinct enabled/selectable descriptors chosen
-in the Wagtail `ReactionSettings` Site Setting. No Wagtail model IDs or
-internal metadata are returned.
+The rollback response continues to contain the three distinct
+enabled/selectable descriptors stored in `ReactionSettings`. The model, its
+three catalog foreign keys, the existing `pepeclap` / `pepehmm` / `pepelove`
+values, and catalog `quick_order` remain unchanged during the compatibility
+window. The active Wagtail quick-selection form is no longer registered in the
+owner navigation. No Wagtail model IDs or internal metadata are returned.
 
 Both endpoints are fully user-independent and return:
 
@@ -750,8 +759,16 @@ ETag: "<sha256>"
 
 They do not vary on `Cookie`; an exact `If-None-Match` receives `304`.
 
-The picker is lazy-loaded and fetches the catalog only when needed (or when a
-valid pending catalog ID is not already present in current groups/config).
+Post detail, top-level comment, reply, and thread instances render only
+existing aggregate pills with counts plus exactly one compact `Choose
+reaction` picker trigger. A surface with no aggregate renders only that
+trigger. No suggested reaction descriptor or image is rendered before the
+picker opens. Feed remains aggregate-only and has no picker trigger.
+
+The picker is lazy-loaded and fetches the catalog only after explicit opening,
+or when a valid pending catalog ID is not already present in the current
+aggregate groups and therefore needs restoration. Pending restoration uses the
+catalog endpoint, never the deprecated config endpoint.
 Search uses display and accessibility labels. Posters and static assets are
 intersection-gated: an offscreen picker item has no image element or `src`,
 rather than relying only on browser `loading=lazy`. The animation URL is
@@ -771,6 +788,11 @@ intents for that target. Valid version-2 duplicates are selected by greatest
 `createdAt` and compacted to one entry; confirm and discard clear the whole
 target namespace. Other targets remain isolated and the ten-minute TTL is
 unchanged. OAuth never auto-submits a restored intent.
+
+Physical removal of the config endpoint, `ReactionSettings` quick catalog
+fields, and catalog `quick_order` is a separate cleanup migration after the
+rollback compatibility window. This remediation does not run catalog sync or
+alter catalog rows, identity, manifests, hashes, asset versions, or objects.
 
 ### Concurrency and rate limit
 

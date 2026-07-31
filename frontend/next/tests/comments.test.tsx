@@ -34,7 +34,7 @@ import {
 } from "@/lib/comments";
 import { resetReactionMutationCoordinatorForTests } from "@/lib/reaction-mutation-coordinator";
 import {
-    resetReactionConfigForTests,
+    resetReactionCatalogForTests,
     type ReactionDescriptor,
     type ReactionGroup,
 } from "@/lib/reactions";
@@ -105,27 +105,6 @@ const clap: ReactionDescriptor = {
     width: 64,
     height: 64,
     version: "sha256-clap",
-};
-
-const hmm: ReactionDescriptor = {
-    ...clap,
-    id: "pepehmm",
-    name: "Pepe hmm",
-    label: "Thinking",
-    kind: "static",
-    asset_url: "/media/reactions/pepehmm/hash/asset.webp",
-    poster_url: "/media/reactions/pepehmm/hash/asset.webp",
-    version: "sha256-hmm",
-};
-
-const love: ReactionDescriptor = {
-    ...hmm,
-    id: "pepelove",
-    name: "Pepe love",
-    label: "Sending love",
-    asset_url: "/media/reactions/pepelove/hash/asset.webp",
-    poster_url: "/media/reactions/pepelove/hash/asset.webp",
-    version: "sha256-love",
 };
 
 function reaction(count: number, viewerReacted = false): ReactionGroup {
@@ -245,11 +224,6 @@ async function renderComments(
         if (url === "/api/me/") {
             return Promise.resolve(response(me));
         }
-        if (url === "/api/v1/reactions/config/") {
-            return Promise.resolve(
-                response({ quick_reactions: [clap, hmm, love] }),
-            );
-        }
         if (url.includes("/thread/") && thread) {
             return Promise.resolve(response(thread));
         }
@@ -273,7 +247,7 @@ async function renderComments(
 }
 
 beforeEach(() => {
-    resetReactionConfigForTests();
+    resetReactionCatalogForTests();
     resetReactionMutationCoordinatorForTests();
     vi.stubGlobal("fetch", vi.fn());
     window.sessionStorage.clear();
@@ -1254,6 +1228,24 @@ describe("comments and Slack-style thread UI", () => {
         expect(
             dialog?.querySelector('[data-comment-kind="reply"]'),
         ).not.toBeNull();
+        expect(
+            dialog?.querySelectorAll('button[aria-label="Choose reaction"]'),
+        ).toHaveLength(2);
+        expect(
+            dialog?.querySelectorAll('button[aria-label^="React with"]'),
+        ).toHaveLength(0);
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.some(
+                    ([input]) =>
+                        (typeof input === "string"
+                            ? input
+                            : input instanceof URL
+                              ? input.href
+                              : input.url) === "/api/v1/reactions/config/",
+                ),
+        ).toBe(false);
         expect(document.activeElement?.getAttribute("aria-label")).toBe(
             "Close thread",
         );

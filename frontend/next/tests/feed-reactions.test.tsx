@@ -227,11 +227,9 @@ describe("Feed reaction hydration", () => {
             ),
         ).toBe(false);
         expect(
-            container.querySelector(
-                'button[aria-label="Open reaction picker"]',
-            ),
+            container.querySelector('button[aria-label="Choose reaction"]'),
         ).toBeNull();
-        expect(container.querySelector(".quick-reaction")).toBeNull();
+        expect(container.querySelector(".reaction-picker-trigger")).toBeNull();
         expect(
             container.querySelector(
                 ".reaction-bar-compact.reaction-bar-slack-pills",

@@ -227,7 +227,8 @@ Discussion routes:
 
 Reaction routes:
 
-- `GET /api/v1/reactions/config/`;
+- `GET /api/v1/reactions/config/` (deprecated, rollback-only; the current
+  public UI does not request it);
 - `GET /api/v1/posts/<unicode-slug>/reactions/`;
 - `POST /api/v1/posts/<unicode-slug>/reactions/toggle/`;
 - `GET /api/v1/comments/<id>/reactions/`;

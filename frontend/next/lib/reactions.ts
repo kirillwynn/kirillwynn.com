@@ -43,10 +43,6 @@ export type ReactionParticipantPage = {
     results: ReactionParticipant[];
 };
 
-export type ReactionConfig = {
-    quick_reactions: ReactionDescriptor[];
-};
-
 export type ReactionCatalog = {
     version: string;
     results: ReactionDescriptor[];
@@ -229,20 +225,7 @@ export function getReactionParticipants(
     );
 }
 
-let configPromise: Promise<ReactionConfig> | null = null;
 let catalogPromise: Promise<ReactionCatalog> | null = null;
-
-export function getReactionConfig(): Promise<ReactionConfig> {
-    configPromise ??= request<ReactionConfig>(
-        "/api/v1/reactions/config/",
-        {},
-        false,
-    ).catch((error: unknown) => {
-        configPromise = null;
-        throw error;
-    });
-    return configPromise;
-}
 
 export function getReactionCatalog(): Promise<ReactionCatalog> {
     catalogPromise ??= request<ReactionCatalog>(
@@ -256,7 +239,6 @@ export function getReactionCatalog(): Promise<ReactionCatalog> {
     return catalogPromise;
 }
 
-export function resetReactionConfigForTests(): void {
-    configPromise = null;
+export function resetReactionCatalogForTests(): void {
     catalogPromise = null;
 }

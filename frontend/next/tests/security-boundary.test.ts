@@ -110,7 +110,7 @@ describe("server-only security boundary", () => {
         );
         expect(config).toContain('source: "/api/v1/email/webhooks/resend/"');
         expect(config).toContain('source: "/api/v1/posts/:slug/comments/"');
-        expect(config).toContain('source: "/api/v1/reactions/config/"');
+        expect(config).not.toContain('source: "/api/v1/reactions/config/"');
         expect(config).toContain('source: "/api/v1/reactions/catalog/"');
         expect(config).toContain('source: "/api/v1/reactions/posts/"');
         expect(
@@ -134,6 +134,18 @@ describe("server-only security boundary", () => {
         expect(config).not.toContain("searchParams");
         expect(config).not.toContain("NEXT_PUBLIC_");
         expect(config).not.toContain('source: "/api/:path*"');
+    });
+
+    it("keeps the rollback config route out of the new browser reaction client", () => {
+        const bar = source("components/reaction-bar.tsx");
+        const reactions = source("lib/reactions.ts");
+
+        expect(bar).not.toContain("getReactionConfig");
+        expect(bar).not.toContain("quickOnly");
+        expect(bar).not.toContain("quick-reaction");
+        expect(bar).not.toContain("Quick reactions could not be loaded");
+        expect(reactions).not.toContain("/api/v1/reactions/config/");
+        expect(reactions).not.toContain("ReactionConfig");
     });
 
     it("keeps one safe-area-aware shell contract without global overflow masking", () => {

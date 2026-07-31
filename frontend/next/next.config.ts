@@ -70,10 +70,6 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/v1/posts/:slug/comments/`,
             },
             {
-                source: "/api/v1/reactions/config/",
-                destination: `${django}/api/v1/reactions/config/`,
-            },
-            {
                 source: "/api/v1/reactions/catalog/",
                 destination: `${django}/api/v1/reactions/catalog/`,
             },
