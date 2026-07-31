@@ -434,6 +434,9 @@ def test_ssh_deployment_persists_bundle_and_uses_cross_workflow_lock():
     assert "RESOLUTION_KIND" in script
     assert "FAILED_OPERATION_ID" in script
     assert "resolve_failed_rollout.sh" in script
+    assert "-o ConnectTimeout=15" in script
+    assert "-o ServerAliveInterval=15" in script
+    assert "-o ServerAliveCountMax=4" in script
     assert script.index("resolve_failed_rollout.sh") < script.index(
         "deploy_edge.sh '$durable_release/release-manifest.json'"
     )
@@ -630,6 +633,9 @@ def test_staging_preflight_does_not_activate_rollout():
     assert "environment: staging" in workflow
     assert "packages: read" in workflow
     assert "docker login ghcr.io" in script
+    assert "-o ConnectTimeout=15" in script
+    assert "-o ServerAliveInterval=15" in script
+    assert "-o ServerAliveCountMax=4" in script
     assert "require_compose_version.sh" in script
     assert "/srv/kirillwynn/state/staging" in script
     assert "/srv/kirillwynn/backups/staging" in script

@@ -78,7 +78,7 @@ case "${GITHUB_RUN_ID:?}:${GITHUB_RUN_ATTEMPT:?}" in
 esac
 remote_dir="/tmp/kirillwynn-deploy-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
 remote_docker_config=$remote_dir/docker-config
-ssh_options="-i $key_file -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"
+ssh_options="-i $key_file -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
 cleanup_remote() {
     ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
         "rm -rf -- '$remote_dir'" \
