@@ -731,6 +731,67 @@ test("picker selection retains focus across an optimistic aggregate insertion", 
     await expect(trigger).toBeFocused();
 });
 
+test("thread picker selection wins the focus trap after settlement", async ({
+    page,
+}) => {
+    await login(page);
+
+    const mainComment = page.locator('article[data-comment-id="10"]').first();
+    const threadButton = mainComment.getByRole("button", {
+        name: "Reply",
+        exact: true,
+    });
+    await expect(threadButton).toHaveCount(1);
+    await threadButton.click();
+
+    const thread = page.getByRole("dialog", {
+        name: "Thread for comment by Site Author",
+    });
+    await expect(thread).toBeVisible();
+    const threadRoot = thread.locator('article[data-comment-id="10"]');
+    await expect(threadRoot).toHaveCount(1);
+    const trigger = threadRoot.getByRole("button", {
+        name: "Choose reaction",
+    });
+    await expect(trigger).toHaveCount(1);
+
+    let releaseToggle: (() => void) | undefined;
+    await page.route(
+        /\/api\/v1\/comments\/10\/reactions\/toggle\/$/,
+        async (route) => {
+            await new Promise<void>((resolve) => {
+                releaseToggle = resolve;
+            });
+            await route.fulfill({
+                status: 400,
+                contentType: "application/json",
+                body: JSON.stringify({ detail: "Controlled rollback" }),
+            });
+        },
+    );
+
+    await trigger.click();
+    const picker = threadRoot.getByRole("dialog", {
+        name: "Choose a reaction",
+    });
+    await expect(picker).toBeVisible();
+    await picker
+        .getByRole("button", { name: "React with Sending love" })
+        .click();
+
+    const optimistic = threadRoot.getByRole("button", {
+        name: "Remove Sending love reaction",
+    });
+    await expect(optimistic).toBeVisible();
+    await expect(trigger).toBeDisabled();
+    expect(releaseToggle).toBeDefined();
+    releaseToggle?.();
+
+    await expect(optimistic).toHaveCount(0);
+    await expect(trigger).toBeEnabled();
+    await expect(trigger).toBeFocused();
+});
+
 test("responsive shell, right header group, skip link, and universal team footer", async ({
     page,
 }, testInfo) => {

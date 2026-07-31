@@ -116,6 +116,9 @@ export function ThreadPanel({
 
     useEffect(() => {
         closeRef.current?.focus();
+    }, [initialRoot.id]);
+
+    useEffect(() => {
         const panel = panelRef.current;
         function keydown(event: KeyboardEvent): void {
             if (event.key === "Escape") {
