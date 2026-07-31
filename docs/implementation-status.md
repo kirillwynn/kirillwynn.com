@@ -33,9 +33,13 @@ accepted on staging as release
 `750c0366b777da252729f7cddf601f418daf50eb`: the writing-first Wagtail editor,
 archive-date contract, durable first-publication email decision, migration,
 required CI, immutable rollout, schema-3 attestation, and controlled live CMS
-acceptance passed. New-stack production deployment, production provider
-configuration, DNS changes, data migration, and promotion remain out of scope
-and unverified.
+acceptance passed. The narrow Stage 16 suggested-reaction remediation is now
+accepted on staging as release
+`b4184f033ae3f2d562bc43a2b19c2b08b8a4f99a`: public quick controls and their
+config consumption are gone, one custom-picker trigger remains, and required
+CI, attested rollout, and controlled live Chrome acceptance passed. New-stack
+production deployment, production provider configuration, DNS changes, data
+migration, and promotion remain out of scope and unverified.
 
 ## Stage 15 editorial workflow and archive publications
 
@@ -520,6 +524,64 @@ GitHub archive digest
 With both deploy gates false, activation was a verified no-op; catalog sync was
 skipped. A fresh documentation commit after this green baseline is the
 staging-only acceptance candidate.
+
+The accepted staging-only candidate is
+`b4184f033ae3f2d562bc43a2b19c2b08b8a4f99a` (parent
+`f9f87dc98ef720e753be37b4279f5acfa8ebd48d`). Pull-request run
+`30666536708` and push/deploy run `30666532805` passed every required job.
+Operation
+`deploy-30666532805-staging-b4184f033ae3f2d562bc43a2b19c2b08b8a4f99a`
+completed with schema-3 status `passed` and every readiness/public-smoke/image
+binding check true. Release artifact `8807300488` has GitHub archive digest
+`sha256:5120f87cca81d149e904e2b4997c6487ffeae132dd4c7beca5cb6a1772b457b1`;
+its `release-manifest.json` hashes to
+`618aaa43d2c3a442c08e6e02ddaf2cb8a6c94f5535e526fdf719424955410dc9`.
+Attestation artifact `8807369276` has GitHub archive digest
+`sha256:6198d0fbb872a1e37dfd9e5bf98e89dc779ebbdf1b7d277991ed2d87f742c81a`;
+its `staging-attestation.json` hashes to
+`9f1a44d867529116c0d0333b3db2a2d50a3c8bbd76881c7570f823ae9a12189e`.
+The active immutable image digests are Django
+`sha256:cf9932df3dffa12b0a8b1da6cecd749c91ac9955657ffe0eac4ee8a7410eb74d`,
+Next
+`sha256:f18f5ae4775896e921e2f12050927a2b3c60e6e6cddfc3213af7d34295ad8b69`,
+and edge
+`sha256:6eccbdba3aa5e425fbd372b178a95b88df9c594dd27c29d06072bd6322382147`.
+
+Live Chrome acceptance on that exact release passed. The empty post and its
+top-level comment each exposed one 44×44 trigger around a 30×30 visual and no
+aggregate or suggested control. The populated post exposed four aggregate
+pills/counts plus exactly one trigger. Feed exposed the same four aggregates,
+zero triggers, and fetched participants only after count activation. Desktop
+thread width was 512px; 320px and 375px drawers were full-width. The duplicate
+thread root exposed one trigger, while the existing tombstoned reply exposed
+none. A controlled authenticated `pepelove` selection appeared only as an
+ordinary count-one aggregate in both comment/thread copies, restored focus to
+the enabled thread trigger rather than `Close thread`, and was removed again;
+both copies returned to zero aggregates.
+
+Chrome's pre-open page asset inventory contained only the account, post
+aggregate, and comment reads: no config request, catalog request, quick asset,
+or picker chunk. Enter activation added exactly one catalog request and one
+lazy JS chunk; the picker exposed all 228 unique entries as 8 recent plus 220
+non-duplicated results while observing only 57 reaction image resources. Static
+`pepelove` used `asset.webp`; animated `pepeclap` began on `poster.webp` and
+switched to `animation.gif` only on hover. The CI reduced-motion cases retained
+the poster and loaded no animated URL. Escape, Space, repeat-trigger close, the
+explicit Close control, and settled selection restored focus. The anonymous
+selection showed the pending `Sign in to add your Pepe love reaction` notice,
+issued no toggle request, created no aggregate, did not enter OAuth, and was
+discarded cleanly.
+
+Dark and light themes, Search, Bridge, Stage 15 public dates, and the read-only
+Wagtail dashboard passed at 320×812, 375×812, 768×1024, 1440×900, and
+1920×1080 with no horizontal overflow. The expanded Wagtail Settings menu did
+not contain a reaction/quick setting. Console scans were empty; rendered
+source/assets contained no secret markers, internal origins, or Next error
+overlay. The rollback-only config endpoint remained covered and working in the
+backend contract suites. Both staging deploy gates and the catalog-sync gate
+are again `false`. No migration, manifest/catalog row, importer, static or
+animated asset, S3/CDN object, provider, production, `main`, post, comment,
+subscription, email, or lasting reaction state changed.
 
 ## Current repository state
 
@@ -1534,7 +1596,7 @@ button. Then proceed to Stage 17. Do not combine either task with Stage 15.
     staging.
   - [ ] Stage 15 — implementation complete; CI/staging acceptance in progress.
   - [x] Stage 16 — custom static/animated reaction catalog accepted on staging.
-  - [ ] Stage 16 remediation — remove three suggested reactions and retain one
+  - [x] Stage 16 remediation — remove three suggested reactions and retain one
     picker button; explicitly outside Stage 15.
   - [ ] Stage 17 — begin only after the separate Stage 16 remediation.
 
