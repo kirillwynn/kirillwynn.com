@@ -248,8 +248,14 @@ jobs:
 
   record-rollout-failure:
     if: >-
-      github.event_name == 'workflow_dispatch' &&
-      inputs.operator_action == 'mark-failed'
+      inputs.operator_action == 'mark-failed' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/rewrite/wagtail-next'
+        )
+      )
     runs-on: ubuntu-latest
     environment: staging
     permissions:

@@ -469,6 +469,8 @@ def test_staging_manual_failure_recording_is_bounded_and_staging_only():
     script = (SCRIPTS / "ci_ssh_mark_rollout_failed.sh").read_text()
     assert "operator_action == 'mark-failed'" in workflow
     assert "github.event_name == 'workflow_dispatch'" in workflow
+    assert "github.event_name == 'push'" in workflow
+    assert "github.ref == 'refs/heads/rewrite/wagtail-next'" in workflow
     assert "environment: staging" in workflow
     assert (
         "TARGET_OPERATION_ID: "
