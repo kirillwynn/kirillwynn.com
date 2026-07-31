@@ -110,6 +110,22 @@ no-skip PostgreSQL search/order/concurrency and full-suite run, while the
 required infrastructure job remains authoritative for Compose, Nginx, image,
 container, backup/recovery, and egress checks.
 
+Required CI passed for implementation SHA
+`37fe567e8ae822501e620a557b3358bbb03b8f98` in push run `30606128346` and
+pull-request run `30606131248`. The push run's PostgreSQL job ran the dedicated
+nine-test PostgreSQL gate without skips, the complete backend suite against
+PostgreSQL, and both populated migration directions; its other required
+backend, frontend, browser-contract, real-Django cross-stack, and
+infrastructure jobs also passed.
+
+A read-only staging census immediately before the Stage 15 migration found 14
+ever-published `BlogPostPage` rows (13 live and one expired), exactly 14
+historical publication outbox events, one unrelated confirmation outbox event,
+and two total deliveries. The deterministic backfill expectation is therefore
+14 queued, zero suppressed, and zero pending decisions. Baseline totals of 15
+outbox events and two deliveries are retained for the post-rollout proof that
+the migration and controlled suppressed QA create no retroactive email work.
+
 ## Stage 16 custom reaction catalog
 
 Stage 16 was delivered before Stage 15 through the planned two-release
