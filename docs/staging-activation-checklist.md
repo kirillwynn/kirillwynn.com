@@ -16,10 +16,13 @@ Repository implementation does not activate staging. Complete externally:
   edge config, and integration config in the same check;
 - prove edge starts with both apps absent, run candidate `nginx -t`, then
   bootstrap the staging database and migrations;
-- keep `STAGING_DEPLOY_ENABLED` false until all checks pass;
-- enable it for a controlled `main` release, then verify schema-3 attestation,
-  exact active digests, worker heartbeat/egress, dynamic DNS replacement,
-  backup checksum, scratch restore, duplicate-finalize idempotency, and
-  reviewed failed-smoke recovery under the same server lock.
+- keep the environment-scoped `STAGING_DEPLOY_ENABLED` false until all checks
+  pass and keep repository-scoped `STAGING_REACTION_CATALOG_SYNC_ENABLED`
+  false unless a separately approved catalog sync is in scope;
+- enable only the environment-scoped deploy gate for a fresh controlled
+  release event, then verify schema-3 attestation, exact active digests, worker
+  heartbeat/egress, dynamic DNS replacement, backup checksum, scratch restore,
+  duplicate-finalize idempotency, and reviewed failed-smoke recovery under the
+  same server lock; return the gate to false at the terminal run state.
 
 Do not create a production administrator or promote production here.

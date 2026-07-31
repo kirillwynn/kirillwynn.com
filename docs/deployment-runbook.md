@@ -34,6 +34,22 @@ Only `control.env` is passed as Compose interpolation input. The other files
 are loaded by the intended container with raw semantics. Validators reject
 extra, missing, multiline, NUL, oversized, or cross-environment values.
 
+## GitHub staging gates
+
+`STAGING_DEPLOY_ENABLED` is an environment-scoped variable on the GitHub
+`staging` Environment. The deploy job declares that Environment, so its value
+shadows any repository variable with the same name. Keep an identically named
+repository variable false or absent; changing it does not authorize staging.
+
+`STAGING_REACTION_CATALOG_SYNC_ENABLED` is repository-scoped because the caller
+decides whether to invoke the catalog workflow before any environment-scoped
+job starts. Both gates are normally false. For an application rollout, set
+only the environment-scoped deploy gate true, confirm the repository-scoped
+catalog gate remains false, and create a fresh branch push. A rerun retains the
+original run context and is not a way to arm a previously disabled rollout.
+Return the deploy gate to false immediately after the fresh run reaches a
+terminal state.
+
 ## Durable release and active state
 
 CI copies a release-owned bundle from the checked-out SHA into:
