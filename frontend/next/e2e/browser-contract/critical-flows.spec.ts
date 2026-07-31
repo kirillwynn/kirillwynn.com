@@ -685,6 +685,52 @@ test("reaction surfaces expose only aggregates and one lazy picker trigger", asy
     await expect(thread).toBeHidden();
 });
 
+test("picker selection retains focus across an optimistic aggregate insertion", async ({
+    page,
+}) => {
+    await login(page);
+
+    const postGroup = page.getByRole("group", { name: "Reactions" }).first();
+    const trigger = postGroup.getByRole("button", {
+        name: "Choose reaction",
+    });
+    await expect(trigger).toHaveCount(1);
+
+    let releaseToggle: (() => void) | undefined;
+    await page.route(
+        /\/api\/v1\/posts\/testing-secure-systems\/reactions\/toggle\/$/,
+        async (route) => {
+            await new Promise<void>((resolve) => {
+                releaseToggle = resolve;
+            });
+            await route.fulfill({
+                status: 400,
+                contentType: "application/json",
+                body: JSON.stringify({ detail: "Controlled rollback" }),
+            });
+        },
+    );
+
+    await trigger.click();
+    const picker = page.getByRole("dialog", { name: "Choose a reaction" });
+    await expect(picker).toBeVisible();
+    await picker
+        .getByRole("button", { name: "React with Sending love" })
+        .click();
+
+    const optimistic = postGroup.getByRole("button", {
+        name: "Remove Sending love reaction",
+    });
+    await expect(optimistic).toBeVisible();
+    await expect(trigger).toBeDisabled();
+    expect(releaseToggle).toBeDefined();
+    releaseToggle?.();
+
+    await expect(optimistic).toHaveCount(0);
+    await expect(trigger).toBeEnabled();
+    await expect(trigger).toBeFocused();
+});
+
 test("responsive shell, right header group, skip link, and universal team footer", async ({
     page,
 }, testInfo) => {

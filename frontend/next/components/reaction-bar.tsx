@@ -90,6 +90,7 @@ export function ReactionBar({
         "idle" | "loading" | "ready" | "error"
     >("idle");
     const pickerTrigger = useRef<HTMLButtonElement>(null);
+    const restorePickerFocusRef = useRef(false);
     const busyRef = useRef(false);
     const participantRequestRef = useRef(0);
     const participantAbortRef = useRef<AbortController | null>(null);
@@ -185,6 +186,18 @@ export function ReactionBar({
     useEffect(() => {
         hydrateReactionMutation(mutationTarget, initialReactions);
     }, [initialReactions, mutationTarget, mutationTargetKey]);
+
+    useEffect(() => {
+        if (
+            restorePickerFocusRef.current &&
+            !pickerOpen &&
+            !busy &&
+            pickerTrigger.current
+        ) {
+            restorePickerFocusRef.current = false;
+            pickerTrigger.current.focus();
+        }
+    }, [busy, pickerOpen]);
 
     useEffect(() => {
         function keydown(event: KeyboardEvent): void {
@@ -507,6 +520,7 @@ export function ReactionBar({
                         aria-label="Choose reaction"
                         className="reaction-picker-trigger"
                         disabled={busy || interactionDisabled}
+                        key="reaction-picker-trigger"
                         onClick={() => {
                             setPickerOpen((open) => !open);
                         }}
@@ -603,9 +617,9 @@ export function ReactionBar({
                             pickerTrigger.current?.focus();
                         }}
                         onSelect={(reaction) => {
+                            restorePickerFocusRef.current = true;
                             setPickerOpen(false);
                             void performToggle(reaction);
-                            pickerTrigger.current?.focus();
                         }}
                     />
                 </Suspense>
