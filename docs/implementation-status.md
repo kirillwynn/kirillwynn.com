@@ -426,6 +426,21 @@ container smoke, S3 isolation, and immutable release builds. The manifest still
 hashes to `1b0a409b80ddb46eed4059a19210eec82f5444530eb268a33d5cb0945e08c018`;
 no migration, catalog sync, or object-store operation occurred locally.
 
+Baseline CI passed for implementation commit
+`6aedc05e6e53330f4da8060ef0b4b1418c7ef2a5` (parent
+`0c1f2643625995c5d37274ac1184384daaf4f60c`). Pull-request run
+`30650491825` and push run `30650491925` both passed every required job,
+including the mandatory no-skip PostgreSQL suite, the complete browser
+contract, cross-stack tests, image/Compose/Nginx/container coverage, and
+`ci-required`. The push run also built all three immutable candidate images,
+passed server preflight, and emitted release artifact
+`release-6aedc05e6e53330f4da8060ef0b4b1418c7ef2a5` (artifact `8801320612`,
+GitHub archive digest
+`sha256:b0e5c3ee56e523a6c25e4052736f3e5e1607a1aa7ed0fe4e81b00d416fb60ea1`).
+With both staging deploy gates false, activation was explicitly skipped; the
+reaction-catalog job was also skipped and no staging state changed. A fresh
+post-baseline push will be used for the one-time staging-only rollout.
+
 ## Current repository state
 
 - The `main` branch contains the deployed legacy Flask/React implementation.
