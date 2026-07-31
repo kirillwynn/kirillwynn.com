@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 Integration branch: `rewrite/wagtail-next`
 
@@ -28,16 +28,20 @@ schema-3 attestation, and read-only live Chrome QA passed. Stage 16 is also
 accepted on staging as release
 `43f5a05213f13d7c5129ddebd05955fc3186de82`: the explicit custom reaction
 catalog, two-phase legacy-safe migration, immutable asset sync, picker/API/UI,
-and Search/Bridge polish passed required CI and live QA. New-stack production
-deployment, production provider configuration, DNS changes, data migration,
-and promotion remain out of scope and unverified.
+and Search/Bridge polish passed required CI and live QA. Stage 15 is now
+accepted on staging as release
+`750c0366b777da252729f7cddf601f418daf50eb`: the writing-first Wagtail editor,
+archive-date contract, durable first-publication email decision, migration,
+required CI, immutable rollout, schema-3 attestation, and controlled live CMS
+acceptance passed. New-stack production deployment, production provider
+configuration, DNS changes, data migration, and promotion remain out of scope
+and unverified.
 
 ## Stage 15 editorial workflow and archive publications
 
-Stage 15 is implemented at the repository boundary from exact parent
-`1224339994df3371c4eeb47a7ad7ad7d5dc2e278`; final CI, staging rollout, and
-live acceptance evidence will be appended after those gates complete. The
-pre-change active staging application release was
+Stage 15 is implemented and accepted on staging from exact parent
+`1224339994df3371c4eeb47a7ad7ad7d5dc2e278`. The pre-change active staging
+application release was
 `43f5a05213f13d7c5129ddebd05955fc3186de82`, and `origin/main` remained
 `1d02912430277cdf5465f856b158a6820bc12be4`.
 
@@ -125,6 +129,97 @@ and two total deliveries. The deterministic backfill expectation is therefore
 14 queued, zero suppressed, and zero pending decisions. Baseline totals of 15
 outbox events and two deliveries are retained for the post-rollout proof that
 the migration and controlled suppressed QA create no retroactive email work.
+
+The implementation and rollout fixes were committed without rewriting history:
+
+- `65e42e3b225fabbd7c1fe1dc7cd89dcc133923d5` from parent
+  `1224339994df3371c4eeb47a7ad7ad7d5dc2e278` implements Stage 15;
+- `b02a054aa422213748d82b42e22076daaf142f98` initializes the Wagtail tree in
+  the PostgreSQL publication-race test;
+- `37fe567e8ae822501e620a557b3358bbb03b8f98` locks public-transition posts
+  without nullable outer joins;
+- `8d8967576202bfc16d1b60e1c663768c09abdb8d` and
+  `0c23ef37d0f47f4e21eeda336ebb9fb4b2d226bb` record and clarify the verified
+  staging gate boundary;
+- `7cc759cd1f15f9cd0f97e3fc600a7c0f70f6caeb`,
+  `79b29087fc8e2ed5fc140bab3d4ade0833a98286`,
+  `648b2c5997d9327fb0b85291412bb46e72645790`, and
+  `750c0366b777da252729f7cddf601f418daf50eb` add bounded SSH liveness and a
+  reviewed, staging-only failed-operation/fix-forward recovery path.
+
+Push run `30612573207`, attempt 3, passed all required jobs: infrastructure
+`91100579878`, PostgreSQL `91100579957`, real-Django cross-stack
+`91100579977`, SQLite `91100579986`, browser contract `91100579990`, frontend
+`91100579999`, and aggregate required gate `91101496482`. Image, preflight,
+manifest, and deploy jobs `91101525648`, `91101525672`, `91101525719`,
+`91101525922`, `91101644180`, and `91101674980` also passed; reaction catalog
+sync `91101525913` was skipped. Pull-request run `30612575848` passed at the
+same release SHA. The final infrastructure suite contains 231 passing tests.
+
+The first rollout operation
+`deploy-30607545243-staging-0c23ef37d0f47f4e21eeda336ebb9fb4b2d226bb`
+created and verified pre-migration backup
+`/srv/kirillwynn/backups/staging/20260731T054904Z_43f5a05213f13d7c5129ddebd05955fc3186de82_pre-migration_deploy-30607545243-staging-0c23ef37d0f47f4e21eeda336ebb9fb4b2d226bb.dump`,
+then applied `blog.0004`, `blog.0005`, and `subscriptions.0004`. Its CI SSH
+session later broke while the durable operation had reached
+`pending-public-smoke`; the operation was explicitly marked failed through the
+reviewed recovery gate rather than abandoned or overwritten.
+
+The successful fix-forward operation is
+`fix-forward-30612573207-staging-750c0366b777da252729f7cddf601f418daf50eb`.
+It created and verified recovery backup
+`/srv/kirillwynn/backups/staging/20260731T074036Z_0c23ef37d0f47f4e21eeda336ebb9fb4b2d226bb_recovery_fix-forward-30612573207-staging-750c0366b777da252729f7cddf601f418daf50eb.dump`;
+the migration command correctly reported no remaining migrations. The
+backfill result was 14 queued, zero suppressed, and zero pending decisions,
+with all 14 historical publication events linked in place. Outbox and delivery
+totals stayed 15 and two, proving that neither migration nor the next
+republish created retroactive email work.
+
+Active immutable images are:
+
+- Django
+  `sha256:f6fb7d40e82e90f2977400a7980d0704953891b6b342ee4f7ab0fad4ad93bab0`;
+- Next
+  `sha256:3ac7a4eae57e122d13dc4c7e3aaaf1bd6206f15525eb7daad0a9da29e520cec7`;
+- edge
+  `sha256:c1c761ed5da2b4d52da4b3915c798bf8870287152b7bc46a3cc52ab7bea54fb1`.
+
+Release artifact `8786427175` has GitHub archive digest
+`sha256:9adf11894215caac08f749d95c69b789cf398ba3f1a8c2d4790b33b0a2feecd8`
+and release-manifest JSON SHA-256
+`bcbbf4ae03d868912fc5977e43d70cc105aed54f930da5bde45e8ca024574d67`.
+Schema-3 staging-attestation artifact `8786481584` has GitHub archive digest
+`sha256:d492ddc6ffda5eb3af8382be41aa3f7ca969a5b81f434b110afb87aa400c7346`
+and JSON SHA-256
+`3b503e378a7d5255e1b24a242c3180cce780e3b27ae17238d6a86477815f751a`.
+Its active-image, Django readiness, edge config, Next health, public smoke,
+worker egress, and worker heartbeat checks all passed.
+
+Authenticated live Chrome acceptance used only two controlled posts with
+notifications deliberately disabled. It verified the dashboard/menu
+`New post`, dynamic Blog index resolution, writing tabs, all 13 chooser
+entries and groups, inline future-date validation, draft isolation, immutable
+headless preview, backend preview fallback, immediate publication, archive
+Feed ordering/search and visible date, HTML time and Open Graph timestamps,
+date-change revalidation, revision restoration as a new draft, republish, and
+locked suppression after rollback. A second post went from scheduled to live
+through the worker and then to expired through the worker; the
+no-original-date path used the actual first-publication timestamp.
+
+Throughout live QA, publication outbox and delivery totals remained exactly 15
+and two. Both controlled decisions displayed the irreversible suppressed
+status, so no `EmailOutbox`, `EmailDelivery`, or provider work was created.
+The public dark/light themes, existing reaction UI, desktop overflow, Django
+Admin, and CMS/public console-error boundaries remained intact. Wagtail then
+expired or unpublished and deleted only the two controlled posts. The Blog
+tree returned to the original 14 pages, both QA URLs returned 404, and no
+existing user publication was edited.
+
+The staging Environment and repository `STAGING_DEPLOY_ENABLED` values and
+repository `STAGING_REACTION_CATALOG_SYNC_ENABLED` are all `false`. One-shot
+recovery variables were deleted. Production, `origin/main`, reaction catalog
+rows/assets/manifest/S3 objects, providers, legacy mounts/data, and real user
+publications were not changed. Stage 17 was not started.
 
 ## Stage 16 custom reaction catalog
 
