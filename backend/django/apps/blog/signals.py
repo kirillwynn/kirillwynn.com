@@ -84,7 +84,17 @@ def blog_post_view_restriction_deleted(sender, instance, **kwargs):
 
     with transaction.atomic():
         candidate_ids = _live_blog_posts_at_or_below(page).values_list("pk", flat=True)
-        for post in public_blog_posts().filter(pk__in=candidate_ids).select_for_update():
+        public_candidates = (
+            public_blog_posts()
+            .filter(pk__in=candidate_ids)
+            # The public Feed queryset eagerly loads an optional image through
+            # a LEFT JOIN. PostgreSQL cannot lock an unspecified nullable join
+            # side, and signal processing needs only the post rows.
+            .select_related(None)
+            .prefetch_related(None)
+            .select_for_update()
+        )
+        for post in public_candidates:
             event = create_revalidation_event(post)
             decide_publication_email(post)
             deliver_event_after_commit(event.pk)
