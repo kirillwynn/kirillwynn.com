@@ -470,8 +470,16 @@ def test_staging_manual_failure_recording_is_bounded_and_staging_only():
     assert "operator_action == 'mark-failed'" in workflow
     assert "github.event_name == 'workflow_dispatch'" in workflow
     assert "environment: staging" in workflow
-    assert "TARGET_OPERATION_ID: ${{ inputs.failed_operation_id }}" in workflow
-    assert "TARGET_RELEASE_SHA: ${{ inputs.failed_release_sha }}" in workflow
+    assert (
+        "TARGET_OPERATION_ID: "
+        "${{ inputs.failed_operation_id || vars.STAGING_FAILED_OPERATION_ID }}"
+        in workflow
+    )
+    assert (
+        "TARGET_RELEASE_SHA: "
+        "${{ inputs.failed_release_sha || vars.STAGING_FAILED_RELEASE_SHA }}"
+        in workflow
+    )
     assert 'test "$environment_name" = staging' in script
     assert "--field status" in script
     assert "--field phase" in script
@@ -673,6 +681,10 @@ def test_rebuild_branch_calls_staging_release_only_from_push_ci():
     assert "github.event_name == 'push'" in ci_workflow
     assert "github.ref == 'refs/heads/rewrite/wagtail-next'" in ci_workflow
     assert "uses: ./.github/workflows/staging-release.yml" in ci_workflow
+    assert (
+        "operator_action: ${{ vars.STAGING_OPERATOR_ACTION || 'release' }}"
+        in ci_workflow
+    )
     assert "secrets: inherit" in ci_workflow
 
     staging = (

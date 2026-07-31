@@ -202,7 +202,11 @@ with `operator_action=mark-failed`, the exact operation ID, and its exact
 and phase, requires `in-progress`, and then invokes the normal
 `mark_rollout_failed.sh` under a bounded server lock. It cannot target
 production. Only after that evidence exists may an exact retry or a new-release
-fix-forward claim the operation.
+fix-forward claim the operation. While this reusable workflow exists only on a
+feature branch, set the temporary repository variable
+`STAGING_OPERATOR_ACTION=mark-failed` and the staging-environment target
+variables before a reviewed push; reset the operator action to `release`
+immediately after its job starts. The normal value is `release`.
 
 ## Failure and reviewed resolution matrix
 

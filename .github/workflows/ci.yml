@@ -305,6 +305,8 @@ jobs:
       contents: read
       packages: write
     uses: ./.github/workflows/staging-release.yml
+    with:
+      operator_action: ${{ vars.STAGING_OPERATOR_ACTION || 'release' }}
     secrets: inherit
 
   staging-reaction-catalog:

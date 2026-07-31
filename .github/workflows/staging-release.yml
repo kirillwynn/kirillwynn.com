@@ -262,8 +262,8 @@ jobs:
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
-      TARGET_OPERATION_ID: ${{ inputs.failed_operation_id }}
-      TARGET_RELEASE_SHA: ${{ inputs.failed_release_sha }}
+      TARGET_OPERATION_ID: ${{ inputs.failed_operation_id || vars.STAGING_FAILED_OPERATION_ID }}
+      TARGET_RELEASE_SHA: ${{ inputs.failed_release_sha || vars.STAGING_FAILED_RELEASE_SHA }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Record reviewed staging rollout failure
