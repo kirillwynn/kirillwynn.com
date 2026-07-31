@@ -441,6 +441,43 @@ With both staging deploy gates false, activation was explicitly skipped; the
 reaction-catalog job was also skipped and no staging state changed. A fresh
 post-baseline push will be used for the one-time staging-only rollout.
 
+The first gated rollout candidate was
+`0150a1a16681e2e5b7cb6a3b8d93c02c392c4dbf` (parent
+`6aedc05e6e53330f4da8060ef0b4b1418c7ef2a5`). Push/deploy run
+`30651650933` and pull-request run `30651654382` passed, operation
+`deploy-30651650933-staging-0150a1a16681e2e5b7cb6a3b8d93c02c392c4dbf`
+completed with a valid schema-3 attestation, and both deploy gates were
+returned to false. Live Chrome acceptance deliberately did not accept that
+candidate: selecting a new reaction on an empty row exposed a real-browser
+focus gap. The busy picker trigger correctly became disabled during the
+optimistic request, but the old immediate focus call could not retain or
+restore focus after the button became enabled. The controlled `pepelove`
+toggle used to expose the gap was removed immediately, restoring the empty
+aggregate state; no post, comment, subscription, email, or catalog state was
+changed.
+
+Separate fix commit `c4866f53c0e60aa96f63f3c02cdbac8d2ebebdd4`
+(parent `0150a1a16681e2e5b7cb6a3b8d93c02c392c4dbf`) gives the trigger stable
+React identity and defers selection focus restoration until the shared
+mutation coordinator leaves its busy state and the trigger is enabled. A
+real-browser regression holds an optimistic insertion in flight, verifies the
+disabled boundary, completes a controlled rollback, and requires the enabled
+trigger to regain focus. It failed on all five viewports before the deferred
+restoration and passed on all five afterward. Prettier, ESLint, TypeScript,
+all 180 Vitest cases, the production Next build, the quick-config/static-bundle
+scan, and the complete 55-case local browser matrix passed.
+
+Fix baseline pull-request run `30663470428` and push run `30663463445` passed
+every required job, including no-skip PostgreSQL, all 55 CI browser cases,
+cross-stack, image/Compose/Nginx/container coverage, and `ci-required`. The
+push produced release artifact
+`release-c4866f53c0e60aa96f63f3c02cdbac8d2ebebdd4` (artifact
+`8806179465`, GitHub archive digest
+`sha256:a178d942dbf0c37b3c0deeb9d9fc5ab0783dab551bfea15b10d1e356579851e8`),
+passed server preflight, explicitly skipped activation with both deploy gates
+false, and skipped reaction-catalog sync. A fresh documentation/evidence
+commit will be the staging-only acceptance candidate.
+
 ## Current repository state
 
 - The `main` branch contains the deployed legacy Flask/React implementation.
