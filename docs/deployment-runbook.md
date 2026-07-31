@@ -193,6 +193,17 @@ normal rollback.
 server `flock`; a retry of identical evidence is a no-op, conflicting evidence
 is rejected, and the original remote exit status remains the job result.
 
+If the CI SSH transport is lost after the remote rollout has reached a durable
+checkpoint, the remote command can finish while the runner never reaches its
+failure-recording branch. In that narrow case, first confirm from the failed
+job log that the operation is still `in-progress`. Dispatch `Staging candidate`
+with `operator_action=mark-failed`, the exact operation ID, and its exact
+40-character release SHA. The staging-environment job reads the durable status
+and phase, requires `in-progress`, and then invokes the normal
+`mark_rollout_failed.sh` under a bounded server lock. It cannot target
+production. Only after that evidence exists may an exact retry or a new-release
+fix-forward claim the operation.
+
 ## Failure and reviewed resolution matrix
 
 | Failed state | Reviewed owner | Activation policy | Required database evidence | Final result |

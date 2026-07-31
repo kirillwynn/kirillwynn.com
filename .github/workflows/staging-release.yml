@@ -2,8 +2,21 @@ name: Staging candidate
 
 on:
   workflow_call:
+    inputs:
+      operator_action:
+        required: false
+        type: string
+        default: release
   workflow_dispatch:
     inputs:
+      operator_action:
+        description: Staging release or reviewed failure recording
+        required: true
+        type: choice
+        default: release
+        options:
+          - release
+          - mark-failed
       resolution_kind:
         description: Reviewed failed-rollout resolution
         required: true
@@ -14,12 +27,17 @@ on:
           - retry
           - fix-forward
       failed_operation_id:
-        description: Authoritative failed operation ID for retry/fix-forward
+        description: Exact operation ID for resolution or reviewed failure recording
+        required: false
+        type: string
+      failed_release_sha:
+        description: Immutable release SHA containing the failed operation tooling
         required: false
         type: string
 
 jobs:
   build-images:
+    if: inputs.operator_action != 'mark-failed'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -69,6 +87,7 @@ jobs:
           retention-days: 30
 
   release-manifest:
+    if: inputs.operator_action != 'mark-failed'
     needs: build-images
     runs-on: ubuntu-latest
     steps:
@@ -113,6 +132,7 @@ jobs:
           retention-days: 90
 
   server-preflight:
+    if: inputs.operator_action != 'mark-failed'
     runs-on: ubuntu-latest
     environment: staging
     permissions:
@@ -135,6 +155,7 @@ jobs:
         run: infra/scripts/ci_ssh_preflight.sh
 
   deploy-staging:
+    if: inputs.operator_action != 'mark-failed'
     needs:
       - release-manifest
       - server-preflight
@@ -224,3 +245,28 @@ jobs:
           path: staging-attestation.json
           if-no-files-found: error
           retention-days: 90
+
+  record-rollout-failure:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.operator_action == 'mark-failed'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+    concurrency:
+      group: kirillwynn-server-release-operations
+      cancel-in-progress: false
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_IP }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+      TARGET_OPERATION_ID: ${{ inputs.failed_operation_id }}
+      TARGET_RELEASE_SHA: ${{ inputs.failed_release_sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Record reviewed staging rollout failure
+        run: >-
+          infra/scripts/ci_ssh_mark_rollout_failed.sh
+          staging "$TARGET_OPERATION_ID" "$TARGET_RELEASE_SHA"

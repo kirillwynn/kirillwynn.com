@@ -462,6 +462,74 @@ def test_staging_dispatch_exposes_only_explicit_reviewed_resolution_inputs():
     )
 
 
+def test_staging_manual_failure_recording_is_bounded_and_staging_only():
+    workflow = (
+        ROOT / ".github" / "workflows" / "staging-release.yml"
+    ).read_text()
+    script = (SCRIPTS / "ci_ssh_mark_rollout_failed.sh").read_text()
+    assert "operator_action == 'mark-failed'" in workflow
+    assert "github.event_name == 'workflow_dispatch'" in workflow
+    assert "environment: staging" in workflow
+    assert "TARGET_OPERATION_ID: ${{ inputs.failed_operation_id }}" in workflow
+    assert "TARGET_RELEASE_SHA: ${{ inputs.failed_release_sha }}" in workflow
+    assert 'test "$environment_name" = staging' in script
+    assert "--field status" in script
+    assert "--field phase" in script
+    assert 'test "$status" = in-progress' in script
+    assert "flock -w 60 /srv/kirillwynn/locks/release.lock" in script
+    assert "mark_rollout_failed.sh staging" in script
+    assert "-o ConnectTimeout=15" in script
+    assert "-o ServerAliveInterval=15" in script
+    assert "-o ServerAliveCountMax=4" in script
+
+
+def test_staging_manual_failure_recording_requires_in_progress_target(tmp_path):
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    runner_temp = tmp_path / "runner"
+    runner_temp.mkdir()
+    ssh_log = tmp_path / "ssh.log"
+    ssh = binary_dir / "ssh"
+    ssh.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s\\n' \"$*\" >> '{ssh_log}'\n"
+        'case "$*" in\n'
+        '  *"--field status"*) printf "in-progress\\n" ;;\n'
+        '  *"--field phase"*) printf "pending-public-smoke\\n" ;;\n'
+        "  *mark_rollout_failed.sh*) exit 0 ;;\n"
+        "  *) exit 3 ;;\n"
+        "esac\n"
+    )
+    ssh.chmod(0o700)
+    operation_id = f"deploy-123-staging-{'a' * 40}"
+    result = subprocess.run(
+        [
+            SCRIPTS / "ci_ssh_mark_rollout_failed.sh",
+            "staging",
+            operation_id,
+            "a" * 40,
+        ],
+        env={
+            **os.environ,
+            "PATH": f"{binary_dir}:{os.environ['PATH']}",
+            "SERVER_HOST": "example.invalid",
+            "SERVER_USER": "deploy",
+            "SSH_PRIVATE_KEY": "test-key",
+            "SERVER_KNOWN_HOSTS": "example.invalid test-key",
+            "RUNNER_TEMP": str(runner_temp),
+        },
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    assert "target_status=in-progress target_phase=pending-public-smoke" in result.stdout
+    assert f"marked_failed_operation={operation_id}" in result.stdout
+    log = ssh_log.read_text()
+    assert "--field status" in log
+    assert "--field phase" in log
+    assert "mark_rollout_failed.sh staging" in log
+
+
 def test_edge_bootstrap_binds_manifest_digest_before_compose_inspection():
     script = (SCRIPTS / "bootstrap_edge_if_absent.sh").read_text()
     bind = script.index("release_image.py")
