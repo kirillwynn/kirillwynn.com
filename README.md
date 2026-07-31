@@ -43,6 +43,7 @@ Do not copy that note into the repository.
 - [Architecture](docs/architecture.md)
 - [Implementation status](docs/implementation-status.md)
 - [Development workflow](docs/development-workflow.md)
+- [Editorial workflow](docs/editorial-workflow.md)
 - [Content API contract](docs/api-contract.md)
 - [ADR 0001: Django/Wagtail and Next.js](docs/decisions/0001-django-wagtail-nextjs.md)
 - [ADR 0002: Content API, preview, and revalidation](docs/decisions/0002-content-api-preview-revalidation.md)
@@ -50,6 +51,7 @@ Do not copy that note into the repository.
 - [ADR 0004: Email subscriptions, outbox, and Resend](docs/decisions/0004-email-subscriptions-outbox-resend.md)
 - [ADR 0005: Isolated Compose deployment](docs/decisions/0005-isolated-compose-deployment.md)
 - [ADR 0006: Manifest-managed custom reaction catalog](docs/decisions/0006-manifest-managed-reaction-catalog.md)
+- [ADR 0007: Editorial dates and publication-email decisions](docs/decisions/0007-editorial-dates-and-publication-email-decision.md)
 - [Reaction catalog asset runbook](docs/reaction-catalog-runbook.md)
 - [Email provider and DNS setup](docs/email-setup.md)
 - [Deployment and rollback](docs/deployment-runbook.md)
@@ -72,8 +74,13 @@ Milestones 1–10 are available under `backend/django/`, `frontend/next/`, and
 - a custom `users.User` model in the initial project migration;
 - environment-specific local, test, and production settings;
 - `/api/health/`, Django Admin, and Wagtail Admin smoke coverage;
-- singleton blog index and structured post authoring with normalized tags;
-- SEO/Open Graph metadata and all 13 first-version StreamField block types;
+- a permission-aware `New post` shortcut and writing-first Wagtail editor for
+  the dynamically resolved singleton Blog index;
+- structured post authoring with normalized tags, revision-aware archive dates,
+  durable first-publication newsletter decisions, and clear workflow
+  documentation;
+- SEO/Open Graph metadata and all 13 stable first-version StreamField block
+  types with grouped, described chooser entries;
 - backend draft preview with image renditions, revisions, rollback, and
   publication scheduling coverage;
 - anonymous live-only `/api/v1/posts/` list and slug detail endpoints;
@@ -125,8 +132,9 @@ Milestones 1–10 are available under `backend/django/`, `frontend/next/`, and
   identity, versioned 48-hour confirmation credentials, revocable unsubscribe,
   and non-enumerating CSRF-protected APIs;
 - durable confirmation/publication outbox events, immutable publication
-  audience cutoffs, unique per-reader deliveries, bounded PostgreSQL claims,
-  stale reclaim, capped exponential retry, and terminal failure visibility;
+  audience cutoffs, irreversible queued/suppressed first-publication decisions,
+  unique per-reader deliveries, bounded PostgreSQL claims, stale reclaim,
+  capped exponential retry, and terminal failure visibility;
 - exact-byte deterministic/Resend provider adapters, immutable adapter
   contract/version and idempotency namespace, provider-independent
   `EMAIL_FROM_ADDRESS`, multipart templates, Resend idempotency keys, RFC 8058

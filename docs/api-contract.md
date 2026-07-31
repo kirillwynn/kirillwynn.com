@@ -35,9 +35,24 @@ page.
 The canonical public visibility policy is applied before search and tag
 filtering. Draft, unpublished, scheduled-for-future, expired, and restricted
 pages cannot match. Without `q`, ordering remains
-`(-first_published_at, -pk)`. With `q`, the database backend orders by
-relevance and then `-pk`, the deterministic tie-break implemented by Wagtail
-7.4's PostgreSQL and SQLite database compilers.
+`(-display_published_at, -pk)`, where the first value is SQL
+`COALESCE(original_published_at, first_published_at)`. With `q`, the database
+backend orders by relevance and then `-pk`, the deterministic tie-break
+implemented by Wagtail 7.4's PostgreSQL and SQLite database compilers.
+
+Post metadata exposes four separate timestamp meanings:
+
+- `published_at`: Wagtail's actual `first_published_at` for this site;
+- `updated_at`: Wagtail's actual `last_published_at`;
+- `original_published_at`: nullable date when archived material first appeared
+  elsewhere;
+- `display_published_at`: `original_published_at` when present, otherwise
+  `published_at`.
+
+The public UI and Open Graph article publication time use
+`display_published_at`. Actual site timestamps remain available and unchanged.
+The original date has no effect on visibility, scheduling, expiry, email
+audience cutoff, outbox availability, or cache event time.
 
 The list never contains `body`. `next` and `previous` are relative API URLs,
 such as `/api/v1/posts/?q=django&tag=python&page=2`; they never include an
@@ -57,6 +72,8 @@ origin and preserve every active supported parameter.
       "excerpt": "A short plain-text summary.",
       "published_at": "2026-07-26T17:00:00Z",
       "updated_at": "2026-07-26T17:05:00Z",
+      "original_published_at": "2018-04-03T12:00:00Z",
+      "display_published_at": "2018-04-03T12:00:00Z",
       "tags": [
         {"name": "Django", "slug": "django"},
         {"name": "Wagtail", "slug": "wagtail"}
@@ -152,6 +169,8 @@ request URL resolve the same resource. A slug never contains `/`.
   "excerpt": "A short plain-text summary.",
   "published_at": "2026-07-26T17:00:00Z",
   "updated_at": "2026-07-26T17:05:00Z",
+  "original_published_at": "2018-04-03T12:00:00Z",
+  "display_published_at": "2018-04-03T12:00:00Z",
   "tags": [
     {"name": "Django", "slug": "django"},
     {"name": "Wagtail", "slug": "wagtail"}
@@ -987,6 +1006,10 @@ return:
 ```
 
 with status 404. Public post endpoints do not accept preview credentials.
+Draft snapshots preserve both archive fields. A never-published draft with no
+archive date returns null for `published_at` and `display_published_at`; an
+archive draft can return a non-null `original_published_at` and
+`display_published_at` while `published_at` remains null.
 
 ## Cache revalidation payload
 
@@ -1028,9 +1051,10 @@ Next.js accepts the default 300-second window and derives only:
 All list/search/filter variants and the available-tag fetch use `posts`;
 detail fetches use their `post-slug:<slug>` tag without the global list tag.
 Stable-ID tags remain available to caches keyed by page identity. Publication,
-update (including body or tags), unpublication, and expiry therefore invalidate
-Feed results without accepting tags or paths from a browser. This keeps one
-post update from evicting every cached detail.
+update (including body, tags, or original publication date), privacy
+transitions, unpublication, and expiry therefore invalidate Feed results
+without accepting tags or paths from a browser. This keeps one post update
+from evicting every cached detail.
 
 Current and previous slugs may use Unicode letters and numbers, `-`, and `_`,
 up to 255 Unicode code points. Slash, backslash, control characters, empty

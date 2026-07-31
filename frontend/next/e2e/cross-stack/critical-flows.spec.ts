@@ -50,9 +50,17 @@ test("real batch reaction endpoint hydrates the cached Feed with one private rea
     });
 
     await page.goto("/");
-    const feedReactions = page
-        .locator(".feed-entry")
-        .getByRole("group", { name: "Reactions" });
+    const seedEntry = page.locator(".feed-entry", {
+        has: page.getByRole("link", {
+            name: "Cross-stack systems",
+            exact: true,
+        }),
+    });
+    const feedReactions = seedEntry.getByRole("group", { name: "Reactions" });
+    await expect(seedEntry.locator("time")).toHaveAttribute(
+        "datetime",
+        "2015-04-03T12:00:00Z",
+    );
     await expect(
         feedReactions.getByRole("button", {
             name: "Add Clapping reaction",
@@ -251,5 +259,11 @@ test("real preview endpoint and Next Draft Mode isolate the saved revision", asy
     await expect(
         publicPage.getByText("Draft: cross-stack systems"),
     ).toHaveCount(0);
+    await expect(
+        publicPage.locator("article header time").first(),
+    ).toHaveAttribute("datetime", "2015-04-03T12:00:00Z");
+    await expect(
+        publicPage.locator('meta[property="article:published_time"]'),
+    ).toHaveAttribute("content", "2015-04-03T12:00:00Z");
     await publicContext.close();
 });

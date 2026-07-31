@@ -17,7 +17,12 @@ from apps.subscriptions.message_limits import (
     bounded_snapshot_value,
 )
 from apps.subscriptions.messages import MESSAGE_SCHEMA_VERSION, message_for_delivery
-from apps.subscriptions.models import EmailDelivery, EmailOutbox, Subscriber
+from apps.subscriptions.models import (
+    EmailDelivery,
+    EmailOutbox,
+    PostPublicationEmailDecision,
+    Subscriber,
+)
 from apps.subscriptions.providers.base import EmailProviderError
 from config.email_settings import normalize_email_from_address
 
@@ -77,10 +82,7 @@ def publication_outbox_snapshot(post):
     }
 
 
-def create_publication_outbox_event(post, *, at=None):
-    cutoff = at or timezone.now()
-    if not public_blog_posts(at=cutoff).filter(pk=post.pk).exists():
-        return None
+def _create_publication_outbox_event(post, *, cutoff):
     event, _ = EmailOutbox.objects.get_or_create(
         post=post,
         message_type=EmailOutbox.MessageType.PUBLICATION,
@@ -92,6 +94,50 @@ def create_publication_outbox_event(post, *, at=None):
         },
     )
     return event
+
+
+@transaction.atomic
+def decide_publication_email(post, *, at=None):
+    """Atomically lock the first-publication notification decision."""
+
+    cutoff = at or timezone.now()
+    from apps.blog.models import BlogPostPage
+
+    locked_post = BlogPostPage.objects.select_for_update().get(pk=post.pk)
+    decision, _ = PostPublicationEmailDecision.objects.select_for_update().get_or_create(
+        post=locked_post
+    )
+    if decision.state != PostPublicationEmailDecision.State.PENDING:
+        return decision
+
+    existing_event = (
+        EmailOutbox.objects.select_for_update()
+        .filter(
+            post=locked_post,
+            message_type=EmailOutbox.MessageType.PUBLICATION,
+        )
+        .first()
+    )
+    if existing_event is not None:
+        decision.state = PostPublicationEmailDecision.State.QUEUED
+        decision.decided_at = existing_event.audience_cutoff
+        decision.outbox = existing_event
+        decision.save(update_fields=("state", "decided_at", "outbox", "updated_at"))
+        return decision
+
+    if not public_blog_posts(at=cutoff).filter(pk=locked_post.pk).exists():
+        return decision
+
+    if locked_post.notify_subscribers_on_first_publication:
+        event = _create_publication_outbox_event(locked_post, cutoff=cutoff)
+        decision.state = PostPublicationEmailDecision.State.QUEUED
+        decision.outbox = event
+    else:
+        decision.state = PostPublicationEmailDecision.State.SUPPRESSED
+        decision.outbox = None
+    decision.decided_at = cutoff
+    decision.save(update_fields=("state", "decided_at", "outbox", "updated_at"))
+    return decision
 
 
 def _select_for_update_skip_locked(queryset):

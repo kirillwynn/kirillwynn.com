@@ -121,36 +121,85 @@ class LinkBlock(blocks.StructBlock):
 
 
 class BlogBodyBlock(blocks.StreamBlock):
-    rich_text = blocks.RichTextBlock(features=RICH_TEXT_FEATURES)
-    heading = HeadingBlock()
-    image = ImageBlock()
-    gallery = blocks.ListBlock(ImageBlock(), min_num=2, max_num=12)
-    quote = QuoteBlock()
+    rich_text = blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        label="Rich text",
+        group="Text",
+        description="Paragraphs with bold, italic, and links.",
+    )
+    heading = HeadingBlock(
+        group="Text",
+        description="A section heading at level 2, 3, or 4.",
+    )
+    image = ImageBlock(
+        group="Media",
+        description="One image with contextual alt text.",
+    )
+    gallery = blocks.ListBlock(
+        ImageBlock(),
+        min_num=2,
+        max_num=12,
+        label="Gallery",
+        group="Media",
+        description="A gallery of 2–12 images.",
+    )
+    quote = QuoteBlock(
+        group="Text",
+        description="A quotation with optional attribution.",
+    )
     bulleted_list = blocks.ListBlock(
         blocks.CharBlock(max_length=500),
         min_num=1,
         label="Bulleted list",
+        group="Lists",
+        description="An unordered list of short items.",
     )
     numbered_list = blocks.ListBlock(
         blocks.CharBlock(max_length=500),
         min_num=1,
         label="Numbered list",
+        group="Lists",
+        description="An ordered list of short items.",
     )
-    checklist = blocks.ListBlock(ChecklistItemBlock(), min_num=1)
-    inline_code = blocks.CharBlock(max_length=500, icon="code")
-    code_block = CodeBlock()
+    checklist = blocks.ListBlock(
+        ChecklistItemBlock(),
+        min_num=1,
+        label="Checklist",
+        group="Lists",
+        description="Items with checked or unchecked state.",
+    )
+    inline_code = blocks.CharBlock(
+        max_length=500,
+        icon="code",
+        label="Inline code",
+        group="Code / Data",
+        description="A short code fragment shown inline.",
+    )
+    code_block = CodeBlock(
+        group="Code / Data",
+        description="A multiline code sample with a language.",
+    )
     table = TableBlock(
         table_options={
             "minSpareRows": 0,
             "startRows": 3,
             "startCols": 3,
-        }
+        },
+        label="Table",
+        group="Code / Data",
+        description="Structured rows and columns with optional headers.",
     )
     horizontal_divider = blocks.StaticBlock(
         admin_text="A horizontal divider.",
         icon="horizontalrule",
+        label="Horizontal divider",
+        group="Structure",
+        description="A visual break between sections.",
     )
-    link = LinkBlock()
+    link = LinkBlock(
+        group="Structure",
+        description="A labelled link to a page or external URL.",
+    )
 
     class Meta:
         label = "Post body"

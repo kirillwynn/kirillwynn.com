@@ -45,6 +45,8 @@ function summary(overrides: Partial<PostListItem> = {}): PostListItem {
         excerpt: "A post excerpt.",
         published_at: "2026-07-26T17:00:00Z",
         updated_at: "2026-07-26T17:05:00Z",
+        original_published_at: null,
+        display_published_at: "2026-07-26T17:00:00Z",
         tags: [{ name: "Django", slug: "django" }],
         canonical_path: "/posts/привет-мир",
         canonical_url: "https://example.com/posts/%D0%BF",
@@ -79,6 +81,21 @@ describe("feed presentation", () => {
         expect(html).not.toContain("%25D0");
         expect(html).toContain('class="feed-entry"');
         expect(html).toContain("#Django");
+    });
+
+    it("renders the display publication date in the Feed time element", () => {
+        const html = renderToStaticMarkup(
+            createElement(PostCard, {
+                post: summary({
+                    published_at: "2026-07-26T17:00:00Z",
+                    original_published_at: "2014-03-02T10:00:00Z",
+                    display_published_at: "2014-03-02T10:00:00Z",
+                }),
+            }),
+        );
+
+        expect(html).toContain('<time dateTime="2014-03-02T10:00:00Z">');
+        expect(html).not.toContain('<time dateTime="2026-07-26T17:00:00Z">');
     });
 
     it("renders accessible previous and next controls", () => {

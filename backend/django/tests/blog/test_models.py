@@ -107,23 +107,33 @@ def test_post_uses_wagtail_publication_fields_without_custom_status():
 
 
 def test_authoring_panels_include_content_tags_and_metadata():
-    content_panel_fields = {
-        panel.field_name for panel in BlogPostPage.content_panels if hasattr(panel, "field_name")
-    }
-    promote_panel_fields = {
-        panel.field_name
-        for panel_group in BlogPostPage.promote_panels
-        for panel in getattr(panel_group, "children", [])
-        if hasattr(panel, "field_name")
-    }
+    edit_handler = BlogPostPage.get_edit_handler()
 
-    assert {"excerpt", "body", "tags"} <= content_panel_fields
+    def fields(panel):
+        result = {panel.field_name} if hasattr(panel, "field_name") else set()
+        for child in getattr(panel, "children", []):
+            result.update(fields(child))
+        return result
+
+    assert [panel.heading for panel in edit_handler.children] == [
+        "Write",
+        "Publish",
+        "SEO & sharing",
+    ]
+    panel_fields = fields(edit_handler)
     assert {
+        "title",
+        "excerpt",
+        "body",
+        "tags",
+        "original_published_at",
+        "notify_subscribers_on_first_publication",
+        "newsletter_status",
         "canonical_url",
         "open_graph_image",
         "open_graph_title",
         "open_graph_description",
-    } <= promote_panel_fields
+    } <= panel_fields
 
 
 def test_wagtail_editor_form_exposes_publication_seo_and_content_fields():
@@ -135,6 +145,8 @@ def test_wagtail_editor_form_exposes_publication_seo_and_content_fields():
         "excerpt",
         "body",
         "tags",
+        "original_published_at",
+        "notify_subscribers_on_first_publication",
         "seo_title",
         "search_description",
         "canonical_url",

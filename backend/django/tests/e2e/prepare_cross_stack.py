@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import django
@@ -15,6 +16,7 @@ django.setup()
 from django.contrib.auth import get_user_model  # noqa: E402
 from django.utils import timezone  # noqa: E402
 from wagtail.models import Page, Site  # noqa: E402
+from wagtail.users.models import UserProfile  # noqa: E402
 
 from apps.blog.models import BlogIndexPage, BlogPostPage  # noqa: E402
 from apps.discussions.models import (  # noqa: E402
@@ -42,6 +44,8 @@ def main() -> None:
         slug="cross-stack-systems",
         excerpt="Real Django, sessions, CSRF, API views, rewrites, and persistence.",
         body=[("rich_text", "<p>Public cross-stack content.</p>")],
+        original_published_at=datetime(2015, 4, 3, 12, tzinfo=UTC),
+        notify_subscribers_on_first_publication=False,
         live=False,
     )
     index.add_child(instance=post)
@@ -56,6 +60,22 @@ def main() -> None:
         last_name="Author",
         is_staff=True,
     )
+    cms_owner = get_user_model().objects.create_superuser(
+        username="cms-owner",
+        email="cms-owner@example.test",
+        password="cms-stage15-test-only",
+    )
+    cms_owner_profile = UserProfile.get_for_user(cms_owner)
+    cms_owner_profile.theme = UserProfile.AdminColorThemes.LIGHT
+    cms_owner_profile.save(update_fields=("theme",))
+    cms_dark_owner = get_user_model().objects.create_superuser(
+        username="cms-dark-owner",
+        email="cms-dark-owner@example.test",
+        password="cms-stage15-test-only",
+    )
+    cms_dark_profile = UserProfile.get_for_user(cms_dark_owner)
+    cms_dark_profile.theme = UserProfile.AdminColorThemes.DARK
+    cms_dark_profile.save(update_fields=("theme",))
     Comment.objects.create(
         post=post,
         author=author,

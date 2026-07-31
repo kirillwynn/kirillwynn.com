@@ -45,9 +45,9 @@ export default async function PostPage({ params }: PostPageProps) {
                     {post.excerpt}
                 </p>
                 <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm text-stone-500">
-                    {post.published_at ? (
+                    {post.display_published_at ? (
                         <DateTime
-                            value={post.published_at}
+                            value={post.display_published_at}
                             label="Published "
                         />
                     ) : null}

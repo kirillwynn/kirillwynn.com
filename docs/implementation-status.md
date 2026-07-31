@@ -32,11 +32,89 @@ and Search/Bridge polish passed required CI and live QA. New-stack production
 deployment, production provider configuration, DNS changes, data migration,
 and promotion remain out of scope and unverified.
 
+## Stage 15 editorial workflow and archive publications
+
+Stage 15 is implemented at the repository boundary from exact parent
+`1224339994df3371c4eeb47a7ad7ad7d5dc2e278`; final CI, staging rollout, and
+live acceptance evidence will be appended after those gates complete. The
+pre-change active staging application release was
+`43f5a05213f13d7c5129ddebd05955fc3186de82`, and `origin/main` remained
+`1d02912430277cdf5465f856b158a6820bc12be4`.
+
+The CMS remains entirely Wagtail-owned. Supported Wagtail 7.4 edit handlers,
+panels, page forms, admin URL/menu/dashboard/CSS hooks, and StreamField chooser
+metadata provide:
+
+- a permission-aware `New post` action that dynamically resolves the single
+  valid `BlogIndexPage` and fails closed for a missing, ambiguous, misplaced,
+  or unauthorized parent;
+- a writing-first **Write / Publish / SEO & sharing** editor with title,
+  excerpt, and wide body flow first, clear archive/newsletter intent, secondary
+  tags and sharing fields, and unchanged Wagtail revision, preview, scheduling,
+  privacy, unpublish, history, and rollback controls;
+- chooser descriptions and Text, Media, Lists, Code / Data, and Structure
+  grouping for all 13 stable body block IDs without changing stored StreamField
+  JSON;
+- scoped semantic-variable CSS with responsive desktop layouts, visible focus,
+  reduced-motion handling, and no Django Admin override or fragile DOM patch.
+
+`BlogPostPage.original_published_at` is nullable revision content. The API adds
+nullable `original_published_at` and `display_published_at` while
+`published_at` and `updated_at` retain their Wagtail meanings. Display time is
+`original_published_at or first_published_at`; Feed ordering is descending
+display time with descending page ID as the stable tie. Feed cards, post
+`<time>`, headless/backend preview, and Open Graph use that display time.
+Visibility, schedules, expiry, email cutoff, outbox availability, and
+revalidation timestamps continue to use actual Wagtail/application time.
+Search keeps relevance first and Wagtail's safe descending-ID tie.
+
+The revision checkbox **Notify subscribers on first publication** defaults on.
+`PostPublicationEmailDecision` stores a constrained durable
+`pending → queued|suppressed` result outside revisions. The decision path locks
+the post and decision rows in one transaction, rechecks canonical public
+visibility, and either links exactly one existing-contract publication outbox
+event or records suppression with no outbox/delivery/provider I/O. Future and
+restricted posts wait until they are actually public; direct privacy removal
+also covers restricted descendants. Republish, slug change, edit, and restored
+revisions cannot change a final result.
+
+The additive data migration backfills an existing publication event as queued,
+an ever-published post without one as suppressed, and never-published drafts or
+not-yet-public schedules as pending. Its forward/reverse test preserves
+historical outbox/delivery/provider IDs and snapshots and creates no email
+work. Live staging counts will be recorded from the rollout migration output.
+ADR 0007 and `docs/editorial-workflow.md` contain the durable contract and the
+owner workflow.
+
+Local verification before the feature commit passed:
+
+- exact `uv 0.11.32` lock check, Ruff format/lint, Django system and production
+  deploy checks, migration drift, a clean empty-SQLite migration chain, the
+  populated forward/reverse Stage 15 migration test, and the full SQLite suite
+  (`546 passed`, `9` PostgreSQL-only tests deselected);
+- Prettier, ESLint, TypeScript, all `178` Vitest cases, the production Next
+  build, runtime-origin verification, browser asset scanning, and `npm audit`
+  with zero vulnerabilities; package manifests and the lockfile did not
+  change, so local `npm ci` was intentionally not repeated;
+- all `45` browser-contract cases across the required public viewports and
+  themes, plus all `7` real-Django cross-stack cases, including the Wagtail
+  dashboard/editor flow at `768×1024`, `1440×900`, and `1920×1080`, explicit
+  dark preference, keyboard focus, reduced motion, axe, overflow, preview,
+  scheduling controls, archive publication, and durable no-email suppression;
+- shell syntax, Python compilation, artifact sanitization, and all `229`
+  infrastructure unit tests.
+
+Docker and a local PostgreSQL server are not installed on this workstation.
+The required CI `backend-postgresql` job therefore remains the authoritative
+no-skip PostgreSQL search/order/concurrency and full-suite run, while the
+required infrastructure job remains authoritative for Compose, Nginx, image,
+container, backup/recovery, and egress checks.
+
 ## Stage 16 custom reaction catalog
 
 Stage 16 was delivered before Stage 15 through the planned two-release
-expand/activate rollout and accepted on staging on 2026-07-30. Stage 15 and
-Stage 17 remain untouched.
+expand/activate rollout and accepted on staging on 2026-07-30. Stage 15 now
+follows it; Stage 17 remains untouched.
 
 The owner approved all 228 supplied files for controlled staging evaluation,
 with no catalog exclusions and quick IDs `pepeclap`, `pepehmm`, and
@@ -1131,45 +1209,27 @@ Commit, CI, deployment, and acceptance evidence:
 
 ## Milestone transition
 
-Milestone 11, functional Stage 13A acceptance, Stage 14A part 1, and Stage 14B
-staging acceptance are complete. The active staging release is
-`5dfd2d17d52972a188cd9d156d219fe229bfbb1a`.
+Milestone 11, functional Stage 13A acceptance, Stages 14A–14C, and Stage 16
+staging acceptance are complete. Stage 15 is implemented and moving through
+its final verification and staging-only acceptance sequence. The pre-Stage-15
+active staging release is
+`43f5a05213f13d7c5129ddebd05955fc3186de82`.
 
 ### Next recommended session
 
-Implement local e-mail/password accounts and authoritative public nicknames as
-one separate next stage. The owner has explicitly selected this as the next
-scope; Stage 15 and Stage 16 remain deferred and were not started by Stage 14B.
-
-Scope:
-
-1. Add e-mail/password signup and login with mandatory e-mail verification,
-   plus reset, set, and change-password flows.
-2. Add one Unicode-safe, case-insensitive unique, changeable public nickname
-   and migrate existing users without changing their IDs, social identities,
-   sessions, staff flags, comments, or reactions.
-3. Require OAuth profile completion before a new OAuth user can interact
-   publicly; provider display names may be suggestions only.
-4. Replace scattered author-name fallbacks with one authoritative helper and
-   use the nickname for post, comment, mention, and reaction-participant
-   authorship.
-
-Out of scope for that session:
-
-- Stage 15 editorial/archive work and Stage 16 custom animated reaction
-  catalog work unless the owner changes the sequence;
-- JWT, Auth.js, browser-stored authentication tokens, or username-based login;
-- production promotion or deletion of legacy containers, mounts, data, or
-  references.
+After Stage 15 acceptance, perform the separately scoped small Stage 16
+remediation: remove the three suggested/quick reactions and retain one picker
+button. Then proceed to Stage 17. Do not combine either task with Stage 15.
 
 ### Exit criteria
 
-- Local e-mail remains the login identifier while nickname is the single
-  public author identity.
-- Existing users and their related content survive a reversible migration.
-- Verified-email linking, OAuth completion, password lifecycle, Unicode
-  collision, session/CSRF, return-to, and inactive/banned-user boundaries pass
-  backend, frontend, PostgreSQL, and staging browser verification.
+- Stage 15 required CI and mandatory PostgreSQL coverage pass.
+- A checked staging PostgreSQL backup precedes the migration.
+- The immutable staging-only rollout and schema-3 attestation pass with both
+  staging gates restored to false.
+- Controlled no-notification CMS QA proves archive dates, preview, publication,
+  revisions, cache movement, and durable suppression without changing real
+  user posts or provider state.
 
 ## Milestone queue
 
@@ -1191,8 +1251,11 @@ Out of scope for that session:
   - [x] Stage 14B — mobile shell/gutters, simplified header/Feed/icon-only
     Bridge, Bridge footer rows, and Feed post reaction hydration; accepted on
     staging.
-  - [ ] Stage 15 and Stage 16 — explicitly deferred, not started.
-  - [ ] Next owner-selected stage — local accounts and public nicknames.
+  - [ ] Stage 15 — implementation complete; CI/staging acceptance in progress.
+  - [x] Stage 16 — custom static/animated reaction catalog accepted on staging.
+  - [ ] Stage 16 remediation — remove three suggested reactions and retain one
+    picker button; explicitly outside Stage 15.
+  - [ ] Stage 17 — begin only after the separate Stage 16 remediation.
 
 ## Known risks
 

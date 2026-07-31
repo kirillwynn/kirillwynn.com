@@ -2,15 +2,24 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models, transaction
+from django.utils import timezone
 from django.utils.encoding import iri_to_uri
 from modelcluster.contrib.taggit import ClusterTaggableManager
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import (
+    FieldPanel,
+    MultiFieldPanel,
+    ObjectList,
+    TabbedInterface,
+    TitleFieldPanel,
+)
 from wagtail.fields import StreamField
 from wagtail.models import Page
 from wagtail.search import index
 from wagtail_headless_preview.models import HeadlessPreviewMixin
 
 from apps.blog.blocks import BlogBodyBlock
+from apps.blog.editor_forms import BlogPostPageForm
+from apps.blog.editor_panels import ReadOnlyPropertyPanel
 
 SEARCH_BOOST_TITLE = 10
 SEARCH_BOOST_EXCERPT = 7
@@ -46,6 +55,24 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
     )
     body = StreamField(BlogBodyBlock(), use_json_field=True)
     tags = ClusterTaggableManager(through="blog.BlogPostTag", blank=True)
+    original_published_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Original publication date",
+        help_text=(
+            "For archived material, enter when it was first published elsewhere. "
+            "Leave this blank for new material. Wagtail scheduling is controlled "
+            "separately in Publishing schedule."
+        ),
+    )
+    notify_subscribers_on_first_publication = models.BooleanField(
+        default=True,
+        verbose_name="Notify subscribers on first publication",
+        help_text=(
+            "Keep this selected for a new post. Clear it for an archive import. "
+            "The choice is locked when the post first becomes public."
+        ),
+    )
     canonical_url = models.URLField(
         blank=True,
         max_length=2_048,
@@ -71,12 +98,59 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
         help_text="Defaults to search description, then excerpt.",
     )
 
-    content_panels = Page.content_panels + [
-        FieldPanel("excerpt"),
-        FieldPanel("body"),
-        FieldPanel("tags"),
+    base_form_class = BlogPostPageForm
+
+    writing_panels = [
+        TitleFieldPanel(
+            "title",
+            classname="editorial-title-panel",
+            attrs={"data-editorial-field": "title"},
+        ),
+        FieldPanel(
+            "excerpt",
+            classname="editorial-excerpt-panel",
+            attrs={"data-editorial-field": "excerpt"},
+        ),
+        FieldPanel(
+            "body",
+            classname="editorial-body-panel",
+            attrs={"data-editorial-field": "body"},
+        ),
     ]
-    promote_panels = Page.promote_panels + [
+    publication_panels = [
+        MultiFieldPanel(
+            [
+                FieldPanel("original_published_at"),
+                FieldPanel("notify_subscribers_on_first_publication"),
+                ReadOnlyPropertyPanel(
+                    "newsletter_status",
+                    heading="Newsletter decision",
+                    help_text=(
+                        "This durable status is separate from revisions and cannot be "
+                        "re-armed by restoring older content."
+                    ),
+                    read_only=True,
+                ),
+            ],
+            heading="Publication intent",
+            classname="editorial-publication-intent",
+        ),
+        FieldPanel(
+            "tags",
+            heading="Tags",
+            help_text="Optional labels used by Feed filters and search.",
+        ),
+        *Page.settings_panels,
+    ]
+    sharing_panels = [
+        MultiFieldPanel(
+            [
+                FieldPanel("slug"),
+                FieldPanel("seo_title"),
+                FieldPanel("search_description"),
+            ],
+            heading="Search and URL",
+        ),
         MultiFieldPanel(
             [
                 FieldPanel("canonical_url"),
@@ -84,9 +158,17 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
                 FieldPanel("open_graph_title"),
                 FieldPanel("open_graph_description"),
             ],
-            heading="Canonical and Open Graph",
-        )
+            heading="Canonical and Open Graph sharing",
+        ),
     ]
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(writing_panels, heading="Write"),
+            ObjectList(publication_panels, heading="Publish"),
+            ObjectList(sharing_panels, heading="SEO & sharing"),
+        ],
+        base_form_class=BlogPostPageForm,
+    )
 
     # ModelSearch de-duplicates fields by type and name, with the later
     # definition winning. Keeping Page.search_fields intact also preserves all
@@ -108,6 +190,33 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
         """Flatten the related ClusterTaggableManager into one tag-only field."""
 
         return "\n".join(self.tags.order_by("slug", "name").values_list("name", flat=True))
+
+    @property
+    def display_published_at(self):
+        """Return the editorial display date without changing Wagtail state."""
+
+        return self.original_published_at or self.first_published_at
+
+    @property
+    def newsletter_status(self):
+        if not self.pk:
+            return "Pending — the choice will be locked when this post first becomes public."
+
+        from apps.subscriptions.models import PostPublicationEmailDecision
+
+        try:
+            decision = self.publication_email_decision
+        except PostPublicationEmailDecision.DoesNotExist:
+            return "Pending — the choice will be locked when this post first becomes public."
+
+        if decision.state == PostPublicationEmailDecision.State.QUEUED:
+            return "Queued — one publication notification was created and the choice is locked."
+        if decision.state == PostPublicationEmailDecision.State.SUPPRESSED:
+            return (
+                "Suppressed — no publication notification was created, and restoring an "
+                "older revision cannot enable it."
+            )
+        return "Pending — the choice will be locked when this post first becomes public."
 
     @property
     def resolved_canonical_url(self):
@@ -174,6 +283,39 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
 
     def clean(self):
         super().clean()
+        original_published_at = self.original_published_at
+        if original_published_at is not None:
+            if timezone.is_naive(original_published_at):
+                raise ValidationError(
+                    {"original_published_at": ("Enter a date and time with a valid time zone.")}
+                )
+            if original_published_at > timezone.now():
+                raise ValidationError(
+                    {"original_published_at": "Original publication date cannot be in the future."}
+                )
+
+            site_first_published_at = self.first_published_at
+            if self.pk:
+                persisted_page = (
+                    Page.objects.filter(pk=self.pk)
+                    .values_list("first_published_at", flat=True)
+                    .first()
+                )
+                if persisted_page is not None:
+                    site_first_published_at = persisted_page
+            if (
+                site_first_published_at is not None
+                and original_published_at > site_first_published_at
+            ):
+                raise ValidationError(
+                    {
+                        "original_published_at": (
+                            "For an already published post, the original date cannot be "
+                            "later than its first publication on this site."
+                        )
+                    }
+                )
+
         try:
             self.body.stream_block.clean(self.body)
         except ValidationError as error:

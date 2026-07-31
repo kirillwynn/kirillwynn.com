@@ -78,6 +78,8 @@ export type PostMetadata = {
     excerpt: string;
     published_at: string | null;
     updated_at: string | null;
+    original_published_at: string | null;
+    display_published_at: string | null;
     tags: ContentTag[];
     canonical_path: string;
     canonical_url: string;

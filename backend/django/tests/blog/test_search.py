@@ -18,6 +18,7 @@ from apps.blog.models.pages import (
     SEARCH_BOOST_TAGS,
     SEARCH_BOOST_TITLE,
 )
+from apps.blog.services.visibility import public_blog_posts
 
 pytestmark = pytest.mark.django_db
 
@@ -478,3 +479,36 @@ def test_postgresql_ranking_respects_weights_and_pk_tie_break(blog_index):
     assert slugs.index(title.slug) < slugs.index(excerpt.slug)
     assert slugs.index(excerpt.slug) < slugs.index(body.slug)
     assert slugs.index(body.slug) < slugs.index(tag.slug)
+
+
+@pytest.mark.postgresql
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="PostgreSQL display-date ordering assertion",
+)
+def test_postgresql_feed_uses_coalesce_display_date_and_deterministic_pk_ties(
+    blog_index,
+):
+    display_date = timezone.now() - timedelta(days=30)
+    lower_pk = make_search_post(
+        blog_index,
+        slug="display-tie-lower",
+        title="Display tie lower",
+    )
+    higher_pk = make_search_post(
+        blog_index,
+        slug="display-tie-higher",
+        title="Display tie higher",
+    )
+    BlogPostPage.objects.filter(pk__in=(lower_pk.pk, higher_pk.pk)).update(
+        original_published_at=display_date
+    )
+
+    queryset = public_blog_posts()
+    response = APIClient().get(reverse("blog_api:post-list"))
+    plan = queryset.explain()
+
+    assert "COALESCE" in str(queryset.query).upper()
+    assert "SORT KEY" in plan.upper()
+    assert "COALESCE" in plan.upper()
+    assert result_slugs(response)[:2] == [higher_pk.slug, lower_pk.slug]

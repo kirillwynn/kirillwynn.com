@@ -230,6 +230,58 @@ class EmailOutbox(models.Model):
         return f"{self.message_type}:{self.pk}"
 
 
+class PostPublicationEmailDecision(models.Model):
+    class State(models.TextChoices):
+        PENDING = "pending", "Pending first public publication"
+        QUEUED = "queued", "Notification queued"
+        SUPPRESSED = "suppressed", "Notification suppressed"
+
+    post = models.OneToOneField(
+        "blog.BlogPostPage",
+        on_delete=models.CASCADE,
+        related_name="publication_email_decision",
+    )
+    state = models.CharField(max_length=16, choices=State.choices, default=State.PENDING)
+    decided_at = models.DateTimeField(null=True, blank=True, editable=False)
+    outbox = models.OneToOneField(
+        EmailOutbox,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="publication_decision",
+        editable=False,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        state="pending",
+                        decided_at__isnull=True,
+                        outbox__isnull=True,
+                    )
+                    | Q(
+                        state="queued",
+                        decided_at__isnull=False,
+                        outbox__isnull=False,
+                    )
+                    | Q(
+                        state="suppressed",
+                        decided_at__isnull=False,
+                        outbox__isnull=True,
+                    )
+                ),
+                name="subscriptions_publication_decision_shape",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.post_id}:{self.state}"
+
+
 class EmailDelivery(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"

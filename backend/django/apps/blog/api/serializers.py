@@ -245,6 +245,8 @@ def _metadata(page, *, lead_image=None):
         "excerpt": page.excerpt,
         "published_at": _timestamp(page.first_published_at),
         "updated_at": _timestamp(page.last_published_at),
+        "original_published_at": _timestamp(page.original_published_at),
+        "display_published_at": _timestamp(page.display_published_at),
         "tags": _tags(page),
         "canonical_path": path,
         "canonical_url": page.canonical_url or f"{settings.PUBLIC_SITE_URL}{iri_to_uri(path)}",

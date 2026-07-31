@@ -12,6 +12,8 @@ function post(overrides: Partial<PostDetail> = {}): PostDetail {
         excerpt: "Preview excerpt",
         published_at: null,
         updated_at: null,
+        original_published_at: null,
+        display_published_at: null,
         tags: [],
         canonical_path: "/posts/bound-snapshot",
         canonical_url: "https://example.com/posts/bound-snapshot",

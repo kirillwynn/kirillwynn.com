@@ -24,7 +24,7 @@ export function postMetadata(post: PostDetail, preview: boolean): Metadata {
             url: post.canonical_url,
             title: post.open_graph.title,
             description: post.open_graph.description,
-            publishedTime: post.published_at ?? undefined,
+            publishedTime: post.display_published_at ?? undefined,
             modifiedTime: post.updated_at ?? undefined,
             tags: post.tags.map((tag) => tag.name),
             images:

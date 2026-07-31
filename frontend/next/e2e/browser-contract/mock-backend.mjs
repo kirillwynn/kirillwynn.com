@@ -97,6 +97,8 @@ function post({ id, slug, title, excerpt, tags, body }) {
         excerpt,
         published_at: publishedAt,
         updated_at: publishedAt,
+        original_published_at: null,
+        display_published_at: publishedAt,
         tags,
         canonical_path: `/posts/${slug}`,
         canonical_url: `http://localhost:3100/posts/${slug}`,

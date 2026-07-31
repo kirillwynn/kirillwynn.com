@@ -37,6 +37,8 @@ function post(id: number): PostListItem {
         excerpt: `Excerpt ${String(id)}.`,
         published_at: "2026-07-29T12:00:00Z",
         updated_at: "2026-07-29T12:00:00Z",
+        original_published_at: null,
+        display_published_at: "2026-07-29T12:00:00Z",
         tags: [],
         canonical_path: `/posts/${slug}`,
         canonical_url: `https://example.com/posts/${slug}`,

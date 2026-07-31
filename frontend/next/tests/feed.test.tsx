@@ -78,6 +78,8 @@ function postSummary(overrides: Partial<PostListItem> = {}): PostListItem {
         excerpt: "A compact message-like summary.",
         published_at: "2026-07-29T12:00:00Z",
         updated_at: "2026-07-29T12:00:00Z",
+        original_published_at: null,
+        display_published_at: "2026-07-29T12:00:00Z",
         tags: [{ name: "Notes", slug: "notes" }],
         canonical_path: "/posts/quiet-feed",
         canonical_url: "https://example.com/posts/quiet-feed",

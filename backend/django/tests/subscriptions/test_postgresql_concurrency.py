@@ -5,8 +5,17 @@ import pytest
 from django.db import close_old_connections, connection
 from django.utils import timezone
 
-from apps.subscriptions.models import EmailOutbox, Subscriber
-from apps.subscriptions.outbox import claim_outbox_batch, confirmation_outbox_snapshot
+from apps.blog.models import BlogPostPage
+from apps.subscriptions.models import (
+    EmailOutbox,
+    PostPublicationEmailDecision,
+    Subscriber,
+)
+from apps.subscriptions.outbox import (
+    claim_outbox_batch,
+    confirmation_outbox_snapshot,
+    decide_publication_email,
+)
 from apps.subscriptions.rate_limits import consume_rate_limit
 
 pytestmark = [
@@ -68,3 +77,46 @@ def test_parallel_rate_limit_creation_keeps_one_hashed_bucket():
 
     bucket = SubscriptionRateLimitBucket.objects.get(scope=scope)
     assert bucket.request_count == 2
+
+
+def test_parallel_first_publication_decision_creates_one_event(blog_index):
+    post = BlogPostPage(
+        title="Concurrent publication",
+        slug="concurrent-publication",
+        excerpt="Concurrent publication excerpt.",
+        body=[("rich_text", "<p>Concurrent publication.</p>")],
+        live=False,
+    )
+    blog_index.add_child(instance=post)
+    now = timezone.now()
+    BlogPostPage.objects.filter(pk=post.pk).update(
+        live=True,
+        first_published_at=now,
+        last_published_at=now,
+    )
+    PostPublicationEmailDecision.objects.create(post_id=post.pk)
+
+    states = _run_concurrently(
+        [
+            lambda: decide_publication_email(
+                BlogPostPage.objects.get(pk=post.pk),
+            ).state,
+            lambda: decide_publication_email(
+                BlogPostPage.objects.get(pk=post.pk),
+            ).state,
+        ]
+    )
+
+    decision = PostPublicationEmailDecision.objects.get(post_id=post.pk)
+    assert states == [
+        PostPublicationEmailDecision.State.QUEUED,
+        PostPublicationEmailDecision.State.QUEUED,
+    ]
+    assert decision.state == PostPublicationEmailDecision.State.QUEUED
+    assert (
+        EmailOutbox.objects.filter(
+            post_id=post.pk,
+            message_type=EmailOutbox.MessageType.PUBLICATION,
+        ).count()
+        == 1
+    )

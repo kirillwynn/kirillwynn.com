@@ -82,6 +82,26 @@ def test_block_library_has_stable_first_version_types():
     )
 
 
+def test_block_chooser_has_descriptions_and_editorial_groups():
+    body_block = BlogBodyBlock()
+    grouped = {
+        group: [block.name for block in child_blocks]
+        for group, child_blocks in body_block.grouped_child_blocks()
+    }
+
+    assert grouped == {
+        "Text": ["rich_text", "heading", "quote"],
+        "Media": ["image", "gallery"],
+        "Lists": ["bulleted_list", "numbered_list", "checklist"],
+        "Code / Data": ["inline_code", "code_block", "table"],
+        "Structure": ["horizontal_divider", "link"],
+    }
+    assert all(block.meta.description for block in body_block.child_blocks.values())
+    assert grouped["Text"][:2] == ["rich_text", "heading"]
+    assert grouped["Media"][0] == "image"
+    assert grouped["Text"][2] == "quote"
+
+
 def test_all_streamfield_blocks_convert_and_validate(wagtail_image):
     body_block = BlogBodyBlock()
     value = body_block.to_python(all_block_values(wagtail_image))

@@ -1,0 +1,26 @@
+<section class="editorial-home" aria-labelledby="editorial-home-title">
+    <div class="editorial-home__copy">
+        <p class="editorial-home__eyebrow">Writing</p>
+        <h2 id="editorial-home-title">Start with the post</h2>
+        <p>
+            Write the title, excerpt, and body first. Then preview, schedule, or publish
+            through Wagtail’s normal revision workflow.
+        </p>
+    </div>
+
+    {% if new_post_url %}
+        <a class="editorial-home__action" href="{{ new_post_url }}">
+            <span aria-hidden="true">＋</span>
+            New post
+        </a>
+    {% else %}
+        <p class="editorial-home__unavailable" role="status">{{ new_post_message }}</p>
+    {% endif %}
+
+    <ol class="editorial-home__steps" aria-label="Post workflow">
+        <li><span>1</span> Write</li>
+        <li><span>2</span> Preview</li>
+        <li><span>3</span> Schedule or publish</li>
+        <li><span>4</span> Restore revisions when needed</li>
+    </ol>
+</section>

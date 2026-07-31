@@ -38,6 +38,8 @@ function post(): PostDetail {
         excerpt: "Fallback description",
         published_at: "2026-07-26T17:00:00Z",
         updated_at: "2026-07-26T18:00:00Z",
+        original_published_at: null,
+        display_published_at: "2026-07-26T17:00:00Z",
         tags: [{ name: "SEO", slug: "seo" }],
         canonical_path: "/posts/metadata",
         canonical_url: "https://kirillwynn.com/posts/metadata",
@@ -84,5 +86,20 @@ describe("post metadata", () => {
             follow: false,
             nocache: true,
         });
+    });
+
+    it("uses the display date for archive Open Graph without changing actual timestamps", () => {
+        const archived = post();
+        archived.original_published_at = "2011-04-03T12:00:00Z";
+        archived.display_published_at = archived.original_published_at;
+
+        const metadata = postMetadata(archived, false);
+
+        expect(metadata.openGraph).toMatchObject({
+            publishedTime: "2011-04-03T12:00:00Z",
+            modifiedTime: "2026-07-26T18:00:00Z",
+        });
+        expect(archived.published_at).toBe("2026-07-26T17:00:00Z");
+        expect(archived.updated_at).toBe("2026-07-26T18:00:00Z");
     });
 });
