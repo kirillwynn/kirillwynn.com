@@ -41,14 +41,16 @@ CI, attested rollout, and controlled live Chrome acceptance passed. New-stack
 production deployment, production provider configuration, DNS changes, data
 migration, and promotion remain out of scope and unverified.
 
-Stage 17 identity expansion and its old-application compatibility proof are
-accepted on staging; the active release is
-`86f25980eed0391e4d4956987420d7da8b5b42ee`. Nullable canonical-email and
-nickname fields, permanent nickname history, purpose-bound credential state,
-the independent auth-email outbox, PostgreSQL rate buckets, and persistent
-legacy-insert defaults are live while local signup remains off. The activation
-application and catch-up migration are implemented and locally verified but
-are not yet active on staging; production remains absent.
+Stage 17 local identity is accepted on staging; the active release is
+`ebb02aae0cf463f430e9906d9d8c77e8e782379e`. The expansion release
+`d2729bb4d5c5372053d2abb1958bfccba0663121`, old-application compatibility
+release `86f25980eed0391e4d4956987420d7da8b5b42ee`, activation release
+`ba1ad9ea3e24dc1a32b5ea6c47dc2df636267740`, and exact-routing remediation
+are separately committed, backed up, tested, and attested. Canonical
+email/password signup and login, mandatory verification, password flows,
+OAuth profile completion, authoritative public nicknames, and post authors are
+active. Controlled real-email and browser acceptance passed. Production
+remains absent, and the shared production edge was not replaced or changed.
 
 ## Stage 17 local identity, nicknames, and authors
 
@@ -205,10 +207,128 @@ bundle scans, `npm audit` with zero vulnerabilities, 70 browser-contract cases
 across 320×812, 375×812, 768×1024, 1440×900, and 1920×1080, eight real-Django
 cross-stack cases (including real fragment verification, password change, and
 password reset), artifact sanitization, and 233 infrastructure tests. Local
-Docker/PostgreSQL are unavailable, so mandatory no-skip PostgreSQL concurrency,
-Compose/Nginx/container integration, immutable images, activation backup,
-staging audit, attestation, and controlled live email acceptance remain CI and
-staging rollout gates.
+Docker/PostgreSQL were unavailable, so mandatory no-skip PostgreSQL
+concurrency, Compose/Nginx/container integration, immutable images, activation
+backup, staging audit, and attestation remained CI and staging rollout gates;
+all subsequently passed.
+
+Activation commits are
+`0d0efe7749f17044b0830f6b141876df12c6b34c` (parent `86f25980...`),
+`2cfd94203325d2e34d06703022c13ba06c8626d7` (parent `0d0efe...`),
+`5cc1c4fde8cc416b6cd849884298f976753a50d1` (parent `2cfd942...`), and release
+marker `ba1ad9ea3e24dc1a32b5ea6c47dc2df636267740` (parent `5cc1c4f...`). Push
+CI run `30717304556` and PR CI run `30717306191` passed. The push run passed
+PostgreSQL `91414999464`, cross-stack `91414999474`, infrastructure
+`91414999483`, browser contract `91414999490`, frontend `91414999492`, SQLite
+`91414999495`, aggregate `91415661986`, three image builds
+`91415678772`/`91415678778`/`91415678779`, preflight `91415678913`, manifest
+`91415761883`, and deploy `91415782883`; reaction catalog sync was skipped.
+
+Activation operation
+`deploy-30717304556-staging-ba1ad9ea3e24dc1a32b5ea6c47dc2df636267740`
+used verified backup
+`/srv/kirillwynn/backups/staging/20260801T204405Z_86f25980eed0391e4d4956987420d7da8b5b42ee_pre-migration_deploy-30717304556-staging-ba1ad9ea3e24dc1a32b5ea6c47dc2df636267740.dump`.
+The populated pre-migration audit contained one user, one confirmed/populated
+nickname, one verified/profile-complete primary email, zero usable passwords,
+one staff account, zero inactive/banned users, three comments, six post
+reactions, one database session, two social accounts, zero social tokens, and
+13 public posts. There were no email/nickname collisions or invalid identity
+rows. The deterministic activation catch-up changed no user and assigned the
+11 ownerless posts to the proven sole existing site author; the post-migration
+audit then reported zero ownerless posts and one distinct owner. A repeated
+catch-up changed zero users and zero owners.
+
+Activation images are Django
+`sha256:b94bc511e9596c81452a277f829b3ee90f3a4927be4d4f5110d9857663b62ebc`,
+Next `sha256:f3faeed54dd0d91cdcfedc0e5dcda4be798099d5dc9ca382e96192898af5b195`,
+and candidate edge
+`sha256:c49cd432e355a2431e3beb6bcb6d2609ec3013ea7a932a98e035984127c66e00`.
+Release artifact `8823817945` has archive SHA-256
+`5b363526f01137afaf72690c74c274441f185472a01f53524258c5c5d216151f`
+and manifest JSON SHA-256
+`bf67cccf6be464d46f866148eee07da0ee4d7ec34f73ff0f94507321017ace3f`.
+Attestation artifact `8823844726` has archive SHA-256
+`c91c6975927ca46b0e8d061b9c9ef201a653a837ab79169d26c246ceb948ce84`
+and JSON SHA-256
+`54b7c5fefbd59ab79c8b23cc3343453e6e7b3d77c537348b901d408a1ca7a64c`.
+
+The first activation smoke exposed one staging-boundary defect: the deliberate
+staging-only rollout had not replaced the shared edge, whose previous exact
+route set did not recognize the new `/api/auth/...` paths. Commit
+`57646288d3495dabbf03a7213d9d44747fe76818` (parent `ba1ad9ea...`) moved the
+canonical browser contract to exact `/api/v1/auth/...` paths already admitted
+by that boundary while retaining only exact legacy aliases in Next and the
+candidate Nginx config; it added no wildcard API proxy. Release marker
+`ebb02aae0cf463f430e9906d9d8c77e8e782379e` (parent `57646288...`) deployed
+that remediation.
+
+Remediation push CI run `30720283303` and PR CI run `30720285357` passed.
+Required jobs were browser `91422804242`, infrastructure `91422804248`,
+frontend `91422804253`, cross-stack `91422804257`, SQLite `91422804258`,
+PostgreSQL `91422804286`, aggregate `91423456961`, Django/Next/edge image
+builds `91423468896`/`91423468909`/`91423468918`, preflight `91423469160`,
+manifest `91423553352`, and deploy `91423571472`; reaction catalog sync was
+again skipped. Operation
+`deploy-30720283303-staging-ebb02aae0cf463f430e9906d9d8c77e8e782379e`
+used verified backup
+`/srv/kirillwynn/backups/staging/20260801T220744Z_ba1ad9ea3e24dc1a32b5ea6c47dc2df636267740_pre-migration_deploy-30720283303-staging-ebb02aae0cf463f430e9906d9d8c77e8e782379e.dump`.
+The audit and repeated catch-up were unchanged and clean.
+
+The active remediation images are Django
+`sha256:e7b6c9fb29dc222ebb954e1e78e9eb101de33bbb2bc5299077e15c83ba205088`
+and Next
+`sha256:1cf17b1eea3cf1c0d05808424f9ccfb6ab4668b6e430a36d7f76834cd4de55b5`.
+Candidate edge
+`sha256:36b0aee56079970f9bde4053377500794a2c3029011eb64998ccf1db84a29e24`
+was built and checked but, by the staging-only boundary, did not replace the
+shared edge. Release artifact `8824718001` has archive SHA-256
+`c61e13d155eb9e4fb1c6f8c92237dc000a526ff5a29ea05a3fe5da3cdd3e409c`
+and manifest JSON SHA-256
+`68e5d02cf0a255912ddd4a14c08617b6bf4b6a7ecbea8af0e64c7e4a550e0e5e`.
+Attestation artifact `8824741742` has archive SHA-256
+`518fdbb017b2d82b9766fe638e80d8a0e0c2e4f7cb5b24de50ee35a64c1d45e3`
+and JSON SHA-256
+`aad8147bea9563b8ceb9a3b68da0cef70f68888a5c54a8eb17950c6ce0c5f27a`;
+its schema-3 status and every recorded check are passed.
+
+Controlled live acceptance used an owner-approved Gmail plus-address and
+created the documented staging fixture `Stage 17 QA Verified`. Signup returned
+the generic enumeration-resistant response; a real verification message was
+delivered, its fragment entry rendered the expected success state, and local
+login/logout worked. The account page showed verified email, password and
+provider states. Initial nickname selection and a live rename succeeded; the
+second change was disabled until the displayed 30-day boundary. Password
+change retained the current session. After a later re-login, a new tab reused
+the database session. Real password-reset delivery plus fragment consumption
+ended with `Password reset. Other sessions are no longer valid.` Successful
+account credentials were not copied into documentation, application logs,
+screenshots, or browser storage. One discarded password from a failed
+pre-remediation signup attempt appeared in the local automation transcript;
+that request created no account, and the value was destroyed and never reused.
+
+Feed and post headers showed `Kirill Wynn` from the Wagtail owner. A controlled
+comment, reply/reply-to label, and post reaction all displayed the current QA
+nickname; the participant list displayed both `Kirill Wynn · Author` and the
+QA nickname. The reaction was removed, and both messages were deleted through
+the product UI. Their protected tombstones remain, so the QA account is
+retained as an explicit staging fixture instead of being hard-deleted.
+Anonymous comment and reaction intents each survived login, required an
+explicit `Comment` or `Confirm`, did not auto-submit, and were discarded
+afterward. No subscriber message, publication state, reaction asset, or
+existing user row was changed. Required viewport/theme, focus, overflow,
+hydration, console, credential, and secret checks also passed the
+post-remediation browser and cross-stack CI.
+
+Real provider linking and OAuth-only password set were not performed against
+the owner's existing Google/GitHub account because the controlled plus-address
+does not match either provider's verified identity and mutating the owner
+account was outside the live-QA boundary. The verified/unverified linking,
+provider ownership, repeated callback, profile completion, OAuth-only password
+set, inactive/banned, session invalidation, and `SocialToken`-absence matrices
+remain covered by the mandatory PostgreSQL, SQLite, cross-stack, and browser
+suites. Both staging deployment gates were restored to false after each
+rollout; production, `origin/main`, providers, reaction catalog/assets, Stage
+15 data, and real publications were not changed.
 
 ## Stage 15 editorial workflow and archive publications
 
@@ -1767,9 +1887,9 @@ button. Then proceed to Stage 17. Do not combine either task with Stage 15.
   - [x] Stage 16 — custom static/animated reaction catalog accepted on staging.
   - [x] Stage 16 remediation — remove three suggested reactions and retain one
     picker button; explicitly outside Stage 15.
-  - [ ] Stage 17 — expansion and compatibility releases accepted on staging;
-    activation candidate locally verified and awaiting required CI/staging
-    acceptance.
+  - [x] Stage 17 — expansion, compatibility, activation, exact-routing
+    remediation, required CI, attested staging rollout, and controlled live
+    account/email acceptance completed.
 
 ## Known risks
 
