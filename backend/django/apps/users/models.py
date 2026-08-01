@@ -26,9 +26,11 @@ class User(AbstractUser):
         unique=True,
         editable=False,
     )
-    nickname_confirmed = models.BooleanField(default=False)
+    # Persistent database defaults are part of the expand/activate contract:
+    # an older Django digest does not name these columns in INSERT statements.
+    nickname_confirmed = models.BooleanField(default=False, db_default=False)
     nickname_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
-    auth_state_version = models.PositiveIntegerField(default=1, editable=False)
+    auth_state_version = models.PositiveIntegerField(default=1, db_default=1, editable=False)
     is_banned = models.BooleanField(
         default=False,
         help_text="Banned users keep historical content but cannot create or change public data.",
