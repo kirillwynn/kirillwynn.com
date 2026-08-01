@@ -170,6 +170,10 @@ test("real local signup and password login keep one canonical nickname identity"
 }, testInfo) => {
     test.slow();
     const email = `local-stage17-${String(testInfo.retry)}@example.test`;
+    const nickname =
+        testInfo.retry === 0
+            ? "Local Cross Stack Reader"
+            : `Local Cross Stack Reader ${String(testInfo.retry)}`;
     const firstPassword = "Cross-stack local password 42!";
     const changedPassword = "Cross-stack changed password 84!";
     const resetPassword = "Cross-stack reset password 126!";
@@ -177,7 +181,7 @@ test("real local signup and password login keep one canonical nickname identity"
     page.on("request", (request) => leakedRequests.push(request.url()));
     await page.goto("/signup?next=%2Fposts%2Fcross-stack-systems");
     await page.getByLabel("Email").fill(email.toLocaleUpperCase());
-    await page.getByLabel("Public nickname").fill("Local Cross Stack Reader");
+    await page.getByLabel("Public nickname").fill(nickname);
     await page.getByLabel("Password", { exact: true }).fill(firstPassword);
     await page.getByLabel("Confirm password").fill(firstPassword);
     await page.getByRole("button", { name: "Create account" }).click();
@@ -199,9 +203,7 @@ test("real local signup and password login keep one canonical nickname identity"
     await page.getByLabel("Password").fill(firstPassword);
     await page.getByRole("button", { name: "Login with email" }).click();
     await expect(page).toHaveURL(/\/posts\/cross-stack-systems$/);
-    await expect(
-        page.getByRole("button", { name: "Local Cross Stack Reader" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: nickname })).toBeVisible();
     await expect(
         page
             .locator("#main-content article")
@@ -216,16 +218,14 @@ test("real local signup and password login keep one canonical nickname identity"
     expect(me).toMatchObject({
         authenticated: true,
         user: {
-            nickname: "Local Cross Stack Reader",
+            nickname,
             email_verified: true,
             profile_complete: true,
             has_usable_password: true,
         },
     });
     await page.reload();
-    await expect(
-        page.getByRole("button", { name: "Local Cross Stack Reader" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: nickname })).toBeVisible();
 
     await page.goto("/account");
     await page.getByRole("link", { name: "Change password" }).click();
@@ -241,6 +241,9 @@ test("real local signup and password login keep one canonical nickname identity"
 
     await page.goto("/account");
     await page.getByRole("button", { name: "Logout" }).click();
+    await expect(
+        page.getByRole("link", { name: "Login", exact: true }),
+    ).toBeVisible();
     await page.goto("/account/password/reset");
     await page.getByLabel("Email").fill(email);
     await page.getByRole("button", { name: "Send reset email" }).click();
@@ -263,9 +266,7 @@ test("real local signup and password login keep one canonical nickname identity"
     await page.getByLabel("Password").fill(resetPassword);
     await page.getByRole("button", { name: "Login with email" }).click();
     await expect(page).toHaveURL("/");
-    await expect(
-        page.getByRole("button", { name: "Local Cross Stack Reader" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: nickname })).toBeVisible();
     expect(
         leakedRequests.some(
             (url) => url.includes(verification) || url.includes(reset),
@@ -293,7 +294,7 @@ test("real local signup and password login keep one canonical nickname identity"
         ),
     ).toBe(true);
     expect(authState("status", email)).toMatchObject({
-        nickname: "Local Cross Stack Reader",
+        nickname,
         email_verified: true,
         profile_complete: true,
         has_usable_password: true,
