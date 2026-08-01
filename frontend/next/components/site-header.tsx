@@ -5,7 +5,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { safeReturnTo } from "@/lib/auth";
+import { authApiPaths, safeReturnTo } from "@/lib/auth";
 
 export function SiteHeader() {
     const { me, refresh, status } = useAuth();
@@ -55,7 +55,7 @@ export function SiteHeader() {
         }
         setLoggingOut(true);
         try {
-            const response = await fetch("/api/auth/logout/", {
+            const response = await fetch(authApiPaths.logout, {
                 method: "POST",
                 credentials: "same-origin",
                 headers: {

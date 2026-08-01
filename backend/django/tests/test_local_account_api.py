@@ -6,6 +6,7 @@ from allauth.account.models import EmailAddress
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
+from django.urls import resolve
 from django.utils import timezone
 
 from apps.subscriptions.models import Subscriber
@@ -1021,11 +1022,34 @@ def test_cross_origin_and_referer_are_rejected_for_login_and_password_change():
     assert_private(change)
 
 
-def test_unknown_auth_api_is_an_ordinary_404():
+@pytest.mark.parametrize("prefix", ["/api/auth/", "/api/v1/auth/"])
+def test_unknown_auth_api_is_an_ordinary_404(prefix):
     response = Client().post(
-        "/api/auth/not-a-real-route/",
+        f"{prefix}not-a-real-route/",
         data=b"{}",
         content_type="application/json",
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        "logout/",
+        "signup/",
+        "login/",
+        "verify-email/",
+        "verify-email/resend/",
+        "password/reset/",
+        "password/reset/confirm/",
+        "password/set/",
+        "password/change/",
+        "profile/",
+    ],
+)
+def test_versioned_auth_routes_preserve_the_legacy_view_contract(suffix):
+    legacy = resolve(f"/api/auth/{suffix}")
+    versioned = resolve(f"/api/v1/auth/{suffix}")
+
+    assert versioned.func.view_class is legacy.func.view_class

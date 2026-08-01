@@ -332,7 +332,7 @@ createServer(async (request, response) => {
         });
         return;
     }
-    if (path === "/api/auth/logout/" && request.method === "POST") {
+    if (path === "/api/v1/auth/logout/" && request.method === "POST") {
         if (!csrfProtected(request)) {
             json(response, 403, { detail: "CSRF failed" });
             return;
@@ -347,7 +347,7 @@ createServer(async (request, response) => {
         response.end();
         return;
     }
-    if (path === "/api/auth/signup/" && request.method === "POST") {
+    if (path === "/api/v1/auth/signup/" && request.method === "POST") {
         if (!csrfProtected(request)) {
             json(response, 403, { detail: "CSRF failed" });
             return;
@@ -366,7 +366,7 @@ createServer(async (request, response) => {
         });
         return;
     }
-    if (path === "/api/auth/verify-email/" && request.method === "POST") {
+    if (path === "/api/v1/auth/verify-email/" && request.method === "POST") {
         if (!csrfProtected(request)) {
             json(response, 403, { detail: "CSRF failed" });
             return;
@@ -384,7 +384,7 @@ createServer(async (request, response) => {
         return;
     }
     if (
-        path === "/api/auth/verify-email/resend/" &&
+        path === "/api/v1/auth/verify-email/resend/" &&
         request.method === "POST"
     ) {
         json(response, csrfProtected(request) ? 202 : 403, {
@@ -394,7 +394,7 @@ createServer(async (request, response) => {
         });
         return;
     }
-    if (path === "/api/auth/login/" && request.method === "POST") {
+    if (path === "/api/v1/auth/login/" && request.method === "POST") {
         if (!csrfProtected(request)) {
             json(response, 403, { detail: "CSRF failed" });
             return;
@@ -424,7 +424,7 @@ createServer(async (request, response) => {
         );
         return;
     }
-    if (path === "/api/auth/password/reset/" && request.method === "POST") {
+    if (path === "/api/v1/auth/password/reset/" && request.method === "POST") {
         json(response, csrfProtected(request) ? 202 : 403, {
             detail: csrfProtected(request)
                 ? "If the account is eligible, an email will be sent."
@@ -433,7 +433,7 @@ createServer(async (request, response) => {
         return;
     }
     if (
-        path === "/api/auth/password/reset/confirm/" &&
+        path === "/api/v1/auth/password/reset/confirm/" &&
         request.method === "POST"
     ) {
         if (!csrfProtected(request)) {
@@ -452,7 +452,7 @@ createServer(async (request, response) => {
         json(response, 200, { status: "password_reset" });
         return;
     }
-    if (path === "/api/auth/password/set/" && request.method === "POST") {
+    if (path === "/api/v1/auth/password/set/" && request.method === "POST") {
         if (!csrfProtected(request) || !isAuthenticated(request)) {
             json(response, 403, { detail: "Unavailable" });
             return;
@@ -466,7 +466,7 @@ createServer(async (request, response) => {
         });
         return;
     }
-    if (path === "/api/auth/password/change/" && request.method === "POST") {
+    if (path === "/api/v1/auth/password/change/" && request.method === "POST") {
         if (!csrfProtected(request) || !isAuthenticated(request)) {
             json(response, 403, { detail: "Unavailable" });
             return;
@@ -494,7 +494,7 @@ createServer(async (request, response) => {
         });
         return;
     }
-    if (path === "/api/auth/profile/" && request.method === "PATCH") {
+    if (path === "/api/v1/auth/profile/" && request.method === "PATCH") {
         if (!csrfProtected(request) || !isAuthenticated(request)) {
             json(response, 403, { detail: "Unavailable" });
             return;

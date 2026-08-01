@@ -57,10 +57,11 @@ use different GitHub applications. Keep local credentials separate from both
 deployed environments when a live local consent flow is needed.
 
 For local development, begin at `http://localhost:3000/login`. Next.js has
-fixed rewrites for `/accounts/*`, `/api/me/`, logout, and each documented local
-account mutation. Nginx has the same explicit location list. Neither layer has
-a general `/api/*` or `/api/auth/*` proxy. The Django trusted origins must
-include `http://localhost:3000`.
+fixed rewrites for `/accounts/*`, `/api/me/`, and each canonical
+`/api/v1/auth/*` local-account mutation; exact `/api/auth/*` aliases remain for
+application rollback. Nginx has the same explicit location lists. Neither
+layer has a general `/api/*`, `/api/auth/*`, or `/api/v1/auth/*` proxy. The
+Django trusted origins must include `http://localhost:3000`.
 
 ## Provider permissions
 

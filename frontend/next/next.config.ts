@@ -82,6 +82,46 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/auth/profile/`,
             },
             {
+                source: "/api/v1/auth/logout/",
+                destination: `${django}/api/v1/auth/logout/`,
+            },
+            {
+                source: "/api/v1/auth/signup/",
+                destination: `${django}/api/v1/auth/signup/`,
+            },
+            {
+                source: "/api/v1/auth/login/",
+                destination: `${django}/api/v1/auth/login/`,
+            },
+            {
+                source: "/api/v1/auth/verify-email/",
+                destination: `${django}/api/v1/auth/verify-email/`,
+            },
+            {
+                source: "/api/v1/auth/verify-email/resend/",
+                destination: `${django}/api/v1/auth/verify-email/resend/`,
+            },
+            {
+                source: "/api/v1/auth/password/reset/",
+                destination: `${django}/api/v1/auth/password/reset/`,
+            },
+            {
+                source: "/api/v1/auth/password/reset/confirm/",
+                destination: `${django}/api/v1/auth/password/reset/confirm/`,
+            },
+            {
+                source: "/api/v1/auth/password/set/",
+                destination: `${django}/api/v1/auth/password/set/`,
+            },
+            {
+                source: "/api/v1/auth/password/change/",
+                destination: `${django}/api/v1/auth/password/change/`,
+            },
+            {
+                source: "/api/v1/auth/profile/",
+                destination: `${django}/api/v1/auth/profile/`,
+            },
+            {
                 source: "/api/v1/subscriptions/",
                 destination: `${django}/api/v1/subscriptions/`,
             },

@@ -30,16 +30,16 @@ export type MeResponse = {
 };
 
 export const authApiPaths = {
-    signup: "/api/auth/signup/",
-    login: "/api/auth/login/",
-    verifyEmail: "/api/auth/verify-email/",
-    resendVerification: "/api/auth/verify-email/resend/",
-    passwordReset: "/api/auth/password/reset/",
-    passwordResetConfirm: "/api/auth/password/reset/confirm/",
-    passwordSet: "/api/auth/password/set/",
-    passwordChange: "/api/auth/password/change/",
-    profile: "/api/auth/profile/",
-    logout: "/api/auth/logout/",
+    signup: "/api/v1/auth/signup/",
+    login: "/api/v1/auth/login/",
+    verifyEmail: "/api/v1/auth/verify-email/",
+    resendVerification: "/api/v1/auth/verify-email/resend/",
+    passwordReset: "/api/v1/auth/password/reset/",
+    passwordResetConfirm: "/api/v1/auth/password/reset/confirm/",
+    passwordSet: "/api/v1/auth/password/set/",
+    passwordChange: "/api/v1/auth/password/change/",
+    profile: "/api/v1/auth/profile/",
+    logout: "/api/v1/auth/logout/",
 } as const;
 
 export type AuthApiPath = (typeof authApiPaths)[keyof typeof authApiPaths];

@@ -113,7 +113,7 @@ The implemented rewrite is available under `backend/django/`,
 - private immutable Draft Mode rendering and HMAC revalidation;
 - classic Google/GitHub OAuth through django-allauth 65.18.0;
 - Django database-backed sessions, same-origin cookies, and standard CSRF;
-- `/api/me/`, CSRF-protected `POST /api/auth/logout/`, `/login`, `/account`,
+- `/api/me/`, CSRF-protected `POST /api/v1/auth/logout/`, `/login`, `/account`,
   and the authenticated header menu;
 - plain-text post comments and one-level Slack-style threads with cursor
   pagination, soft deletion, moderation tombstones, protected identities, and
@@ -255,16 +255,21 @@ Subscription routes:
 
 Local account routes (all exact, JSON-only mutation paths):
 
-- `POST /api/auth/signup/`;
-- `POST /api/auth/login/`;
-- `POST /api/auth/verify-email/` and
-  `POST /api/auth/verify-email/resend/`;
-- `POST /api/auth/password/reset/` and
-  `POST /api/auth/password/reset/confirm/`;
-- `POST /api/auth/password/set/` and
-  `POST /api/auth/password/change/`;
-- `PATCH /api/auth/profile/`;
-- `POST /api/auth/logout/`.
+- `POST /api/v1/auth/signup/`;
+- `POST /api/v1/auth/login/`;
+- `POST /api/v1/auth/verify-email/` and
+  `POST /api/v1/auth/verify-email/resend/`;
+- `POST /api/v1/auth/password/reset/` and
+  `POST /api/v1/auth/password/reset/confirm/`;
+- `POST /api/v1/auth/password/set/` and
+  `POST /api/v1/auth/password/change/`;
+- `PATCH /api/v1/auth/profile/`;
+- `POST /api/v1/auth/logout/`.
+
+The browser uses the versioned paths so a staging-only application rollout can
+traverse the already-active shared `/api/v1/` boundary without replacing the
+shared edge. Exact legacy `/api/auth/` aliases remain for application rollback;
+neither namespace has a wildcard auth proxy.
 
 Comment mutations use Django sessions, normal CSRF, and the per-user fixed
 windows configured by the four `COMMENT_*_RATE_LIMIT_*` environment values.

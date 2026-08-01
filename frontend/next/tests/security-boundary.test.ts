@@ -104,6 +104,7 @@ describe("server-only security boundary", () => {
 
     it("uses only fixed same-origin auth rewrites and preserves Django slashes", () => {
         const config = source("next.config.ts");
+        const authClient = source("lib/auth.ts");
 
         expect(config).toContain("skipTrailingSlashRedirect: true");
         expect(config).toContain('source: "/accounts/:path*/"');
@@ -121,7 +122,10 @@ describe("server-only security boundary", () => {
             "profile",
         ]) {
             expect(config).toContain(`source: "/api/auth/${route}/"`);
+            expect(config).toContain(`source: "/api/v1/auth/${route}/"`);
+            expect(authClient).toContain(`/api/v1/auth/${route}/`);
         }
+        expect(authClient).not.toContain('"/api/auth/');
         expect(config).toContain('source: "/api/v1/subscriptions/"');
         expect(config).toContain('source: "/api/v1/subscriptions/confirm/"');
         expect(config).toContain(
@@ -157,6 +161,7 @@ describe("server-only security boundary", () => {
         expect(config).not.toContain("NEXT_PUBLIC_");
         expect(config).not.toContain('source: "/api/:path*"');
         expect(config).not.toContain('source: "/api/auth/:path*"');
+        expect(config).not.toContain('source: "/api/v1/auth/:path*"');
     });
 
     it("keeps the rollback config route out of the new browser reaction client", () => {

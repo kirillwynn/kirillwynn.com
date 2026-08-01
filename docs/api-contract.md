@@ -309,8 +309,10 @@ The following are the only local account API paths. They accept a bounded JSON
 object (`Content-Type: application/json`, default maximum 16 KiB), reject
 unknown fields, use `SessionAuthentication`, and require normal same-origin
 Django CSRF even before authentication. Every success and error response is
-`private, no-store` with `Vary: Cookie`. Unknown `/api/auth/*` paths are normal
-404s; there is no wildcard API proxy.
+`private, no-store` with `Vary: Cookie`. The canonical browser namespace is
+`/api/v1/auth/`. Exact `/api/auth/` aliases remain only for application
+rollback compatibility. Unknown paths in either auth namespace are normal
+404s; there is no wildcard auth proxy.
 
 Database-backed, HMAC-keyed fixed-window rate limits cover canonical email,
 client IP, and authenticated-user scopes across processes and containers;
@@ -328,7 +330,7 @@ complete windows, bounding cleanup work while preventing indefinite history
 growth. Public credential fields remain disabled until `/api/me/` has supplied
 the masked CSRF token, so input cannot be lost during hydration.
 
-#### `POST /api/auth/signup/`
+#### `POST /api/v1/auth/signup/`
 
 Accepts exactly:
 
@@ -349,7 +351,7 @@ cannot be combined with a claimed nickname to enumerate accounts. Signup does
 not create a session and the primary `EmailAddress` remains unverified until a
 credential is consumed.
 
-#### `POST /api/auth/login/`
+#### `POST /api/v1/auth/login/`
 
 Accepts `email`, `password`, and optional `next`. Wrong password, unknown email,
 inactive account, and banned account return the same generic 400. A successful
@@ -368,10 +370,10 @@ The public return-to allowlist itself is not expanded: only `/`, `/bridge`,
 
 #### Email verification
 
-- `POST /api/auth/verify-email/resend/` accepts exactly `{"email":"..."}`
+- `POST /api/v1/auth/verify-email/resend/` accepts exactly `{"email":"..."}`
   and always returns the same 202 response for eligible, unknown, already
   verified, inactive, or banned accounts.
-- `POST /api/auth/verify-email/` accepts exactly `{"credential":"..."}`.
+- `POST /api/v1/auth/verify-email/` accepts exactly `{"credential":"..."}`.
   Success is `{"status":"verified"}`. Stable credential states are invalid
   (400), used (409), expired (410), and unavailable (403).
 
@@ -383,21 +385,21 @@ POST body after the frontend has synchronously removed the fragment with
 
 #### Password reset, set, and change
 
-- `POST /api/auth/password/reset/` accepts exactly `{"email":"..."}` and
+- `POST /api/v1/auth/password/reset/` accepts exactly `{"email":"..."}` and
   returns the same 202 response for known and unknown addresses. Only an
   active, non-banned account with a matching verified primary address gets a
   one-hour reset credential.
-- `POST /api/auth/password/reset/confirm/` accepts `credential`, `password`,
+- `POST /api/v1/auth/password/reset/confirm/` accepts `credential`, `password`,
   and `password_confirmation`. Success invalidates all old sessions and returns
   `{"status":"password_reset"}`. Consumption locks the user before the
   credential/allauth rows and rechecks that the bound canonical address is
   still the unique verified primary identity.
-- `POST /api/auth/password/set/` accepts `password` and
+- `POST /api/v1/auth/password/set/` accepts `password` and
   `password_confirmation` for an authenticated OAuth-only account with a
   connected Google or GitHub provider and matching verified primary email. An
   arbitrary `SocialAccount.provider` row is not sufficient. It keeps OAuth
   connections and the current session.
-- `POST /api/auth/password/change/` additionally requires
+- `POST /api/v1/auth/password/change/` additionally requires
   `current_password`. It changes an existing usable password, invalidates other
   sessions, and preserves the current session through Django's session-auth
   hash update.
@@ -406,7 +408,7 @@ Password or relevant account-state changes revoke outstanding credentials.
 Credential success clears sensitive component state; no password or credential
 uses `localStorage`, `sessionStorage`, a query string, or a response payload.
 
-#### `PATCH /api/auth/profile/`
+#### `PATCH /api/v1/auth/profile/`
 
 Accepts exactly `{"nickname":"..."}` for an authenticated, active, non-banned
 account. Initial OAuth profile completion has no cooldown. Later user changes
@@ -414,7 +416,7 @@ are limited to one every 30 days; a rejection and `/api/me/` expose the exact
 next allowed timestamp. Current and historical nickname keys are protected by
 database uniqueness, so concurrent signup or rename cannot recycle a claim.
 
-### `POST /api/auth/logout/`
+### `POST /api/v1/auth/logout/`
 
 Logout accepts only POST with `Content-Type: application/json` and the exact
 empty object `{}`. For an authenticated session,

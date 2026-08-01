@@ -272,7 +272,7 @@ describe("header auth behavior", () => {
         await flushEffects();
 
         const logoutCall = vi.mocked(fetch).mock.calls[1];
-        expect(logoutCall[0]).toBe("/api/auth/logout/");
+        expect(logoutCall[0]).toBe("/api/v1/auth/logout/");
         const logoutOptions = logoutCall[1] as RequestInit;
         expect(logoutOptions.method).toBe("POST");
         expect(logoutOptions.credentials).toBe("same-origin");

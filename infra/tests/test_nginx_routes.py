@@ -1,6 +1,21 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+AUTH_SUFFIXES = (
+    "logout/",
+    "signup/",
+    "login/",
+    "verify-email/",
+    "verify-email/resend/",
+    "password/reset/",
+    "password/reset/confirm/",
+    "password/set/",
+    "password/change/",
+    "profile/",
+)
+AUTH_ROUTES = tuple(f"/api/auth/{suffix}" for suffix in AUTH_SUFFIXES) + tuple(
+    f"/api/v1/auth/{suffix}" for suffix in AUTH_SUFFIXES
+)
 
 
 def config(name):
@@ -15,6 +30,10 @@ def test_exact_frontend_api_exceptions_precede_django_api_prefixes():
         assert contents.index("location = /api/revalidate") < contents.index(
             "location ^~ /api/v1/"
         )
+        for suffix in AUTH_SUFFIXES:
+            assert contents.index(
+                f"location = /api/v1/auth/{suffix}"
+            ) < contents.index("location ^~ /api/v1/")
 
 
 def test_django_and_static_routes_are_explicit():
@@ -24,16 +43,7 @@ def test_django_and_static_routes_are_explicit():
             "/api/health/",
             "/api/readiness/",
             "/api/me/",
-            "/api/auth/logout/",
-            "/api/auth/signup/",
-            "/api/auth/login/",
-            "/api/auth/verify-email/",
-            "/api/auth/verify-email/resend/",
-            "/api/auth/password/reset/",
-            "/api/auth/password/reset/confirm/",
-            "/api/auth/password/set/",
-            "/api/auth/password/change/",
-            "/api/auth/profile/",
+            *AUTH_ROUTES,
         ):
             assert f"location = {route} " in contents
         for prefix in (
@@ -48,26 +58,15 @@ def test_django_and_static_routes_are_explicit():
         assert "proxy_pass http://" in contents
         assert "location ^~ /api/" in contents
         assert "location ^~ /api/auth/" not in contents
+        assert "location ^~ /api/v1/auth/" not in contents
         assert "location ^~ /media/" in contents
         assert "return 404;" in contents
 
 
 def test_account_mutations_have_bounded_json_edge_errors():
-    routes = (
-        "/api/auth/logout/",
-        "/api/auth/signup/",
-        "/api/auth/login/",
-        "/api/auth/verify-email/",
-        "/api/auth/verify-email/resend/",
-        "/api/auth/password/reset/",
-        "/api/auth/password/reset/confirm/",
-        "/api/auth/password/set/",
-        "/api/auth/password/change/",
-        "/api/auth/profile/",
-    )
     for name in ("production.conf", "staging.conf"):
         contents = config(name)
-        for route in routes:
+        for route in AUTH_ROUTES:
             block = contents[contents.index(f"location = {route} ") :]
             block = block[: block.index("\n    }")]
             assert "client_max_body_size 16k;" in block

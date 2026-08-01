@@ -43,6 +43,14 @@ urlpatterns = [
         local_account_surface_disabled,
     ),
     path("accounts/", include("allauth.urls")),
+    # The versioned Stage 17 account API is canonical for browser clients.
+    # Keeping the legacy /api/auth/ include in apps.core preserves rollback
+    # compatibility, while /api/v1/ traverses the already-active staging edge
+    # boundary without broadening it with a generic auth proxy.
+    path(
+        "api/v1/auth/",
+        include("apps.users.api.urls", namespace="users_api_v1"),
+    ),
     path("api/v1/", include("apps.subscriptions.api.urls")),
     path("api/v1/", include("apps.discussions.api.urls")),
     path("api/v1/", include("apps.blog.api.urls")),

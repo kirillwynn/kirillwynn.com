@@ -327,13 +327,14 @@ rehearsal, and separate approval.
 Next owns `/`, `/posts/*`, `/bridge`, account/subscription UI, `/_next/*`, and
 exact `/api/draft`, `/api/draft/disable`, `/api/revalidate`. Django owns
 health/readiness/session endpoints, `/api/v1/*`, `/accounts/*`, `/cms/*`, and
-`/django-admin/*`. The only account API routes forwarded to Django are exact
-`/api/me/`, `/api/auth/logout/`, `/api/auth/signup/`, `/api/auth/login/`,
-`/api/auth/verify-email/`, `/api/auth/verify-email/resend/`,
-`/api/auth/password/reset/`, `/api/auth/password/reset/confirm/`,
-`/api/auth/password/set/`, `/api/auth/password/change/`, and
-`/api/auth/profile/`. `/media/documents/*` redirects through Django/S3; other
-`/media/*`, unknown `/api/*`, and unknown `/api/auth/*` return 404. Staging
+`/django-admin/*`. Canonical browser account mutations use the exact
+`/api/v1/auth/{logout,signup,login,verify-email,verify-email/resend,password/reset,password/reset/confirm,password/set,password/change,profile}/`
+paths. Exact `/api/auth/` aliases remain for application rollback. There is no
+wildcard auth proxy. A staging-only application rollout deliberately does not
+replace the shared edge, so the canonical versioned paths traverse its existing
+`/api/v1/` boundary; every candidate edge still contains and verifies the exact
+locations and the 16 KiB pre-proxy limit. `/media/documents/*` redirects through
+Django/S3; other `/media/*` and unknown `/api/*` paths return 404. Staging
 Basic Auth excludes only ACME and the exact signed Resend webhook. Edge
 replaces, never appends, inbound forwarding headers.
 
