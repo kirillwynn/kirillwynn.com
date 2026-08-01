@@ -22,7 +22,7 @@ def public_blog_posts(*, at=None):
                 output_field=DateTimeField(),
             )
         )
-        .select_related("open_graph_image")
+        .select_related("open_graph_image", "owner")
         .prefetch_related("tags", "open_graph_image__renditions")
         .order_by("-_display_published_at_order", "-pk")
     )

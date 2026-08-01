@@ -327,7 +327,32 @@ rehearsal, and separate approval.
 Next owns `/`, `/posts/*`, `/bridge`, account/subscription UI, `/_next/*`, and
 exact `/api/draft`, `/api/draft/disable`, `/api/revalidate`. Django owns
 health/readiness/session endpoints, `/api/v1/*`, `/accounts/*`, `/cms/*`, and
-`/django-admin/*`. `/media/documents/*` redirects through Django/S3; other
-`/media/*` and unknown `/api/*` return 404. Staging Basic Auth excludes only
-ACME and the exact signed Resend webhook. Edge replaces, never appends, inbound
-forwarding headers.
+`/django-admin/*`. The only account API routes forwarded to Django are exact
+`/api/me/`, `/api/auth/logout/`, `/api/auth/signup/`, `/api/auth/login/`,
+`/api/auth/verify-email/`, `/api/auth/verify-email/resend/`,
+`/api/auth/password/reset/`, `/api/auth/password/reset/confirm/`,
+`/api/auth/password/set/`, `/api/auth/password/change/`, and
+`/api/auth/profile/`. `/media/documents/*` redirects through Django/S3; other
+`/media/*`, unknown `/api/*`, and unknown `/api/auth/*` return 404. Staging
+Basic Auth excludes only ACME and the exact signed Resend webhook. Edge
+replaces, never appends, inbound forwarding headers.
+
+Stage 17 activation runs the active expansion image's read-only
+`audit_stage17_identity` immediately before the first migration and retains its
+bounded baseline report in the operation log. After the activation catch-up,
+the rollout script automatically runs
+`audit_stage17_identity --require-activation-ready` before it marks migration
+complete or starts the candidate application. The report contains counts and
+bounded user/page IDs, never canonical email values or credentials. The
+ordinary pre-migration verified PostgreSQL backup remains mandatory. Local
+account APIs and Next routes are enabled only in the activation image; the
+expansion image has schema only, so a partial account flow cannot become
+externally reachable. A resumed operation repeats the catch-up and audit
+immediately before candidate startup. Immediately before that final catch-up,
+the rollout stops only the resolved active Django container, retaining its
+exact container ID for fail-safe restoration. The bounded write quiescence
+lasts through the activation-ready audit and candidate `up`; this removes the
+old-digest OAuth insert race instead of merely narrowing it. If catch-up or
+audit fails, the exact stopped Django and worker container IDs are restarted.
+Next, edge, PostgreSQL, backup state, and the rollback-compatible nullable
+schema remain available throughout.

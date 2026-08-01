@@ -3,6 +3,7 @@ from datetime import UTC
 from django.utils import timezone
 
 from apps.discussions.models import Comment
+from apps.users.services import can_interact, is_site_author, public_display_name
 
 
 def _timestamp(value):
@@ -12,15 +13,11 @@ def _timestamp(value):
     return localized.isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
-def _display_name(user):
-    return user.get_full_name().strip() or user.username
-
-
 def _author(user):
     return {
         "id": user.pk,
-        "display_name": _display_name(user),
-        "is_site_author": bool(user.is_staff or user.is_superuser),
+        "display_name": public_display_name(user),
+        "is_site_author": is_site_author(user),
     }
 
 
@@ -28,14 +25,10 @@ def serialize_reaction_participant(user):
     return _author(user)
 
 
-def _can_interact(user):
-    return bool(user.is_authenticated and user.is_active and not user.is_banned)
-
-
 def serialize_comment(comment, *, viewer, reactions=()):
     status = comment.public_status
     root = comment.thread_root if comment.thread_root_id else comment
-    can_interact = _can_interact(viewer)
+    viewer_can_interact = can_interact(viewer)
     owns_comment = bool(viewer.is_authenticated and comment.author_id == viewer.pk)
     thread_allows_replies = root.moderation_state != Comment.ModerationState.HIDDEN
     return {
@@ -48,7 +41,7 @@ def serialize_comment(comment, *, viewer, reactions=()):
         "reply_to": (
             {
                 "id": comment.reply_to_user.pk,
-                "display_name": _display_name(comment.reply_to_user),
+                "display_name": public_display_name(comment.reply_to_user),
             }
             if comment.reply_to_user_id
             else None
@@ -61,17 +54,17 @@ def serialize_comment(comment, *, viewer, reactions=()):
         "reactions": list(reactions) if status == "visible" else [],
         "viewer": {
             "can_edit": (
-                can_interact
+                viewer_can_interact
                 and owns_comment
                 and comment.deleted_at is None
                 and comment.moderation_state == Comment.ModerationState.VISIBLE
             ),
-            "can_delete": can_interact and owns_comment and comment.deleted_at is None,
+            "can_delete": (viewer_can_interact and owns_comment and comment.deleted_at is None),
             "can_reply": (
-                can_interact
+                viewer_can_interact
                 and thread_allows_replies
                 and comment.moderation_state != Comment.ModerationState.HIDDEN
             ),
-            "can_react": can_interact and status == "visible",
+            "can_react": viewer_can_interact and status == "visible",
         },
     }

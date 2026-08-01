@@ -25,7 +25,8 @@ local development stack.
 - `/` — searchable feed of published posts
 - `/posts/<slug>` — full post, reactions, comments, and Slack-style threads
 - `/bridge` — links to external profiles
-- Google and GitHub login
+- Local email/password accounts plus Google and GitHub login
+- Required unique public nicknames and verified-email interaction boundary
 - Wagtail desktop authoring with revisions, preview, and scheduling
 - Emoji reactions on posts, comments, and replies
 - Double-opt-in email subscription
@@ -52,6 +53,7 @@ Do not copy that note into the repository.
 - [ADR 0005: Isolated Compose deployment](docs/decisions/0005-isolated-compose-deployment.md)
 - [ADR 0006: Manifest-managed custom reaction catalog](docs/decisions/0006-manifest-managed-reaction-catalog.md)
 - [ADR 0007: Editorial dates and publication-email decisions](docs/decisions/0007-editorial-dates-and-publication-email-decision.md)
+- [ADR 0008: Local identity, nicknames, and auth email](docs/decisions/0008-local-identity-nicknames-and-auth-email.md)
 - [Reaction catalog asset runbook](docs/reaction-catalog-runbook.md)
 - [Email provider and DNS setup](docs/email-setup.md)
 - [Deployment and rollback](docs/deployment-runbook.md)
@@ -63,8 +65,8 @@ Do not copy that note into the repository.
 
 ## Current state
 
-Milestones 1–10 are available under `backend/django/`, `frontend/next/`, and
-`infra/`:
+The implemented rewrite is available under `backend/django/`,
+`frontend/next/`, and `infra/`:
 
 - Python 3.12.13;
 - Django 5.2.16 LTS;
@@ -128,6 +130,11 @@ Milestones 1–10 are available under `backend/django/`, `frontend/next/`, and
   sessionStorage-backed pending OAuth drafts;
 - verified-email provider linking without retained provider tokens, JWT,
   Auth.js, or browser-stored session tokens;
+- canonical email/password signup and login, mandatory email verification,
+  reset/set/change password flows, and OAuth profile completion;
+- permanent Unicode nickname claims with a 30-day change cooldown, one
+  authoritative public display helper, and Wagtail-owner post attribution;
+- a separate durable auth-email outbox whose provider I/O remains worker-only;
 - anonymous double-opt-in subscriptions with canonical case-insensitive email
   identity, versioned 48-hour confirmation credentials, revocable unsubscribe,
   and non-enumerating CSRF-protected APIs;
@@ -173,7 +180,9 @@ The Django container waits for PostgreSQL, applies migrations, and starts at
 
 - `http://localhost:8000/api/health/`
 - `http://localhost:3000/login`
+- `http://localhost:3000/signup`
 - `http://localhost:3000/account`
+- `http://localhost:3000/account/profile`
 - `http://localhost:8000/cms/`
 - `http://localhost:8000/django-admin/`
 
@@ -244,6 +253,19 @@ Subscription routes:
 - `POST /api/v1/subscriptions/unsubscribe/one-click/`;
 - `POST /api/v1/email/webhooks/resend/`.
 
+Local account routes (all exact, JSON-only mutation paths):
+
+- `POST /api/auth/signup/`;
+- `POST /api/auth/login/`;
+- `POST /api/auth/verify-email/` and
+  `POST /api/auth/verify-email/resend/`;
+- `POST /api/auth/password/reset/` and
+  `POST /api/auth/password/reset/confirm/`;
+- `POST /api/auth/password/set/` and
+  `POST /api/auth/password/change/`;
+- `PATCH /api/auth/profile/`;
+- `POST /api/auth/logout/`.
+
 Comment mutations use Django sessions, normal CSRF, and the per-user fixed
 windows configured by the four `COMMENT_*_RATE_LIMIT_*` environment values.
 Defaults are 10 creates/replies and 30 edits/deletes per 60 seconds. Comment
@@ -276,6 +298,13 @@ Process a bounded email batch:
 ```bash
 cd backend/django
 uv run python manage.py process_email_outbox --limit 25 --delivery-limit 100
+```
+
+Process the independent account-email outbox:
+
+```bash
+cd backend/django
+uv run python manage.py process_auth_email_outbox --limit 25
 ```
 
 Reconcile bounded early-arriving webhook state and retention:
@@ -333,8 +362,9 @@ The public frontend includes:
   history rows;
 - `/api/draft` and `/api/draft/disable`;
 - signed `POST /api/revalidate`;
-- `/login` and `/account` with Google/GitHub POST initiation and provider
-  connection state;
+- `/login`, `/signup`, `/account`, `/account/profile`, email verification,
+  password reset confirmation, password set, and password change, with local
+  forms plus Google/GitHub POST initiation and provider connection state;
 - client-side comments below public posts and a responsive Slack-style thread
   layer; comments are deliberately omitted from Draft Mode;
 - post, comment, and reply reactions with quick actions, local lazy picker,

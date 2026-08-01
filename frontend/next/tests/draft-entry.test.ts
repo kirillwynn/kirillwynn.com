@@ -14,6 +14,11 @@ function post(overrides: Partial<PostDetail> = {}): PostDetail {
         updated_at: null,
         original_published_at: null,
         display_published_at: null,
+        author: {
+            id: 1,
+            display_name: "Kirill Wynn",
+            is_site_author: true,
+        },
         tags: [],
         canonical_path: "/posts/bound-snapshot",
         canonical_url: "https://example.com/posts/bound-snapshot",

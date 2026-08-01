@@ -322,16 +322,48 @@ def test_rollout_order_health_gates_and_active_state_policy():
     deploy = (SCRIPTS / "deploy_environment.sh").read_text()
     attempt = deploy.index('python3 "$state_script" begin')
     backup = deploy.index('"$repository_root/infra/scripts/backup_postgres.sh"')
+    pre_identity_audit = deploy.index(
+        "python manage.py audit_stage17_identity\n",
+    )
     migrate = deploy.index("python manage.py migrate --noinput")
+    identity_audit = deploy.index(
+        "python manage.py audit_stage17_identity --require-activation-ready"
+    )
+    identity_catchup = deploy.index("python manage.py catchup_stage17_identity")
+    identity_quiesce = deploy.index("pause_identity_django\n")
+    migration_complete = deploy.index("checkpoint migration-completed")
     wait = deploy.index("--wait-timeout")
     healthy = deploy.index("checkpoint application-healthy")
-    assert attempt < backup < migrate < wait < healthy
+    assert (
+        attempt
+        < backup
+        < pre_identity_audit
+        < migrate
+        < identity_quiesce
+        < identity_catchup
+        < identity_audit
+        < migration_complete
+        < wait
+        < healthy
+    )
+    assert 'active_runtime=$(operation_field base_active.application.runtime_directory)' in deploy
+    assert deploy.count(
+        "python manage.py audit_stage17_identity --require-activation-ready"
+    ) == 2
+    assert deploy.count("python manage.py catchup_stage17_identity") == 2
+    assert deploy.count("pause_identity_django\n") == 2
+    assert "restore_identity_django" in deploy
+    assert 'docker start "$identity_django_container"' in deploy
+    assert 'docker start "$migration_worker_container"' in deploy
+    assert "start django" not in deploy
+    assert "start worker" not in deploy
+    assert wait < deploy.index("identity_django_paused=false", identity_catchup)
+    assert 'if [ "$identity_audited_now" != true ]; then' in deploy
     assert deploy.count("checkpoint migration-started") == 1
     assert deploy.count("checkpoint migration-completed") == 1
     assert "python manage.py migrate --plan" in deploy
     assert deploy.index("stop --timeout 60 worker") < migrate
     assert "restore_migration_worker" in deploy
-    assert "start worker" in deploy
     assert deploy.index("checkpoint application-healthy") < deploy.index(
         "migration_worker_paused=false", deploy.index("checkpoint application-healthy")
     )

@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-07-31
+Last updated: 2026-08-01
 
 Integration branch: `rewrite/wagtail-next`
 
@@ -40,6 +40,175 @@ config consumption are gone, one custom-picker trigger remains, and required
 CI, attested rollout, and controlled live Chrome acceptance passed. New-stack
 production deployment, production provider configuration, DNS changes, data
 migration, and promotion remain out of scope and unverified.
+
+Stage 17 identity expansion and its old-application compatibility proof are
+accepted on staging; the active release is
+`86f25980eed0391e4d4956987420d7da8b5b42ee`. Nullable canonical-email and
+nickname fields, permanent nickname history, purpose-bound credential state,
+the independent auth-email outbox, PostgreSQL rate buckets, and persistent
+legacy-insert defaults are live while local signup remains off. The activation
+application and catch-up migration are implemented and locally verified but
+are not yet active on staging; production remains absent.
+
+## Stage 17 local identity, nicknames, and authors
+
+Stage 17 began from clean, synchronized local/origin SHA
+`dffe656c751a0c22e8993b0c8550c53d8404ce11` on
+`rewrite/wagtail-next`, with active staging release
+`b4184f033ae3f2d562bc43a2b19c2b08b8a4f99a` and unchanged `origin/main`
+`1d02912430277cdf5465f856b158a6820bc12be4`. Repository instructions,
+architecture/API/OAuth/email/deployment sources, installed allauth 65.18.0
+extension points, and the private Obsidian checklist were audited before edits.
+
+The expansion history is additive and intact:
+
+- `6c2023a6e116b22ecfc0ded117b30353ec5a887a` (parent `dffe656...`)
+  adds the nullable schema and deterministic backfill;
+- `a6b165ea9e0d0e876d3e7031670a017b27a97525` bounds migration resources after
+  the first deployment was atomically killed before `users.0002` committed;
+- `d2729bb4d5c5372053d2abb1958bfccba0663121` is the successful fix-forward
+  release marker.
+
+Required expansion CI run `30693993434` passed frontend `91353557524`, browser
+`91353557546`, PostgreSQL `91353557600`, SQLite `91353558681`, infrastructure
+`91353558996`, cross-stack `91353559565`, aggregate gate `91354079926`, and
+deploy `91354191933`. Fix-forward operation
+`fix-forward-30693993434-staging-d2729bb4d5c5372053d2abb1958bfccba0663121`
+used verified backup
+`/srv/kirillwynn/backups/staging/20260801T094153Z_6c2023a6e116b22ecfc0ded117b30353ec5a887a_recovery_fix-forward-30693993434-staging-d2729bb4d5c5372053d2abb1958bfccba0663121.dump`.
+The staging report was one user, one confirmed nickname, zero incomplete
+profiles, zero nickname/email collisions, 13 public posts, two existing-owned
+posts, and 11 ownerless public posts awaiting the activation catch-up. No user
+ID, password hash, session, social identity, content relation, verification
+flag, staff flag, or ban state changed.
+
+Expansion images are Django
+`sha256:2703e16555be6542fa68f55ead82a4c3879b779129c58cbc5c4f07745807e163`,
+Next `sha256:665158f6c57069df9f96429d233e36c57ca2ce3c236cdbad1c39fe0bceffa98e`,
+and edge `sha256:592d5235f8b85e16a269a922615455d4bae810168683c3f6fb242c954fb14187`.
+Release artifact `8816690844` contains manifest SHA-256
+`974fc6a4d629975286f8adf9a6d62600e5772807d2fabab49bac5b5cd1ea0819`;
+attestation artifact `8816713965` contains JSON SHA-256
+`dfbcedefbfde8794b7c67135045b8af7c8a71306a72487c3bdc1d1152096da95`.
+
+Compatibility commits are
+`9ca1280ae0ba203baf13b73a4cfabb62b6dc63f6` (parent `d2729bb...`) for
+persistent legacy-insert defaults,
+`52d741d8bcf4ee1d1197b8bd8f5ab4129dffb1b6` (parent `9ca1280...`) for the
+historical-schema regression, and release marker
+`86f25980eed0391e4d4956987420d7da8b5b42ee` (parent `52d741d...`). Required CI
+run `30706799595` passed frontend `91387209740`, browser `91387209748`,
+infrastructure `91387209752`, PostgreSQL `91387209755`, SQLite `91387209763`,
+cross-stack `91387209831`, aggregate gate `91387700135`, image builds
+`91387708137`/`91387708138`/`91387708143`, preflight `91387708282`, manifest
+`91387871825`, and deploy `91387883941`. Operation
+`deploy-30706799595-staging-86f25980eed0391e4d4956987420d7da8b5b42ee`
+used verified backup
+`/srv/kirillwynn/backups/staging/20260801T155757Z_d2729bb4d5c5372053d2abb1958bfccba0663121_pre-migration_deploy-30706799595-staging-86f25980eed0391e4d4956987420d7da8b5b42ee.dump`.
+Compatibility images are Django
+`sha256:45a107d7d1642107daa46dc712c85e7bede7c8a0c13a2bd211b84ed947aeee54`,
+Next `sha256:84356a099f287cdddf504f059582b4184ecc65f06592ee51aa77a622b76c9ac7`,
+and edge `sha256:aba9e1f86dc54351ff748ba43dcd866d620f04edcc89f6128786a6ef65985552`.
+Release artifact `8820649559` contains JSON SHA-256
+`4f875ed8f867cfb36c6c5e0e65fe3ebb79b815d58e8dd019dfd18b1e94783951`;
+attestation artifact `8820670843` contains JSON SHA-256
+`9ab1ce53510d1ed3552a22a7542bc745b8423f841f46988c006ecb62e6c439e5`.
+
+The activation candidate adds canonical email/password signup and login,
+mandatory verification, reset/set/change password, OAuth profile completion,
+safe local/provider linking, permanent Unicode nickname claims with a 30-day
+change cooldown, one authoritative display helper, additive `/api/me/`, and
+Wagtail-owner author objects in list/detail/preview. Exact Next and Nginx routes
+cover only the nine new mutation paths. Credentials use one-time fragment
+entry and are never stored raw; web creates a dedicated bounded outbox event,
+while only the worker has the Resend send key and can perform provider I/O.
+Retries pin exact bytes/transport identity and stop at the provider idempotency
+window. Subscription and publication-email rows are disjoint.
+
+Django Admin and the custom Wagtail Users viewset enforce the same identity
+boundary. Wagtail creation writes canonical email, confirmed nickname, and its
+permanent history atomically; Wagtail editing cannot mutate email or nickname,
+and audited nickname overrides remain Django-Admin-only. Built-in Wagtail
+lock/workflow labels, choosers, user listing, and moderation display all resolve
+the authoritative nickname instead of legacy full name or internal username.
+
+The activation migration catches users created during the expansion window,
+validates every populated canonical email/nickname, and repairs every ownerless
+public or draft `BlogPostPage` only after resolving exactly one owner through
+configured email or the existing-owner-plus-unique-superuser proof. It fails
+closed on ambiguity, collisions, invalid values, null identities, ownerless
+public posts, or anything other than one site-author marker. Rollback clears
+only an unchanged catch-up identity and its migration claim; an account renamed
+after activation retains its current identity and both permanent claims across
+reverse/forward. Proven page ownership intentionally survives. Existing
+migrations were not edited.
+
+The security audit additionally removed process-local failed-login precedence,
+made PostgreSQL rate buckets authoritative, equalized signup responses even
+when a claimed nickname is supplied, rejected duplicate/non-finite malformed
+JSON, prevented public staff from bypassing reserved names, made existing Admin
+email immutable in this no-email-change stage, removed canonical email values
+from audit output, and bounded ambiguous auth-email retry at the provider
+idempotency window. Authenticated password set/change now share database-backed
+per-IP and per-user limits; CSRF failures on API paths are stable private JSON;
+activation-ready audit rejects missing permanent nickname claims and persisted
+`SocialToken` rows; a resumed deployment repeats that audit immediately before
+candidate startup; and pending comments/reactions remain bound to the original
+user namespace across a failed or changed login instead of crossing accounts.
+Verified-email OAuth linking now locks the target user and commits account
+state, verified address, and provider identity atomically. Credential HMAC keys
+are purpose-separated, stale workers cannot downgrade terminal auth-email
+deliveries, exact Nginx routes return a stable private JSON 413 before proxying
+oversized auth bodies, and database rate buckets prune a bounded batch older
+than two windows. Anonymous sensitive form inputs stay inert until the masked
+CSRF session has loaded, closing a pre-hydration input-loss race found by the
+five-viewport browser suite. Existing linked OAuth identities still require a
+currently provider-verified email on every login. Local incomplete-profile
+login uses a trusted response flag plus an independently allowlisted product
+destination, never an attacker-selected auth route. Unicode 15.0
+Default_Ignorable_Code_Point ranges, including variation selectors and Hangul
+fillers, are rejected in both backend and defensive frontend validation.
+Wagtail's separate public reset and self-service email-management routes are
+disabled so they cannot bypass fragment credentials, the durable outbox, or the
+no-email-change boundary; authenticated staff password change remains enabled.
+A provider takeover of an unverified local preregistration now destroys the
+untrusted password/sessions, including sessions derived from an already
+unusable hash, and also unconfirms its attacker-selected nickname, forcing
+explicit profile completion by the verified owner. OAuth persistence retains
+only the selected provider-verified canonical address; credential consumption
+uses the same normalization, locks User before credential/EmailAddress rows,
+and password reset rechecks the current verified primary address. Activated
+schema constraints retain the old digest's `NULL/false` insert shape while
+rejecting incoherent nickname state and more than one site author. Python
+Unicode data is pinned to 15.0.0 and activation fails closed on a runtime-data
+version mismatch. Staff nickname override cannot bypass the inactive/banned
+boundary; OAuth-only password set accepts only the configured Google/GitHub
+providers; the site-owner bootstrap requires the verified primary address,
+sets the unique author marker, and refuses to replace another marker. Allauth
+account notifications are explicitly disabled so the web role cannot fall back
+to synchronous email delivery.
+
+The rollout closes the last old-digest insert race by stopping only the active
+Django container for the bounded final catch-up → activation-ready audit →
+candidate-up interval. Its exact pre-rollout container ID is restored if the
+catch-up or audit fails; the worker has the same exact-container restoration
+boundary. This prevents an expansion/rollback OAuth insert from appearing
+after the final audit while keeping Next, edge, PostgreSQL, and the backup
+state intact.
+
+Local verification of the activation candidate passed: uv lock, Ruff format
+and lint, Django system/migration/production deploy checks, an empty migration
+chain plus activation reverse/forward, 704 SQLite tests with 14 PostgreSQL-only
+cases skipped, Prettier, ESLint, TypeScript, 197 Vitest cases, production Next
+build, runtime-origin and browser
+bundle scans, `npm audit` with zero vulnerabilities, 70 browser-contract cases
+across 320×812, 375×812, 768×1024, 1440×900, and 1920×1080, eight real-Django
+cross-stack cases (including real fragment verification, password change, and
+password reset), artifact sanitization, and 233 infrastructure tests. Local
+Docker/PostgreSQL are unavailable, so mandatory no-skip PostgreSQL concurrency,
+Compose/Nginx/container integration, immutable images, activation backup,
+staging audit, attestation, and controlled live email acceptance remain CI and
+staging rollout gates.
 
 ## Stage 15 editorial workflow and archive publications
 
@@ -1598,7 +1767,9 @@ button. Then proceed to Stage 17. Do not combine either task with Stage 15.
   - [x] Stage 16 — custom static/animated reaction catalog accepted on staging.
   - [x] Stage 16 remediation — remove three suggested reactions and retain one
     picker button; explicitly outside Stage 15.
-  - [ ] Stage 17 — begin only after the separate Stage 16 remediation.
+  - [ ] Stage 17 — expansion and compatibility releases accepted on staging;
+    activation candidate locally verified and awaiting required CI/staging
+    acceptance.
 
 ## Known risks
 

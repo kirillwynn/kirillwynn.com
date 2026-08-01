@@ -80,6 +80,11 @@ function postSummary(overrides: Partial<PostListItem> = {}): PostListItem {
         updated_at: "2026-07-29T12:00:00Z",
         original_published_at: null,
         display_published_at: "2026-07-29T12:00:00Z",
+        author: {
+            id: 1,
+            display_name: "Kirill Wynn",
+            is_site_author: true,
+        },
         tags: [{ name: "Notes", slug: "notes" }],
         canonical_path: "/posts/quiet-feed",
         canonical_url: "https://example.com/posts/quiet-feed",

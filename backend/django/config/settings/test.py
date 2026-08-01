@@ -33,6 +33,8 @@ WAGTAIL_HEADLESS_PREVIEW = {
 REVALIDATION_URL = ""
 REVALIDATION_SECRET = "test-revalidation-secret"
 SUBSCRIPTION_SIGNING_SECRET = "test-subscription-signing-secret-32-bytes"
+AUTH_CREDENTIAL_SIGNING_SECRET = "test-auth-credential-signing-secret-32-bytes"
+AUTH_RATE_LIMIT_SIGNING_SECRET = "test-auth-rate-limit-signing-secret-32-bytes"
 EMAIL_PROVIDER_ADAPTER = "apps.subscriptions.providers.memory.MemoryEmailProvider"
 RESEND_WEBHOOK_SECRET = "whsec_dGVzdC13ZWJob29rLXNlY3JldC0zMi1ieXRlcy0wMQ=="
 

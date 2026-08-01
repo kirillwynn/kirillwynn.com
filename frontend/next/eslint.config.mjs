@@ -3,7 +3,13 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
     {
-        ignores: [".next/**", "coverage/**", "next-env.d.ts"],
+        ignores: [
+            ".next/**",
+            "coverage/**",
+            "playwright-report/**",
+            "test-results/**",
+            "next-env.d.ts",
+        ],
     },
     eslint.configs.recommended,
     ...tseslint.configs.strictTypeChecked.map((config) => ({

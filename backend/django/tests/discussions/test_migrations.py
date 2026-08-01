@@ -4,13 +4,14 @@ from django.db.migrations.executor import MigrationExecutor
 
 from apps.discussions.models import CommentReaction, PostReaction
 from apps.discussions.services import create_top_level_comment
+from apps.users.models import NicknameHistory
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def test_discussions_migration_reverses_and_applies_from_zero():
     executor = MigrationExecutor(connection)
-    leaf = executor.loader.graph.leaf_nodes("discussions")
+    leaf = executor.loader.graph.leaf_nodes()
 
     executor.migrate([("discussions", None)])
     assert "discussions_comment" not in connection.introspection.table_names()
@@ -43,7 +44,11 @@ def test_reaction_catalog_expansion_preserves_populated_unicode_rows_forward_and
     legacy = ("discussions", "0002_reactionratelimitbucket_reactionsettings_and_more")
 
     executor = MigrationExecutor(connection)
-    leaf = executor.loader.graph.leaf_nodes("discussions")
+    leaf = executor.loader.graph.leaf_nodes()
+    # Rolling discussions below 0004 also rolls back the dependent Stage 17
+    # identity data migration. These current-schema fixture claims did not
+    # exist in that historical state, so remove them before exercising it.
+    NicknameHistory.objects.all().delete()
     try:
         executor.migrate([legacy])
         legacy_apps = executor.loader.project_state([legacy]).apps
@@ -114,7 +119,8 @@ def test_catalog_identity_activation_constraint_reverses_with_populated_rows(
     activation = ("discussions", "0004_activate_catalog_reaction_identity")
 
     executor = MigrationExecutor(connection)
-    leaf = executor.loader.graph.leaf_nodes("discussions")
+    leaf = executor.loader.graph.leaf_nodes()
+    NicknameHistory.objects.all().delete()
     try:
         executor.migrate([expansion])
         expanded_apps = executor.loader.project_state([expansion]).apps

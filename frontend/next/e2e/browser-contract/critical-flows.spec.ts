@@ -802,7 +802,14 @@ test("responsive shell, right header group, skip link, and universal team footer
         "/?page=0",
         "/posts/testing-secure-systems",
         "/login",
+        "/signup",
         "/account",
+        "/account/profile",
+        "/account/verify-email",
+        "/account/password/reset",
+        "/account/password/reset/confirm",
+        "/account/password/set",
+        "/account/password/change",
         "/subscriptions/confirm",
         "/subscriptions/unsubscribe",
         "/missing-footer-route",
@@ -992,7 +999,14 @@ test("theme follows the system, persists, and remains beside account", async ({
         "/bridge",
         "/posts/testing-secure-systems",
         "/login",
+        "/signup",
         "/account",
+        "/account/profile",
+        "/account/verify-email",
+        "/account/password/reset",
+        "/account/password/reset/confirm",
+        "/account/password/set",
+        "/account/password/change",
         "/subscriptions/confirm",
         "/subscriptions/unsubscribe",
         "/missing-theme-route",
@@ -1054,6 +1068,207 @@ test("mock Google and GitHub provider login keep the safe return route", async (
 
     await login(page, "GitHub");
     await expect(page).toHaveURL("/posts/testing-secure-systems");
+    await expectAccessible(page);
+});
+
+test("local signup, verification, login, nickname interaction, reset, and change", async ({
+    page,
+}) => {
+    test.slow();
+    const leakedRequests: string[] = [];
+    page.on("request", (request) => leakedRequests.push(request.url()));
+
+    await page.goto("/posts/testing-secure-systems");
+    await expect(
+        page.getByText("by Site Author", { exact: true }),
+    ).toBeVisible();
+    const postGroup = page.getByRole("group", { name: "Reactions" }).first();
+    await postGroup.getByRole("button", { name: "Choose reaction" }).click();
+    await page
+        .getByRole("dialog", { name: "Choose a reaction" })
+        .getByRole("button", { name: "React with Clapping" })
+        .press("Enter");
+    const pending = page.locator(".reaction-notice");
+    await expect(pending).toContainText(
+        "Sign in to add your Pepe clap reaction",
+    );
+    await pending.getByRole("link", { name: "Login" }).click();
+    await page.getByRole("link", { name: "Create an account" }).click();
+
+    const email = "stage17-reader@example.test";
+    const firstPassword = "Stage17 browser passphrase 42!";
+    const changedPassword = "Stage17 changed passphrase 84!";
+    const resetPassword = "Stage17 reset passphrase 126!";
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Public nickname").fill("Stage Reader");
+    await page.getByLabel("Password", { exact: true }).fill(firstPassword);
+    await page.getByLabel("Confirm password").fill(firstPassword);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(
+        page.getByText(/If the address can be registered/),
+    ).toBeVisible();
+
+    await page.goto("/account/verify-email#credential=e2e-verification");
+    await expect(page).toHaveURL(/\/account\/verify-email$/);
+    await expect(page.getByText(/Email verified/)).toBeVisible();
+    expect(
+        leakedRequests.some((request) => request.includes("e2e-verification")),
+    ).toBe(false);
+
+    await page.goto("/login?next=%2Fposts%2Ftesting-secure-systems");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(firstPassword);
+    await page.getByRole("button", { name: "Login with email" }).click();
+    await expect(page).toHaveURL(/\/posts\/testing-secure-systems$/);
+    await expect(
+        page.getByRole("button", { name: "Stage Reader" }),
+    ).toBeVisible();
+    await expect(page.locator(".reaction-notice")).toContainText(
+        "Add your saved Pepe clap reaction?",
+    );
+    await expect(
+        postGroup.getByRole("button", {
+            name: "View 1 participant for Clapping",
+        }),
+    ).toBeVisible();
+    await page
+        .locator(".reaction-notice")
+        .getByRole("button", { name: "Confirm" })
+        .click();
+    const participants = postGroup.getByRole("button", {
+        name: "View 2 participants for Clapping",
+    });
+    await expect(participants).toBeVisible();
+    await participants.click();
+    await expect(
+        page
+            .getByRole("dialog", { name: "Clapping reaction participants" })
+            .getByText("Stage Reader", { exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page
+        .getByPlaceholder("Write a plain-text comment")
+        .fill("Nickname-backed browser comment.");
+    await page.getByRole("button", { name: "Comment", exact: true }).click();
+    const createdComment = page
+        .locator("article[data-comment-id]")
+        .filter({ hasText: "Nickname-backed browser comment." });
+    await expect(createdComment).toContainText("Stage Reader");
+
+    await page.goto("/account");
+    await expect(
+        page.getByText("stage17-reader@example.test · Verified"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(page.getByText("GitHubConnected")).toBeVisible();
+
+    await page.getByRole("link", { name: "Change password" }).click();
+    await page.getByLabel("Current password").fill(firstPassword);
+    await page
+        .getByLabel("New password", { exact: true })
+        .fill(changedPassword);
+    await page.getByLabel("Confirm new password").fill(changedPassword);
+    await page.getByRole("button", { name: "Change password" }).click();
+    await expect(
+        page.getByText("Password changed.", { exact: false }),
+    ).toBeVisible();
+
+    await page.goto("/account");
+    await page.getByRole("button", { name: "Logout" }).click();
+    await expect(
+        page
+            .getByRole("navigation", { name: "Primary navigation" })
+            .getByRole("link", { name: "Login", exact: true }),
+    ).toBeVisible();
+    await page.goto("/account/password/reset");
+    await page.getByLabel("Email").fill(email);
+    await page.getByRole("button", { name: "Send reset email" }).click();
+    await expect(page.getByText(/If the account is eligible/)).toBeVisible();
+
+    await page.goto("/account/password/reset/confirm#credential=e2e-reset");
+    await expect(page).toHaveURL(/\/account\/password\/reset\/confirm$/);
+    await page.getByLabel("New password", { exact: true }).fill(resetPassword);
+    await page.getByLabel("Confirm new password").fill(resetPassword);
+    await page.getByRole("button", { name: "Reset password" }).click();
+    await expect(page.getByText(/Password reset/)).toBeVisible();
+    expect(
+        leakedRequests.some((request) => request.includes("e2e-reset")),
+    ).toBe(false);
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(resetPassword);
+    await page.getByRole("button", { name: "Login with email" }).click();
+    await expect(page).toHaveURL("/");
+    await expect(
+        page.getByRole("button", { name: "Stage Reader" }),
+    ).toBeVisible();
+    expect(
+        await page.evaluate(
+            (secrets) => {
+                const values: string[] = [];
+                for (const storage of [localStorage, sessionStorage]) {
+                    for (let index = 0; index < storage.length; index += 1) {
+                        const value = storage.getItem(storage.key(index) ?? "");
+                        if (value !== null) {
+                            values.push(value);
+                        }
+                    }
+                }
+                return values.some((value) =>
+                    secrets.some((secret) => value.includes(secret)),
+                );
+            },
+            [
+                firstPassword,
+                changedPassword,
+                resetPassword,
+                "e2e-verification",
+                "e2e-reset",
+            ],
+        ),
+    ).toBe(false);
+    await expectNoHorizontalOverflow(page);
+    await expectAccessible(page);
+});
+
+test("OAuth profile completion and password set stay on one account", async ({
+    page,
+}) => {
+    await page.request.post("http://127.0.0.1:3101/__oauth-incomplete");
+    await page.goto("/login?next=%2Fposts%2Ftesting-secure-systems");
+    await page.getByRole("button", { name: "Continue with Google" }).click();
+    await expect(page).toHaveURL(/\/account\/profile\?next=/);
+    await expect(page.getByText(/public profile is incomplete/i)).toHaveCount(
+        0,
+    );
+    const nickname = page.getByLabel("Public nickname");
+    await expect(nickname).toHaveValue("Suggested Reader");
+    await nickname.fill("OAuth Public Reader");
+    await page.getByRole("button", { name: "Finish profile" }).click();
+    await expect(page).toHaveURL(/\/posts\/testing-secure-systems$/);
+    await expect(
+        page.getByRole("button", { name: "OAuth Public Reader" }),
+    ).toBeVisible();
+
+    await page.goto("/account");
+    await expect(page.getByText("GoogleConnected")).toBeVisible();
+    await page.getByRole("link", { name: "Set password" }).click();
+    await page
+        .getByLabel("New password", { exact: true })
+        .fill("OAuth local passphrase 42!");
+    await page
+        .getByLabel("Confirm new password")
+        .fill("OAuth local passphrase 42!");
+    await page.getByRole("button", { name: "Set password" }).click();
+    await expect(
+        page.getByText("Password set.", { exact: false }),
+    ).toBeVisible();
+    await page.goto("/account");
+    await expect(page.getByText("GoogleConnected")).toBeVisible();
+    await expect(page.getByText("PasswordSet")).toBeVisible();
     await expectAccessible(page);
 });
 

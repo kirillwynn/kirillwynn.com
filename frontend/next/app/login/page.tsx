@@ -20,8 +20,8 @@ export default async function LoginPage({
                 Login
             </h1>
             <p className="mt-3 mb-6 text-stone-600">
-                Use a verified Google or GitHub identity. Provider access tokens
-                are not retained.
+                Use email and password, or continue with Google or GitHub.
+                Provider access tokens are not retained.
             </p>
             <LoginPanel error={params.error} next={params.next} />
         </section>

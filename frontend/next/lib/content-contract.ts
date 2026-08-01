@@ -70,6 +70,12 @@ export type OpenGraphMetadata = {
     image: ContentImage | null;
 };
 
+export type PostAuthor = {
+    id: number;
+    display_name: string;
+    is_site_author: boolean;
+};
+
 export type PostMetadata = {
     api_version: "1.0";
     id: number;
@@ -80,6 +86,7 @@ export type PostMetadata = {
     updated_at: string | null;
     original_published_at: string | null;
     display_published_at: string | null;
+    author: PostAuthor;
     tags: ContentTag[];
     canonical_path: string;
     canonical_url: string;

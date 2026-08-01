@@ -24,5 +24,14 @@ Repository implementation does not activate staging. Complete externally:
   heartbeat/egress, dynamic DNS replacement, backup checksum, scratch restore,
   duplicate-finalize idempotency, and reviewed failed-smoke recovery under the
   same server lock; return the gate to false at the terminal run state.
+- for Stage 17, capture the identity audit before activation, verify the
+  activation catch-up report and post-migration `--require-activation-ready`
+  audit, confirm the bounded old-Django write quiescence/restoration evidence,
+  and confirm exactly one site author plus zero ownerless posts;
+- use only an owner-approved controlled staging mailbox for verification/reset
+  acceptance; never inspect a personal inbox or place fragment credentials in
+  logs, traces, screenshots, or browser storage;
+- confirm the auth-email worker queue, provider idempotency namespace, and
+  manual-review boundary without creating newsletter/subscriber side effects.
 
 Do not create a production administrator or promote production here.

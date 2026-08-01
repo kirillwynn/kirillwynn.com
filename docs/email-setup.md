@@ -1,6 +1,7 @@
-# Email subscription setup
+# Email setup
 
-Milestone 9 implements the application boundary only. Do not put real values in
+Subscription and account mail use separate durable application records while
+sharing the same deterministic provider transport. Do not put real values in
 Git, `.env.example`, a browser bundle, or command output. Provider, GitHub
 Environment, DNS, scheduler, and monitoring changes are external setup.
 
@@ -42,6 +43,65 @@ Optional tuning values are documented in `.env.example`. In particular,
 Resend's 24-hour idempotency retention. Provider success/error bodies are read
 only up to their separate 65,536-byte limits. Webhook correlation defaults to
 seven days and applied/ignored event retention to 30 days.
+
+## Local-account mail boundary
+
+Email verification and password reset use `AuthEmailOutbox` and
+`AuthEmailDelivery`, not `Subscriber`, `EmailOutbox`, publication decisions, or
+newsletter constraints. The web role has the Django signing/session key and
+provider-independent serializer configuration but never receives
+`RESEND_API_KEY`; its transaction creates one bounded event and records only
+the SHA-256 fingerprint of the exact provider request. The worker role receives
+the send key, reconstructs the same bytes, verifies contract/version/namespace
+and fingerprint, and only then performs provider I/O.
+
+`ACCOUNT_EMAIL_VERIFICATION="none"` and
+`ACCOUNT_EMAIL_NOTIFICATIONS=False` are deliberate: allauth still owns account
+and social flows, while Stage 17 exclusively owns verification/reset delivery.
+Do not enable an allauth SMTP/notification fallback in the web role.
+
+The account transport namespace is the configured environment-specific
+`EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE` with a fixed `/auth` suffix. The
+provider-visible idempotency key is that namespace plus the delivery UUID;
+retries reuse it byte-for-byte and stop before
+`EMAIL_PROVIDER_IDEMPOTENCY_WINDOW_SECONDS`; an ambiguous delivery that reaches
+the boundary moves to `manual_review` without another provider call. Terminal
+errors are bounded and raw provider bodies are never stored or logged.
+
+Verification credentials default to 86,400 seconds and password-reset
+credentials to 3,600 seconds. Their per-purpose HMAC keys are domain-separated
+from each other and from rate-limit keys; deployed web and worker roles derive the same
+keys from their shared environment-specific `DJANGO_SECRET_KEY`. Optional
+local overrides are `AUTH_CREDENTIAL_SIGNING_SECRET` and
+`AUTH_RATE_LIMIT_SIGNING_SECRET`, each at least 32 UTF-8 bytes. Other bounded
+defaults are `AUTH_API_MAX_BODY_BYTES=16384`,
+`WORKER_AUTH_EMAIL_INTERVAL_SECONDS=10`, and
+`WORKER_AUTH_EMAIL_BATCH_SIZE=25`.
+
+Credential consumption locks the user before credential/allauth-address rows.
+Reset succeeds only while the bound canonical address remains the unique
+verified primary address; case and NFKC variants are resolved with the same
+normalizer used by signup, login, and provider linking.
+
+Wagtail keeps staff password login and authenticated password change, but its
+separate public password-reset flow is disabled: that flow would place a
+credential in the query string and send synchronously outside
+`AuthEmailOutbox`. Wagtail self-service email editing is disabled as well;
+email change is intentionally outside Stage 17.
+
+Only a digest and a purpose/user/email/version/expiry lifecycle row are stored;
+the raw credential is reconstructed for the immutable message and appears only
+after a URL fragment marker:
+
+```text
+/account/verify-email#credential=...
+/account/password/reset/confirm#credential=...
+```
+
+Fragments are not sent in HTTP requests. The Next entry removes the fragment
+immediately and posts the credential only in a CSRF-protected JSON body. Plain
+text and HTML templates use generic subjects and contain no account metadata
+beyond the destination link.
 
 ## Resend domain and DNS checklist
 
@@ -170,6 +230,7 @@ The repository-owned `worker` service runs one scheduler per environment. Its
 defaults are:
 
 - `process_email_outbox` every 10 seconds with outbox/delivery limits 25/100;
+- `process_auth_email_outbox` every 10 seconds with limit 25;
 - `reconcile_email_webhooks` every 60 seconds with limit 100;
 - `process_revalidation_outbox` every 15 seconds with limit 100;
 - `publish_scheduled_pages` every 60 seconds.
@@ -181,6 +242,13 @@ invocations:
 ```bash
 cd backend/django
 uv run python manage.py process_email_outbox --limit 25 --delivery-limit 100
+```
+
+Run account mail independently:
+
+```bash
+cd backend/django
+uv run python manage.py process_auth_email_outbox --limit 25
 ```
 
 Schedule it independently and much more frequently than the 23-hour

@@ -55,6 +55,7 @@ export default async function PostPage({ params }: PostPageProps) {
                     post.updated_at !== post.published_at ? (
                         <DateTime value={post.updated_at} label="Updated " />
                     ) : null}
+                    <span>by {post.author.display_name}</span>
                 </div>
                 <div className="mt-5">
                     <Tags tags={post.tags} />

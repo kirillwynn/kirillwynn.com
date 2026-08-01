@@ -38,6 +38,7 @@ def make_search_post(
         slug=slug,
         excerpt=excerpt,
         body=[("rich_text", f"<p>{body_text}</p>")],
+        owner=blog_index._stage17_author,
         live=False,
     )
     blog_index.add_child(instance=post)

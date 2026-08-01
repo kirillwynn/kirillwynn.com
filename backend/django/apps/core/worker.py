@@ -67,6 +67,12 @@ def configured_tasks() -> list[ScheduledTask]:
             },
         ),
         ScheduledTask(
+            "auth-email",
+            interval("WORKER_AUTH_EMAIL_INTERVAL_SECONDS", "10"),
+            "process_auth_email_outbox",
+            {"limit": batch("WORKER_AUTH_EMAIL_BATCH_SIZE", "25")},
+        ),
+        ScheduledTask(
             "webhooks",
             interval("WORKER_WEBHOOK_INTERVAL_SECONDS", "60"),
             "reconcile_email_webhooks",

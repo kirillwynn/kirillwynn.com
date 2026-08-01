@@ -46,6 +46,42 @@ const nextConfig: NextConfig = {
                 destination: `${django}/api/auth/logout/`,
             },
             {
+                source: "/api/auth/signup/",
+                destination: `${django}/api/auth/signup/`,
+            },
+            {
+                source: "/api/auth/login/",
+                destination: `${django}/api/auth/login/`,
+            },
+            {
+                source: "/api/auth/verify-email/",
+                destination: `${django}/api/auth/verify-email/`,
+            },
+            {
+                source: "/api/auth/verify-email/resend/",
+                destination: `${django}/api/auth/verify-email/resend/`,
+            },
+            {
+                source: "/api/auth/password/reset/",
+                destination: `${django}/api/auth/password/reset/`,
+            },
+            {
+                source: "/api/auth/password/reset/confirm/",
+                destination: `${django}/api/auth/password/reset/confirm/`,
+            },
+            {
+                source: "/api/auth/password/set/",
+                destination: `${django}/api/auth/password/set/`,
+            },
+            {
+                source: "/api/auth/password/change/",
+                destination: `${django}/api/auth/password/change/`,
+            },
+            {
+                source: "/api/auth/profile/",
+                destination: `${django}/api/auth/profile/`,
+            },
+            {
                 source: "/api/v1/subscriptions/",
                 destination: `${django}/api/v1/subscriptions/`,
             },

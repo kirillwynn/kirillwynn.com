@@ -249,7 +249,7 @@ export function ThreadPanel({
                     slug,
                     kind: "reply",
                     threadId: root.id,
-                    userId: null,
+                    userId: user.id,
                     body,
                 });
                 await refresh();

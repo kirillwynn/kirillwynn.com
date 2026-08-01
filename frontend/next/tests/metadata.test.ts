@@ -40,6 +40,11 @@ function post(): PostDetail {
         updated_at: "2026-07-26T18:00:00Z",
         original_published_at: null,
         display_published_at: "2026-07-26T17:00:00Z",
+        author: {
+            id: 1,
+            display_name: "Kirill Wynn",
+            is_site_author: true,
+        },
         tags: [{ name: "SEO", slug: "seo" }],
         canonical_path: "/posts/metadata",
         canonical_url: "https://kirillwynn.com/posts/metadata",
@@ -58,6 +63,7 @@ describe("post metadata", () => {
         const metadata = postMetadata(post(), false);
         expect(metadata.title).toBe("SEO title");
         expect(metadata.description).toBe("SEO description");
+        expect(metadata.authors).toEqual([{ name: "Kirill Wynn" }]);
         expect(metadata.alternates?.canonical).toBe(
             "https://kirillwynn.com/posts/metadata",
         );
@@ -67,6 +73,7 @@ describe("post metadata", () => {
             description: "Open Graph description",
             publishedTime: "2026-07-26T17:00:00Z",
             modifiedTime: "2026-07-26T18:00:00Z",
+            authors: ["Kirill Wynn"],
             tags: ["SEO"],
             images: [
                 {

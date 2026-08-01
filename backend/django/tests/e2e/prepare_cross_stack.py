@@ -13,7 +13,6 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.cross_stack")
 django.setup()
 
-from django.contrib.auth import get_user_model  # noqa: E402
 from django.utils import timezone  # noqa: E402
 from wagtail.models import Page, Site  # noqa: E402
 from wagtail.users.models import UserProfile  # noqa: E402
@@ -25,6 +24,7 @@ from apps.discussions.models import (  # noqa: E402
     ReactionCatalogItem,
     ReactionSettings,
 )
+from tests.identity import create_identity_user  # noqa: E402
 
 
 def main() -> None:
@@ -39,6 +39,28 @@ def main() -> None:
     root.add_child(instance=index)
     index.save_revision().publish()
 
+    author = create_identity_user(
+        username="site-author",
+        email="author@example.test",
+        nickname="Site Author",
+        is_staff=True,
+        site_author=True,
+    )
+    cms_owner = create_identity_user(
+        username="cms-owner",
+        email="cms-owner@example.test",
+        nickname="CMS Owner",
+        password="cms-stage15-test-only",
+        superuser=True,
+    )
+    cms_dark_owner = create_identity_user(
+        username="cms-dark-owner",
+        email="cms-dark-owner@example.test",
+        nickname="CMS Dark Owner",
+        password="cms-stage15-test-only",
+        superuser=True,
+    )
+
     post = BlogPostPage(
         title="Cross-stack systems",
         slug="cross-stack-systems",
@@ -46,6 +68,7 @@ def main() -> None:
         body=[("rich_text", "<p>Public cross-stack content.</p>")],
         original_published_at=datetime(2015, 4, 3, 12, tzinfo=UTC),
         notify_subscribers_on_first_publication=False,
+        owner=author,
         live=False,
     )
     index.add_child(instance=post)
@@ -53,26 +76,9 @@ def main() -> None:
     post.save_revision().publish()
     post = BlogPostPage.objects.get(pk=post.pk)
 
-    author = get_user_model().objects.create_user(
-        username="site-author",
-        email="author@example.test",
-        first_name="Site",
-        last_name="Author",
-        is_staff=True,
-    )
-    cms_owner = get_user_model().objects.create_superuser(
-        username="cms-owner",
-        email="cms-owner@example.test",
-        password="cms-stage15-test-only",
-    )
     cms_owner_profile = UserProfile.get_for_user(cms_owner)
     cms_owner_profile.theme = UserProfile.AdminColorThemes.LIGHT
     cms_owner_profile.save(update_fields=("theme",))
-    cms_dark_owner = get_user_model().objects.create_superuser(
-        username="cms-dark-owner",
-        email="cms-dark-owner@example.test",
-        password="cms-stage15-test-only",
-    )
     cms_dark_profile = UserProfile.get_for_user(cms_dark_owner)
     cms_dark_profile.theme = UserProfile.AdminColorThemes.DARK
     cms_dark_profile.save(update_fields=("theme",))

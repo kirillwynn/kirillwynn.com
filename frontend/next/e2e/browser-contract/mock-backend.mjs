@@ -12,6 +12,11 @@ function reset() {
     state = {
         nextCommentId: 20,
         postReactionCount: 1,
+        localAccount: null,
+        providerPasswordSet: false,
+        providerNickname: "Mock Reader",
+        providerProfileComplete: true,
+        connectedProviders: [],
         comments: [
             comment({
                 id: 10,
@@ -37,9 +42,23 @@ function reset() {
 }
 
 function isAuthenticated(request) {
-    return /(?:^|;\s*)e2e_provider=(google|github)(?:;|$)/.test(
+    return /(?:^|;\s*)e2e_(?:provider=(?:google|github)|local=1)(?:;|$)/.test(
         request.headers.cookie ?? "",
     );
+}
+
+function isLocal(request) {
+    return /(?:^|;\s*)e2e_local=1(?:;|$)/.test(request.headers.cookie ?? "");
+}
+
+function csrfProtected(request) {
+    return request.headers["x-csrftoken"] === "deterministic-test-csrf";
+}
+
+function currentNickname(request) {
+    return isLocal(request) && state.localAccount
+        ? state.localAccount.nickname
+        : state.providerNickname;
 }
 
 function viewer(request, owner = false) {
@@ -99,6 +118,11 @@ function post({ id, slug, title, excerpt, tags, body }) {
         updated_at: publishedAt,
         original_published_at: null,
         display_published_at: publishedAt,
+        author: {
+            id: 7,
+            display_name: "Site Author",
+            is_site_author: true,
+        },
         tags,
         canonical_path: `/posts/${slug}`,
         canonical_url: `http://localhost:3100/posts/${slug}`,
@@ -246,34 +270,62 @@ createServer(async (request, response) => {
         json(response, 200, { ok: true });
         return;
     }
+    if (path === "/__oauth-incomplete" && request.method === "POST") {
+        state.providerProfileComplete = false;
+        json(response, 200, { ok: true });
+        return;
+    }
     if (path === "/api/me/") {
         const authenticated = isAuthenticated(request);
+        const local = isLocal(request) && state.localAccount;
+        const identity = local
+            ? {
+                  nickname: state.localAccount.nickname,
+                  email: state.localAccount.email,
+                  emailVerified: state.localAccount.verified,
+                  profileComplete: true,
+                  hasPassword: true,
+              }
+            : {
+                  nickname: state.providerNickname,
+                  email: "reader@example.test",
+                  emailVerified: true,
+                  profileComplete: state.providerProfileComplete,
+                  hasPassword: state.providerPasswordSet,
+              };
         json(response, 200, {
             authenticated,
             user: authenticated
                 ? {
                       id: 2,
-                      display_name: "Mock Reader",
-                      email: "reader@example.test",
+                      nickname: identity.nickname,
+                      display_name: identity.nickname,
+                      nickname_suggestion: identity.profileComplete
+                          ? null
+                          : "Suggested Reader",
+                      email: identity.email,
+                      email_verified: identity.emailVerified,
+                      profile_complete: identity.profileComplete,
+                      has_usable_password: identity.hasPassword,
+                      nickname_change_available_at: null,
                       is_admin: false,
                       is_banned: false,
-                      can_interact: true,
+                      can_interact:
+                          identity.emailVerified && identity.profileComplete,
                   }
                 : null,
             providers: {
                 google: {
                     available: true,
                     connected:
-                        request.headers.cookie?.includes(
-                            "e2e_provider=google",
-                        ) ?? false,
+                        authenticated &&
+                        state.connectedProviders.includes("google"),
                 },
                 github: {
                     available: true,
                     connected:
-                        request.headers.cookie?.includes(
-                            "e2e_provider=github",
-                        ) ?? false,
+                        authenticated &&
+                        state.connectedProviders.includes("github"),
                 },
             },
             csrf_token: "deterministic-test-csrf",
@@ -281,19 +333,195 @@ createServer(async (request, response) => {
         return;
     }
     if (path === "/api/auth/logout/" && request.method === "POST") {
+        if (!csrfProtected(request)) {
+            json(response, 403, { detail: "CSRF failed" });
+            return;
+        }
         response.writeHead(204, {
             "Cache-Control": "private, no-store",
-            "Set-Cookie":
+            "Set-Cookie": [
                 "e2e_provider=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+                "e2e_local=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+            ],
         });
         response.end();
+        return;
+    }
+    if (path === "/api/auth/signup/" && request.method === "POST") {
+        if (!csrfProtected(request)) {
+            json(response, 403, { detail: "CSRF failed" });
+            return;
+        }
+        const payload = JSON.parse(await body(request));
+        if (!state.localAccount) {
+            state.localAccount = {
+                email: String(payload.email).trim().toLocaleLowerCase(),
+                nickname: String(payload.nickname).trim(),
+                password: String(payload.password),
+                verified: false,
+            };
+        }
+        json(response, 202, {
+            detail: "If the address can be registered, a verification email will be sent.",
+        });
+        return;
+    }
+    if (path === "/api/auth/verify-email/" && request.method === "POST") {
+        if (!csrfProtected(request)) {
+            json(response, 403, { detail: "CSRF failed" });
+            return;
+        }
+        const payload = JSON.parse(await body(request));
+        if (payload.credential !== "e2e-verification" || !state.localAccount) {
+            json(response, 400, {
+                status: "invalid",
+                detail: "Invalid credential",
+            });
+            return;
+        }
+        state.localAccount.verified = true;
+        json(response, 200, { status: "verified" });
+        return;
+    }
+    if (
+        path === "/api/auth/verify-email/resend/" &&
+        request.method === "POST"
+    ) {
+        json(response, csrfProtected(request) ? 202 : 403, {
+            detail: csrfProtected(request)
+                ? "If the account is eligible, an email will be sent."
+                : "CSRF failed",
+        });
+        return;
+    }
+    if (path === "/api/auth/login/" && request.method === "POST") {
+        if (!csrfProtected(request)) {
+            json(response, 403, { detail: "CSRF failed" });
+            return;
+        }
+        const payload = JSON.parse(await body(request));
+        if (
+            !state.localAccount ||
+            String(payload.email).toLocaleLowerCase() !==
+                state.localAccount.email ||
+            payload.password !== state.localAccount.password
+        ) {
+            json(response, 400, {
+                detail: "The email or password is invalid.",
+            });
+            return;
+        }
+        json(
+            response,
+            200,
+            {
+                status: "authenticated",
+                next: safeReturnTo(payload.next ?? "/"),
+                requires_profile_completion: false,
+                csrf_token: "rotated-test-csrf",
+            },
+            { "Set-Cookie": "e2e_local=1; Path=/; HttpOnly; SameSite=Lax" },
+        );
+        return;
+    }
+    if (path === "/api/auth/password/reset/" && request.method === "POST") {
+        json(response, csrfProtected(request) ? 202 : 403, {
+            detail: csrfProtected(request)
+                ? "If the account is eligible, an email will be sent."
+                : "CSRF failed",
+        });
+        return;
+    }
+    if (
+        path === "/api/auth/password/reset/confirm/" &&
+        request.method === "POST"
+    ) {
+        if (!csrfProtected(request)) {
+            json(response, 403, { detail: "CSRF failed" });
+            return;
+        }
+        const payload = JSON.parse(await body(request));
+        if (payload.credential !== "e2e-reset" || !state.localAccount) {
+            json(response, 400, {
+                status: "invalid",
+                detail: "Invalid credential",
+            });
+            return;
+        }
+        state.localAccount.password = payload.password;
+        json(response, 200, { status: "password_reset" });
+        return;
+    }
+    if (path === "/api/auth/password/set/" && request.method === "POST") {
+        if (!csrfProtected(request) || !isAuthenticated(request)) {
+            json(response, 403, { detail: "Unavailable" });
+            return;
+        }
+        const payload = JSON.parse(await body(request));
+        state.providerPasswordSet = true;
+        state.providerPassword = payload.password;
+        json(response, 200, {
+            status: "password_set",
+            csrf_token: "rotated-test-csrf",
+        });
+        return;
+    }
+    if (path === "/api/auth/password/change/" && request.method === "POST") {
+        if (!csrfProtected(request) || !isAuthenticated(request)) {
+            json(response, 403, { detail: "Unavailable" });
+            return;
+        }
+        const payload = JSON.parse(await body(request));
+        if (
+            isLocal(request) &&
+            payload.current_password !== state.localAccount?.password
+        ) {
+            json(response, 400, {
+                errors: {
+                    current_password: ["The current password is invalid."],
+                },
+            });
+            return;
+        }
+        if (isLocal(request)) {
+            state.localAccount.password = payload.password;
+        } else {
+            state.providerPassword = payload.password;
+        }
+        json(response, 200, {
+            status: "password_changed",
+            csrf_token: "rotated-test-csrf",
+        });
+        return;
+    }
+    if (path === "/api/auth/profile/" && request.method === "PATCH") {
+        if (!csrfProtected(request) || !isAuthenticated(request)) {
+            json(response, 403, { detail: "Unavailable" });
+            return;
+        }
+        const payload = JSON.parse(await body(request));
+        state.providerNickname = String(payload.nickname).trim();
+        state.providerProfileComplete = true;
+        json(response, 200, {
+            status: "profile_complete",
+            nickname: state.providerNickname,
+            nickname_change_available_at: null,
+        });
         return;
     }
     const login = path.match(/^\/accounts\/(google|github)\/login\/$/);
     if (login && request.method === "POST") {
         const fields = new URLSearchParams(await body(request));
+        const destination = safeReturnTo(fields.get("next") ?? "/");
+        if (!state.connectedProviders.includes(login[1])) {
+            state.connectedProviders.push(login[1]);
+        }
         response.writeHead(303, {
-            Location: safeReturnTo(fields.get("next") ?? "/"),
+            Location:
+                fields.get("process") !== "connect" &&
+                !state.providerProfileComplete
+                    ? `/account/profile?next=${encodeURIComponent(destination)}`
+                    : destination,
             "Set-Cookie": `e2e_provider=${login[1]}; Path=/; HttpOnly; SameSite=Lax`,
         });
         response.end();
@@ -420,6 +648,15 @@ createServer(async (request, response) => {
                     display_name: "Site Author",
                     is_site_author: true,
                 },
+                ...(isAuthenticated(request) && state.postReactionCount > 1
+                    ? [
+                          {
+                              id: 2,
+                              display_name: currentNickname(request),
+                              is_site_author: false,
+                          },
+                      ]
+                    : []),
             ],
         });
         return;
@@ -443,6 +680,11 @@ createServer(async (request, response) => {
         const created = comment({
             id: state.nextCommentId++,
             body: String(payload.body).trim(),
+            author: {
+                id: 2,
+                display_name: currentNickname(request),
+                is_site_author: false,
+            },
         });
         state.comments.unshift(created);
         json(response, 201, withViewer(request, created));
@@ -479,6 +721,11 @@ createServer(async (request, response) => {
             kind: "reply",
             threadRootId: rootId,
             replyTo: { id: 7, display_name: "Site Author" },
+            author: {
+                id: 2,
+                display_name: currentNickname(request),
+                is_site_author: false,
+            },
         });
         state.replies.push(created);
         const root = state.comments.find((value) => value.id === rootId);

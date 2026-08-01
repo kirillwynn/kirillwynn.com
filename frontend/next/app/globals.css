@@ -415,6 +415,136 @@ img {
     background: var(--color-accent-strong);
 }
 
+.account-page {
+    width: min(100%, 38rem);
+    margin-inline: auto;
+}
+
+.account-title {
+    margin-top: var(--space-2);
+    color: var(--color-ink);
+    font-size: var(--type-2xl);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: var(--leading-tight);
+}
+
+.account-intro {
+    margin-top: var(--space-3);
+    color: var(--color-muted);
+    line-height: var(--leading-copy);
+}
+
+.account-card {
+    margin-top: var(--space-6);
+    border: var(--border-thin) solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    padding: clamp(var(--space-4), 3vw, var(--space-6));
+    box-shadow: var(--shadow-sm);
+}
+
+.account-form {
+    display: grid;
+    gap: var(--space-5);
+}
+
+.account-field-group {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.account-label {
+    color: var(--color-ink);
+    font-size: var(--type-sm);
+    font-weight: 700;
+}
+
+.account-input {
+    width: 100%;
+    min-height: 2.875rem;
+    border: var(--border-thin) solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    padding: 0.6875rem 0.75rem;
+    color: var(--color-ink);
+    font: inherit;
+}
+
+.account-input:hover:not(:disabled) {
+    border-color: var(--color-ink-soft);
+}
+
+.account-input:focus-visible {
+    border-color: var(--color-accent-strong);
+    outline: 3px solid var(--color-accent);
+    outline-offset: 1px;
+}
+
+.account-input[aria-invalid="true"] {
+    border-color: var(--color-danger);
+}
+
+.account-input:disabled {
+    cursor: not-allowed;
+    background: var(--color-surface-subtle);
+    color: var(--color-muted);
+}
+
+.account-help,
+.account-field-error {
+    font-size: var(--type-sm);
+    line-height: 1.45;
+}
+
+.account-help {
+    color: var(--color-muted);
+}
+
+.account-field-error {
+    color: var(--color-danger);
+}
+
+.account-notice {
+    border: var(--border-thin) solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-subtle);
+    padding: var(--space-3);
+    color: var(--color-ink-soft);
+    font-size: var(--type-sm);
+    line-height: 1.5;
+}
+
+.account-notice--error {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+.account-notice--success {
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+.account-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: var(--color-muted);
+    font-size: var(--type-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.account-divider::before,
+.account-divider::after {
+    height: var(--border-thin);
+    flex: 1;
+    background: var(--color-border);
+    content: "";
+}
+
 .feed-search-input {
     min-height: 2.75rem;
     min-width: 0;

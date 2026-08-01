@@ -53,7 +53,15 @@ describe("server-only security boundary", () => {
         for (const path of [
             "app/globals.css",
             "app/account/page.tsx",
+            "app/account/password/change/page.tsx",
+            "app/account/password/reset/confirm/page.tsx",
+            "app/account/password/reset/page.tsx",
+            "app/account/password/set/page.tsx",
+            "app/account/profile/page.tsx",
+            "app/account/verify-email/page.tsx",
             "app/login/page.tsx",
+            "app/signup/page.tsx",
+            "components/account-credential-action.tsx",
             "components/account-panel.tsx",
             "components/auth-provider.tsx",
             "components/comment-card.tsx",
@@ -61,6 +69,7 @@ describe("server-only security boundary", () => {
             "components/feed-controls.tsx",
             "components/feed-stream.tsx",
             "components/login-panel.tsx",
+            "components/local-auth-forms.tsx",
             "components/provider-form.tsx",
             "components/site-header.tsx",
             "components/site-footer.tsx",
@@ -99,7 +108,20 @@ describe("server-only security boundary", () => {
         expect(config).toContain("skipTrailingSlashRedirect: true");
         expect(config).toContain('source: "/accounts/:path*/"');
         expect(config).toContain('source: "/api/me/"');
-        expect(config).toContain('source: "/api/auth/logout/"');
+        for (const route of [
+            "logout",
+            "signup",
+            "login",
+            "verify-email",
+            "verify-email/resend",
+            "password/reset",
+            "password/reset/confirm",
+            "password/set",
+            "password/change",
+            "profile",
+        ]) {
+            expect(config).toContain(`source: "/api/auth/${route}/"`);
+        }
         expect(config).toContain('source: "/api/v1/subscriptions/"');
         expect(config).toContain('source: "/api/v1/subscriptions/confirm/"');
         expect(config).toContain(
@@ -134,6 +156,7 @@ describe("server-only security boundary", () => {
         expect(config).not.toContain("searchParams");
         expect(config).not.toContain("NEXT_PUBLIC_");
         expect(config).not.toContain('source: "/api/:path*"');
+        expect(config).not.toContain('source: "/api/auth/:path*"');
     });
 
     it("keeps the rollback config route out of the new browser reaction client", () => {
@@ -192,8 +215,10 @@ describe("server-only security boundary", () => {
     it("does not implement browser-stored auth tokens", () => {
         for (const path of [
             "components/account-panel.tsx",
+            "components/account-credential-action.tsx",
             "components/auth-provider.tsx",
             "components/login-panel.tsx",
+            "components/local-auth-forms.tsx",
             "components/provider-form.tsx",
             "components/site-header.tsx",
             "lib/auth.ts",
@@ -204,6 +229,18 @@ describe("server-only security boundary", () => {
             expect(contents).not.toContain("X-Session-Token");
             expect(contents).not.toContain("Authorization");
         }
+    });
+
+    it("keeps fragment credentials out of URL queries, rendered state, and storage", () => {
+        const action = source("components/account-credential-action.tsx");
+
+        expect(action).toContain("window.location.hash");
+        expect(action).toContain("window.history.replaceState");
+        expect(action).toContain("useRef<string | null>");
+        expect(action).not.toContain("searchParams.get");
+        expect(action).not.toContain("useState<string | null>(credential");
+        expect(action).not.toContain("localStorage");
+        expect(action).not.toContain("sessionStorage");
     });
 
     it("keeps the custom catalog behind the lazy picker boundary without Unicode datasets", () => {

@@ -46,8 +46,14 @@ const signedIn: MeResponse = {
     authenticated: true,
     user: {
         id: 42,
+        nickname: "Reader",
         display_name: "Reader",
+        nickname_suggestion: null,
         email: "reader@example.com",
+        email_verified: true,
+        profile_complete: true,
+        has_usable_password: true,
+        nickname_change_available_at: null,
         is_admin: false,
         is_banned: false,
         can_interact: true,
@@ -453,14 +459,14 @@ describe("reaction API and local storage boundaries", () => {
         }
 
         const pendingKey =
-            "kw:reaction-intent:v2:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:pepeclap";
+            "kw:reaction-intent:v3:pending-auth:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:pepeclap";
         for (const malformedJson of [
             "null",
             "[]",
             "{}",
-            '{"version":2,"reactionId":"🔥","createdAt":90}',
-            '{"version":2,"reactionId":"pepeclap","createdAt":"90"}',
-            '{"version":1,"reactionId":"pepeclap","createdAt":90}',
+            '{"version":3,"reactionId":"🔥","createdAt":90}',
+            '{"version":3,"reactionId":"pepeclap","createdAt":"90"}',
+            '{"version":2,"reactionId":"pepeclap","createdAt":90}',
         ]) {
             sessionStorage.setItem(pendingKey, malformedJson);
             expect(loadPendingReaction(postTarget, 91)).toBeNull();
@@ -501,13 +507,13 @@ describe("reaction API and local storage boundaries", () => {
         expect(loadPendingReaction(otherTarget, 202)).toBe(love.id);
     });
 
-    it("chooses duplicate v2 intents by createdAt and preserves TTL", () => {
+    it("chooses duplicate v3 intents by createdAt and preserves TTL", () => {
         const prefix =
-            "kw:reaction-intent:v2:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:";
+            "kw:reaction-intent:v3:pending-auth:%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80:post:9:";
         sessionStorage.setItem(
             `${prefix}${hmm.id}`,
             JSON.stringify({
-                version: 2,
+                version: 3,
                 reactionId: hmm.id,
                 createdAt: 200,
             }),
@@ -515,7 +521,7 @@ describe("reaction API and local storage boundaries", () => {
         sessionStorage.setItem(
             `${prefix}${clap.id}`,
             JSON.stringify({
-                version: 2,
+                version: 3,
                 reactionId: clap.id,
                 createdAt: 100,
             }),
@@ -529,6 +535,22 @@ describe("reaction API and local storage boundaries", () => {
                 200 + reactionStorageLimits.intentTtlMs + 1,
             ),
         ).toBeNull();
+    });
+
+    it("adopts an anonymous intent into one user namespace without leaking it", () => {
+        savePendingReaction(postTarget, clap.id, 100);
+
+        expect(loadPendingReaction(postTarget, 101, 42)).toBe(clap.id);
+        expect(loadPendingReaction(postTarget, 101)).toBeNull();
+        expect(loadPendingReaction(postTarget, 101, 7)).toBeNull();
+
+        savePendingReaction(postTarget, hmm.id, 102, 7);
+        expect(loadPendingReaction(postTarget, 103, 42)).toBe(clap.id);
+        expect(loadPendingReaction(postTarget, 103, 7)).toBe(hmm.id);
+
+        clearPendingReaction(postTarget, 42);
+        expect(loadPendingReaction(postTarget, 104, 42)).toBeNull();
+        expect(loadPendingReaction(postTarget, 104, 7)).toBe(hmm.id);
     });
 });
 
@@ -947,6 +969,8 @@ describe("reaction mutation state", () => {
         expect(meCalls).toBe(2);
         expect(container.textContent).toContain("session expired");
         expect(buttonByLabel(container, "Add Clapping reaction")).toBeDefined();
+        expect(loadPendingReaction(postTarget, Date.now(), 42)).toBe(clap.id);
+        expect(loadPendingReaction(postTarget, Date.now(), 7)).toBeNull();
         act(() => {
             root.unmount();
         });
@@ -1981,6 +2005,7 @@ describe("participants, picker, and OAuth continuation", () => {
         await flush();
         expect(postCalls).toBe(1);
         expect(loadPendingReaction(postTarget)).toBeNull();
+        expect(loadPendingReaction(postTarget, Date.now(), 42)).toBeNull();
         act(() => {
             authenticatedRender.root.unmount();
         });
@@ -2003,6 +2028,7 @@ describe("participants, picker, and OAuth continuation", () => {
                 ?.click();
         });
         expect(loadPendingReaction(postTarget, now + 1)).toBeNull();
+        expect(loadPendingReaction(postTarget, now + 1, 42)).toBeNull();
         act(() => {
             first.root.unmount();
         });

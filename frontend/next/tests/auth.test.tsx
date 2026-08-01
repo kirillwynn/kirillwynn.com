@@ -31,8 +31,14 @@ const authenticated: MeResponse = {
     authenticated: true,
     user: {
         id: 42,
+        nickname: "<Safe Reader>",
         display_name: "<Safe Reader>",
+        nickname_suggestion: null,
         email: "reader@example.com",
+        email_verified: true,
+        profile_complete: true,
+        has_usable_password: true,
+        nickname_change_available_at: null,
         is_admin: false,
         is_banned: false,
         can_interact: true,
@@ -270,9 +276,13 @@ describe("header auth behavior", () => {
         const logoutOptions = logoutCall[1] as RequestInit;
         expect(logoutOptions.method).toBe("POST");
         expect(logoutOptions.credentials).toBe("same-origin");
+        expect(logoutOptions.body).toBe("{}");
         expect(
             (logoutOptions.headers as Record<string, string>)["X-CSRFToken"],
         ).toBe("masked-csrf-token");
+        expect(
+            (logoutOptions.headers as Record<string, string>)["Content-Type"],
+        ).toBe("application/json");
         expect(container.textContent).toContain("Login");
         act(() => {
             root.unmount();
@@ -312,6 +322,33 @@ describe("account provider state", () => {
         expect(container.textContent).toContain(
             "Sign in to view connected providers",
         );
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("does not initiate provider linking before primary-email verification", async () => {
+        const unverified = structuredClone(authenticated);
+        if (unverified.user) {
+            unverified.user.email_verified = false;
+            unverified.user.can_interact = false;
+        }
+        unverified.providers.google.connected = false;
+        const { container, root } = await renderWithAuth(
+            <AccountPanel />,
+            unverified,
+        );
+
+        expect(container.textContent).toContain(
+            "Verify the primary email before connecting another provider",
+        );
+        const providerButtons = Array.from(
+            container.querySelectorAll<HTMLButtonElement>(
+                'form[action^="/accounts/"] button',
+            ),
+        );
+        expect(providerButtons).toHaveLength(2);
+        expect(providerButtons.every((button) => button.disabled)).toBe(true);
         act(() => {
             root.unmount();
         });

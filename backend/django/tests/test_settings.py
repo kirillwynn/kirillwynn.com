@@ -16,6 +16,8 @@ OAUTH_CREDENTIAL_NAMES = (
 def production_environment():
     environment = os.environ.copy()
     environment.pop("SOCIALACCOUNT_REQUESTS_TIMEOUT", None)
+    environment.pop("AUTH_CREDENTIAL_SIGNING_SECRET", None)
+    environment.pop("AUTH_RATE_LIMIT_SIGNING_SECRET", None)
     environment.update(
         {
             "DJANGO_SETTINGS_MODULE": "config.settings.production",
@@ -105,6 +107,52 @@ def test_local_settings_default_and_normalize_public_site_url():
 
     assert default.stdout.strip() == "http://localhost:3000"
     assert normalized.stdout.strip() == "http://localhost:3000"
+
+
+def test_local_auth_signing_keys_are_long_and_domain_separated():
+    environment = os.environ.copy()
+    environment["DJANGO_SETTINGS_MODULE"] = "config.settings.local"
+    environment.pop("AUTH_CREDENTIAL_SIGNING_SECRET", None)
+    environment.pop("AUTH_RATE_LIMIT_SIGNING_SECRET", None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from config.settings import local; "
+            "print(local.AUTH_CREDENTIAL_SIGNING_SECRET); "
+            "print(local.AUTH_RATE_LIMIT_SIGNING_SECRET)",
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+    credential, rate = result.stdout.splitlines()
+
+    assert len(credential.encode()) >= 32
+    assert len(rate.encode()) >= 32
+    assert credential != rate
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["AUTH_CREDENTIAL_SIGNING_SECRET", "AUTH_RATE_LIMIT_SIGNING_SECRET"],
+)
+def test_production_rejects_short_explicit_auth_signing_secret(name):
+    environment = production_environment()
+    environment[name] = "short"
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert f"{name} must be at least 32 bytes" in result.stderr
 
 
 def test_production_settings_require_wagtail_admin_base_url():
@@ -570,6 +618,21 @@ def test_production_rejects_invalid_provider_idempotency_namespace(value):
     )
 
 
+def test_production_rejects_idempotency_namespace_that_cannot_fit_auth_suffix():
+    environment = production_environment()
+    environment["EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"] = "a" * 124
+
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import production"],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "auth sub-namespace must be a normalized transport identifier" in result.stderr
+
+
 def test_production_normalizes_provider_idempotency_namespace():
     environment = production_environment()
     environment["EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"] = " Resend/Production/Account-Main "
@@ -648,7 +711,13 @@ def test_allauth_uses_classic_sessions_minimal_scopes_and_settings_apps(settings
         "django.contrib.auth.backends.ModelBackend",
         "allauth.account.auth_backends.AuthenticationBackend",
     ]
-    assert settings.SOCIALACCOUNT_ONLY is True
+    assert settings.SOCIALACCOUNT_ONLY is False
+    assert settings.ACCOUNT_LOGIN_METHODS == {"email"}
+    assert settings.ACCOUNT_SIGNUP_FIELDS == ["email*", "password1*", "password2*"]
+    assert settings.ACCOUNT_EMAIL_VERIFICATION == "none"
+    assert settings.ACCOUNT_EMAIL_NOTIFICATIONS is False
+    assert settings.ACCOUNT_PREVENT_ENUMERATION == "strict"
+    assert settings.ACCOUNT_RATE_LIMITS == {"login_failed": None}
     assert settings.SOCIALACCOUNT_LOGIN_ON_GET is False
     assert settings.SOCIALACCOUNT_STORE_TOKENS is False
     assert settings.SESSION_ENGINE == "django.contrib.sessions.backends.db"

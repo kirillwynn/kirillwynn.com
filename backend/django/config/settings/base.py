@@ -1,3 +1,4 @@
+import hashlib
 import math
 import os
 from pathlib import Path
@@ -35,6 +36,17 @@ def positive_int(name: str, default: str) -> int:
     return value
 
 
+def domain_signing_secret(name: str, domain: str, secret_key: str) -> str:
+    explicit = os.environ.get(name, "").strip()
+    if explicit:
+        if len(explicit.encode()) < 32:
+            raise ImproperlyConfigured(f"{name} must be at least 32 bytes")
+        return explicit
+    if not secret_key:
+        return ""
+    return hashlib.sha256(f"{domain}\0{secret_key}".encode()).hexdigest()
+
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 DEBUG = False
 ALLOWED_HOSTS: list[str] = []
@@ -57,7 +69,7 @@ INSTALLED_APPS = [
     "wagtail.contrib.table_block",
     "wagtail.embeds",
     "wagtail.sites",
-    "wagtail.users",
+    "apps.users.wagtail_apps.Stage17WagtailUsersAppConfig",
     "wagtail.snippets",
     "wagtail.documents",
     "wagtail.images",
@@ -150,10 +162,20 @@ AUTHENTICATION_BACKENDS = [
 
 ACCOUNT_ADAPTER = "apps.users.adapters.SiteAccountAdapter"
 SOCIALACCOUNT_ADAPTER = "apps.users.adapters.SiteSocialAccountAdapter"
-SOCIALACCOUNT_ONLY = True
+SOCIALACCOUNT_ONLY = False
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_SIGNUP_FIELDS = ["email*"]
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_SIGNUP_FORM_CLASS = "apps.users.forms.LocalSignupFieldsForm"
+ACCOUNT_PREVENT_ENUMERATION = "strict"
+# The public JSON login has a transactional PostgreSQL limiter. Disable only
+# LoginForm's duplicate cache-based failed-login counter so one process cannot
+# reject a request earlier than another; all other allauth defaults remain.
+ACCOUNT_RATE_LIMITS = {"login_failed": None}
 ACCOUNT_EMAIL_VERIFICATION = "none"
+# Stage 17 owns auth-email delivery through its durable outbox. Keep allauth
+# from performing synchronous notification delivery in the web process.
+ACCOUNT_EMAIL_NOTIFICATIONS = False
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
@@ -163,6 +185,7 @@ SOCIALACCOUNT_EMAIL_REQUIRED = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_LOGIN_ON_GET = False
 SOCIALACCOUNT_STORE_TOKENS = False
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False
 SOCIALACCOUNT_REQUESTS_TIMEOUT = positive_finite_float("SOCIALACCOUNT_REQUESTS_TIMEOUT", "5")
 ALLAUTH_TRUSTED_PROXY_COUNT = int(os.environ.get("ALLAUTH_TRUSTED_PROXY_COUNT", "0"))
 
@@ -215,8 +238,38 @@ SESSION_COOKIE_PATH = "/"
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_HTTPONLY = True
+CSRF_FAILURE_VIEW = "apps.core.views.csrf_failure"
 
 SITE_OWNER_EMAIL = os.environ.get("SITE_OWNER_EMAIL", "").strip()
+
+AUTH_CREDENTIAL_SIGNING_SECRET = domain_signing_secret(
+    "AUTH_CREDENTIAL_SIGNING_SECRET",
+    "kirillwynn.com/stage17/auth-credential/v1",
+    SECRET_KEY,
+)
+AUTH_RATE_LIMIT_SIGNING_SECRET = domain_signing_secret(
+    "AUTH_RATE_LIMIT_SIGNING_SECRET",
+    "kirillwynn.com/stage17/auth-rate-limit/v1",
+    SECRET_KEY,
+)
+AUTH_EMAIL_VERIFICATION_TTL_SECONDS = positive_int("AUTH_EMAIL_VERIFICATION_TTL_SECONDS", "86400")
+AUTH_PASSWORD_RESET_TTL_SECONDS = positive_int("AUTH_PASSWORD_RESET_TTL_SECONDS", "3600")
+AUTH_API_MAX_BODY_BYTES = positive_int("AUTH_API_MAX_BODY_BYTES", "16384")
+AUTH_RATE_LIMITS = {
+    "signup_ip": (5, 3600),
+    "signup_email": (3, 3600),
+    "login_ip": (30, 300),
+    "login_email": (10, 300),
+    "verification_ip": (30, 300),
+    "resend_ip": (10, 3600),
+    "resend_email": (3, 3600),
+    "reset_ip": (10, 3600),
+    "reset_email": (3, 3600),
+    "password_credential_ip": (20, 3600),
+    "password_account_ip": (20, 3600),
+    "password_account_user": (10, 3600),
+    "profile_ip": (30, 3600),
+}
 
 COMMENT_CREATE_RATE_LIMIT_COUNT = positive_int("COMMENT_CREATE_RATE_LIMIT_COUNT", "10")
 COMMENT_CREATE_RATE_LIMIT_WINDOW_SECONDS = positive_int(
@@ -259,6 +312,12 @@ WAGTAILSEARCH_BACKENDS = {
     }
 }
 WAGTAILADMIN_BASE_URL = os.environ.get("WAGTAIL_ADMIN_BASE_URL", "http://localhost:8000")
+# Keep Wagtail's authenticated password-change surface and ModelBackend login,
+# but do not expose its separate query-token/synchronous-email reset flow.
+WAGTAIL_PASSWORD_RESET_ENABLED = False
+# Email change is deliberately outside Stage 17 and must not bypass the
+# canonical identity and verification boundary.
+WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False
 PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "http://localhost:3000").rstrip("/")
 FRONTEND_PREVIEW_URL = os.environ.get(
     "FRONTEND_PREVIEW_URL",

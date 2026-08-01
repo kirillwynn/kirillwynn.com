@@ -2,6 +2,10 @@
 
 import { ProviderForm } from "@/components/provider-form";
 import { useAuth } from "@/components/auth-provider";
+import {
+    LocalLoginForm,
+    SecuritySessionRetry,
+} from "@/components/local-auth-forms";
 import { authErrorMessage, providerIds, safeReturnTo } from "@/lib/auth";
 
 export function LoginPanel({ error, next }: { error?: string; next?: string }) {
@@ -44,12 +48,11 @@ export function LoginPanel({ error, next }: { error?: string; next?: string }) {
                     {message}
                 </p>
             ) : null}
-            {status === "error" ? (
-                <p className="text-sm text-stone-600" role="status">
-                    Sign-in options are temporarily unavailable. Public posts
-                    remain readable.
-                </p>
-            ) : null}
+            {status === "error" ? <SecuritySessionRetry /> : null}
+            <LocalLoginForm next={returnTo} />
+            <div className="account-divider" role="separator">
+                <span>or continue with</span>
+            </div>
             <div className="grid gap-3">
                 {providerIds.map((provider) => (
                     <ProviderForm

@@ -30,6 +30,7 @@ def make_post(blog_index, *, number, live=True):
         slug=f"post-{number}",
         excerpt=f"Excerpt {number}",
         body=[("rich_text", f"<p>Body {number}</p>")],
+        owner=blog_index._stage17_author,
         live=False,
     )
     blog_index.add_child(instance=post)
@@ -67,6 +68,7 @@ def test_list_contract_is_paginated_compact_and_exact(blog_post):
         "updated_at",
         "original_published_at",
         "display_published_at",
+        "author",
         "tags",
         "canonical_path",
         "canonical_url",
@@ -90,6 +92,11 @@ def test_list_contract_is_paginated_compact_and_exact(blog_post):
     assert result["open_graph"]["title"] == "Published post"
     assert result["open_graph"]["description"] == "A concise draft excerpt."
     assert result["lead_image"] is None
+    assert result["author"] == {
+        "id": blog_post.owner_id,
+        "display_name": "Kirill Wynn",
+        "is_site_author": True,
+    }
     assert "body" not in result
 
 
@@ -117,6 +124,7 @@ def test_detail_contract_has_fallbacks_and_serialized_body(blog_post):
         "updated_at",
         "original_published_at",
         "display_published_at",
+        "author",
         "tags",
         "canonical_path",
         "canonical_url",
@@ -582,6 +590,7 @@ def test_list_image_loading_does_not_grow_per_post(blog_index, wagtail_image):
                     },
                 }
             ],
+            owner=blog_index._stage17_author,
             live=False,
         )
         blog_index.add_child(instance=post)

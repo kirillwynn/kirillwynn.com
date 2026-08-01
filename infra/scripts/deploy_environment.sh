@@ -26,19 +26,58 @@ state_root=${STATE_DIRECTORY:-/srv/kirillwynn/state}
 backup_root=${BACKUP_DIRECTORY:-/srv/kirillwynn/backups}
 state_script="$repository_root/infra/scripts/record_rollout_state.py"
 migration_worker_paused=false
+migration_worker_container=
+identity_django_paused=false
+identity_django_container=
 
 restore_migration_worker() {
     if [ "$migration_worker_paused" = true ]; then
         # The existing worker container belongs to the still-active release.
-        # Starting, rather than recreating, it keeps a failed pre-migration
-        # attempt on the previous digest and restores durable outbox delivery.
-        docker compose --env-file "$control_env" -f "$compose_file" \
-            start worker >/dev/null 2>&1 || true
+        # Address the resolved pre-rollout container directly. If candidate
+        # `up` already removed it, do not accidentally start a partially
+        # created candidate under the old-release recovery path.
+        docker start "$migration_worker_container" >/dev/null 2>&1 || true
         migration_worker_paused=false
+        migration_worker_container=
     fi
 }
 
-trap restore_migration_worker EXIT HUP INT TERM
+restore_identity_django() {
+    if [ "$identity_django_paused" = true ]; then
+        # The one-off migration/audit containers use the candidate image, but
+        # the saved container ID still addresses the stopped active digest.
+        # Before candidate `up` removes it, this restores that exact digest if
+        # catch-up or its invariant audit fails.
+        docker start "$identity_django_container" >/dev/null 2>&1 || true
+        identity_django_paused=false
+        identity_django_container=
+    fi
+}
+
+restore_migration_services() {
+    restore_identity_django
+    restore_migration_worker
+}
+
+pause_identity_django() {
+    if [ "$identity_django_paused" = false ]; then
+        django_container=$(docker compose --env-file "$control_env" -f "$compose_file" \
+            ps -q django)
+        if [ -n "$django_container" ] && \
+            [ "$(docker inspect --format '{{.State.Running}}' "$django_container")" = true ]; then
+            # Quiesce the old OAuth/admin/API write surface for the bounded
+            # final catch-up -> audit -> candidate-up window. Without this,
+            # a rollback digest could insert a nullable identity after the
+            # final audit and make activation probabilistic.
+            docker compose --env-file "$control_env" -f "$compose_file" \
+                stop --timeout 60 django
+            identity_django_container=$django_container
+            identity_django_paused=true
+        fi
+    fi
+}
+
+trap restore_migration_services EXIT HUP INT TERM
 
 needs_optional() {
     printf '%s\n' "$operation_plan" | grep -Fxq -- "$1" || return 1
@@ -199,6 +238,7 @@ fi
 docker compose --env-file "$control_env" -f "$compose_file" pull django next worker
 
 migration_started_now=false
+identity_audited_now=false
 if needs_optional migration-started; then
     checkpoint migration-started
     migration_started_now=true
@@ -214,9 +254,17 @@ if needs_optional migration-completed; then
         # trap restores this exact worker container if any later gate fails.
         docker compose --env-file "$control_env" -f "$compose_file" \
             stop --timeout 60 worker
+        migration_worker_container=$worker_container
         migration_worker_paused=true
     fi
     if [ "$migration_started_now" = true ]; then
+        # Capture the live expansion-state counts with the active image before
+        # the candidate performs the first schema/data mutation. The active
+        # Stage 17 expansion command understands nullable identities and emits
+        # only bounded IDs/counts, so ownerless rows remain reportable here.
+        active_runtime=$(operation_field base_active.application.runtime_directory)
+        docker compose --env-file "$active_runtime/control.env" -f "$compose_file" \
+            run --rm --no-deps django python manage.py audit_stage17_identity
         docker compose --env-file "$control_env" -f "$compose_file" \
             run --rm --no-deps django python manage.py migrate --noinput
     else
@@ -231,6 +279,21 @@ if needs_optional migration-completed; then
                 run --rm --no-deps django python manage.py migrate --noinput
         fi
     fi
+    # A previous compatible digest can create an OAuth user with nullable
+    # identity fields after an application rollback. Re-run the exact,
+    # idempotent activation catch-up before every audit/roll-forward. Stop the
+    # active Django write surface first so no legacy INSERT can race the audit.
+    pause_identity_django
+    docker compose --env-file "$control_env" -f "$compose_file" \
+        run --rm --no-deps django python manage.py catchup_stage17_identity
+    # Stage 17 activation must fail before the candidate application or edge
+    # can become healthy if any identity/owner invariant is not satisfied.
+    # The pre-migration backup and nullable expansion schema keep the active
+    # predecessor compatible when this gate aborts a rollout.
+    docker compose --env-file "$control_env" -f "$compose_file" \
+        run --rm --no-deps django \
+        python manage.py audit_stage17_identity --require-activation-ready
+    identity_audited_now=true
     checkpoint migration-completed
 fi
 
@@ -238,14 +301,32 @@ if needs_optional application-rollout-started; then
     checkpoint application-rollout-started
 fi
 if needs_optional application-healthy; then
+    if [ "$identity_audited_now" != true ]; then
+        # A resumed operation may have reached migration-completed while the
+        # expansion application remained live. Recheck immediately before the
+        # candidate starts so a user/page created in that interval cannot
+        # bypass the activation invariant gate.
+        pause_identity_django
+        docker compose --env-file "$control_env" -f "$compose_file" \
+            run --rm --no-deps django python manage.py catchup_stage17_identity
+        docker compose --env-file "$control_env" -f "$compose_file" \
+            run --rm --no-deps django \
+            python manage.py audit_stage17_identity --require-activation-ready
+    fi
     docker compose --env-file "$control_env" -f "$compose_file" up \
         -d --remove-orphans --wait \
         --wait-timeout "${ROLLOUT_WAIT_TIMEOUT_SECONDS:-180}"
+    # `up` has now replaced/restarted Django from the candidate manifest. The
+    # EXIT trap must not treat that candidate container as the paused legacy
+    # service if a later health gate fails.
+    identity_django_paused=false
+    identity_django_container=
     "$repository_root/infra/scripts/verify_application_rollout.sh" \
         "$runtime_dir" "$release_manifest" "$compose_file"
     checkpoint application-healthy
     migration_worker_paused=false
+    migration_worker_container=
 fi
 
-restore_migration_worker
+restore_migration_services
 trap - EXIT HUP INT TERM

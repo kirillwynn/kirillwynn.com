@@ -2,13 +2,13 @@ import hashlib
 
 import pytest
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from wagtail.coreutils import get_supported_content_language_variant
 from wagtail.models import Locale, Page, Site
 
 from apps.blog.models import BlogIndexPage, BlogPostPage
 from apps.discussions.models import ReactionCatalogItem
+from tests.identity import create_identity_user
 
 
 @pytest.fixture
@@ -30,12 +30,13 @@ def blog_index():
 
 
 @pytest.fixture
-def public_post(blog_index):
+def public_post(blog_index, admin_user):
     post = BlogPostPage(
         title="Public comments",
         slug="привет-мир",
         excerpt="A public post.",
         body=[("rich_text", "<p>Public body.</p>")],
+        owner=admin_user,
         live=False,
     )
     blog_index.add_child(instance=post)
@@ -45,9 +46,10 @@ def public_post(blog_index):
 
 @pytest.fixture
 def user():
-    return get_user_model().objects.create_user(
+    return create_identity_user(
         username="reader",
         email="reader@example.com",
+        nickname="Safe Reader",
         password="test-password",
         first_name="Safe",
         last_name="Reader",
@@ -56,19 +58,23 @@ def user():
 
 @pytest.fixture
 def other_user():
-    return get_user_model().objects.create_user(
+    return create_identity_user(
         username="other",
         email="other@example.com",
+        nickname="other",
         password="test-password",
     )
 
 
 @pytest.fixture
 def admin_user():
-    return get_user_model().objects.create_superuser(
+    return create_identity_user(
         username="owner",
         email="owner@example.com",
+        nickname="owner",
         password="test-password",
+        superuser=True,
+        site_author=True,
     )
 
 

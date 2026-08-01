@@ -66,6 +66,7 @@ def test_configured_worker_tasks_are_bounded(monkeypatch):
 
     monkeypatch.setenv("WORKER_EMAIL_OUTBOX_BATCH_SIZE", "7")
     monkeypatch.setenv("WORKER_EMAIL_DELIVERY_BATCH_SIZE", "9")
+    monkeypatch.setenv("WORKER_AUTH_EMAIL_BATCH_SIZE", "5")
 
     tasks = configured_tasks()
 
@@ -73,6 +74,8 @@ def test_configured_worker_tasks_are_bounded(monkeypatch):
         "publish_scheduled_pages",
         "process_revalidation_outbox",
         "process_email_outbox",
+        "process_auth_email_outbox",
         "reconcile_email_webhooks",
     ]
     assert tasks[2].options == {"limit": 7, "delivery_limit": 9}
+    assert tasks[3].options == {"limit": 5}

@@ -2,16 +2,36 @@
 
 import { ProviderForm } from "@/components/provider-form";
 import { useAuth } from "@/components/auth-provider";
+import {
+    AccountLogoutButton,
+    ResendVerificationButton,
+    SecuritySessionRetry,
+} from "@/components/local-auth-forms";
 import { authErrorMessage, providerIds } from "@/lib/auth";
 
 const providerLabels = { google: "Google", github: "GitHub" } as const;
 
-export function AccountPanel({ error }: { error?: string }) {
+export function AccountPanel({
+    error,
+    status: accountStatus,
+}: {
+    error?: string;
+    status?: string;
+}) {
     const { me, status } = useAuth();
     const message = authErrorMessage(error);
+    const providerNotice =
+        accountStatus === "already_connected"
+            ? "That provider is already connected."
+            : accountStatus === "connected"
+              ? "Provider connected."
+              : null;
 
     if (status === "loading") {
         return <p role="status">Loading account…</p>;
+    }
+    if (status === "error") {
+        return <SecuritySessionRetry />;
     }
     if (!me?.authenticated || !me.user) {
         return (
@@ -33,6 +53,10 @@ export function AccountPanel({ error }: { error?: string }) {
             </div>
         );
     }
+    const emailVerified = me.user.email_verified;
+    const canSetOAuthPassword =
+        emailVerified &&
+        providerIds.some((provider) => me.providers[provider].connected);
 
     return (
         <div className="space-y-6">
@@ -44,20 +68,106 @@ export function AccountPanel({ error }: { error?: string }) {
                     {message}
                 </p>
             ) : null}
+            {providerNotice ? (
+                <p
+                    className="account-notice account-notice--success"
+                    role="status"
+                >
+                    {providerNotice}
+                </p>
+            ) : null}
+            {!me.user.profile_complete ? (
+                <div className="account-notice" role="status">
+                    <p>
+                        Your public profile is incomplete, so comments and
+                        reactions are disabled.
+                    </p>
+                    <a
+                        className="mt-3 inline-block font-semibold"
+                        href="/account/profile"
+                    >
+                        Finish profile
+                    </a>
+                </div>
+            ) : null}
+            {!me.user.email_verified ? (
+                <div className="account-notice" role="status">
+                    <p>
+                        Verify the primary email before commenting or reacting.
+                    </p>
+                    <div className="mt-3">
+                        <ResendVerificationButton />
+                    </div>
+                </div>
+            ) : null}
             <dl className="grid gap-2 rounded-xl border border-stone-200 bg-[var(--color-surface)] p-5">
                 <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                        Name
+                        Public nickname
                     </dt>
-                    <dd className="text-stone-950">{me.user.display_name}</dd>
+                    <dd className="text-stone-950">{me.user.nickname}</dd>
                 </div>
                 <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                         Email
                     </dt>
-                    <dd className="text-stone-700">{me.user.email}</dd>
+                    <dd className="text-stone-700">
+                        {me.user.email} ·{" "}
+                        {me.user.email_verified ? "Verified" : "Not verified"}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        Password
+                    </dt>
+                    <dd className="text-stone-700">
+                        {me.user.has_usable_password ? "Set" : "Not set"}
+                    </dd>
                 </div>
             </dl>
+            <section
+                className="account-card"
+                aria-labelledby="profile-actions-heading"
+            >
+                <h2
+                    id="profile-actions-heading"
+                    className="text-lg font-semibold text-stone-950"
+                >
+                    Profile and password
+                </h2>
+                <div className="mt-4 flex flex-wrap gap-3">
+                    <a className="button-link" href="/account/profile">
+                        {me.user.profile_complete
+                            ? "Change nickname"
+                            : "Finish profile"}
+                    </a>
+                    {me.user.has_usable_password ? (
+                        <a
+                            className="button-link"
+                            href="/account/password/change"
+                        >
+                            Change password
+                        </a>
+                    ) : canSetOAuthPassword ? (
+                        <a className="button-link" href="/account/password/set">
+                            Set password
+                        </a>
+                    ) : (
+                        <span className="text-sm text-stone-600">
+                            Password setup requires a verified connected
+                            provider.
+                        </span>
+                    )}
+                </div>
+                {me.user.nickname_change_available_at ? (
+                    <p className="mt-3 text-sm text-stone-600">
+                        Next nickname change:{" "}
+                        {new Date(
+                            me.user.nickname_change_available_at,
+                        ).toLocaleString()}
+                    </p>
+                ) : null}
+            </section>
             <section aria-labelledby="connected-providers-heading">
                 <h2
                     id="connected-providers-heading"
@@ -65,6 +175,12 @@ export function AccountPanel({ error }: { error?: string }) {
                 >
                     Connected providers
                 </h2>
+                {!me.user.email_verified ? (
+                    <p className="mt-2 text-sm text-stone-600" role="status">
+                        Verify the primary email before connecting another
+                        provider.
+                    </p>
+                ) : null}
                 <ul className="mt-3 grid gap-3">
                     {providerIds.map((provider) => {
                         const state = me.providers[provider];
@@ -84,7 +200,9 @@ export function AccountPanel({ error }: { error?: string }) {
                                     <div className="min-w-36">
                                         <ProviderForm
                                             provider={provider}
-                                            available={state.available}
+                                            available={
+                                                state.available && emailVerified
+                                            }
                                             csrfToken={me.csrf_token}
                                             next="/account"
                                             process="connect"
@@ -95,6 +213,12 @@ export function AccountPanel({ error }: { error?: string }) {
                         );
                     })}
                 </ul>
+            </section>
+            <section
+                className="border-t border-stone-200 pt-5"
+                aria-label="Session"
+            >
+                <AccountLogoutButton />
             </section>
         </div>
     );

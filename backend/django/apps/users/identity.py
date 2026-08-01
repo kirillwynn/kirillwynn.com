@@ -5,12 +5,21 @@ from dataclasses import dataclass
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
-MAX_EMAIL_CODE_POINTS = 320
+# django-allauth 65.18 stores EmailAddress.email as varchar(254). Keeping the
+# public identity boundary at that exact limit prevents a split User/allauth
+# identity that one side could persist and the other could not.
+MAX_EMAIL_CODE_POINTS = 254
 MIN_NICKNAME_CODE_POINTS = 2
 MAX_NICKNAME_CODE_POINTS = 40
 MAX_NICKNAME_UTF8_BYTES = 160
 NICKNAME_PUNCTUATION = frozenset("-_.\u00b7'\u2019")
 RESERVED_NICKNAME_SKELETON_VERSION = "stage17-v1/unicodedata-15.0.0"
+UNICODE_DATA_VERSION = "15.0.0"
+if unicodedata.unidata_version != UNICODE_DATA_VERSION:
+    raise RuntimeError(
+        "Stage 17 nickname normalization requires Python Unicode data "
+        f"{UNICODE_DATA_VERSION}, got {unicodedata.unidata_version}"
+    )
 RESERVED_NICKNAMES = frozenset(
     {
         "admin",
@@ -37,9 +46,13 @@ _CONFUSABLE_TO_ASCII = str.maketrans(
         "с": "c",
         "х": "x",
         "у": "y",
+        "ѕ": "s",
         "і": "i",
         "ј": "j",
         "һ": "h",
+        "к": "k",
+        "ӏ": "l",
+        "ԁ": "d",
         "α": "a",
         "ε": "e",
         "ι": "i",
@@ -50,6 +63,20 @@ _CONFUSABLE_TO_ASCII = str.maketrans(
         "υ": "y",
         "χ": "x",
     }
+)
+
+# Unicode 15.0 Default_Ignorable_Code_Point ranges whose members are not
+# already rejected by their general-category value. Keeping the complete
+# ranges explicit also makes the migration/frontend copies reviewable.
+_DEFAULT_IGNORABLE_RANGES = (
+    (0x034F, 0x034F),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFFA0, 0xFFA0),
+    (0xE0000, 0xE0FFF),
 )
 
 
@@ -93,6 +120,10 @@ def _is_noncharacter(code_point: int) -> bool:
     return 0xFDD0 <= code_point <= 0xFDEF or code_point & 0xFFFF in {0xFFFE, 0xFFFF}
 
 
+def _is_default_ignorable(code_point: int) -> bool:
+    return any(start <= code_point <= end for start, end in _DEFAULT_IGNORABLE_RANGES)
+
+
 def _collapse_spaces(value: str) -> str:
     pieces: list[str] = []
     pending_space = False
@@ -129,7 +160,12 @@ def normalize_nickname(
     for character in value:
         code_point = ord(character)
         category = unicodedata.category(character)
-        if category.startswith("C") or category in {"Zl", "Zp"} or _is_noncharacter(code_point):
+        if (
+            category.startswith("C")
+            or category in {"Zl", "Zp"}
+            or _is_noncharacter(code_point)
+            or _is_default_ignorable(code_point)
+        ):
             raise InvalidNickname({"nickname": "Enter a valid nickname."})
 
     try:
@@ -146,7 +182,7 @@ def normalize_nickname(
         raise InvalidNickname({"nickname": "Nickname is too large when encoded."})
 
     previous_separator = False
-    has_base = False
+    cluster_has_base = False
     for index, character in enumerate(display):
         category = unicodedata.category(character)
         is_base = category[0] in {"L", "N"}
@@ -156,12 +192,15 @@ def normalize_nickname(
             raise InvalidNickname({"nickname": "Enter a valid nickname."})
         if index == 0 and not is_base:
             raise InvalidNickname({"nickname": "Nickname must begin with a letter or number."})
-        if is_mark and not has_base:
+        if is_mark and not cluster_has_base:
             raise InvalidNickname({"nickname": "Enter a valid nickname."})
         if is_separator and previous_separator:
             raise InvalidNickname({"nickname": "Nickname separators may not be repeated."})
         previous_separator = is_separator
-        has_base = has_base or is_base
+        if is_separator:
+            cluster_has_base = False
+        elif is_base:
+            cluster_has_base = True
     if previous_separator:
         raise InvalidNickname({"nickname": "Nickname must end with a letter or number."})
 

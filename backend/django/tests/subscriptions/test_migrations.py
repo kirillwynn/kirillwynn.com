@@ -13,7 +13,7 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 def test_subscriptions_migration_reverses_and_reapplies():
     executor = MigrationExecutor(connection)
-    leaf = executor.loader.graph.leaf_nodes("subscriptions")
+    leaf = executor.loader.graph.leaf_nodes()
 
     executor.migrate([("subscriptions", None)])
     tables = connection.introspection.table_names()

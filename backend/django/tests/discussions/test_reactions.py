@@ -2,7 +2,6 @@ from datetime import timedelta
 from urllib.parse import quote
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models.deletion import ProtectedError
@@ -25,6 +24,8 @@ from apps.discussions.services import (
     set_comment_hidden,
     soft_delete_comment,
 )
+from apps.users.services import change_nickname
+from tests.identity import create_identity_user
 
 pytestmark = pytest.mark.django_db
 
@@ -673,9 +674,10 @@ def test_participants_are_minimal_cursor_paginated_and_endpoint_bound(
     users = [user]
     for index in range(20):
         users.append(
-            get_user_model().objects.create_user(
+            create_identity_user(
                 username=f"participant-{index}",
                 email=f"participant-{index}@example.com",
+                nickname=f"participant-{index}",
                 password="test",
             )
         )
@@ -696,6 +698,46 @@ def test_participants_are_minimal_cursor_paginated_and_endpoint_bound(
     assert "testserver" not in first.data["next"]
     assert set(first.data["results"][0]) == {"id", "display_name", "is_site_author"}
     assert "email" not in str(first.data).lower()
+
+
+def test_historical_comments_reply_labels_and_participants_use_current_nickname(
+    public_post,
+    user,
+    other_user,
+    reaction_catalog_item,
+):
+    root = create_top_level_comment(post=public_post, author=user, body="Historical root")
+    reply = create_reply(target_id=root.pk, author=other_user, body="Historical reply")
+    CommentReaction.objects.create(
+        comment=root,
+        user=other_user,
+        catalog_item=reaction_catalog_item,
+    )
+    change_nickname(user=user, nickname="Current Root Author")
+    change_nickname(user=other_user, nickname="Current Reply Author")
+
+    listing = APIClient().get(
+        reverse("discussions_api:post-comments", kwargs={"slug": public_post.slug})
+    )
+    thread = APIClient().get(reverse("discussions_api:comment-thread", kwargs={"pk": root.pk}))
+    participants = APIClient().get(
+        reverse(
+            "discussions_api:comment-reaction-participants",
+            kwargs={"pk": root.pk, "reaction_id": reaction_catalog_item.catalog_id},
+        )
+    )
+
+    assert listing.data["results"][0]["author"]["display_name"] == "Current Root Author"
+    serialized_reply = next(item for item in thread.data["results"] if item["id"] == reply.pk)
+    assert serialized_reply["author"]["display_name"] == "Current Reply Author"
+    assert serialized_reply["reply_to"]["display_name"] == "Current Root Author"
+    assert participants.data["results"] == [
+        {
+            "id": other_user.pk,
+            "display_name": "Current Reply Author",
+            "is_site_author": False,
+        }
+    ]
 
 
 @override_settings(

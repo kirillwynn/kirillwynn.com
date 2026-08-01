@@ -1,7 +1,8 @@
 import pytest
-from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import get_resolver
+
+from tests.identity import create_identity_user
 
 pytestmark = pytest.mark.django_db
 
@@ -14,9 +15,10 @@ def test_test_helpers_are_absent_from_the_application_urlconf(settings):
 
 
 def test_csrf_token_is_bound_to_its_csrf_cookie_secret_not_login_session(settings):
-    user = get_user_model().objects.create_user(
+    user = create_identity_user(
         username="reader",
         email="reader@example.com",
+        nickname="CSRF Reader",
     )
     issuer = Client(enforce_csrf_checks=True)
     issuer.force_login(user)
@@ -26,6 +28,8 @@ def test_csrf_token_is_bound_to_its_csrf_cookie_secret_not_login_session(setting
     other_session.force_login(user)
     rejected = other_session.post(
         "/api/auth/logout/",
+        data="{}",
+        content_type="application/json",
         HTTP_X_CSRFTOKEN=foreign_token,
     )
     assert rejected.status_code == 403
@@ -36,6 +40,8 @@ def test_csrf_token_is_bound_to_its_csrf_cookie_secret_not_login_session(setting
     ].value
     accepted = other_session.post(
         "/api/auth/logout/",
+        data="{}",
+        content_type="application/json",
         HTTP_X_CSRFTOKEN=foreign_token,
     )
 
@@ -43,9 +49,10 @@ def test_csrf_token_is_bound_to_its_csrf_cookie_secret_not_login_session(setting
 
 
 def test_cross_origin_and_cross_site_referer_are_rejected_even_with_valid_token():
-    user = get_user_model().objects.create_user(
+    user = create_identity_user(
         username="reader",
         email="reader@example.com",
+        nickname="Origin Reader",
     )
     client = Client(enforce_csrf_checks=True)
     client.force_login(user)

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default async function AccountPage({
     searchParams,
 }: {
-    searchParams: Promise<{ error?: string }>;
+    searchParams: Promise<{ error?: string; status?: string }>;
 }) {
     const params = await searchParams;
     return (
@@ -19,7 +19,7 @@ export default async function AccountPage({
             <h1 className="mt-2 mb-6 text-3xl font-bold tracking-tight text-stone-950">
                 Your account
             </h1>
-            <AccountPanel error={params.error} />
+            <AccountPanel error={params.error} status={params.status} />
         </section>
     );
 }

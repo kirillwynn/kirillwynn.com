@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
@@ -9,7 +10,10 @@ from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, override_settings
 
 from apps.users.adapters import SiteAccountAdapter
+from apps.users.auth_email import queue_auth_email
+from apps.users.models import AuthCredential
 from apps.users.return_to import safe_return_to
+from tests.identity import create_identity_user
 
 pytestmark = pytest.mark.django_db
 
@@ -139,11 +143,21 @@ def test_mocked_provider_signup_login_and_repeated_login(provider):
     )
 
     assert first.status_code == 302
-    assert first.headers["Location"] == ("/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82?from=login")
+    assert first.headers["Location"] == (
+        "/account/profile?next=%2Fposts%2F%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82%3Ffrom%3Dlogin"
+    )
     assert get_user_model().objects.count() == 1
+    created_user = get_user_model().objects.get()
+    assert created_user.username.startswith("usr_")
+    assert provider not in created_user.username
     assert SocialAccount.objects.filter(provider=provider).count() == 1
     assert SocialToken.objects.count() == 0
-    user_id = client.get("/api/me/").json()["user"]["id"]
+    me = client.get("/api/me/").json()
+    user_id = me["user"]["id"]
+    assert me["user"]["profile_complete"] is False
+    assert me["user"]["email_verified"] is True
+    assert me["user"]["can_interact"] is False
+    assert me["user"]["nickname_suggestion"] == "Reader"
 
     repeated = oauth_callback(
         client,
@@ -155,6 +169,136 @@ def test_mocked_provider_signup_login_and_repeated_login(provider):
     assert repeated.status_code == 302
     assert get_user_model().objects.count() == 1
     assert client.get("/api/me/").json()["user"]["id"] == user_id
+    assert SocialToken.objects.count() == 0
+
+
+def test_new_oauth_signup_persists_only_the_selected_canonical_provider_email():
+    client = Client(enforce_csrf_checks=True)
+    me = client.get("/api/me/").json()
+    start = client.post(
+        "/accounts/google/login/",
+        {
+            "csrfmiddlewaretoken": me["csrf_token"],
+            "next": "/account",
+        },
+    )
+    state = parse_qs(urlsplit(start.headers["Location"]).query)["state"][0]
+
+    def multiple_addresses(adapter, request, app, token, **kwargs):
+        sociallogin = mocked_social_login(
+            adapter,
+            "google",
+            "new-multiple-addresses",
+            "Kirill@example.com",
+        )
+        sociallogin.email_addresses.append(
+            EmailAddress(email="unrelated@example.com", verified=True, primary=False)
+        )
+        return sociallogin
+
+    with (
+        patch(
+            "allauth.socialaccount.providers.google.views.GoogleOAuth2Adapter.get_access_token_data",
+            return_value={"access_token": "temporary"},
+        ),
+        patch(
+            "allauth.socialaccount.providers.google.views.GoogleOAuth2Adapter.complete_login",
+            autospec=True,
+            side_effect=multiple_addresses,
+        ),
+    ):
+        response = client.get(
+            "/accounts/google/login/callback/",
+            {"code": "mock-code", "state": state},
+        )
+
+    user = get_user_model().objects.get()
+    assert response.status_code == 302
+    assert user.email == user.email_normalized == "kirill@example.com"
+    assert list(
+        EmailAddress.objects.filter(user=user).values_list("email", "primary", "verified")
+    ) == [("kirill@example.com", True, True)]
+
+
+@pytest.mark.parametrize("provider", ["google", "github"])
+def test_existing_provider_identity_still_requires_current_verified_email(provider):
+    established = Client(enforce_csrf_checks=True)
+    oauth_callback(
+        established,
+        provider,
+        f"{provider}-verified-boundary",
+        f"{provider}@example.com",
+    )
+    user_id = get_user_model().objects.get().pk
+
+    fresh = Client(enforce_csrf_checks=True)
+    rejected = oauth_callback(
+        fresh,
+        provider,
+        f"{provider}-verified-boundary",
+        f"{provider}@example.com",
+        verified=False,
+    )
+
+    assert rejected.headers["Location"] == "/login?error=verified_email_required"
+    assert fresh.get("/api/me/").json()["authenticated"] is False
+    assert get_user_model().objects.get().pk == user_id
+    assert SocialAccount.objects.count() == 1
+
+
+@pytest.mark.parametrize("provider", ["google", "github"])
+def test_existing_provider_identity_rejects_a_different_verified_email(provider):
+    established = Client(enforce_csrf_checks=True)
+    oauth_callback(
+        established,
+        provider,
+        f"{provider}-stable-email-boundary",
+        f"{provider}@example.com",
+    )
+    user_id = get_user_model().objects.get().pk
+
+    fresh = Client(enforce_csrf_checks=True)
+    rejected = oauth_callback(
+        fresh,
+        provider,
+        f"{provider}-stable-email-boundary",
+        f"changed-{provider}@example.com",
+    )
+
+    assert rejected.headers["Location"] == "/login?error=identity_mismatch"
+    assert fresh.get("/api/me/").json()["authenticated"] is False
+    assert get_user_model().objects.get().pk == user_id
+    assert SocialAccount.objects.count() == 1
+
+
+@pytest.mark.parametrize("provider", ["google", "github"])
+def test_new_oauth_profile_completion_confirms_nickname_without_replacing_identity(provider):
+    client = Client(enforce_csrf_checks=True)
+    oauth_callback(
+        client,
+        provider,
+        f"{provider}-profile",
+        f"{provider}-profile@example.com",
+        next_url="/posts/profile-return",
+    )
+    before = client.get("/api/me/").json()
+    user_id = before["user"]["id"]
+    social_id = SocialAccount.objects.get().pk
+
+    completed = client.patch(
+        "/api/auth/profile/",
+        data=json.dumps({"nickname": "OAuth Public Reader"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=before["csrf_token"],
+    )
+    after = client.get("/api/me/").json()
+
+    assert completed.status_code == 200
+    assert after["user"]["id"] == user_id
+    assert after["user"]["nickname"] == "OAuth Public Reader"
+    assert after["user"]["profile_complete"] is True
+    assert after["user"]["can_interact"] is True
+    assert SocialAccount.objects.get(pk=social_id).user_id == user_id
     assert SocialToken.objects.count() == 0
 
 
@@ -171,6 +315,185 @@ def test_second_provider_verified_email_matches_and_connects_existing_user():
         "google",
         "github",
     }
+
+
+@pytest.mark.parametrize("provider", ["google", "github"])
+def test_verified_local_account_links_provider_without_changing_user_or_password(provider):
+    password = "Stage17!verified-local-password"
+    user = create_identity_user(
+        username="legacy-internal",
+        email="Reader@example.com",
+        nickname="Local Reader",
+        password=password,
+    )
+    client = Client(enforce_csrf_checks=True)
+
+    response = oauth_callback(
+        client,
+        provider,
+        f"{provider}-local-link",
+        "reader@EXAMPLE.COM",
+    )
+
+    user.refresh_from_db()
+    assert response.status_code == 302
+    assert get_user_model().objects.count() == 1
+    assert client.get("/api/me/").json()["user"]["id"] == user.pk
+    assert user.check_password(password)
+    assert SocialAccount.objects.get(provider=provider).user_id == user.pk
+
+
+def test_verified_provider_link_uses_canonical_allauth_address_matching():
+    password = "Stage17!canonical-local-password"
+    user = create_identity_user(
+        username="legacy-internal",
+        email="kirill@example.com",
+        nickname="Local Reader",
+        password=password,
+    )
+    EmailAddress.objects.filter(user=user).update(email="Kirill@example.com")
+    client = Client(enforce_csrf_checks=True)
+
+    response = oauth_callback(
+        client,
+        "google",
+        "google-canonical-local-link",
+        "KIRILL@example.com",
+    )
+
+    user.refresh_from_db()
+    assert response.status_code == 302
+    assert user.check_password(password)
+    assert SocialAccount.objects.get(uid="google-canonical-local-link").user_id == user.pk
+    assert list(
+        EmailAddress.objects.filter(user=user).values_list("email", "primary", "verified")
+    ) == [("kirill@example.com", True, True)]
+
+
+def test_verified_provider_claims_unverified_preregistration_and_destroys_attacker_password():
+    password = "Stage17!attacker-preregistration"
+    user = create_identity_user(
+        username="preregistered",
+        email="victim@example.com",
+        nickname="Preregistered Victim",
+        password=password,
+        verified=False,
+    )
+    credential = queue_auth_email(
+        user=user,
+        purpose=AuthCredential.Purpose.VERIFY_EMAIL,
+    ).credential
+    attacker = Client()
+    attacker.force_login(user)
+    victim = Client(enforce_csrf_checks=True)
+
+    response = oauth_callback(
+        victim,
+        "google",
+        "verified-victim",
+        "victim@example.com",
+    )
+
+    user.refresh_from_db()
+    credential.refresh_from_db()
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/account/profile?next=%2Faccount"
+    assert get_user_model().objects.count() == 1
+    assert not user.has_usable_password()
+    assert user.nickname == "Preregistered Victim"
+    assert user.nickname_confirmed is False
+    assert credential.revoked_at is not None
+    assert EmailAddress.objects.get(user=user, primary=True).verified is True
+    assert SocialAccount.objects.get(uid="verified-victim").user_id == user.pk
+    assert attacker.get("/api/me/").json()["authenticated"] is False
+    victim_identity = victim.get("/api/me/").json()["user"]
+    assert victim_identity["profile_complete"] is False
+    assert victim_identity["can_interact"] is False
+
+
+def test_verified_provider_takeover_rotates_even_an_unusable_session_hash():
+    user = create_identity_user(
+        username="unusable-preregistered",
+        email="victim-unusable@example.com",
+        nickname="Unusable Preregistered",
+        password=None,
+        verified=False,
+    )
+    user.set_unusable_password()
+    user.save(update_fields=("password",))
+    old_password_hash = user.password
+    anomalous_session = Client()
+    anomalous_session.force_login(user)
+    verified_owner = Client(enforce_csrf_checks=True)
+
+    response = oauth_callback(
+        verified_owner,
+        "github",
+        "verified-unusable-victim",
+        "victim-unusable@example.com",
+    )
+
+    user.refresh_from_db()
+    assert response.status_code == 302
+    assert user.password != old_password_hash
+    assert not user.has_usable_password()
+    assert anomalous_session.get("/api/me/").json()["authenticated"] is False
+
+
+def test_email_authentication_uses_the_exact_matching_verified_provider_address():
+    user = create_identity_user(
+        username="reader",
+        email="matched@example.com",
+        nickname="Matched Reader",
+        password="Stage17!matched-address",
+    )
+    client = Client(enforce_csrf_checks=True)
+    me = client.get("/api/me/").json()
+    start = client.post(
+        "/accounts/google/login/",
+        {
+            "csrfmiddlewaretoken": me["csrf_token"],
+            "next": "/account",
+        },
+    )
+    state = parse_qs(urlsplit(start.headers["Location"]).query)["state"][0]
+
+    def multiple_addresses(adapter, request, app, token, **kwargs):
+        sociallogin = mocked_social_login(
+            adapter,
+            "google",
+            "multiple-addresses",
+            "unrelated@example.com",
+        )
+        sociallogin.email_addresses = [
+            EmailAddress(email="unrelated@example.com", verified=True, primary=True),
+            EmailAddress(email="MATCHED@example.com", verified=True, primary=False),
+        ]
+        return sociallogin
+
+    with (
+        patch(
+            "allauth.socialaccount.providers.google.views.GoogleOAuth2Adapter.get_access_token_data",
+            return_value={"access_token": "temporary"},
+        ),
+        patch(
+            "allauth.socialaccount.providers.google.views.GoogleOAuth2Adapter.complete_login",
+            autospec=True,
+            side_effect=multiple_addresses,
+        ),
+    ):
+        response = client.get(
+            "/accounts/google/login/callback/",
+            {"code": "mock-code", "state": state},
+        )
+
+    user.refresh_from_db()
+    assert response.status_code == 302
+    assert user.email_normalized == "matched@example.com"
+    assert SocialAccount.objects.get(uid="multiple-addresses").user_id == user.pk
+    assert not EmailAddress.objects.filter(
+        user=user, email__iexact="unrelated@example.com"
+    ).exists()
 
 
 def test_explicit_second_provider_connection_for_authenticated_user():
@@ -196,7 +519,7 @@ def test_explicit_second_provider_connection_for_authenticated_user():
             "allauth.socialaccount.providers.github.views.GitHubOAuth2Adapter.complete_login",
             autospec=True,
             side_effect=lambda adapter, request, app, token, **kwargs: mocked_social_login(
-                adapter, "github", "github-connected", "other-verified@example.com"
+                adapter, "github", "github-connected", "reader@example.com"
             ),
         ),
     ):
@@ -234,9 +557,17 @@ def test_unverified_email_cannot_signup_or_match_existing_user():
 
 
 def test_identity_cannot_be_reassigned_to_another_authenticated_user():
-    owner = get_user_model().objects.create_user(username="owner", email="owner@example.com")
+    owner = create_identity_user(
+        username="owner",
+        email="owner@example.com",
+        nickname="owner",
+    )
     identity = SocialAccount.objects.create(provider="github", uid="shared", user=owner)
-    other = get_user_model().objects.create_user(username="other", email="other@example.com")
+    other = create_identity_user(
+        username="other",
+        email="other@example.com",
+        nickname="other",
+    )
     client = Client(enforce_csrf_checks=True)
     client.force_login(other)
 
@@ -255,13 +586,15 @@ def test_identity_cannot_be_reassigned_to_another_authenticated_user():
 
 
 def test_connect_cannot_claim_verified_email_of_another_user():
-    get_user_model().objects.create_user(
+    create_identity_user(
         username="owner",
         email="owner@example.com",
+        nickname="owner",
     )
-    other = get_user_model().objects.create_user(
+    other = create_identity_user(
         username="other",
         email="other@example.com",
+        nickname="other",
     )
     client = Client(enforce_csrf_checks=True)
     client.force_login(other)
@@ -279,9 +612,10 @@ def test_connect_cannot_claim_verified_email_of_another_user():
 
 
 def test_connecting_an_already_connected_identity_reports_safe_error():
-    user = get_user_model().objects.create_user(
+    user = create_identity_user(
         username="reader",
         email="reader@example.com",
+        nickname="reader",
     )
     SocialAccount.objects.create(provider="google", uid="connected", user=user)
     client = Client(enforce_csrf_checks=True)
@@ -295,7 +629,7 @@ def test_connecting_an_already_connected_identity_reports_safe_error():
         process="connect",
     )
 
-    assert response.headers["Location"] == "/account?error=already_connected"
+    assert response.headers["Location"] == "/account?status=already_connected"
     assert SocialAccount.objects.count() == 1
 
 
@@ -489,7 +823,7 @@ def test_malicious_next_is_not_stashed_or_returned_after_oauth_callback(provider
     )
 
     assert callback.status_code == 302
-    assert callback.headers["Location"] == "/"
+    assert callback.headers["Location"] == "/account/profile?next=%2F"
     parsed_location = urlsplit(callback.headers["Location"])
     assert not parsed_location.scheme
     assert not parsed_location.netloc

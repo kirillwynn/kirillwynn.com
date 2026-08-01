@@ -8,6 +8,7 @@ export function postMetadata(post: PostDetail, preview: boolean): Metadata {
     return {
         title: post.seo.title,
         description: post.seo.description,
+        authors: [{ name: post.author.display_name }],
         alternates: {
             canonical: post.canonical_url,
         },
@@ -26,6 +27,7 @@ export function postMetadata(post: PostDetail, preview: boolean): Metadata {
             description: post.open_graph.description,
             publishedTime: post.display_published_at ?? undefined,
             modifiedTime: post.updated_at ?? undefined,
+            authors: [post.author.display_name],
             tags: post.tags.map((tag) => tag.name),
             images:
                 image && post.open_graph.image

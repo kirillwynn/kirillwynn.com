@@ -47,6 +47,11 @@ function summary(overrides: Partial<PostListItem> = {}): PostListItem {
         updated_at: "2026-07-26T17:05:00Z",
         original_published_at: null,
         display_published_at: "2026-07-26T17:00:00Z",
+        author: {
+            id: 1,
+            display_name: "Kirill Wynn",
+            is_site_author: true,
+        },
         tags: [{ name: "Django", slug: "django" }],
         canonical_path: "/posts/привет-мир",
         canonical_url: "https://example.com/posts/%D0%BF",
@@ -81,6 +86,7 @@ describe("feed presentation", () => {
         expect(html).not.toContain("%25D0");
         expect(html).toContain('class="feed-entry"');
         expect(html).toContain("#Django");
+        expect(html).toContain("by Kirill Wynn");
     });
 
     it("renders the display publication date in the Feed time element", () => {

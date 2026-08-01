@@ -16,13 +16,13 @@ type AuthStatus = "loading" | "ready" | "error";
 
 type AuthContextValue = {
     me: MeResponse | null;
-    refresh: () => Promise<void>;
+    refresh: () => Promise<boolean>;
     status: AuthStatus;
 };
 
 const AuthContext = createContext<AuthContextValue>({
     me: null,
-    refresh: () => Promise.resolve(),
+    refresh: () => Promise.resolve(false),
     status: "loading",
 });
 
@@ -31,12 +31,43 @@ function isMeResponse(value: unknown): value is MeResponse {
         return false;
     }
     const candidate = value as Partial<MeResponse>;
+    const user = candidate.user;
+    const providers: unknown = candidate.providers;
+    const providerRecord =
+        providers && typeof providers === "object"
+            ? (providers as Record<string, unknown>)
+            : null;
+    const validUser =
+        user === null ||
+        (typeof user === "object" &&
+            typeof user.id === "number" &&
+            typeof user.nickname === "string" &&
+            typeof user.display_name === "string" &&
+            (user.nickname_suggestion === null ||
+                typeof user.nickname_suggestion === "string") &&
+            typeof user.email === "string" &&
+            typeof user.email_verified === "boolean" &&
+            typeof user.profile_complete === "boolean" &&
+            typeof user.has_usable_password === "boolean" &&
+            (user.nickname_change_available_at === null ||
+                typeof user.nickname_change_available_at === "string") &&
+            typeof user.is_admin === "boolean" &&
+            typeof user.is_banned === "boolean" &&
+            typeof user.can_interact === "boolean");
     return (
         typeof candidate.authenticated === "boolean" &&
         typeof candidate.csrf_token === "string" &&
-        candidate.providers !== undefined &&
-        "google" in candidate.providers &&
-        "github" in candidate.providers
+        validUser &&
+        providerRecord !== null &&
+        [providerRecord.google, providerRecord.github].every(
+            (provider) =>
+                Boolean(provider) &&
+                typeof provider === "object" &&
+                typeof (provider as Record<string, unknown>).available ===
+                    "boolean" &&
+                typeof (provider as Record<string, unknown>).connected ===
+                    "boolean",
+        )
     );
 }
 
@@ -44,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [me, setMe] = useState<MeResponse | null>(null);
     const [status, setStatus] = useState<AuthStatus>("loading");
 
-    const refresh = useCallback(async () => {
+    const refresh = useCallback(async (): Promise<boolean> => {
         try {
             const response = await fetch("/api/me/", {
                 cache: "no-store",
@@ -60,9 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             setMe(payload);
             setStatus("ready");
+            return true;
         } catch {
             setMe(null);
             setStatus("error");
+            return false;
         }
     }, []);
 

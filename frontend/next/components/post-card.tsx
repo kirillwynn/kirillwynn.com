@@ -19,14 +19,13 @@ export function PostCard({
 
     return (
         <article className="feed-entry">
-            {post.display_published_at || post.tags.length > 0 ? (
-                <div className="feed-entry-meta">
-                    {post.display_published_at ? (
-                        <DateTime value={post.display_published_at} />
-                    ) : null}
-                    <Tags tags={post.tags} variant="feed" />
-                </div>
-            ) : null}
+            <div className="feed-entry-meta">
+                {post.display_published_at ? (
+                    <DateTime value={post.display_published_at} />
+                ) : null}
+                <span>by {post.author.display_name}</span>
+                <Tags tags={post.tags} variant="feed" />
+            </div>
             <div className="feed-entry-layout">
                 <div className="min-w-0">
                     <h2 className="feed-entry-title">

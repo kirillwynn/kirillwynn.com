@@ -61,7 +61,9 @@ export function SiteHeader() {
                 headers: {
                     "X-CSRFToken": me.csrf_token,
                     Accept: "application/json",
+                    "Content-Type": "application/json",
                 },
+                body: JSON.stringify({}),
             });
             if (response.ok) {
                 window.location.assign(returnTo);

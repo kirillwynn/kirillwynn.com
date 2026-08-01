@@ -219,7 +219,11 @@ export function ReactionBar({
         if (authStatus !== "ready") {
             return;
         }
-        const pendingId = loadPendingReaction(mutationTarget);
+        const pendingId = loadPendingReaction(
+            mutationTarget,
+            Date.now(),
+            user?.id ?? null,
+        );
         if (!pendingId) {
             setPendingReaction(null);
             return;
@@ -243,7 +247,7 @@ export function ReactionBar({
                 if (reaction) {
                     setPendingReaction(reaction);
                 } else {
-                    clearPendingReaction(mutationTarget);
+                    clearPendingReaction(mutationTarget, user?.id ?? null);
                     setPendingReaction(null);
                 }
             })
@@ -255,7 +259,7 @@ export function ReactionBar({
         return () => {
             active = false;
         };
-    }, [authStatus, mutationTarget, reactions]);
+    }, [authStatus, mutationTarget, reactions, user?.id]);
 
     async function performToggle(
         reaction: ReactionDescriptor,
@@ -290,7 +294,7 @@ export function ReactionBar({
         if (outcome.status === "authoritative") {
             rememberReaction(reaction.id);
             if (fromPending) {
-                clearPendingReaction(target);
+                clearPendingReaction(target, user.id);
                 if (
                     mountedRef.current &&
                     initiatingTargetKey === latestTargetKeyRef.current
@@ -307,6 +311,8 @@ export function ReactionBar({
                 outcome.error instanceof ReactionApiError &&
                 outcome.error.status === 403
             ) {
+                savePendingReaction(target, reaction.id, Date.now(), user.id);
+                setPendingReaction(reaction);
                 await refresh();
             }
         }
@@ -323,7 +329,7 @@ export function ReactionBar({
                 group.viewer_reacted,
         );
         if (alreadyPresent) {
-            clearPendingReaction(target);
+            clearPendingReaction(target, user?.id ?? null);
             setNotice(
                 `Your ${pendingReaction.name} reaction is already active.`,
             );
@@ -579,7 +585,7 @@ export function ReactionBar({
                     )}
                     <button
                         onClick={() => {
-                            clearPendingReaction(target);
+                            clearPendingReaction(target, user?.id ?? null);
                             setPendingReaction(null);
                         }}
                         type="button"

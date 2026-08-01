@@ -53,8 +53,14 @@ const authenticated: MeResponse = {
     authenticated: true,
     user: {
         id: 42,
+        nickname: "Reader",
         display_name: "Reader",
+        nickname_suggestion: null,
         email: "reader@example.com",
+        email_verified: true,
+        profile_complete: true,
+        has_usable_password: true,
+        nickname_change_available_at: null,
         is_admin: false,
         is_banned: false,
         can_interact: true,
@@ -947,9 +953,16 @@ describe("comments and Slack-style thread UI", () => {
             loadCommentDraft({
                 slug: "привет-мир",
                 kind: "comment",
-                userId: 100,
+                userId: authenticated.user?.id ?? null,
             }),
         ).toBe("Keep after OAuth");
+        expect(
+            loadCommentDraft({
+                slug: "привет-мир",
+                kind: "comment",
+                userId: 100,
+            }),
+        ).toBe("");
         act(() => {
             root.unmount();
         });

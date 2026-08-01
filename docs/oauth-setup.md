@@ -1,6 +1,6 @@
 # OAuth setup
 
-Status: implemented application configuration; external applications pending
+Status: implemented; staging applications configured; production applications absent
 
 The site uses the classic django-allauth browser OAuth flow with Google and
 GitHub. Django owns identities, database-backed sessions, and CSRF. Next.js owns
@@ -57,9 +57,10 @@ use different GitHub applications. Keep local credentials separate from both
 deployed environments when a live local consent flow is needed.
 
 For local development, begin at `http://localhost:3000/login`. Next.js has
-fixed rewrites for `/accounts/*`, `/api/me/`, and `/api/auth/logout/`; it is not
-a caller-controlled general proxy. The Django trusted origins must include
-`http://localhost:3000`.
+fixed rewrites for `/accounts/*`, `/api/me/`, logout, and each documented local
+account mutation. Nginx has the same explicit location list. Neither layer has
+a general `/api/*` or `/api/auth/*` proxy. The Django trusted origins must
+include `http://localhost:3000`.
 
 ## Provider permissions
 
@@ -82,6 +83,56 @@ without a verified provider email is rejected. A second provider with the same
 verified email connects to the existing user; explicit `process=connect` is
 available from `/account`. The `(provider, uid)` database constraint and
 allauth connection flow prevent silent reassignment from another user.
+An already linked provider must continue to return that Django user's canonical
+email as verified on every login. A different newly verified provider address
+does not silently change or bypass the local identity; email change is outside
+Stage 17 and the login fails closed.
+
+Only the selected authoritative verified address is normalized and passed to
+allauth persistence. Extra provider-profile addresses are not persisted as
+secondary identity candidates. A takeover of an unverified preregistration
+always rotates the Django password hash, including an already-unusable hash,
+so every pre-existing session is invalidated.
+
+The installed django-allauth 65.18.0 extension contract is explicit:
+`ACCOUNT_LOGIN_METHODS={"email"}`, `ACCOUNT_USER_MODEL_USERNAME_FIELD=None`,
+settings-backed provider `APPS`, provider `EMAIL_AUTHENTICATION=True`, custom
+account/social adapters, and `SOCIALACCOUNT_STORE_TOKENS=False`. Provider
+scopes and Google PKCE remain unchanged. Public local forms are project-owned
+JSON/Next surfaces; duplicate allauth HTML account/password/social-management
+routes return 404, while allauth continues to own the exact Google/GitHub
+provider initiation, callback, state, and connection processing routes.
+
+The public JSON login consumes its transactional PostgreSQL IP/email limits
+before invoking allauth's `LoginForm`. Only allauth's duplicate cache-based
+`login_failed` action is disabled, preventing process-local early rejection;
+other installed-version allauth rate-limit defaults remain unchanged.
+
+## Local/provider linking matrix
+
+- A verified local account followed by Google or GitHub with the same verified
+  canonical email stays one `User`; its password is preserved.
+- A verified Google account may set a local password and later connect GitHub,
+  still on the same `User`.
+- A provider-verified identity may reclaim an unverified local
+  preregistration of that exact canonical address. The preregistration's
+  password, sessions, and outstanding credentials are invalidated before the
+  provider is connected and the primary address becomes verified. Its
+  untrusted nickname is marked incomplete until the verified owner explicitly
+  accepts or replaces it on `/account/profile`.
+- An unverified provider address never signs up, authenticates by email, or
+  connects.
+- Explicit connection requires the current account to have the same verified
+  primary email. A `SocialAccount` already owned by another user cannot move.
+- Repeated callbacks are idempotent and no `SocialToken` is persisted.
+- Inactive and banned users cannot enter through local or social login.
+
+A newly created OAuth user receives an opaque provisional public key and a
+provider-name suggestion only. The suggestion is not trusted or automatically
+confirmed. `/account/profile` requires a valid unique nickname before
+`can_interact` becomes true and then returns to the backend-approved original
+destination. Reading, logout, password setup, and account management remain
+available during completion.
 
 ## Sessions, cookies, and CSRF
 
@@ -129,10 +180,12 @@ cd backend/django
 uv run python manage.py promote_site_owner
 ```
 
-The command requires an existing matching user, a verified allauth
-`EmailAddress`, and a connected Google or GitHub identity. It idempotently
-grants Django/Wagtail administrator status and never creates a user. Do not run
-it against production as part of automated deployment.
+The command requires an existing matching user, the matching verified primary
+allauth `EmailAddress`, and a connected Google or GitHub identity. It
+idempotently grants Django/Wagtail administrator status and the unique public
+site-author marker, refuses to replace a different marked author, and never
+creates a user. Do not run it against production as part of automated
+deployment.
 
 ## External setup checklist
 

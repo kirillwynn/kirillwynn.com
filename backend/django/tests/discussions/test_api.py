@@ -247,13 +247,15 @@ def test_owner_edit_delete_permissions_and_noop(public_post, user, other_user, a
 
 
 def test_site_author_identity_does_not_grant_cross_owner_or_moderation_permission(
-    public_post, user, other_user
+    public_post, user, other_user, admin_user
 ):
     from django.core.exceptions import PermissionDenied
 
+    admin_user.is_site_author = False
+    admin_user.save(update_fields=("is_site_author",))
     site_author = other_user
-    site_author.is_staff = True
-    site_author.save(update_fields=("is_staff",))
+    site_author.is_site_author = True
+    site_author.save(update_fields=("is_site_author",))
     owned = create_top_level_comment(post=public_post, author=user, body="Reader-owned")
     authored = create_top_level_comment(post=public_post, author=site_author, body="Author-owned")
 

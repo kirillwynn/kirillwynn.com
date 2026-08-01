@@ -8,6 +8,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.discussions.models import Comment, CommentRateLimitBucket
+from apps.users.services import ensure_can_interact as ensure_identity_can_interact
 
 MAX_COMMENT_LENGTH = 5000
 _DANGEROUS_FORMAT_CONTROLS = {
@@ -63,12 +64,7 @@ def normalize_comment_body(value):
 
 
 def ensure_can_interact(user):
-    if not user.is_authenticated:
-        raise PermissionDenied("Authentication is required.")
-    if not user.is_active:
-        raise PermissionDenied("This account is inactive.")
-    if user.is_banned:
-        raise PermissionDenied("This account is read-only.")
+    ensure_identity_can_interact(user)
 
 
 def _rate_policy(scope):

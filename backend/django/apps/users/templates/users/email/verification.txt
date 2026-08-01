@@ -1,0 +1,5 @@
+Confirm your email address by opening this secure link:
+
+{{ credential_url }}
+
+If you did not create an account, you can ignore this message.

@@ -30,6 +30,7 @@ def add_post(blog_index, *, slug, original_published_at=None):
         excerpt=f"Excerpt for {slug}.",
         body=[("rich_text", f"<p>Body for {slug}.</p>")],
         original_published_at=original_published_at,
+        owner=blog_index._stage17_author,
         live=False,
     )
     blog_index.add_child(instance=post)

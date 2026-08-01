@@ -248,7 +248,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                 saveCommentDraft({
                     slug,
                     kind: "comment",
-                    userId: null,
+                    userId: user.id,
                     body,
                 });
                 await refresh();

@@ -113,6 +113,13 @@ EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE = normalize_transport_identity(
     os.environ["EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE"],
     name="EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE",
 )
+# Auth mail owns a distinct transport namespace and stores that exact value in
+# a 128-character immutable delivery field. Reject an overlong base at startup
+# instead of discovering it during a signup transaction.
+normalize_transport_identity(
+    f"{EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE}/auth",
+    name="EMAIL_PROVIDER_IDEMPOTENCY_NAMESPACE auth sub-namespace",
+)
 if (
     SERVICE_ROLE == "web"
     and EMAIL_PROVIDER_ADAPTER == "apps.subscriptions.providers.resend.ResendEmailProvider"

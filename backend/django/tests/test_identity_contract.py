@@ -4,10 +4,18 @@ from django.core.exceptions import ValidationError
 from apps.users.identity import (
     MAX_NICKNAME_CODE_POINTS,
     RESERVED_NICKNAME_SKELETON_VERSION,
+    UNICODE_DATA_VERSION,
     InvalidNickname,
     normalize_email_address,
     normalize_nickname,
 )
+
+
+def test_nickname_normalization_pins_python_unicode_data():
+    import unicodedata
+
+    assert UNICODE_DATA_VERSION == "15.0.0"
+    assert unicodedata.unidata_version == UNICODE_DATA_VERSION
 
 
 @pytest.mark.parametrize(
@@ -47,6 +55,11 @@ def test_nickname_normalization_contract(source, display, key):
         "a\u202eb",
         "a\u2066b",
         "a\u200bb",
+        "a\u034fb",
+        "a\u180bb",
+        "a\ufe0fb",
+        "\u115f\u1160",
+        "\u3164a",
         "a\ue000b",
         "a\ufdd0b",
         "a\ufffeb",
@@ -68,6 +81,8 @@ def test_nickname_rejects_unsafe_or_out_of_bounds_values(source):
         "ADMIN",
         "Ａdmin",
         "аdmin",
+        "ѕupport",
+        "кіrill-wуnn",
         "administrator",
         "moderator",
         "staff",

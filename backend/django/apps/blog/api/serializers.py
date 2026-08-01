@@ -8,6 +8,7 @@ from wagtail.images import get_image_model
 from wagtail.rich_text import expand_db_html
 
 from apps.blog.services.content_routes import frontend_page_path
+from apps.users.services import is_site_author, public_display_name
 
 API_VERSION = "1.0"
 IMAGE_RENDITION_SPECS = {
@@ -247,6 +248,11 @@ def _metadata(page, *, lead_image=None):
         "updated_at": _timestamp(page.last_published_at),
         "original_published_at": _timestamp(page.original_published_at),
         "display_published_at": _timestamp(page.display_published_at),
+        "author": {
+            "id": page.owner.pk,
+            "display_name": public_display_name(page.owner),
+            "is_site_author": is_site_author(page.owner),
+        },
         "tags": _tags(page),
         "canonical_path": path,
         "canonical_url": page.canonical_url or f"{settings.PUBLIC_SITE_URL}{iri_to_uri(path)}",
