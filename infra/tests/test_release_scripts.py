@@ -329,6 +329,12 @@ def test_rollout_order_health_gates_and_active_state_policy():
     assert deploy.count("checkpoint migration-started") == 1
     assert deploy.count("checkpoint migration-completed") == 1
     assert "python manage.py migrate --plan" in deploy
+    assert deploy.index("stop --timeout 60 worker") < migrate
+    assert "restore_migration_worker" in deploy
+    assert "start worker" in deploy
+    assert deploy.index("checkpoint application-healthy") < deploy.index(
+        "migration_worker_paused=false", deploy.index("checkpoint application-healthy")
+    )
     for proof in (
         "verify_application_rollout.sh",
         "migration-started",
@@ -353,6 +359,16 @@ def test_rollout_order_health_gates_and_active_state_policy():
     assert "finalize" in finalize
     assert "verify_application_rollout.sh" in finalize
     assert "verify_active_edge.sh" in finalize
+
+
+def test_staging_preflight_and_failed_deploy_report_bounded_memory_evidence():
+    preflight = (SCRIPTS / "ci_ssh_preflight.sh").read_text()
+    deploy = (SCRIPTS / "ci_ssh_deploy.sh").read_text()
+    assert "memory_total_kib=" in preflight
+    assert "memory_available_kib=" in preflight
+    assert "memory_after_failure_kib=" in deploy
+    assert "journalctl -k --since '-15 minutes'" in deploy
+    assert "tail -n 20" in deploy
 
 
 def test_first_bootstrap_starts_only_pinned_postgres_then_backup():

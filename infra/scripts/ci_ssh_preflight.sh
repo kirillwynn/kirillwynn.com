@@ -200,6 +200,10 @@ else
     echo "production_rollout_state=absent"
 fi
 df -Pk /srv/kirillwynn | awk 'NR == 2 { print "available_kib=" $4 }'
+awk '
+    $1 == "MemTotal:" { print "memory_total_kib=" $2 }
+    $1 == "MemAvailable:" { print "memory_available_kib=" $2 }
+' /proc/meminfo
 REMOTE
 
 cleanup_remote

@@ -118,6 +118,8 @@ ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
 remote_rollout_status=$?
 set -e
 if [ "$remote_rollout_status" -ne 0 ]; then
+    ssh $ssh_options "$SERVER_USER@$SERVER_HOST" \
+        "printf 'memory_after_failure_kib='; awk '/^MemAvailable:/ { print \$2 }' /proc/meminfo; journalctl -k --since '-15 minutes' --no-pager -o cat 2>/dev/null | grep -E 'oom-kill|Out of memory|Killed process' | tail -n 20 || true" || true
     failure_command="cd '$durable_release' && flock -w 900 /srv/kirillwynn/locks/release.lock infra/scripts/mark_rollout_failed.sh '$environment_name' '$operation_id' remote-rollout 'remote rollout command failed'"
     set +e
     ssh $ssh_options "$SERVER_USER@$SERVER_HOST" "$failure_command"

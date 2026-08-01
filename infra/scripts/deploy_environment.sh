@@ -25,6 +25,20 @@ compose_file="$repository_root/infra/compose/application.yml"
 state_root=${STATE_DIRECTORY:-/srv/kirillwynn/state}
 backup_root=${BACKUP_DIRECTORY:-/srv/kirillwynn/backups}
 state_script="$repository_root/infra/scripts/record_rollout_state.py"
+migration_worker_paused=false
+
+restore_migration_worker() {
+    if [ "$migration_worker_paused" = true ]; then
+        # The existing worker container belongs to the still-active release.
+        # Starting, rather than recreating, it keeps a failed pre-migration
+        # attempt on the previous digest and restores durable outbox delivery.
+        docker compose --env-file "$control_env" -f "$compose_file" \
+            start worker >/dev/null 2>&1 || true
+        migration_worker_paused=false
+    fi
+}
+
+trap restore_migration_worker EXIT HUP INT TERM
 
 needs_optional() {
     printf '%s\n' "$operation_plan" | grep -Fxq -- "$1" || return 1
@@ -190,6 +204,18 @@ if needs_optional migration-started; then
     migration_started_now=true
 fi
 if needs_optional migration-completed; then
+    worker_container=$(docker compose --env-file "$control_env" -f "$compose_file" \
+        ps -q worker)
+    if [ -n "$worker_container" ] && \
+        [ "$(docker inspect --format '{{.State.Running}}' "$worker_container")" = true ]; then
+        # A migration imports the same Django/Wagtail application as the
+        # worker. Temporarily release that duplicate memory footprint on
+        # small hosts. The web and Next containers remain live, and the EXIT
+        # trap restores this exact worker container if any later gate fails.
+        docker compose --env-file "$control_env" -f "$compose_file" \
+            stop --timeout 60 worker
+        migration_worker_paused=true
+    fi
     if [ "$migration_started_now" = true ]; then
         docker compose --env-file "$control_env" -f "$compose_file" \
             run --rm --no-deps django python manage.py migrate --noinput
@@ -218,4 +244,8 @@ if needs_optional application-healthy; then
     "$repository_root/infra/scripts/verify_application_rollout.sh" \
         "$runtime_dir" "$release_manifest" "$compose_file"
     checkpoint application-healthy
+    migration_worker_paused=false
 fi
+
+restore_migration_worker
+trap - EXIT HUP INT TERM
