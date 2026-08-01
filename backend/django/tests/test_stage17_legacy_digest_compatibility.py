@@ -11,6 +11,11 @@ def test_stage16_user_insert_remains_compatible_with_current_schema():
     """The predecessor model can omit every Stage 17 column on INSERT."""
 
     executor = MigrationExecutor(connection)
+    # Migration-direction tests intentionally leave the shared transactional
+    # test database at historical nodes. Establish the real current schema
+    # explicitly so this compatibility proof is order-independent.
+    executor.migrate(executor.loader.graph.leaf_nodes())
+    executor = MigrationExecutor(connection)
     stage16_apps = executor.loader.project_state([("users", "0001_initial")]).apps
     Stage16User = stage16_apps.get_model("users", "User")
 
