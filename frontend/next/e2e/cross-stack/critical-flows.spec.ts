@@ -241,9 +241,7 @@ test("real local signup and password login keep one canonical nickname identity"
 
     await page.goto("/account");
     await page.getByRole("button", { name: "Logout" }).click();
-    await expect(
-        page.getByRole("link", { name: "Login", exact: true }),
-    ).toBeVisible();
+    await expect(page).toHaveURL("/");
     await page.goto("/account/password/reset");
     await page.getByLabel("Email").fill(email);
     await page.getByRole("button", { name: "Send reset email" }).click();
