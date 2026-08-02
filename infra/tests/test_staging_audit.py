@@ -386,6 +386,13 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
         "await postLink.click()"
     )
     assert 'const unicodeListing = listings["/api/v1/posts/?q=東京"];' in live_spec
+    theme_reload = live_spec.index(
+        'await page.reload({ waitUntil: "domcontentloaded" });'
+    )
+    assert live_spec.index("await expectHydrated(page);", theme_reload) > theme_reload
+    assert live_spec.index(
+        'requests.filter((request) => request === "/api/me/")', theme_reload
+    ) > live_spec.index("await expectHydrated(page);", theme_reload)
     assert "Unicode staging fixture did not expose a responsive lead image" in live_spec
     assert 'for (const key of ["480w", "960w", "1440w"] as const)' in live_spec
     assert 'page.locator(".feed-entry-image img").first()' in live_spec

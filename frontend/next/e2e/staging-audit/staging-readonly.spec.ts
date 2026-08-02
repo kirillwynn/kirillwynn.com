@@ -159,6 +159,7 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expectHydrated(page);
 
     const browserStorageKeys = await page.evaluate(() => [
         ...Object.keys(window.localStorage),
