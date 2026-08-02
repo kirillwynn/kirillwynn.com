@@ -381,7 +381,7 @@ test("repeatable public API and media cache baseline", async ({
     await page.goto("/", { waitUntil: "domcontentloaded" });
     const endpoints = ["/api/v1/posts/?page=1", "/api/v1/posts/?q=東京"];
     const samples: Record<string, number[]> = {};
-    let listing: Record<string, unknown> | null = null;
+    const listings: Partial<Record<string, Record<string, unknown>>> = {};
 
     for (const endpoint of endpoints) {
         samples[endpoint] = [];
@@ -390,8 +390,11 @@ test("repeatable public API and media cache baseline", async ({
             const response = await page.request.get(endpoint);
             samples[endpoint].push(Date.now() - started);
             expect(response.status()).toBe(200);
-            if (endpoint.includes("page=1") && attempt === 0) {
-                listing = (await response.json()) as Record<string, unknown>;
+            if (attempt === 0) {
+                listings[endpoint] = (await response.json()) as Record<
+                    string,
+                    unknown
+                >;
             }
         }
     }
@@ -400,8 +403,9 @@ test("repeatable public API and media cache baseline", async ({
         [...values].sort((left, right) => left - right)[
             Math.floor(values.length / 2)
         ];
-    const results = Array.isArray(listing?.results)
-        ? (listing.results as Array<Record<string, unknown>>)
+    const feedListing = listings["/api/v1/posts/?page=1"];
+    const results = Array.isArray(feedListing?.results)
+        ? (feedListing.results as Array<Record<string, unknown>>)
         : [];
     expect(results.length).toBeGreaterThan(0);
     const first = results[0];
@@ -418,41 +422,70 @@ test("repeatable public API and media cache baseline", async ({
         expect(response.status()).toBe(200);
     }
 
-    const imagePost = results.find((result) => result.lead_image) ?? first;
+    const unicodeListing = listings["/api/v1/posts/?q=東京"];
+    const unicodeResults = Array.isArray(unicodeListing?.results)
+        ? (unicodeListing.results as Array<Record<string, unknown>>)
+        : [];
+    const imagePost = unicodeResults.find((result) => result.lead_image);
+    if (!imagePost) {
+        throw new Error(
+            "Unicode staging fixture did not expose a responsive lead image",
+        );
+    }
     const leadImage = imagePost.lead_image as
         | { renditions?: Record<string, { url?: string }> }
         | null
         | undefined;
-    const rendition = Object.values(leadImage?.renditions ?? {}).find(
-        (candidate) => candidate.url,
-    );
-    let mediaHeaders: Record<string, string> | null = null;
-    if (rendition?.url) {
+    const renditionHeaders: Record<
+        string,
+        { cache_control: string; content_type: string }
+    > = {};
+    for (const key of ["480w", "960w", "1440w"] as const) {
+        const rendition = leadImage?.renditions?.[key];
+        if (!rendition?.url) {
+            throw new Error(`Lead image did not expose its ${key} rendition`);
+        }
         const media = await page.request.head(rendition.url);
         expect(media.status()).toBeLessThan(400);
         expect(media.headers()["content-type"] ?? "").toMatch(/^image\//);
         expect(media.headers()["cache-control"] ?? "").toMatch(
             /(?:immutable|max-age=31536000)/,
         );
-        mediaHeaders = {
+        renditionHeaders[key] = {
             cache_control: media.headers()["cache-control"] ?? "",
             content_type: media.headers()["content-type"] ?? "",
         };
     }
 
-    const responsiveImages = await page.locator("img").evaluateAll((images) =>
-        images.map((image) => {
-            if (!(image instanceof HTMLImageElement)) {
-                throw new Error("img locator returned a non-image element");
-            }
-            return {
-                has_sizes: image.hasAttribute("sizes"),
-                has_srcset: image.hasAttribute("srcset"),
-                natural_width: image.naturalWidth,
-                rendered_width: image.getBoundingClientRect().width,
-            };
-        }),
-    );
+    await page.goto("/?q=東京", { waitUntil: "domcontentloaded" });
+    await expectHydrated(page);
+    const renderedLeadImage = page.locator(".feed-entry-image img").first();
+    await expect(renderedLeadImage).toBeVisible();
+    await expect
+        .poll(() =>
+            renderedLeadImage.evaluate(
+                (image) =>
+                    image instanceof HTMLImageElement &&
+                    image.complete &&
+                    image.naturalWidth > 0,
+            ),
+        )
+        .toBe(true);
+    const responsiveImage = await renderedLeadImage.evaluate((image) => {
+        if (!(image instanceof HTMLImageElement)) {
+            throw new Error("Lead image locator returned a non-image element");
+        }
+        return {
+            has_sizes: image.hasAttribute("sizes"),
+            has_srcset: image.hasAttribute("srcset"),
+            natural_width: image.naturalWidth,
+            rendered_width: image.getBoundingClientRect().width,
+        };
+    });
+    expect(responsiveImage.has_sizes).toBe(true);
+    expect(responsiveImage.has_srcset).toBe(true);
+    expect(responsiveImage.natural_width).toBeGreaterThan(0);
+    expect(responsiveImage.rendered_width).toBeGreaterThan(0);
     writeMetrics(testInfo, {
         api_median_ms: {
             feed: median(samples["/api/v1/posts/?page=1"]),
@@ -460,8 +493,8 @@ test("repeatable public API and media cache baseline", async ({
             detail: median(detailSamples),
         },
         api_samples_ms: { ...samples, [detailEndpoint]: detailSamples },
-        media_headers: mediaHeaders,
-        responsive_images: responsiveImages,
+        media_headers: renditionHeaders,
+        responsive_images: [responsiveImage],
     });
 });
 

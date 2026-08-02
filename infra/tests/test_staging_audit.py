@@ -338,6 +338,13 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert live_spec.index("const feedParticipant =") < live_spec.index(
         "await postLink.click()"
     )
+    assert 'const unicodeListing = listings["/api/v1/posts/?q=東京"];' in live_spec
+    assert "Unicode staging fixture did not expose a responsive lead image" in live_spec
+    assert 'for (const key of ["480w", "960w", "1440w"] as const)' in live_spec
+    assert 'page.locator(".feed-entry-image img").first()' in live_spec
+    assert "expect(responsiveImage.has_sizes).toBe(true);" in live_spec
+    assert "expect(responsiveImage.has_srcset).toBe(true);" in live_spec
+    assert "media_headers: renditionHeaders" in live_spec
     for forbidden in (
         "deploy_environment.sh",
         "ci_ssh_deploy.sh",
