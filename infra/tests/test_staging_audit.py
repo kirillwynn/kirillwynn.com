@@ -64,6 +64,17 @@ def test_data_audit_is_read_only_and_does_not_emit_record_values():
     assert "staging-only/unverified" in script
     assert "EXPECTED_CATALOG_ITEMS = 228" in script
     assert catalog_sha256 in script
+    assert ".select_related(None)" in script
+    assert ".prefetch_related(None)" in script
+    assert '.select_related("owner")' in script
+    for projected_field in (
+        '"pk"',
+        '"owner_id"',
+        '"owner__nickname"',
+        '"owner__nickname_normalized"',
+        '"owner__is_site_author"',
+    ):
+        assert projected_field in script
     assert 'values_list("email"' not in script
     assert 'values_list("nickname"' not in script
     assert "snapshot_recipient_email" not in script
@@ -257,6 +268,10 @@ def test_stage18_recovery_drill_is_scratch_only_and_retains_evidence():
         "backup-metadata-verified",
         "backup-restore-list-verified",
         "scratch-database-restored",
+        "restored-data-audit-started",
+        "restored-data-audit-verified",
+        "restored-performance-audit-started",
+        "restored-performance-audit-verified",
         "restored-database-verified",
         "data-comparison-verified",
         "release-state-unchanged",

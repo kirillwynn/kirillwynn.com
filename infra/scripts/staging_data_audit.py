@@ -68,7 +68,19 @@ def build_report():
         seconds=max(getattr(settings, "EMAIL_OUTBOX_PROCESSING_TIMEOUT_SECONDS", 300), 300)
     )
     stale_before = now - stale_window
-    public_pages = list(public_blog_posts())
+    public_pages = list(
+        public_blog_posts()
+        .select_related(None)
+        .prefetch_related(None)
+        .select_related("owner")
+        .only(
+            "pk",
+            "owner_id",
+            "owner__nickname",
+            "owner__nickname_normalized",
+            "owner__is_site_author",
+        )
+    )
     public_ids = [page.pk for page in public_pages]
 
     author_mismatches = 0

@@ -290,12 +290,16 @@ run_django "$restore_database" python manage.py check --deploy \
     > "$output_dir/restored-django-deploy-check.txt"
 run_django "$restore_database" python manage.py makemigrations --check --dry-run \
     > "$output_dir/restored-makemigrations.txt"
+record_phase restored-data-audit-started
 run_django "$restore_database" python manage.py shell --no-imports \
     < "$data_audit_script" \
     > "$output_dir/data-restored.json"
+record_phase restored-data-audit-verified
+record_phase restored-performance-audit-started
 run_django "$restore_database" python manage.py shell --no-imports \
     < "$performance_audit_script" \
     > "$output_dir/performance-restored.json"
+record_phase restored-performance-audit-verified
 record_phase restored-database-verified
 
 run_django "$active_database" python manage.py shell --no-imports \
