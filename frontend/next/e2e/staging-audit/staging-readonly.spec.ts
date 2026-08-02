@@ -74,6 +74,38 @@ function writeMetrics(testInfo: TestInfo, payload: Record<string, unknown>) {
 test("public shell, security headers, focus, theme, and accessibility", async ({
     page,
 }, testInfo) => {
+    await page.addInitScript(() => {
+        const auditWindow = window as Window & {
+            __stage18LayoutShift?: number;
+            __stage18LayoutShiftObserver?: PerformanceObserver;
+            __stage18LayoutShiftSupported?: boolean;
+        };
+        auditWindow.__stage18LayoutShift = 0;
+        auditWindow.__stage18LayoutShiftSupported =
+            PerformanceObserver.supportedEntryTypes.includes("layout-shift");
+        if (!auditWindow.__stage18LayoutShiftSupported) {
+            return;
+        }
+        auditWindow.__stage18LayoutShiftObserver = new PerformanceObserver(
+            (list) => {
+                for (const entry of list.getEntries()) {
+                    const shift = entry as PerformanceEntry & {
+                        hadRecentInput?: boolean;
+                        value?: number;
+                    };
+                    if (!shift.hadRecentInput) {
+                        auditWindow.__stage18LayoutShift =
+                            (auditWindow.__stage18LayoutShift ?? 0) +
+                            (shift.value ?? 0);
+                    }
+                }
+            },
+        );
+        auditWindow.__stage18LayoutShiftObserver.observe({
+            type: "layout-shift",
+            buffered: true,
+        });
+    });
     const failures = observeBrowserFailures(page);
     const requests: string[] = [];
     page.on("request", (request) =>
@@ -160,6 +192,9 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await expectHydrated(page);
+    await expect(
+        page.getByRole("link", { name: "Login", exact: true }),
+    ).toBeVisible();
 
     const browserStorageKeys = await page.evaluate(() => [
         ...Object.keys(window.localStorage),
@@ -184,15 +219,17 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
     const initialAssets = resources.filter((entry) =>
         entry.name.startsWith("/_next/static/"),
     );
-    const layoutShift = await page.evaluate(() =>
-        performance.getEntriesByType("layout-shift").reduce((total, entry) => {
-            const shift = entry as PerformanceEntry & {
-                hadRecentInput?: boolean;
-                value?: number;
-            };
-            return shift.hadRecentInput ? total : total + (shift.value ?? 0);
-        }, 0),
-    );
+    const layoutShift = await page.evaluate(() => {
+        const auditWindow = window as Window & {
+            __stage18LayoutShift?: number;
+            __stage18LayoutShiftSupported?: boolean;
+        };
+        return {
+            supported: auditWindow.__stage18LayoutShiftSupported ?? false,
+            value: auditWindow.__stage18LayoutShift ?? 0,
+        };
+    });
+    expect(layoutShift.supported).toBe(true);
     expect(
         resources.some(
             (entry) =>
@@ -211,7 +248,8 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
             (total, entry) => total + entry.encodedBodySize,
             0,
         ),
-        cumulative_layout_shift: layoutShift,
+        cumulative_layout_shift: layoutShift.value,
+        layout_shift_supported: layoutShift.supported,
         me_requests: requests.filter((request) => request === "/api/me/")
             .length,
         horizontal_overflow: false,
