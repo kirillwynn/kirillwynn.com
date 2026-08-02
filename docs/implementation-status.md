@@ -60,7 +60,11 @@ frontend contract defects (the footer separator and a stale anonymous Login
 return target after live search), added their regressions, updated GitHub
 Actions to reviewed Node 24-compatible immutable pins, and added a manual,
 staging-only backup/isolated-restore/data/performance/live-browser audit. Local
-deterministic checks have passed; required CI, the controlled staging runtime
+deterministic checks and the required closed-gate push/PR CI have passed. The
+first controlled rollout attempt exposed a Python-host compatibility defect in
+schema-3 state creation and failed before its first state transition; the gate
+was restored to false, active staging remained on the Stage 17 release, and a
+minimal compatibility fix plus regression is in progress. A successful
 rollout, fresh recovery evidence, live acceptance, and final closed-gate docs
 CI remain pending. See `docs/staging-stabilization-audit.md`. Production and
 the reaction catalog remain untouched; custom emoji rights remain an explicit

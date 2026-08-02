@@ -1,3 +1,4 @@
+import datetime
 import importlib.util
 import json
 import os
@@ -121,6 +122,19 @@ def begin_resolution_args(
 
 def state_file(args):
     return args.state_directory / args.environment / "rollout-state.json"
+
+
+def test_now_supports_host_datetime_without_utc_alias(monkeypatch):
+    module = load_script("record_rollout_state.py")
+    monkeypatch.setattr(
+        module,
+        "datetime",
+        SimpleNamespace(datetime=datetime.datetime, timezone=datetime.timezone),
+    )
+
+    timestamp = datetime.datetime.fromisoformat(module.now())
+
+    assert timestamp.utcoffset() == datetime.timedelta(0)
 
 
 def test_active_a_to_b_duplicate_finalize_preserves_previous_a(tmp_path):
@@ -960,10 +974,7 @@ def test_resolve_shell_uses_reviewed_sequence_without_rewriting_failed_runtime(
     edge_env = tmp_path / "edge.env"
     staging_htpasswd = tmp_path / "staging.htpasswd"
     staging_htpasswd.write_text("staging:test-only\n")
-    edge_env.write_text(
-        "EDGE_TEST_ONLY=1\n"
-        f"STAGING_HTPASSWD_FILE={staging_htpasswd}\n"
-    )
+    edge_env.write_text(f"EDGE_TEST_ONLY=1\nSTAGING_HTPASSWD_FILE={staging_htpasswd}\n")
     runtime_before = {
         path.relative_to(operation_b.runtime_directory): path.read_bytes()
         for path in operation_b.runtime_directory.rglob("*")

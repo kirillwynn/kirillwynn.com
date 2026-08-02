@@ -2,11 +2,15 @@
 
 Last updated: 2026-08-01
 
-Status: in progress. Local deterministic verification is complete for the
-implementation candidate, but required GitHub CI, the controlled staging
-rollout, the fresh backup/isolated-restore drill, automated five-viewport live
-acceptance, and final gate restoration evidence are still pending. This file
-must not describe Stage 18 as complete until all of those boundaries pass.
+Status: in progress. Local deterministic verification and closed-gate push/PR
+CI are complete for the implementation candidate. The first controlled rollout
+attempt failed closed before its first state transition because the VPS host
+Python did not provide `datetime.UTC`; the environment gate was restored to
+false and the compatibility remediation is awaiting CI. A successful rollout,
+fresh backup/isolated-restore drill, automated five-viewport live acceptance,
+final gate restoration, and closing documentation-only CI evidence are still
+pending. This file must not describe Stage 18 as complete until all of those
+boundaries pass.
 
 ## Scope and baseline
 
@@ -61,10 +65,12 @@ recorded from the authoritative schema-3 state in the fresh audit evidence.
 
 | Finding | Severity | Evidence | Disposition |
 | --- | --- | --- | --- |
+| Schema-3 rollout state creation used the Python 3.11-only `datetime.UTC` alias on the Python 3.10 VPS host | P1 operational | Attempt 2 of run `30727380396`, deploy job `91444944090`, failed in `record_rollout_state.py:now()` before `begin` wrote the operation; the log recorded `shared_edge=existing`, the public footer remained the prior release, and attestation upload was skipped | Replaced the alias with `datetime.timezone.utc`. A regression simulates a host datetime module without `UTC`; the full 242-test infrastructure suite and a direct system-Python compatibility probe pass. Retry requires fresh closed-gate CI and a new controlled operation. |
 | Footer rendered an em dash instead of the exact two-line `Current Team:` / `Previous Team:` contract | P2 | Real staging browser plus computed `dt::after` content | Fixed locally with the one-character CSS correction and browser regression coverage. |
 | Anonymous Login retained a stale `next` value after Feed live-search replaced the query string | P2 | Real staging browser reproduced `/` after the visible URL became `/?q=...` | Fixed by deriving the target from pathname plus reactive search parameters; unit and browser regressions cover Unicode live search. |
 | Node 20 action releases were being forced onto Node 24 by GitHub Actions | P2 maintenance | Existing workflow warnings and upstream action manifests/releases | Updated to reviewed Node 24-compatible upstream releases pinned to full immutable SHAs. Permissions, provenance, sanitization, and gates are unchanged. |
 | The first draft of the new audit workflow held the rollout concurrency lock per job | P2 tooling | Static review showed a possible rollout window between recovery and browser jobs | Corrected before first use by holding the shared release-operation lock for the entire workflow; regression guard added. |
+| The first pushed audit workflow used the step-only `runner.temp` context in job-level `env` | P2 tooling | GitHub configuration run `30727326442` rejected the manual workflow before any job or staging action | Fixed additively in `aa2533a...` by scoping the path to the browser step and using the runner-provided shell variable for sanitizer input; regression guard added. |
 | A discarded password from a failed pre-remediation signup attempt exists in an internal local automation transcript | P2 local data hygiene | Exact-value, project-scoped fail-closed scan found only two mirrored internal Codex transcript records and no Git/worktree/GitHub artifact/release-bundle occurrence | The value is not an active credential and is never reproduced. The internal transcript store is not safely mutable through the project workspace, so it was not edited or deleted. Application/DB/browser evidence is rechecked without exposing the value. |
 | Rollback-only quick-reaction schema and internal config endpoint remain | P3 backlog | `ReactionSettings` keeps three Unicode fields, three catalog FKs, and Django `/api/v1/reactions/config/`; the frontend and its exact proxy allowlist do not consume or expose that route | Retain during the rollback window. Remove only after previous-release compatibility is retired, with a backward-compatible migration and cache plan. |
 | Custom emoji rights remain unverified | Production blocker | All 228 items are expected to remain `staging-only/unverified` | Deliberately unchanged. No production approval exists. |
@@ -102,6 +108,21 @@ never deploys, syncs the reaction catalog, points the public application at the
 restore, replaces the active database, or removes a database/volume. All
 retained evidence and Playwright output are fail-closed sanitizer inputs.
 
+The additive implementation history is:
+
+- `631e188036869ef3fce347c9ea8bbe51ab6dec78`, parent
+  `ac0a7cd1cc5c386e9b9a74e299ea51d8cd3e792f`: footer and reactive auth
+  return-route fixes plus regressions;
+- `a8cc9e22c577330678fcd3956ff9a8cab97c80e6`, parent
+  `631e188036869ef3fce347c9ea8bbe51ab6dec78`: reviewed action pins and the
+  staging-only stabilization/recovery/browser audit;
+- `9fb44ed38071689163a2b68c907e207fcf1efca4`, parent
+  `a8cc9e22c577330678fcd3956ff9a8cab97c80e6`: initial in-progress audit
+  record;
+- `aa2533a9abff7c3d2ac55e953c03048339beaaec`, parent
+  `9fb44ed38071689163a2b68c907e207fcf1efca4`: GitHub runner-context
+  correction. No commit was amended, squashed, rebased, or force-pushed.
+
 ## Confirmed repository and browser invariants
 
 The deterministic local suites and initial read-only real-browser audit have
@@ -132,6 +153,36 @@ Docker, PostgreSQL, `psql`, and Nginx are unavailable locally. Compose/Nginx,
 container smoke, PostgreSQL-only no-skip concurrency/search, worker egress,
 and the fresh recovery drill are therefore not represented as locally passed;
 they remain mandatory CI/live gates.
+
+## Closed-gate CI evidence
+
+Push run `30727380396` and PR run `30727381598` passed at exact head
+`aa2533a9abff7c3d2ac55e953c03048339beaaec`. The push run passed SQLite
+`91441507707`, PostgreSQL-only `91441507733`, frontend `91441507734`,
+browser-contract `91441507750`, cross-stack `91441507720`, infrastructure
+`91441507725`, and aggregate gate `91442045560`. It then passed immutable
+Django/Next/Edge builds `91442053029`/`91442053008`/`91442053030`, staging
+server preflight `91442053132`, and release manifest `91442262417`.
+
+Release artifact `8826916501` has GitHub archive digest
+`sha256:ae363f5a6e5613b5aacc2716edd4234b0c655fdb350a618ebfbb9f3ce385ef5c`.
+The deploy job `91442277027` rendered and validated the candidate runtime but
+its deploy, attestation validation, and attestation upload steps were all
+skipped because `STAGING_DEPLOY_ENABLED=false`. Catalog job `91442053148` and
+rollout-failure job `91442053273` were skipped. The superseded `9fb44ed...`
+push/PR runs were cancelled by the documented CI concurrency after the
+additive workflow correction; they are not represented as passing evidence.
+
+Attempt 2 of the same immutable run re-executed all six required suites and
+the aggregate gate successfully, skipped catalog sync, rebuilt all three image
+roles, passed server preflight, and created a fresh release manifest. The
+deployment then failed before the schema-3 `begin` transition because the host
+Python lacks the 3.11-only `datetime.UTC` alias. No operation record, backup,
+migration, application activation, attestation, or Edge replacement occurred;
+the failure path therefore correctly had no operation ID to mark. The staging
+Environment gate was returned to false immediately. A reloaded public Feed
+still rendered the prior release's em-dash footer, independently confirming
+that the candidate frontend was not activated.
 
 ## Performance baseline
 
@@ -168,14 +219,13 @@ files outside project-related scope were not scanned or deleted.
 
 ## Remaining gates and production blockers
 
-Before completion, the implementation commit must pass full push/PR CI while
-deployment remains disabled. Because the CSS/Next runtime changed, one
-controlled staging rollout must then pass immutable build, pre-migration
-backup, migration, health, schema-3 attestation, and live acceptance. Deployment
-must be returned to false, catalog sync must remain false, and one-shot values
-must be absent. The fresh stabilization workflow must pass against the new
-active SHA. A final documentation-only commit must pass required CI with
-deployment and attestation skipped.
+Closed-gate implementation push/PR CI has passed. Because the CSS/Next runtime
+changed, one controlled staging rollout must now pass immutable build,
+pre-migration backup, migration, health, schema-3 attestation, and live
+acceptance. Deployment must be returned to false, catalog sync must remain
+false, and one-shot values must be absent. The fresh stabilization workflow
+must pass against the new active SHA. A final documentation-only commit must
+pass required CI with deployment and attestation skipped.
 
 Production remains blocked by the absence of a production Environment and all
 production infrastructure/provider configuration, by the lack of a separately
