@@ -82,6 +82,11 @@ def test_data_audit_is_read_only_and_does_not_emit_record_values():
 
     performance = (SCRIPTS / "staging_performance_audit.py").read_text()
     assert "SET TRANSACTION READ ONLY" in performance
+    assert "list(public_blog_posts()[:10])" not in performance
+    assert ".select_related(None)" in performance
+    assert ".prefetch_related(None)" in performance
+    assert '.values("pk", "slug")[:10]' in performance
+    assert "BlogPostTag.objects.filter" in performance
     for probe in (
         "feed_page_1",
         "feed_page_2",
@@ -350,7 +355,9 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert 'new URL(entry.name).pathname === "/api/me/"' in live_spec
     assert 'const headerControls = controls.locator(":scope > *");' in live_spec
     assert "const headerText = await controls.innerText();" not in live_spec
-    assert "await expect(headerControls.nth(3)).toHaveClass(/account-slot/);" in live_spec
+    assert (
+        "await expect(headerControls.nth(3)).toHaveClass(/account-slot/);" in live_spec
+    )
     assert 'getByRole("link", { name: "Login", exact: true })' in live_spec
     assert 'headerControls.nth(3)).toHaveAccessibleName("Login")' not in live_spec
     assert (

@@ -10,6 +10,7 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from apps.blog.models import BlogPostTag
 from apps.blog.services.visibility import public_blog_posts
 
 
@@ -30,7 +31,9 @@ def measure(client, path, parameters=None):
             )
         elapsed = (time.perf_counter() - started) * 1_000
         if response.status_code != 200:
-            raise RuntimeError(f"read-only performance probe returned {response.status_code}")
+            raise RuntimeError(
+                f"read-only performance probe returned {response.status_code}"
+            )
         samples.append(round(elapsed, 3))
         query_counts.append(len(queries))
         response_sizes.append(len(response.content))
@@ -48,11 +51,21 @@ def measure(client, path, parameters=None):
 
 
 def build_report():
-    posts = list(public_blog_posts()[:10])
+    posts = list(
+        public_blog_posts()
+        .select_related(None)
+        .prefetch_related(None)
+        .values("pk", "slug")[:10]
+    )
     if not posts:
         raise RuntimeError("staging performance audit requires a public post")
     first = posts[0]
-    first_tag = first.tags.order_by("slug").values_list("slug", flat=True).first()
+    first_tag = (
+        BlogPostTag.objects.filter(content_object_id=first["pk"])
+        .order_by("tag__slug")
+        .values_list("tag__slug", flat=True)
+        .first()
+    )
     client = Client()
     probes = {
         "feed_page_1": measure(client, reverse("blog_api:post-list"), {"page": 1}),
@@ -64,17 +77,17 @@ def build_report():
         ),
         "post_detail": measure(
             client,
-            reverse("blog_api:post-detail", kwargs={"slug": first.slug}),
+            reverse("blog_api:post-detail", kwargs={"slug": first["slug"]}),
         ),
         "tag_catalog": measure(client, reverse("blog_api:tag-list")),
         "comments": measure(
             client,
-            reverse("discussions_api:post-comments", kwargs={"slug": first.slug}),
+            reverse("discussions_api:post-comments", kwargs={"slug": first["slug"]}),
         ),
         "post_reactions_batch": measure(
             client,
             reverse("discussions_api:post-reaction-batch"),
-            {"ids": ",".join(str(post.pk) for post in posts)},
+            {"ids": ",".join(str(post["pk"]) for post in posts)},
         ),
     }
     if first_tag:
