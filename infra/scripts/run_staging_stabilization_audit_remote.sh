@@ -143,6 +143,56 @@ compose() {
     docker compose --env-file "$control_env" -f "$application_compose" "$@"
 }
 
+report_memory() {
+    report_name=$1
+    report_file="$output_dir/memory-$report_name.txt"
+    awk '
+        $1 == "MemTotal:" { print "memory_total_kib=" $2 }
+        $1 == "MemAvailable:" { print "memory_available_kib=" $2 }
+    ' /proc/meminfo > "$report_file"
+    if [ -r /sys/fs/cgroup/memory.events ]; then
+        sed -n '/^oom /p;/^oom_kill /p;/^oom_group_kill /p' \
+            /sys/fs/cgroup/memory.events >> "$report_file"
+    fi
+    for memory_service in postgres django next worker
+    do
+        memory_container=$(compose ps -q "$memory_service")
+        if [ -n "$memory_container" ]; then
+            docker stats --no-stream \
+                --format "$memory_service {{.MemUsage}}" \
+                "$memory_container" >> "$report_file"
+        fi
+    done
+}
+
+worker_stopped=false
+worker_container_before=
+restore_worker() {
+    [ "$worker_stopped" = true ] || return 0
+    echo "restoring staging outbox worker" >&2
+    compose start worker >&2
+    worker_container_after=$(compose ps -q worker)
+    test -n "$worker_container_after"
+    test "$worker_container_after" = "$worker_container_before"
+    attempt=0
+    while [ "$attempt" -lt 36 ]
+    do
+        worker_health=$(docker inspect --format \
+            '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+            "$worker_container_after")
+        if [ "$worker_health" = healthy ]; then
+            worker_stopped=false
+            echo "staging outbox worker is healthy" >&2
+            return 0
+        fi
+        test "$worker_health" != unhealthy
+        attempt=$((attempt + 1))
+        sleep 5
+    done
+    echo "staging outbox worker did not become healthy" >&2
+    return 1
+}
+
 for service in postgres django worker next
 do
     container_id=$(compose ps -q "$service")
@@ -211,6 +261,15 @@ case "$active_database" in
     kirillwynn_staging) ;;
     *) echo "active database identity is not staging" >&2; exit 2 ;;
 esac
+
+worker_container_before=$(compose ps -q worker)
+test -n "$worker_container_before"
+report_memory before-worker-pause
+worker_stopped=true
+trap restore_worker EXIT
+compose stop --timeout 60 worker >&2
+record_phase worker-paused
+report_memory after-worker-pause
 
 run_django() {
     target_database=$1
@@ -312,6 +371,14 @@ python3 "$comparison_script" \
     --output "$output_dir/data-comparison.json"
 record_phase data-comparison-verified
 
+restore_worker
+trap - EXIT
+record_phase worker-restored
+report_memory after-worker-restore
+"$repository_root/infra/scripts/verify_application_rollout.sh" \
+    "$active_runtime" "$active_manifest" "$application_compose"
+record_phase post-audit-runtime-health-verified
+
 active_edge_container_after=$(live_edge_container)
 test "$active_edge_container_after" = "$active_edge_container"
 active_edge_image_after=$(docker inspect --format '{{.Config.Image}}' \
@@ -334,6 +401,8 @@ printf '%s\n' \
     'restored_database_public_attachment=none' \
     'restored_migration_plan=verified' \
     'restored_django_checks=passed' \
+    'active_worker_pause=bounded-and-restored' \
+    'post_audit_worker_heartbeat_egress=passed' \
     'active_database_replacement=none' \
     'scratch_database_retained=true' \
     >> "$output_dir/recovery-summary.txt"

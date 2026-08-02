@@ -279,10 +279,28 @@ def test_stage18_recovery_drill_is_scratch_only_and_retains_evidence():
         "restored-performance-audit-verified",
         "restored-database-verified",
         "data-comparison-verified",
+        "worker-paused",
+        "worker-restored",
+        "post-audit-runtime-health-verified",
         "release-state-unchanged",
         "complete",
     ):
         assert f"record_phase {phase}" in remote
+    assert "trap restore_worker EXIT" in remote
+    assert "compose stop --timeout 60 worker" in remote
+    assert "compose start worker" in remote
+    assert "report_memory before-worker-pause" in remote
+    assert "report_memory after-worker-pause" in remote
+    assert "report_memory after-worker-restore" in remote
+    assert "memory_available_kib=" in remote
+    assert "oom_kill" in remote
+    assert remote.index("verify_application_rollout.sh") < remote.index(
+        "compose stop --timeout 60 worker"
+    )
+    assert remote.index("compose stop --timeout 60 worker") < backup
+    assert remote.index("restore_worker\ntrap - EXIT") < remote.rindex(
+        "verify_application_rollout.sh"
+    )
     assert (
         "SET TRANSACTION READ ONLY" in (SCRIPTS / "staging_data_audit.py").read_text()
     )
