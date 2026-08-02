@@ -244,6 +244,8 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert "ci_ssh_staging_stabilization_audit.sh" in workflow
     assert "test:staging-audit" in workflow
     assert "scan_test_artifacts.sh" in workflow
+    assert workflow.index("STAGING_AUDIT_OUTPUT_DIR") > workflow.index("- id: browser")
+    assert '"$RUNNER_TEMP/stage18-live-browser"' in workflow
     config = (ROOT / "frontend" / "next" / "playwright.staging-audit.config.ts").read_text()
     assert "STAGING_AUDIT_OUTPUT_DIR" in config
     assert 'screenshot: "off"' in config

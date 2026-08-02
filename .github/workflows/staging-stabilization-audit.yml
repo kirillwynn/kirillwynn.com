@@ -61,7 +61,6 @@ jobs:
     environment: staging
     env:
       STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
-      STAGING_AUDIT_OUTPUT_DIR: ${{ runner.temp }}/stage18-live-browser
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -76,12 +75,16 @@ jobs:
       - id: browser
         name: Read-only five-viewport staging acceptance
         continue-on-error: true
+        env:
+          STAGING_AUDIT_OUTPUT_DIR: ${{ runner.temp }}/stage18-live-browser
         working-directory: frontend/next
         run: npm run test:staging-audit
       - id: artifacts
         name: Fail-closed browser baseline scan
         if: always()
-        run: infra/tests/scan_test_artifacts.sh "$STAGING_AUDIT_OUTPUT_DIR"
+        run: >-
+          infra/tests/scan_test_artifacts.sh
+          "$RUNNER_TEMP/stage18-live-browser"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always() && steps.artifacts.outcome == 'success'
         with:
