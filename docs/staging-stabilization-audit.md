@@ -5,12 +5,14 @@ Last updated: 2026-08-01
 Status: in progress. Local deterministic verification, closed-gate push/PR CI,
 the controlled staging rollout, schema-3 attestation, gate restoration, and
 targeted live remediation acceptance are complete for active release
-`07542f5a90d2849577219ed74a1628ba39555674`. The first recovery-audit run
-failed before backup because its new evidence reader incorrectly required
-production-owned Edge state inside the staging snapshot. The corrected fresh
-backup/isolated-restore drill, automated five-viewport live acceptance, and
-closing documentation-only CI evidence are still pending. This file must not
-describe Stage 18 as complete until all of those boundaries pass.
+`07542f5a90d2849577219ed74a1628ba39555674`. Two recovery-audit attempts
+failed before backup: the first reader incorrectly required production-owned
+Edge state inside the staging snapshot, and the second tried to discover the
+running Edge through a Compose interpolation that itself requires the unknown
+image. The corrected fresh backup/isolated-restore drill, automated
+five-viewport live acceptance, and closing documentation-only CI evidence are
+still pending. This file must not describe Stage 18 as complete until all of
+those boundaries pass.
 
 ## Scope and baseline
 
@@ -68,6 +70,7 @@ digest directly and bind it to matching immutable durable release manifests.
 | --- | --- | --- | --- |
 | Schema-3 rollout state creation used the Python 3.11-only `datetime.UTC` alias on the Python 3.10 VPS host | P1 operational | Attempt 2 of run `30727380396`, deploy job `91444944090`, failed in `record_rollout_state.py:now()` before `begin` wrote the operation; the log recorded `shared_edge=existing`, the public footer remained the prior release, and attestation upload was skipped | Replaced the alias with `datetime.timezone.utc`. A regression simulates a host datetime module without `UTC`; closed-gate CI, the full 242-test infrastructure suite, a direct system-Python compatibility probe, and the later successful rollout all pass. |
 | The first recovery-audit reader required `active.edge` in staging even though schema 3 deliberately keeps Edge production-owned | P2 tooling | Audit run `30730318625`, recovery job `91449388175`, rejected the otherwise valid staging snapshot before backup; the deployment runbook and state-machine code both require staging snapshots to carry `edge=null` | The reader now requires the documented null staging field, independently reads the live shared-Edge digest, binds it to immutable durable manifests, verifies the running Edge before and after the drill, and has regression coverage. No backup, restore, or data change occurred in the rejected run. |
+| Live shared-Edge discovery invoked Compose before `EDGE_IMAGE` was known | P2 tooling | Audit run `30730968704`, recovery job `91451228121`, failed on the compose file's required image interpolation before an evidence directory or backup existed | Discover the existing container through its exact Compose project/service labels, then read `.Config.Image`, bind the digest to immutable manifests, and let the normal active-Edge verifier export the matched digest. Static regression coverage prevents reintroducing the circular Compose lookup. No backup, restore, or data change occurred. |
 | Footer rendered an em dash instead of the exact two-line `Current Team:` / `Previous Team:` contract | P2 | Real staging browser plus computed `dt::after` content | Fixed locally with the one-character CSS correction and browser regression coverage. |
 | Anonymous Login retained a stale `next` value after Feed live-search replaced the query string | P2 | Real staging browser reproduced `/` after the visible URL became `/?q=...` | Fixed by deriving the target from pathname plus reactive search parameters; unit and browser regressions cover Unicode live search. |
 | Node 20 action releases were being forced onto Node 24 by GitHub Actions | P2 maintenance | Existing workflow warnings and upstream action manifests/releases | Updated to reviewed Node 24-compatible upstream releases pinned to full immutable SHAs. Permissions, provenance, sanitization, and gates are unchanged. |

@@ -230,7 +230,10 @@ def test_stage18_recovery_drill_is_scratch_only_and_retains_evidence():
     assert "restore_stage18_" in remote
     assert "--active-edge-image" in remote
     assert "active_shared_edge" in remote
+    assert "com.docker.compose.project=kirillwynn-edge" in remote
+    assert "com.docker.compose.service=edge" in remote
     assert "docker inspect --format '{{.Config.Image}}'" in remote
+    assert 'edge_compose="$repository_root/infra/compose/edge.yml"' not in remote
     assert "scratch_database_retained=true" in remote
     assert "restored_database_public_attachment=none" in remote
     assert (

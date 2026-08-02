@@ -62,13 +62,14 @@ Actions to reviewed Node 24-compatible immutable pins, and added a manual,
 staging-only backup/isolated-restore/data/performance/live-browser audit. Local
 deterministic checks, required closed-gate push/PR CI, the compatibility
 remediation, immutable rollout, pre-migration backup, schema-3 attestation,
-gate restoration, and targeted live acceptance have passed. The first fresh
-recovery-audit run exposed a staging/shared-Edge evidence-reader mismatch and
-failed before backup; its local low-risk correction and regression pass, while
-the corrected recovery/live workflow and final closed-gate docs CI remain
-pending. See `docs/staging-stabilization-audit.md`. Production and the reaction
-catalog remain untouched; custom emoji rights remain an explicit production
-blocker.
+gate restoration, and targeted live acceptance have passed. Two fresh
+recovery-audit attempts exposed staging/shared-Edge evidence-reader defects
+before backup: incorrect state ownership, then circular Compose image
+interpolation during live container discovery. Their local low-risk
+corrections and regressions pass, while the corrected recovery/live workflow
+and final closed-gate docs CI remain pending. See
+`docs/staging-stabilization-audit.md`. Production and the reaction catalog
+remain untouched; custom emoji rights remain an explicit production blocker.
 
 ## Stage 18 staging stabilization
 

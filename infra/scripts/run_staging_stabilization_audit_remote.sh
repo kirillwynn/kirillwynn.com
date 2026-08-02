@@ -44,7 +44,6 @@ performance_audit_script="$repository_root/infra/scripts/staging_performance_aud
 comparison_script="$repository_root/infra/scripts/compare_staging_data_audits.py"
 release_audit_script="$repository_root/infra/scripts/staging_release_state_audit.py"
 edge_runtime_env=/srv/kirillwynn/runtime/edge.env
-edge_compose="$repository_root/infra/compose/edge.yml"
 
 test ! -L "$output_dir" || {
     echo "audit output directory must not be a symlink" >&2
@@ -62,8 +61,9 @@ state_field() {
 }
 
 live_edge_image() {
-    edge_container=$(docker compose --env-file "$edge_runtime_env" \
-        -f "$edge_compose" ps -q edge)
+    edge_container=$(docker ps -q \
+        --filter label=com.docker.compose.project=kirillwynn-edge \
+        --filter label=com.docker.compose.service=edge)
     case "$edge_container" in
         "") echo "active shared Edge container is missing" >&2; exit 2 ;;
         *'
@@ -72,7 +72,7 @@ live_edge_image() {
     docker inspect --format '{{.Config.Image}}' "$edge_container"
 }
 
-test -r "$edge_runtime_env" && test -r "$edge_compose"
+test -r "$edge_runtime_env"
 active_edge_image=$(live_edge_image)
 python3 "$release_audit_script" \
     --expected-active-release "$expected_release_sha" \
