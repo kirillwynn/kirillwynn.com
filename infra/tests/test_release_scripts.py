@@ -271,6 +271,65 @@ def test_database_operations_do_not_load_application_images():
         script = (SCRIPTS / script_name).read_text()
         assert "infra/compose/database.yml" in script
         assert "infra/compose/application.yml" not in script
+    backup = (SCRIPTS / "backup_postgres.sh").read_text()
+    assert "PostgreSQL custom-format dump failed with status" in backup
+    assert "PostgreSQL custom-format dump is empty" in backup
+    assert "PostgreSQL dump listing failed with status" in backup
+
+
+@pytest.mark.parametrize(
+    ("mode", "message"),
+    [
+        ("dump-failure", "PostgreSQL custom-format dump failed with status 7"),
+        ("empty-dump", "PostgreSQL custom-format dump is empty"),
+        ("list-failure", "PostgreSQL dump listing failed with status 9"),
+    ],
+)
+def test_backup_reports_dump_and_listing_failures(tmp_path, mode, message):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "control.env").write_text("COMPOSE_PROJECT_NAME=test\n")
+    (runtime / "postgres.env").write_text(
+        "POSTGRES_DB=kirillwynn_staging\nPOSTGRES_USER=kirillwynn_staging\n"
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        """#!/bin/sh
+if [ "$1" = compose ] && [ "$2" = version ]; then
+    printf '%s\\n' 2.30.0
+    exit 0
+fi
+case "${FAKE_DOCKER_MODE}:$*" in
+    dump-failure:*pg_dump*) exit 7 ;;
+    empty-dump:*pg_dump*) exit 0 ;;
+    list-failure:*pg_dump*) printf '%s' custom-dump; exit 0 ;;
+    list-failure:*pg_restore*) exit 9 ;;
+    *) exit 2 ;;
+esac
+"""
+    )
+    docker.chmod(0o700)
+    result = subprocess.run(
+        [
+            SCRIPTS / "backup_postgres.sh",
+            "staging",
+            runtime,
+            "a" * 40,
+            tmp_path / "backups",
+            "manual",
+            "stage18-test",
+        ],
+        env={
+            "FAKE_DOCKER_MODE": mode,
+            "PATH": f"{fake_bin}:/usr/local/bin:/usr/bin:/bin",
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert message in result.stderr
 
 
 @pytest.mark.parametrize(

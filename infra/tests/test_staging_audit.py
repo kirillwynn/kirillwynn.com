@@ -241,6 +241,23 @@ def test_stage18_recovery_drill_is_scratch_only_and_retains_evidence():
     assert 'edge_compose="$repository_root/infra/compose/edge.yml"' not in remote
     assert "scratch_database_retained=true" in remote
     assert "restored_database_public_attachment=none" in remote
+    assert 'progress_file="$output_dir/audit-progress.txt"' in remote
+    assert "manual staging backup command failed with status" in remote
+    for phase in (
+        "release-state-verified",
+        "runtime-health-verified",
+        "production-boundary-verified",
+        "active-data-before-read",
+        "backup-created",
+        "backup-metadata-verified",
+        "backup-restore-list-verified",
+        "scratch-database-restored",
+        "restored-database-verified",
+        "data-comparison-verified",
+        "release-state-unchanged",
+        "complete",
+    ):
+        assert f"record_phase {phase}" in remote
     assert (
         "SET TRANSACTION READ ONLY" in (SCRIPTS / "staging_data_audit.py").read_text()
     )

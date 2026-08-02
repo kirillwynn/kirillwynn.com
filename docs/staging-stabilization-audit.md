@@ -5,12 +5,15 @@ Last updated: 2026-08-01
 Status: in progress. Local deterministic verification, closed-gate push/PR CI,
 the controlled staging rollout, schema-3 attestation, gate restoration, and
 targeted live remediation acceptance are complete for active release
-`07542f5a90d2849577219ed74a1628ba39555674`. Three recovery-audit attempts
-failed before backup: the first reader incorrectly required production-owned
-Edge state inside the staging snapshot, the second used circular Compose image
-interpolation to discover the running Edge, and the third misclassified the
-shared Edge project's required dormant production-edge network as a production
-application object. The corrected fresh backup/isolated-restore drill,
+`07542f5a90d2849577219ed74a1628ba39555674`. Four recovery-audit dispatches
+(five recovery job executions including one failed-job retry) have not yet
+completed the drill. The first three dispatches exposed, before backup, an
+incorrect Edge-state ownership assumption, circular Compose image
+interpolation, and misclassification of the shared Edge project's required
+dormant production-edge network. The fourth passed all pre-backup release,
+runtime, production-boundary, and active-data checks twice, then exited inside
+the backup phase before durable metadata or a child-failure classification was
+captured. The diagnostic correction, fresh backup/isolated-restore drill,
 automated five-viewport live acceptance, and closing documentation-only CI
 evidence are still pending. This file must not describe Stage 18 as complete
 until all of those boundaries pass.
@@ -78,6 +81,7 @@ matching immutable durable release manifests.
 | The first recovery-audit reader required `active.edge` in staging even though schema 3 deliberately keeps Edge production-owned | P2 tooling | Audit run `30730318625`, recovery job `91449388175`, rejected the otherwise valid staging snapshot before backup; the deployment runbook and state-machine code both require staging snapshots to carry `edge=null` | The reader now requires the documented null staging field, independently reads the live shared-Edge digest, binds it to immutable durable manifests, verifies the running Edge before and after the drill, and has regression coverage. No backup, restore, or data change occurred in the rejected run. |
 | Live shared-Edge discovery invoked Compose before `EDGE_IMAGE` was known | P2 tooling | Audit run `30730968704`, recovery job `91451228121`, failed on the compose file's required image interpolation before an evidence directory or backup existed | Discover the existing container through its exact Compose project/service labels, then read `.Config.Image`, bind the digest to immutable manifests, and let the normal active-Edge verifier export the matched digest. Static regression coverage prevents reintroducing the circular Compose lookup. No backup, restore, or data change occurred. |
 | The production-absence probe treated the shared Edge project's dormant production-edge network as a production application object | P2 tooling | Sanitized audit artifact `8831902252` from run `30742919327` proves active application/runtime/Edge health and no Compose drift, then job `91483433251` stops at the generic production-object check before backup. ADR 0005 and the committed Edge Compose contract require the shared project to own both edge networks before either application exists | Keep production rollout state, application containers, volumes, and database/application/egress networks forbidden. Require the exact production-edge network to be Compose-owned by `kirillwynn-edge` and attached only to the unchanged active Edge container. Add static regression coverage and clarify the recovery runbook. No backup, restore, or data change occurred. |
+| The recovery wrapper lost bounded evidence when its backup child exited under `set -e` | P2 tooling | Both recovery executions of run `30743388424` (jobs `91484692581` and `91485010762`) passed release/runtime/production checks and read the active database, then ended with status 1 before `backup-metadata.json`. Their sanitized artifacts contain the same last completed boundary but cannot prove whether an immutable dump completed; neither shows that restore began | Persist a fixed, non-secret phase ledger from the start of the audit and classify dump/list child exit statuses, empty dumps, and missing dump/metadata paths explicitly. This does not change backup format, destination, retention, restore target, or database data. Static regressions cover the diagnostic contract; a fresh live run remains required to establish the underlying child failure and complete the drill. |
 | Footer rendered an em dash instead of the exact two-line `Current Team:` / `Previous Team:` contract | P2 | Real staging browser plus computed `dt::after` content | Fixed locally with the one-character CSS correction and browser regression coverage. |
 | Anonymous Login retained a stale `next` value after Feed live-search replaced the query string | P2 | Real staging browser reproduced `/` after the visible URL became `/?q=...` | Fixed by deriving the target from pathname plus reactive search parameters; unit and browser regressions cover Unicode live search. |
 | Node 20 action releases were being forced onto Node 24 by GitHub Actions | P2 maintenance | Existing workflow warnings and upstream action manifests/releases | Updated to reviewed Node 24-compatible upstream releases pinned to full immutable SHAs. Permissions, provenance, sanitization, and gates are unchanged. |

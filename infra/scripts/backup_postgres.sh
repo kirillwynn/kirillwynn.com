@@ -55,6 +55,7 @@ temporary=$(mktemp "$backup_dir/.${timestamp}.XXXXXX.dump")
 temporary_metadata="${temporary}.json"
 trap 'rm -f "$temporary" "$temporary_metadata"' EXIT HUP INT TERM
 
+set +e
 docker compose \
     --env-file "$control_env" \
     -f "$repository_root/infra/compose/database.yml" \
@@ -64,11 +65,28 @@ docker compose \
     --format custom \
     --no-owner \
     --no-acl > "$temporary"
+dump_status=$?
+set -e
+[ "$dump_status" -eq 0 ] || {
+    echo "PostgreSQL custom-format dump failed with status $dump_status" >&2
+    exit 2
+}
+test -s "$temporary" || {
+    echo "PostgreSQL custom-format dump is empty" >&2
+    exit 2
+}
 
+set +e
 docker compose \
     --env-file "$control_env" \
     -f "$repository_root/infra/compose/database.yml" \
     exec -T postgres pg_restore --list < "$temporary" > /dev/null
+restore_list_status=$?
+set -e
+[ "$restore_list_status" -eq 0 ] || {
+    echo "PostgreSQL dump listing failed with status $restore_list_status" >&2
+    exit 2
+}
 
 checksum=$(shasum -a 256 "$temporary" | awk '{print $1}')
 final_dump="$backup_dir/${timestamp}_${release_sha}_${backup_kind}_${operation_id}.dump"

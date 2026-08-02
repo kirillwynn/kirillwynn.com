@@ -52,6 +52,12 @@ test ! -L "$output_dir" || {
 umask 077
 mkdir -p "$output_dir"
 test -d "$output_dir" && test -O "$output_dir"
+progress_file="$output_dir/audit-progress.txt"
+: > "$progress_file"
+
+record_phase() {
+    printf 'phase=%s\n' "$1" >> "$progress_file"
+}
 
 state_field() {
     python3 "$state_script" inspect \
@@ -131,6 +137,7 @@ PY
     "$active_runtime" "$active_manifest" "$application_compose"
 "$repository_root/infra/scripts/verify_active_edge.sh" \
     "$active_edge_manifest" "$edge_runtime_env"
+record_phase release-state-verified
 
 compose() {
     docker compose --env-file "$control_env" -f "$application_compose" "$@"
@@ -153,6 +160,7 @@ printf '%s\n' \
     'runtime_contract=passed' \
     'committed_compose_drift=none' \
     >> "$output_dir/runtime-health.txt"
+record_phase runtime-health-verified
 
 production_containers=$(docker ps -aq \
     --filter label=com.docker.compose.project=kirillwynn-production)
@@ -195,6 +203,7 @@ printf '%s\n' \
     'shared_production_edge_network=owned-by-shared-edge' \
     'shared_production_edge_network_attachments=active-edge-only' \
     > "$output_dir/production-boundary.txt"
+record_phase production-boundary-verified
 
 active_database=$(python3 "$repository_root/infra/scripts/env_value.py" \
     "$postgres_env" POSTGRES_DB)
@@ -214,26 +223,51 @@ run_django() {
 run_django "$active_database" python manage.py shell \
     < "$data_audit_script" \
     > "$output_dir/data-active-before.json"
+record_phase active-data-before-read
 
+set +e
 backup_dump=$(
     "$repository_root/infra/scripts/backup_postgres.sh" \
         staging "$active_runtime" "$expected_release_sha" \
         /srv/kirillwynn/backups manual "$audit_operation_id"
 )
+backup_status=$?
+set -e
+[ "$backup_status" -eq 0 ] || {
+    echo "manual staging backup command failed with status $backup_status" >&2
+    exit 2
+}
 case "$backup_dump" in
     /srv/kirillwynn/backups/staging/*.dump) ;;
     *) echo "manual backup path escaped the staging backup directory" >&2; exit 2 ;;
 esac
-test -f "$backup_dump" && test -f "$backup_dump.json"
+test -f "$backup_dump" || {
+    echo "manual staging backup dump is missing" >&2
+    exit 2
+}
+test -f "$backup_dump.json" || {
+    echo "manual staging backup metadata is missing" >&2
+    exit 2
+}
+record_phase backup-created
 python3 "$repository_root/infra/scripts/verify_backup_metadata.py" \
     staging "$backup_dump"
 cp "$backup_dump.json" "$output_dir/backup-metadata.json"
+record_phase backup-metadata-verified
 
+set +e
 docker compose --env-file "$control_env" -f "$database_compose" \
     exec -T postgres pg_restore --list \
     < "$backup_dump" \
     > "$output_dir/pg-restore-list.txt"
+restore_list_status=$?
+set -e
+[ "$restore_list_status" -eq 0 ] || {
+    echo "manual staging backup listing failed with status $restore_list_status" >&2
+    exit 2
+}
 test -s "$output_dir/pg-restore-list.txt"
+record_phase backup-restore-list-verified
 
 restore_database="restore_stage18_${audit_run_id}_${audit_attempt}"
 case "$restore_database" in
@@ -243,6 +277,7 @@ esac
 "$repository_root/infra/scripts/restore_postgres.sh" \
     staging "$active_runtime" "$backup_dump" "$restore_database" \
     > "$output_dir/restore.txt"
+record_phase scratch-database-restored
 
 run_django "$restore_database" python manage.py showmigrations --plan \
     > "$output_dir/restored-showmigrations.txt"
@@ -261,6 +296,7 @@ run_django "$restore_database" python manage.py shell \
 run_django "$restore_database" python manage.py shell \
     < "$performance_audit_script" \
     > "$output_dir/performance-restored.json"
+record_phase restored-database-verified
 
 run_django "$active_database" python manage.py shell \
     < "$data_audit_script" \
@@ -270,6 +306,7 @@ python3 "$comparison_script" \
     "$output_dir/data-restored.json" \
     "$output_dir/data-active-after.json" \
     --output "$output_dir/data-comparison.json"
+record_phase data-comparison-verified
 
 active_edge_container_after=$(live_edge_container)
 test "$active_edge_container_after" = "$active_edge_container"
@@ -282,6 +319,7 @@ python3 "$release_audit_script" \
     --state-directory "$state_root" \
     --output "$output_dir/release-state-after.json"
 cmp "$output_dir/release-state-before.json" "$output_dir/release-state-after.json"
+record_phase release-state-unchanged
 
 printf 'scratch_database=%s\n' "$restore_database" > "$output_dir/recovery-summary.txt"
 printf 'backup_file=%s\n' "$(basename "$backup_dump")" >> "$output_dir/recovery-summary.txt"
@@ -295,3 +333,4 @@ printf '%s\n' \
     'active_database_replacement=none' \
     'scratch_database_retained=true' \
     >> "$output_dir/recovery-summary.txt"
+record_phase complete
