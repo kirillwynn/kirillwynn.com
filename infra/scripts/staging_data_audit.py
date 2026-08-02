@@ -45,7 +45,7 @@ from apps.users.services import is_site_author, public_display_name
 
 EXPECTED_CATALOG_ITEMS = 228
 EXPECTED_CATALOG_MANIFEST_SHA256 = (
-    "1b0a40976ef1e47dd35d12eeaaf2bf41c9d84da83203d5aecfbd8bcc12a61e89"
+    "1b0a409b80ddb46eed4059a19210eec82f5444530eb268a33d5cb0945e08c018"
 )
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 

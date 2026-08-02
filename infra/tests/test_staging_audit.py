@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import re
@@ -56,10 +57,13 @@ def report():
 
 def test_data_audit_is_read_only_and_does_not_emit_record_values():
     script = (SCRIPTS / "staging_data_audit.py").read_text()
+    catalog_manifest = ROOT / "docs" / "reaction-catalog" / "stage16-staging-v1.json"
+    catalog_sha256 = hashlib.sha256(catalog_manifest.read_bytes()).hexdigest()
     assert "SET TRANSACTION READ ONLY" in script
     assert "SocialToken.objects.count()" in script
     assert "staging-only/unverified" in script
     assert "EXPECTED_CATALOG_ITEMS = 228" in script
+    assert catalog_sha256 in script
     assert 'values_list("email"' not in script
     assert 'values_list("nickname"' not in script
     assert "snapshot_recipient_email" not in script
@@ -243,6 +247,7 @@ def test_stage18_recovery_drill_is_scratch_only_and_retains_evidence():
     assert "restored_database_public_attachment=none" in remote
     assert 'progress_file="$output_dir/audit-progress.txt"' in remote
     assert "manual staging backup command failed with status" in remote
+    assert remote.count("python manage.py shell --no-imports") == 4
     for phase in (
         "release-state-verified",
         "runtime-health-verified",

@@ -220,7 +220,7 @@ run_django() {
         django "$@"
 }
 
-run_django "$active_database" python manage.py shell \
+run_django "$active_database" python manage.py shell --no-imports \
     < "$data_audit_script" \
     > "$output_dir/data-active-before.json"
 record_phase active-data-before-read
@@ -290,15 +290,15 @@ run_django "$restore_database" python manage.py check --deploy \
     > "$output_dir/restored-django-deploy-check.txt"
 run_django "$restore_database" python manage.py makemigrations --check --dry-run \
     > "$output_dir/restored-makemigrations.txt"
-run_django "$restore_database" python manage.py shell \
+run_django "$restore_database" python manage.py shell --no-imports \
     < "$data_audit_script" \
     > "$output_dir/data-restored.json"
-run_django "$restore_database" python manage.py shell \
+run_django "$restore_database" python manage.py shell --no-imports \
     < "$performance_audit_script" \
     > "$output_dir/performance-restored.json"
 record_phase restored-database-verified
 
-run_django "$active_database" python manage.py shell \
+run_django "$active_database" python manage.py shell --no-imports \
     < "$data_audit_script" \
     > "$output_dir/data-active-after.json"
 python3 "$comparison_script" \
