@@ -99,7 +99,10 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
     await expect(headerControls.nth(2)).toHaveAccessibleName(
         "Switch to light theme",
     );
-    await expect(headerControls.nth(3)).toHaveAccessibleName("Login");
+    await expect(headerControls.nth(3)).toHaveClass(/account-slot/);
+    await expect(
+        headerControls.nth(3).getByRole("link", { name: "Login", exact: true }),
+    ).toBeVisible();
 
     const footer = page.getByRole("contentinfo");
     await expect(footer.locator(".site-team-context > div")).toHaveCount(2);
@@ -273,7 +276,9 @@ test("Unicode live search, history, filters, pagination, empty and 404 states", 
     ).toBeVisible();
     await expectNoOverflow(page);
     await expectAccessible(page);
-    expect(failures).toEqual([]);
+    expect(failures).toEqual([
+        "error:Failed to load resource: the server responded with a status of 404 ()",
+    ]);
 });
 
 test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe", async ({

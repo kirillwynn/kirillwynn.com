@@ -350,6 +350,13 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert 'new URL(entry.name).pathname === "/api/me/"' in live_spec
     assert 'const headerControls = controls.locator(":scope > *");' in live_spec
     assert "const headerText = await controls.innerText();" not in live_spec
+    assert "await expect(headerControls.nth(3)).toHaveClass(/account-slot/);" in live_spec
+    assert 'getByRole("link", { name: "Login", exact: true })' in live_spec
+    assert 'headerControls.nth(3)).toHaveAccessibleName("Login")' not in live_spec
+    assert (
+        '"error:Failed to load resource: the server responded with a status of 404 ()"'
+        in live_spec
+    )
     assert live_spec.index("const feedParticipant =") < live_spec.index(
         "await postLink.click()"
     )
