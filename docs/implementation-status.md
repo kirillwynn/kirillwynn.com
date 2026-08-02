@@ -52,6 +52,30 @@ OAuth profile completion, authoritative public nicknames, and post authors are
 active. Controlled real-email and browser acceptance passed. Production
 remains absent, and the shared production edge was not replaced or changed.
 
+Stage 18 post-MVP stabilization is in progress from the independently verified
+clean/docs-only baseline `ac0a7cd1cc5c386e9b9a74e299ea51d8cd3e792f`, while
+the distinct active staging application remains
+`ebb02aae0cf463f430e9906d9d8c77e8e782379e`. The audit found two local P2
+frontend contract defects (the footer separator and a stale anonymous Login
+return target after live search), added their regressions, updated GitHub
+Actions to reviewed Node 24-compatible immutable pins, and added a manual,
+staging-only backup/isolated-restore/data/performance/live-browser audit. Local
+deterministic checks have passed; required CI, the controlled staging runtime
+rollout, fresh recovery evidence, live acceptance, and final closed-gate docs
+CI remain pending. See `docs/staging-stabilization-audit.md`. Production and
+the reaction catalog remain untouched; custom emoji rights remain an explicit
+production blocker.
+
+## Stage 18 staging stabilization
+
+Stage 18 does not add a feature milestone or authorize production. The audit
+record, issue matrix, local/live evidence, performance baseline, recovery
+evidence, remaining backlog, and production blockers are maintained in
+`docs/staging-stabilization-audit.md`. This section must remain in-progress
+until the required CI, one controlled runtime rollout, schema-3 attestation,
+five-viewport live audit, fresh isolated restore, gate restoration, and final
+documentation-only skipped-deployment evidence all pass.
+
 ## Stage 17 local identity, nicknames, and authors
 
 Stage 17 began from clean, synchronized local/origin SHA
