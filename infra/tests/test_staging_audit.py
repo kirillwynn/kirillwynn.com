@@ -331,6 +331,13 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     ).read_text()
     for mutation in (".post(", ".put(", ".patch(", ".delete("):
         assert mutation not in live_spec
+    assert "async function expectHydrated(page: Page)" in live_spec
+    assert 'new URL(entry.name).pathname === "/api/me/"' in live_spec
+    assert 'const headerControls = controls.locator(":scope > *");' in live_spec
+    assert "const headerText = await controls.innerText();" not in live_spec
+    assert live_spec.index("const feedParticipant =") < live_spec.index(
+        "await postLink.click()"
+    )
     for forbidden in (
         "deploy_environment.sh",
         "ci_ssh_deploy.sh",

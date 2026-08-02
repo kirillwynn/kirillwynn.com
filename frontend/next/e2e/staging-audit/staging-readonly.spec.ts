@@ -34,6 +34,23 @@ async function expectAccessible(page: Page) {
     expect(result.violations).toEqual([]);
 }
 
+async function expectHydrated(page: Page) {
+    await expect
+        .poll(
+            () =>
+                page.evaluate(() =>
+                    performance
+                        .getEntriesByType("resource")
+                        .some(
+                            (entry) =>
+                                new URL(entry.name).pathname === "/api/me/",
+                        ),
+                ),
+            { timeout: 15_000 },
+        )
+        .toBe(true);
+}
+
 function writeMetrics(testInfo: TestInfo, payload: Record<string, unknown>) {
     const output = process.env.STAGING_AUDIT_OUTPUT_DIR;
     if (!output) {
@@ -64,6 +81,7 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
     );
     const response = await page.goto("/", { waitUntil: "domcontentloaded" });
     expect(response?.status()).toBe(200);
+    await expectHydrated(page);
     const headers = response?.headers() ?? {};
     expect(headers["content-security-policy"]).toContain("default-src");
     expect(headers["strict-transport-security"]).toContain("max-age=");
@@ -74,16 +92,14 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
         page.getByRole("link", { name: "Feed", exact: true }),
     ).toBeVisible();
     const controls = page.locator(".site-header__controls");
-    const headerText = await controls.innerText();
-    expect(headerText.indexOf("Feed")).toBeLessThan(
-        headerText.indexOf("Bridge"),
+    const headerControls = controls.locator(":scope > *");
+    await expect(headerControls).toHaveCount(4);
+    await expect(headerControls.nth(0)).toHaveAccessibleName("Feed");
+    await expect(headerControls.nth(1)).toHaveAccessibleName("Bridge");
+    await expect(headerControls.nth(2)).toHaveAccessibleName(
+        "Switch to light theme",
     );
-    expect(headerText.indexOf("Bridge")).toBeLessThan(
-        headerText.indexOf("Switch to light theme"),
-    );
-    expect(headerText.indexOf("Switch to light theme")).toBeLessThan(
-        headerText.indexOf("Login"),
-    );
+    await expect(headerControls.nth(3)).toHaveAccessibleName("Login");
 
     const footer = page.getByRole("contentinfo");
     await expect(footer.locator(".site-team-context > div")).toHaveCount(2);
@@ -209,6 +225,7 @@ test("Unicode live search, history, filters, pagination, empty and 404 states", 
 }) => {
     const failures = observeBrowserFailures(page);
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expectHydrated(page);
     const search = page.getByRole("searchbox", { name: "Search posts" });
     await search.fill("東京");
     await expect(page).toHaveURL(/\?q=%E6%9D%B1%E4%BA%AC$/);
@@ -239,6 +256,7 @@ test("Unicode live search, history, filters, pagination, empty and 404 states", 
     );
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expectHydrated(page);
     const firstTag = page.locator(".feed-tag").nth(1);
     await expect(firstTag).toBeVisible();
     await firstTag.click();
@@ -271,6 +289,33 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     });
     await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" });
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expectHydrated(page);
+
+    const feedParticipant = page
+        .getByRole("button", { name: /participant/i })
+        .first();
+    await expect(feedParticipant).toBeVisible();
+    const participantRequestsBefore = reactionRequests.filter((request) =>
+        request.includes("/participants/"),
+    ).length;
+    await feedParticipant.hover();
+    await feedParticipant.focus();
+    await page.waitForTimeout(100);
+    await expect(
+        page.getByRole("dialog", { name: /participants/i }),
+    ).toHaveCount(0);
+    expect(
+        reactionRequests.filter((request) =>
+            request.includes("/participants/"),
+        ),
+    ).toHaveLength(participantRequestsBefore);
+    await feedParticipant.press("Space");
+    await expect(
+        page.getByRole("dialog", { name: /participants/i }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(feedParticipant).toBeFocused();
+
     const postLink = page.locator(".feed-entry h2 a").first();
     await expect(postLink).toBeVisible();
     await postLink.click();
@@ -323,32 +368,6 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     });
     await page.keyboard.press("Escape");
     await expect(trigger).toBeFocused();
-
-    const participant = page
-        .getByRole("button", { name: /participant/i })
-        .first();
-    if (await participant.isVisible().catch(() => false)) {
-        const participantRequestsBefore = reactionRequests.filter((request) =>
-            request.includes("/participants/"),
-        ).length;
-        await participant.hover();
-        await participant.focus();
-        await page.waitForTimeout(100);
-        await expect(
-            page.getByRole("dialog", { name: /participants/i }),
-        ).toHaveCount(0);
-        expect(
-            reactionRequests.filter((request) =>
-                request.includes("/participants/"),
-            ),
-        ).toHaveLength(participantRequestsBefore);
-        await participant.press("Space");
-        await expect(
-            page.getByRole("dialog", { name: /participants/i }),
-        ).toBeVisible();
-        await page.keyboard.press("Escape");
-        await expect(participant).toBeFocused();
-    }
 
     await expectNoOverflow(page);
     await expectAccessible(page);
