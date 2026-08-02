@@ -53,22 +53,22 @@ active. Controlled real-email and browser acceptance passed. Production
 remains absent, and the shared production edge was not replaced or changed.
 
 Stage 18 post-MVP stabilization is in progress from the independently verified
-clean/docs-only baseline `ac0a7cd1cc5c386e9b9a74e299ea51d8cd3e792f`, while
-the distinct active staging application remains
-`ebb02aae0cf463f430e9906d9d8c77e8e782379e`. The audit found two local P2
+clean/docs-only baseline `ac0a7cd1cc5c386e9b9a74e299ea51d8cd3e792f`. The
+controlled rollout is now active on staging as
+`07542f5a90d2849577219ed74a1628ba39555674`. The audit found two local P2
 frontend contract defects (the footer separator and a stale anonymous Login
 return target after live search), added their regressions, updated GitHub
 Actions to reviewed Node 24-compatible immutable pins, and added a manual,
 staging-only backup/isolated-restore/data/performance/live-browser audit. Local
-deterministic checks and the required closed-gate push/PR CI have passed. The
-first controlled rollout attempt exposed a Python-host compatibility defect in
-schema-3 state creation and failed before its first state transition; the gate
-was restored to false, active staging remained on the Stage 17 release, and a
-minimal compatibility fix plus regression is in progress. A successful
-rollout, fresh recovery evidence, live acceptance, and final closed-gate docs
-CI remain pending. See `docs/staging-stabilization-audit.md`. Production and
-the reaction catalog remain untouched; custom emoji rights remain an explicit
-production blocker.
+deterministic checks, required closed-gate push/PR CI, the compatibility
+remediation, immutable rollout, pre-migration backup, schema-3 attestation,
+gate restoration, and targeted live acceptance have passed. The first fresh
+recovery-audit run exposed a staging/shared-Edge evidence-reader mismatch and
+failed before backup; its local low-risk correction and regression pass, while
+the corrected recovery/live workflow and final closed-gate docs CI remain
+pending. See `docs/staging-stabilization-audit.md`. Production and the reaction
+catalog remain untouched; custom emoji rights remain an explicit production
+blocker.
 
 ## Stage 18 staging stabilization
 

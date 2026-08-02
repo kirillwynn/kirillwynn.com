@@ -89,7 +89,9 @@ def test_comparison_requires_equal_values_when_active_snapshot_is_stable():
 
     result = module.compare(before, restored, after)
 
-    assert result["mismatches"] == {"posts.total": {"before": 13, "restored": 12, "after": 13}}
+    assert result["mismatches"] == {
+        "posts.total": {"before": 13, "restored": 12, "after": 13}
+    }
 
 
 def test_comparison_reports_concurrent_user_activity_without_false_failure():
@@ -162,7 +164,7 @@ def test_release_state_audit_binds_immutable_paths_and_shared_edge(tmp_path):
         "revision": 7,
         "active": {
             "application": reference,
-            "edge": reference,
+            "edge": None,
             "deployment_sequence": 123,
             "activated_by_operation_id": "deploy-123-staging-aaaaaaaa",
         },
@@ -180,14 +182,43 @@ def test_release_state_audit_binds_immutable_paths_and_shared_edge(tmp_path):
         "recovery_required_for": None,
     }
 
-    result = module.build_report(state, release_sha, release_root, runtime_root)
+    result = module.build_report(
+        state,
+        release_sha,
+        f"edge@sha256:{'3' * 64}",
+        release_root,
+        runtime_root,
+    )
 
-    assert result["active"]["edge"]["edge_image"].endswith("3" * 64)
+    assert result["active"]["edge"] is None
+    assert result["active_shared_edge"]["image"].endswith("3" * 64)
+    assert result["active_shared_edge"]["matching_manifests"] == [
+        {
+            "release_sha": release_sha,
+            "manifest_path": str(manifest_path),
+            "manifest_sha256": module.record_rollout_state.sha256(manifest_path),
+        }
+    ]
     assert result["in_progress_operation_id"] is None
+
+    with pytest.raises(ValueError, match="no immutable release manifest"):
+        module.build_report(
+            state,
+            release_sha,
+            f"edge@sha256:{'9' * 64}",
+            release_root,
+            runtime_root,
+        )
 
     manifest_path.write_text("{}")
     with pytest.raises(ValueError, match="manifest"):
-        module.build_report(state, release_sha, release_root, runtime_root)
+        module.build_report(
+            state,
+            release_sha,
+            f"edge@sha256:{'3' * 64}",
+            release_root,
+            runtime_root,
+        )
 
 
 def test_stage18_recovery_drill_is_scratch_only_and_retains_evidence():
@@ -197,9 +228,14 @@ def test_stage18_recovery_drill_is_scratch_only_and_retains_evidence():
     compare = remote.index('python3 "$comparison_script"')
     assert backup < restore < compare
     assert "restore_stage18_" in remote
+    assert "--active-edge-image" in remote
+    assert "active_shared_edge" in remote
+    assert "docker inspect --format '{{.Config.Image}}'" in remote
     assert "scratch_database_retained=true" in remote
     assert "restored_database_public_attachment=none" in remote
-    assert "SET TRANSACTION READ ONLY" in (SCRIPTS / "staging_data_audit.py").read_text()
+    assert (
+        "SET TRANSACTION READ ONLY" in (SCRIPTS / "staging_data_audit.py").read_text()
+    )
     for forbidden in (
         "dropdb",
         "docker volume rm",
@@ -234,7 +270,9 @@ def test_external_actions_use_reviewed_node24_release_shas():
 
 
 def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
-    workflow = (ROOT / ".github" / "workflows" / "staging-stabilization-audit.yml").read_text()
+    workflow = (
+        ROOT / ".github" / "workflows" / "staging-stabilization-audit.yml"
+    ).read_text()
     assert "workflow_dispatch:" in workflow
     assert "environment: staging" in workflow
     assert "expected_active_release_sha" in workflow
@@ -246,13 +284,20 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert "scan_test_artifacts.sh" in workflow
     assert workflow.index("STAGING_AUDIT_OUTPUT_DIR") > workflow.index("- id: browser")
     assert '"$RUNNER_TEMP/stage18-live-browser"' in workflow
-    config = (ROOT / "frontend" / "next" / "playwright.staging-audit.config.ts").read_text()
+    config = (
+        ROOT / "frontend" / "next" / "playwright.staging-audit.config.ts"
+    ).read_text()
     assert "STAGING_AUDIT_OUTPUT_DIR" in config
     assert 'screenshot: "off"' in config
     assert 'trace: "off"' in config
     assert 'video: "off"' in config
     live_spec = (
-        ROOT / "frontend" / "next" / "e2e" / "staging-audit" / "staging-readonly.spec.ts"
+        ROOT
+        / "frontend"
+        / "next"
+        / "e2e"
+        / "staging-audit"
+        / "staging-readonly.spec.ts"
     ).read_text()
     for mutation in (".post(", ".put(", ".patch(", ".delete("):
         assert mutation not in live_spec

@@ -43,6 +43,8 @@ data_audit_script="$repository_root/infra/scripts/staging_data_audit.py"
 performance_audit_script="$repository_root/infra/scripts/staging_performance_audit.py"
 comparison_script="$repository_root/infra/scripts/compare_staging_data_audits.py"
 release_audit_script="$repository_root/infra/scripts/staging_release_state_audit.py"
+edge_runtime_env=/srv/kirillwynn/runtime/edge.env
+edge_compose="$repository_root/infra/compose/edge.yml"
 
 test ! -L "$output_dir" || {
     echo "audit output directory must not be a symlink" >&2
@@ -59,18 +61,39 @@ state_field() {
         --field "$1"
 }
 
+live_edge_image() {
+    edge_container=$(docker compose --env-file "$edge_runtime_env" \
+        -f "$edge_compose" ps -q edge)
+    case "$edge_container" in
+        "") echo "active shared Edge container is missing" >&2; exit 2 ;;
+        *'
+'*) echo "multiple active shared Edge containers were found" >&2; exit 2 ;;
+    esac
+    docker inspect --format '{{.Config.Image}}' "$edge_container"
+}
+
+test -r "$edge_runtime_env" && test -r "$edge_compose"
+active_edge_image=$(live_edge_image)
 python3 "$release_audit_script" \
     --expected-active-release "$expected_release_sha" \
+    --active-edge-image "$active_edge_image" \
     --state-directory "$state_root" \
     --output "$output_dir/release-state-before.json"
+active_edge_manifest=$(python3 - "$output_dir/release-state-before.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report = json.loads(Path(sys.argv[1]).read_text())
+print(report["active_shared_edge"]["matching_manifests"][0]["manifest_path"])
+PY
+)
 
 active_runtime=$(state_field active.application.runtime_directory)
 active_manifest=$(state_field active.application.manifest_path)
-active_edge_manifest=$(state_field active.edge.manifest_path)
 active_release_root=$(dirname "$active_manifest")
 application_compose="$active_release_root/infra/compose/application.yml"
 database_compose="$active_release_root/infra/compose/database.yml"
-edge_runtime_env=/srv/kirillwynn/runtime/edge.env
 control_env="$active_runtime/control.env"
 postgres_env="$active_runtime/postgres.env"
 
@@ -231,8 +254,11 @@ python3 "$comparison_script" \
     "$output_dir/data-active-after.json" \
     --output "$output_dir/data-comparison.json"
 
+active_edge_image_after=$(live_edge_image)
+test "$active_edge_image_after" = "$active_edge_image"
 python3 "$release_audit_script" \
     --expected-active-release "$expected_release_sha" \
+    --active-edge-image "$active_edge_image_after" \
     --state-directory "$state_root" \
     --output "$output_dir/release-state-after.json"
 cmp "$output_dir/release-state-before.json" "$output_dir/release-state-after.json"

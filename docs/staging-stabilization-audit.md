@@ -2,15 +2,15 @@
 
 Last updated: 2026-08-01
 
-Status: in progress. Local deterministic verification and closed-gate push/PR
-CI are complete for the implementation candidate. The first controlled rollout
-attempt failed closed before its first state transition because the VPS host
-Python did not provide `datetime.UTC`; the environment gate was restored to
-false and the compatibility remediation is awaiting CI. A successful rollout,
-fresh backup/isolated-restore drill, automated five-viewport live acceptance,
-final gate restoration, and closing documentation-only CI evidence are still
-pending. This file must not describe Stage 18 as complete until all of those
-boundaries pass.
+Status: in progress. Local deterministic verification, closed-gate push/PR CI,
+the controlled staging rollout, schema-3 attestation, gate restoration, and
+targeted live remediation acceptance are complete for active release
+`07542f5a90d2849577219ed74a1628ba39555674`. The first recovery-audit run
+failed before backup because its new evidence reader incorrectly required
+production-owned Edge state inside the staging snapshot. The corrected fresh
+backup/isolated-restore drill, automated five-viewport live acceptance, and
+closing documentation-only CI evidence are still pending. This file must not
+describe Stage 18 as complete until all of those boundaries pass.
 
 ## Scope and baseline
 
@@ -58,14 +58,16 @@ The independently verified pre-mutation baseline was:
   volumes, or environment-qualified networks on the server. Preserved legacy
   containers, mounts, and data were not touched.
 
-No baseline discrepancy was found. The active shared Edge identity will be
-recorded from the authoritative schema-3 state in the fresh audit evidence.
+No baseline discrepancy was found. Because staging deliberately does not own
+an Edge snapshot in schema 3, the fresh audit will read the running shared-Edge
+digest directly and bind it to matching immutable durable release manifests.
 
 ## Issue matrix
 
 | Finding | Severity | Evidence | Disposition |
 | --- | --- | --- | --- |
-| Schema-3 rollout state creation used the Python 3.11-only `datetime.UTC` alias on the Python 3.10 VPS host | P1 operational | Attempt 2 of run `30727380396`, deploy job `91444944090`, failed in `record_rollout_state.py:now()` before `begin` wrote the operation; the log recorded `shared_edge=existing`, the public footer remained the prior release, and attestation upload was skipped | Replaced the alias with `datetime.timezone.utc`. A regression simulates a host datetime module without `UTC`; the full 242-test infrastructure suite and a direct system-Python compatibility probe pass. Retry requires fresh closed-gate CI and a new controlled operation. |
+| Schema-3 rollout state creation used the Python 3.11-only `datetime.UTC` alias on the Python 3.10 VPS host | P1 operational | Attempt 2 of run `30727380396`, deploy job `91444944090`, failed in `record_rollout_state.py:now()` before `begin` wrote the operation; the log recorded `shared_edge=existing`, the public footer remained the prior release, and attestation upload was skipped | Replaced the alias with `datetime.timezone.utc`. A regression simulates a host datetime module without `UTC`; closed-gate CI, the full 242-test infrastructure suite, a direct system-Python compatibility probe, and the later successful rollout all pass. |
+| The first recovery-audit reader required `active.edge` in staging even though schema 3 deliberately keeps Edge production-owned | P2 tooling | Audit run `30730318625`, recovery job `91449388175`, rejected the otherwise valid staging snapshot before backup; the deployment runbook and state-machine code both require staging snapshots to carry `edge=null` | The reader now requires the documented null staging field, independently reads the live shared-Edge digest, binds it to immutable durable manifests, verifies the running Edge before and after the drill, and has regression coverage. No backup, restore, or data change occurred in the rejected run. |
 | Footer rendered an em dash instead of the exact two-line `Current Team:` / `Previous Team:` contract | P2 | Real staging browser plus computed `dt::after` content | Fixed locally with the one-character CSS correction and browser regression coverage. |
 | Anonymous Login retained a stale `next` value after Feed live-search replaced the query string | P2 | Real staging browser reproduced `/` after the visible URL became `/?q=...` | Fixed by deriving the target from pathname plus reactive search parameters; unit and browser regressions cover Unicode live search. |
 | Node 20 action releases were being forced onto Node 24 by GitHub Actions | P2 maintenance | Existing workflow warnings and upstream action manifests/releases | Updated to reviewed Node 24-compatible upstream releases pinned to full immutable SHAs. Permissions, provenance, sanitization, and gates are unchanged. |
@@ -121,7 +123,11 @@ The additive implementation history is:
   record;
 - `aa2533a9abff7c3d2ac55e953c03048339beaaec`, parent
   `9fb44ed38071689163a2b68c907e207fcf1efca4`: GitHub runner-context
-  correction. No commit was amended, squashed, rebased, or force-pushed.
+  correction;
+- `07542f5a90d2849577219ed74a1628ba39555674`, parent
+  `aa2533a9abff7c3d2ac55e953c03048339beaaec`: VPS-host Python compatibility
+  remediation and rollout evidence. No commit was amended, squashed, rebased,
+  or force-pushed.
 
 ## Confirmed repository and browser invariants
 
@@ -146,7 +152,7 @@ Local verification passed:
   secret/internal-origin scan, `npm audit` with zero vulnerabilities, 70/70
   deterministic browser-contract cases across the five required viewports,
   and 8/8 real-Django cross-stack cases;
-- 241 infrastructure tests, shell syntax, Python compile and Ruff lint, plus
+- 242 infrastructure tests, shell syntax, Python compile and Ruff lint, plus
   targeted Stage 18 recovery/workflow regression tests.
 
 Docker, PostgreSQL, `psql`, and Nginx are unavailable locally. Compose/Nginx,
@@ -184,6 +190,45 @@ Environment gate was returned to false immediately. A reloaded public Feed
 still rendered the prior release's em-dash footer, independently confirming
 that the candidate frontend was not activated.
 
+The compatibility remediation then passed closed-gate push run `30728939433`
+and PR run `30728940566` at exact SHA
+`07542f5a90d2849577219ed74a1628ba39555674`; the closed-gate deploy job
+`91446151752` skipped deployment, attestation validation, and attestation
+upload, while catalog sync remained skipped. A controlled rerun passed all
+required suites, builds, manifest, and preflight. Its first deploy attempt lost
+SSH during `scp` before the remote rollout command; public staging briefly
+returned 504, recovered on the prior release, and still showed the prior footer.
+The failed-job-only retry reused the same immutable SHA, run ID, manifest, and
+operation ID and completed as deploy job `91447769894`.
+
+Active release `07542f5a90d2849577219ed74a1628ba39555674` was activated by
+`deploy-30728939433-staging-07542f5a90d2849577219ed74a1628ba39555674`.
+The pre-migration backup is
+`20260802T025743Z_ebb02aae0cf463f430e9906d9d8c77e8e782379e_pre-migration_deploy-30728939433-staging-07542f5a90d2849577219ed74a1628ba39555674.dump`;
+no migrations were pending. Pre/post checks agreed on two users, two verified
+primary e-mails, two confirmed nicknames, three nickname-history rows, two
+social accounts, zero social tokens, 13 public posts, zero ownerless posts,
+five comments, six post reactions, zero comment reactions, and one database
+session.
+
+Release artifact `8827442606` has archive digest
+`sha256:8bc8c74c85dddfa90bd31ce19e5518f8dd977666a1ae5499ac7321a67ee6cf65`
+and manifest JSON SHA-256
+`5069e0a9d9404a723e68e4cab74ab065e57cdd941028ea5f4b9ba2fcb425fdc6`.
+The immutable images are Django
+`sha256:77c6ae90b0c600dcc75bd76ef6899119f28ea194ba634d720f1c08889eaf71d2`,
+Next `sha256:1a424bc98cf7d5cf647adf8a5d13fe2425f8ec5eee3c1815ae723da9b73d2186`,
+and candidate Edge
+`sha256:460850e0023b16a34f017a25ca1705d1ab89955a60a13053aea512389b237b7b`.
+Schema-3 attestation artifact `8827559823` has archive digest
+`sha256:73b9c7e9486b3f50ce906222b329753032be7ae3c9923bcefe09d51e719a75f8`
+and JSON SHA-256
+`16837c35efa4d8b859af452964a42b4c32f9c23e960505a9a22edbb7a5f21e7d`.
+All seven application-image, readiness, Next, worker heartbeat/egress,
+edge-candidate, and public-smoke checks are true. The shared Edge was reported
+as existing and was not replaced. The environment and repository deploy gates
+were returned to false immediately; catalog sync remained false.
+
 ## Performance baseline
 
 The repository probes collect three samples and the median for Feed page 1/2,
@@ -219,13 +264,13 @@ files outside project-related scope were not scanned or deleted.
 
 ## Remaining gates and production blockers
 
-Closed-gate implementation push/PR CI has passed. Because the CSS/Next runtime
-changed, one controlled staging rollout must now pass immutable build,
-pre-migration backup, migration, health, schema-3 attestation, and live
-acceptance. Deployment must be returned to false, catalog sync must remain
-false, and one-shot values must be absent. The fresh stabilization workflow
-must pass against the new active SHA. A final documentation-only commit must
-pass required CI with deployment and attestation skipped.
+Closed-gate implementation/remediation push and PR CI, controlled rollout,
+pre-migration backup, migration, health, schema-3 attestation, gate restoration,
+and targeted live acceptance have passed. The corrected fresh stabilization
+workflow must still pass backup/isolated restore, data/performance comparison,
+and five-viewport live acceptance against the active SHA. A final
+documentation-only commit must then pass required CI with deployment and
+attestation skipped.
 
 Production remains blocked by the absence of a production Environment and all
 production infrastructure/provider configuration, by the lack of a separately

@@ -8,6 +8,7 @@ from collections import Counter
 from pathlib import Path
 
 import record_rollout_state
+from validate_release_manifest import load_manifest
 
 
 def bounded_reference(reference):
@@ -40,14 +41,42 @@ def require_release_layout(reference, release_directory, runtime_directory):
     manifest_path = Path(reference["manifest_path"]).resolve(strict=True)
     runtime_directory = Path(reference["runtime_directory"]).resolve(strict=True)
     if manifest_path != expected_release / "release-manifest.json":
-        raise ValueError("active staging manifest is outside the immutable release layout")
+        raise ValueError(
+            "active staging manifest is outside the immutable release layout"
+        )
     if runtime_directory != expected_runtime:
         raise ValueError("active staging runtime is outside the release-scoped layout")
+
+
+def active_shared_edge_report(active_edge_image, release_directory):
+    if not isinstance(active_edge_image, str) or "@sha256:" not in active_edge_image:
+        raise ValueError("active shared Edge image is not digest-pinned")
+    matches = []
+    for manifest_path in sorted(release_directory.glob("*/release-manifest.json")):
+        release_sha = manifest_path.parent.name
+        if record_rollout_state.SHA.fullmatch(release_sha) is None:
+            continue
+        manifest = load_manifest(manifest_path)
+        if manifest["release_sha"] != release_sha:
+            raise ValueError("durable release directory conflicts with its manifest")
+        if manifest["images"]["edge"] != active_edge_image:
+            continue
+        matches.append(
+            {
+                "release_sha": release_sha,
+                "manifest_path": str(manifest_path.resolve(strict=True)),
+                "manifest_sha256": record_rollout_state.sha256(manifest_path),
+            }
+        )
+    if not matches:
+        raise ValueError("active shared Edge digest has no immutable release manifest")
+    return {"image": active_edge_image, "matching_manifests": matches}
 
 
 def build_report(
     state,
     expected_release_sha,
+    active_edge_image,
     release_directory=Path("/srv/kirillwynn/releases"),
     runtime_directory=Path("/srv/kirillwynn/runtime/releases"),
 ):
@@ -55,22 +84,23 @@ def build_report(
     if active is None:
         raise ValueError("staging has no active application snapshot")
     if active["application"]["release_sha"] != expected_release_sha:
-        raise ValueError("active staging application release differs from the audit input")
-    if active["edge"] is None:
-        raise ValueError("staging has no authoritative shared Edge snapshot")
+        raise ValueError(
+            "active staging application release differs from the audit input"
+        )
+    if active["edge"] is not None or (
+        state["previous"] is not None and state["previous"]["edge"] is not None
+    ):
+        raise ValueError("staging state must not claim production-owned Edge state")
     if state["in_progress_operation_id"] is not None:
         raise ValueError("staging has an in-progress rollout operation")
     if state["recovery_required_for"] is not None:
         raise ValueError("staging requires reviewed rollout recovery")
 
     require_release_layout(active["application"], release_directory, runtime_directory)
-    require_release_layout(active["edge"], release_directory, runtime_directory)
     if state["previous"] is not None:
         require_release_layout(
             state["previous"]["application"], release_directory, runtime_directory
         )
-        if state["previous"]["edge"] is not None:
-            require_release_layout(state["previous"]["edge"], release_directory, runtime_directory)
 
     attempts = Counter(attempt["status"] for attempt in state["attempts"].values())
     database = state["database"]
@@ -80,6 +110,9 @@ def build_report(
         "rollout_revision": state["revision"],
         "active": bounded_snapshot(active),
         "previous": bounded_snapshot(state["previous"]),
+        "active_shared_edge": active_shared_edge_report(
+            active_edge_image, release_directory
+        ),
         "database": {
             "lifecycle_state": database["lifecycle_state"],
             "volume_name": database["volume_name"],
@@ -112,6 +145,7 @@ def main():
         type=Path,
         default=Path("/srv/kirillwynn/runtime/releases"),
     )
+    parser.add_argument("--active-edge-image", required=True)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
@@ -123,6 +157,7 @@ def main():
         result = build_report(
             state,
             args.expected_active_release,
+            args.active_edge_image,
             args.release_directory,
             args.runtime_directory,
         )
