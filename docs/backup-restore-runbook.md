@@ -96,8 +96,12 @@ server snapshot and live browser acceptance.
 
 The workflow verifies the active application and separately retained shared
 Edge references, committed/active Compose and runtime contracts, container
-health, and absence of exact production infrastructure. It reads the active
-database inside PostgreSQL read-only transactions, creates a purpose `manual`
+health, and absence of production application state, containers, volumes, and
+private networks. ADR 0005 requires the shared Edge project to own the dormant
+production edge network even before production exists; the audit therefore
+requires that exact network to contain only the active shared Edge container.
+It reads the active database inside PostgreSQL read-only transactions, creates
+a purpose `manual`
 custom-format backup, verifies schema-2 metadata/SHA-256 and
 `pg_restore --list`, and restores only into a new
 `restore_stage18_<run>_<attempt>` database. The scratch database is never

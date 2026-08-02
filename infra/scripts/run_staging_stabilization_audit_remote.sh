@@ -60,8 +60,8 @@ state_field() {
         --field "$1"
 }
 
-live_edge_image() {
-    edge_container=$(docker ps -q \
+live_edge_container() {
+    edge_container=$(docker ps --no-trunc -q \
         --filter label=com.docker.compose.project=kirillwynn-edge \
         --filter label=com.docker.compose.service=edge)
     case "$edge_container" in
@@ -69,11 +69,13 @@ live_edge_image() {
         *'
 '*) echo "multiple active shared Edge containers were found" >&2; exit 2 ;;
     esac
-    docker inspect --format '{{.Config.Image}}' "$edge_container"
+    printf '%s\n' "$edge_container"
 }
 
 test -r "$edge_runtime_env"
-active_edge_image=$(live_edge_image)
+active_edge_container=$(live_edge_container)
+active_edge_image=$(docker inspect --format '{{.Config.Image}}' \
+    "$active_edge_container")
 python3 "$release_audit_script" \
     --expected-active-release "$expected_release_sha" \
     --active-edge-image "$active_edge_image" \
@@ -160,8 +162,7 @@ for production_object in \
     volume:kirillwynn-production-next-cache \
     network:kirillwynn-production-database \
     network:kirillwynn-production-application \
-    network:kirillwynn-production-egress \
-    network:kirillwynn-production-edge
+    network:kirillwynn-production-egress
 do
     object_kind=${production_object%%:*}
     object_name=${production_object#*:}
@@ -170,13 +171,29 @@ do
         exit 2
     fi
 done
+production_edge_network=kirillwynn-production-edge
+test "$(docker network inspect --format \
+    '{{index .Labels "com.docker.compose.project"}}' \
+    "$production_edge_network")" = kirillwynn-edge
+test "$(docker network inspect --format \
+    '{{index .Labels "com.docker.compose.network"}}' \
+    "$production_edge_network")" = production_edge
+production_edge_members=$(docker network inspect --format \
+    '{{range $id, $container := .Containers}}{{println $id}}{{end}}' \
+    "$production_edge_network")
+test "$production_edge_members" = "$active_edge_container" || {
+    echo "shared production-edge network has an unexpected attachment" >&2
+    exit 2
+}
 test ! -e /srv/kirillwynn/state/production/rollout-state.json
 printf '%s\n' \
     'production_rollout_state=absent' \
     'production_compose_containers=absent' \
     'production_database_volume=absent' \
     'production_next_cache_volume=absent' \
-    'production_networks=absent' \
+    'production_application_private_networks=absent' \
+    'shared_production_edge_network=owned-by-shared-edge' \
+    'shared_production_edge_network_attachments=active-edge-only' \
     > "$output_dir/production-boundary.txt"
 
 active_database=$(python3 "$repository_root/infra/scripts/env_value.py" \
@@ -254,7 +271,10 @@ python3 "$comparison_script" \
     "$output_dir/data-active-after.json" \
     --output "$output_dir/data-comparison.json"
 
-active_edge_image_after=$(live_edge_image)
+active_edge_container_after=$(live_edge_container)
+test "$active_edge_container_after" = "$active_edge_container"
+active_edge_image_after=$(docker inspect --format '{{.Config.Image}}' \
+    "$active_edge_container_after")
 test "$active_edge_image_after" = "$active_edge_image"
 python3 "$release_audit_script" \
     --expected-active-release "$expected_release_sha" \
