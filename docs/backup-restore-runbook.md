@@ -85,6 +85,35 @@ scratch data is a separate approved incident action. Monthly staging drills
 must restore the newest dump, run Django migration/check plans, compare key row
 counts, and record duration/results.
 
+## Staging stabilization audit drill
+
+The manual `staging-stabilization-audit.yml` workflow is the bounded repository
+implementation of a fresh staging recovery drill. Dispatch it only with the
+exact application release currently recorded as active in schema-3 rollout
+state. The entire workflow holds `kirillwynn-server-release-operations`, so a
+deployment, recovery, or catalog operation cannot interleave between its
+server snapshot and live browser acceptance.
+
+The workflow verifies the active application and separately retained shared
+Edge references, committed/active Compose and runtime contracts, container
+health, and absence of exact production infrastructure. It reads the active
+database inside PostgreSQL read-only transactions, creates a purpose `manual`
+custom-format backup, verifies schema-2 metadata/SHA-256 and
+`pg_restore --list`, and restores only into a new
+`restore_stage18_<run>_<attempt>` database. The scratch database is never
+attached to the public application and is intentionally retained for reviewed
+operator cleanup. The workflow does not replace the active database and does
+not delete a database or volume.
+
+Migration plans, Django checks, PII-free integrity counts/invariants, and
+three-sample query-count/server-time baselines run against the restore. A second
+read-only active snapshot distinguishes concurrent user activity from backup
+drift, while identity, migration, ownerless-post, SocialToken, and reaction
+catalog invariants remain strict. Release state must be byte-equivalent before
+and after the drill. All retrieved recovery and five-viewport Playwright
+evidence passes the repository artifact sanitizer before upload. The workflow
+has no deployment, reaction-catalog sync, or production path.
+
 PostgreSQL dumps do not contain media. S3 buckets remain environment-specific
 and require provider versioning/lifecycle/off-site protection plus a staging
 recovery drill for an original, rendition, and document.

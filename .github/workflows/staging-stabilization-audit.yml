@@ -1,0 +1,99 @@
+name: Staging stabilization audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_active_release_sha:
+        description: Exact active staging application release to audit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kirillwynn-server-release-operations
+  cancel-in-progress: false
+
+jobs:
+  recovery-audit:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_IP }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: audit
+        name: Backup, isolated restore, and staging integrity audit
+        continue-on-error: true
+        env:
+          EXPECTED_ACTIVE_RELEASE_SHA: ${{ inputs.expected_active_release_sha }}
+        run: >-
+          infra/scripts/ci_ssh_staging_stabilization_audit.sh
+          "$EXPECTED_ACTIVE_RELEASE_SHA"
+          "$RUNNER_TEMP/stage18-audit"
+      - id: artifacts
+        name: Fail-closed audit evidence scan
+        if: always()
+        run: infra/tests/scan_test_artifacts.sh "$RUNNER_TEMP/stage18-audit"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && steps.artifacts.outcome == 'success'
+        with:
+          name: stage18-staging-recovery-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stage18-audit
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce recovery and evidence boundaries
+        if: always()
+        env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.artifacts.outcome }}
+        run: |
+          test "$AUDIT_OUTCOME" = success
+          test "$ARTIFACT_OUTCOME" = success
+
+  live-browser:
+    needs: recovery-audit
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      STAGING_BASIC_AUTH: ${{ secrets.STAGING_BASIC_AUTH }}
+      STAGING_AUDIT_OUTPUT_DIR: ${{ runner.temp }}/stage18-live-browser
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/next/package-lock.json
+      - working-directory: frontend/next
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - id: browser
+        name: Read-only five-viewport staging acceptance
+        continue-on-error: true
+        working-directory: frontend/next
+        run: npm run test:staging-audit
+      - id: artifacts
+        name: Fail-closed browser baseline scan
+        if: always()
+        run: infra/tests/scan_test_artifacts.sh "$STAGING_AUDIT_OUTPUT_DIR"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && steps.artifacts.outcome == 'success'
+        with:
+          name: stage18-staging-browser-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stage18-live-browser
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce live browser and evidence boundaries
+        if: always()
+        env:
+          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.artifacts.outcome }}
+        run: |
+          test "$BROWSER_OUTCOME" = success
+          test "$ARTIFACT_OUTCOME" = success

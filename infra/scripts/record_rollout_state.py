@@ -122,7 +122,7 @@ ACTIVATION_POLICIES = {
 
 
 def now():
-    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return datetime.datetime.now(datetime.UTC).isoformat()
 
 
 def fsync_directory(path):
@@ -1283,7 +1283,7 @@ def inspect(args):
     value = get_attempt(state, args.operation_id) if args.operation_id else state
     if args.field:
         value = field_value(value, args.field)
-    if isinstance(value, (dict, list)) or value is None:
+    if isinstance(value, dict | list) or value is None:
         print(json.dumps(value, sort_keys=True))
     elif isinstance(value, bool):
         print("true" if value else "false")
