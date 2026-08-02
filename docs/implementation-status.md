@@ -52,44 +52,39 @@ OAuth profile completion, authoritative public nicknames, and post authors are
 active. Controlled real-email and browser acceptance passed. Production
 remains absent, and the shared production edge was not replaced or changed.
 
-Stage 18 post-MVP stabilization is in progress from the independently verified
-clean/docs-only baseline `ac0a7cd1cc5c386e9b9a74e299ea51d8cd3e792f`. The
-controlled rollout is now active on staging as
-`07542f5a90d2849577219ed74a1628ba39555674`. The audit found two local P2
-frontend contract defects (the footer separator and a stale anonymous Login
-return target after live search), added their regressions, updated GitHub
-Actions to reviewed Node 24-compatible immutable pins, and added a manual,
-staging-only backup/isolated-restore/data/performance/live-browser audit. Local
-deterministic checks, required closed-gate push/PR CI, the compatibility
-remediation, immutable rollout, pre-migration backup, schema-3 attestation,
-gate restoration, and targeted live acceptance have passed. Five fresh
-recovery-audit dispatches (six recovery job executions including one retry)
-first exposed three staging/shared-Edge evidence-reader defects before backup:
-incorrect state ownership, circular Compose image interpolation during live
-container discovery, then misclassification of the ADR-required dormant
-production-edge network as a production application object. The fourth
-dispatch passed those boundaries and read active data twice, but exited inside
-the pre-backup data-audit command without a durable child-failure
-classification. A fixed non-secret phase ledger and explicit backup child
-diagnostics then proved that the fifth dispatch stopped at the same point
-before backup: its read-only data reader contained a mistyped expected
-catalog-manifest digest, and Django's automatic shell imports prefixed its
-intended JSON. The digest is corrected to the unchanged committed manifest and
-all audit shells disable automatic imports; the
-corrected recovery/live workflow and final closed-gate docs CI remain pending.
-See
-`docs/staging-stabilization-audit.md`. Production and the reaction catalog
-remain untouched; custom emoji rights remain an explicit production blocker.
+Stage 18 post-MVP stabilization is a completion candidate from the independently
+verified clean/docs-only baseline
+`ac0a7cd1cc5c386e9b9a74e299ea51d8cd3e792f`. The controlled application
+release remains active on staging as
+`07542f5a90d2849577219ed74a1628ba39555674`; later audit-only head
+`76478921604adb0734686b6a50e106a4f209a92f` is not an active application
+release. The audit fixed two local P2 frontend contract defects, the Python
+3.10 rollout compatibility defect, and confirmed audit/recovery harness
+defects with additive regression-tested remediations. GitHub Actions now use
+reviewed Node 24-compatible immutable pins.
+
+All locally available deterministic checks, required closed-gate push/PR CI,
+the controlled immutable rollout, pre-migration backup, schema-3 attestation,
+gate restoration, and targeted live acceptance passed. Final workflow
+`30754896193` also passed the fresh custom-format backup, isolated
+`restore_stage18_30754896193_1`, migration/system/data/query-count checks,
+exact worker restoration, and five-viewport read-only browser audit. Its
+sanitized recovery/browser artifacts are `8835686488` and `8835715340`.
+Only closed-gate CI for the documentation-only completion commit remains.
+See `docs/staging-stabilization-audit.md`. Production and the reaction catalog
+remain untouched; all 228 custom emoji rights remain
+`staging-only/unverified` and an explicit production blocker.
 
 ## Stage 18 staging stabilization
 
 Stage 18 does not add a feature milestone or authorize production. The audit
 record, issue matrix, local/live evidence, performance baseline, recovery
 evidence, remaining backlog, and production blockers are maintained in
-`docs/staging-stabilization-audit.md`. This section must remain in-progress
-until the required CI, one controlled runtime rollout, schema-3 attestation,
-five-viewport live audit, fresh isolated restore, gate restoration, and final
-documentation-only skipped-deployment evidence all pass.
+`docs/staging-stabilization-audit.md`. Every substantive implementation,
+rollout, recovery, and live-acceptance gate has passed. This completion
+candidate becomes complete only when the documentation-only commit containing
+this status passes required push/PR CI with deployment, attestation, and
+catalog sync skipped.
 
 ## Stage 17 local identity, nicknames, and authors
 
