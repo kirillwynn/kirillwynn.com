@@ -205,7 +205,7 @@ async function expectTeamFooter(page: Page) {
                 .locator("dt")
                 .evaluate((term) => getComputedStyle(term, "::after").content),
         )
-        .toBe('" —"');
+        .toBe('":"');
 }
 
 async function expectSlackReactionGeometry(pill: Locator) {
@@ -353,6 +353,17 @@ test("anonymous reader, feed search, tags, and pagination", async ({
     await expect(
         page.getByRole("searchbox", { name: "Search posts" }),
     ).toHaveValue("日本");
+    await expect
+        .poll(async () => {
+            const href = await page
+                .getByRole("link", { name: "Login", exact: true })
+                .getAttribute("href");
+            return new URL(
+                href ?? "",
+                "http://localhost:3100",
+            ).searchParams.get("next");
+        })
+        .toBe("/?q=日本");
     await expectAccessible(page);
 });
 

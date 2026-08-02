@@ -934,7 +934,7 @@ img {
 }
 
 .site-team-context dt::after {
-    content: " —";
+    content: ":";
 }
 
 .preview-container {

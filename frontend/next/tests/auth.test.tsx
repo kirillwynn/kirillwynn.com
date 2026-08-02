@@ -12,9 +12,11 @@ import { SiteHeader } from "@/components/site-header";
 import { authErrorMessage, type MeResponse, safeReturnTo } from "@/lib/auth";
 
 let currentPath = "/";
+let currentSearch = "";
 
 vi.mock("next/navigation", () => ({
     usePathname: () => currentPath,
+    useSearchParams: () => new URLSearchParams(currentSearch),
 }));
 
 const anonymous: MeResponse = {
@@ -80,6 +82,7 @@ async function flushEffects(): Promise<void> {
 
 beforeEach(() => {
     currentPath = "/";
+    currentSearch = "";
     vi.stubGlobal("fetch", vi.fn());
     (
         globalThis as typeof globalThis & {
@@ -203,6 +206,36 @@ describe("header auth behavior", () => {
         expect(container.querySelector('a[href="/"]')?.textContent).toBe(
             "Feed",
         );
+        act(() => {
+            root.unmount();
+        });
+    });
+
+    it("keeps the anonymous Login return route synchronized with live search", async () => {
+        currentSearch = "q=%E6%97%A5%E6%9C%AC";
+        const { container, root } = await renderWithAuth(
+            <SiteHeader />,
+            anonymous,
+        );
+        const loginTarget = () => {
+            const href = container
+                .querySelector<HTMLAnchorElement>('a[href^="/login?next="]')
+                ?.getAttribute("href");
+            return new URL(href ?? "", "http://localhost").searchParams.get(
+                "next",
+            );
+        };
+        expect(loginTarget()).toBe("/?q=日本");
+
+        currentSearch = "q=stage18-no-result";
+        act(() => {
+            root.render(
+                createElement(AuthProvider, null, createElement(SiteHeader)),
+            );
+        });
+        await flushEffects();
+
+        expect(loginTarget()).toBe("/?q=stage18-no-result");
         act(() => {
             root.unmount();
         });

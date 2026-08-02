@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -10,6 +10,9 @@ import { authApiPaths, safeReturnTo } from "@/lib/auth";
 export function SiteHeader() {
     const { me, refresh, status } = useAuth();
     const pathname = usePathname();
+    const searchParameters = useSearchParams();
+    const search =
+        (searchParameters as { toString(): string } | null)?.toString() ?? "";
     const [menuOpen, setMenuOpen] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [returnTo, setReturnTo] = useState("/");
@@ -18,9 +21,9 @@ export function SiteHeader() {
 
     useEffect(() => {
         setMenuOpen(false);
-        const current = `${pathname}${window.location.search}`;
+        const current = `${pathname}${search ? `?${search}` : ""}`;
         setReturnTo(safeReturnTo(current));
-    }, [pathname]);
+    }, [pathname, search]);
 
     useEffect(() => {
         if (!menuOpen) {
