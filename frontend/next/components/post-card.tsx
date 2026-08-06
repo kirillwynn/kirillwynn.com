@@ -29,7 +29,9 @@ export function PostCard({
             <div className="feed-entry-layout">
                 <div className="min-w-0">
                     <h2 className="feed-entry-title">
-                        <Link href={href}>{post.title}</Link>
+                        <Link href={href} prefetch>
+                            {post.title}
+                        </Link>
                     </h2>
                     <p className="feed-entry-excerpt">{post.excerpt}</p>
                     {reactionContent}
@@ -39,6 +41,7 @@ export function PostCard({
                         href={href}
                         aria-label={`Read ${post.title}`}
                         className="feed-entry-image"
+                        prefetch
                     >
                         <ContentImage
                             image={post.lead_image}

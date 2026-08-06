@@ -236,6 +236,33 @@ describe("server-only security boundary", () => {
         }
     });
 
+    it("fully prefetches only allowlisted public navigation targets", () => {
+        const header = source("components/site-header.tsx");
+        const postCard = source("components/post-card.tsx");
+
+        for (const href of ['href="/"', 'href="/bridge"']) {
+            const publicLinks = Array.from(
+                header.matchAll(/<Link[\s\S]*?>\s*(?:Feed|Bridge)\s*<\/Link>/g),
+                (match) => match[0],
+            ).filter((link) => link.includes(href));
+            expect(publicLinks).toHaveLength(2);
+            for (const link of publicLinks) {
+                expect(link).toMatch(/\bprefetch\b/);
+                expect(link).not.toContain("prefetch={false}");
+            }
+        }
+        expect(postCard.match(/\bprefetch\b/g)).toHaveLength(2);
+
+        for (const path of [
+            "components/account-panel.tsx",
+            "components/feed-controls.tsx",
+            "components/login-panel.tsx",
+            "components/local-auth-forms.tsx",
+        ]) {
+            expect(source(path)).toContain("prefetch={false}");
+        }
+    });
+
     it("keeps fragment credentials out of URL queries, rendered state, and storage", () => {
         const action = source("components/account-credential-action.tsx");
 

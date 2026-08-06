@@ -25,15 +25,12 @@ export function SiteHeaderFallback() {
                             onClick={() => {
                                 scheduleFeedScrollRestoration("");
                             }}
+                            prefetch
                             scroll={false}
                         >
                             Feed
                         </Link>
-                        <Link
-                            className="nav-link"
-                            href="/bridge"
-                            prefetch={false}
-                        >
+                        <Link className="nav-link" href="/bridge" prefetch>
                             Bridge
                         </Link>
                         <ThemeToggle />
@@ -166,6 +163,7 @@ export function SiteHeader() {
                             onClick={() => {
                                 scheduleFeedScrollRestoration("");
                             }}
+                            prefetch
                             scroll={false}
                         >
                             Feed
@@ -176,7 +174,7 @@ export function SiteHeader() {
                                 pathname === "/bridge" ? "page" : undefined
                             }
                             href="/bridge"
-                            prefetch={false}
+                            prefetch
                         >
                             Bridge
                         </Link>

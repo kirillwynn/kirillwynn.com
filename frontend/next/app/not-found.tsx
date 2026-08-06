@@ -17,7 +17,7 @@ export default function NotFound() {
                     The page may have moved, or it may never have been
                     published.
                 </p>
-                <Link className="button-link" href="/">
+                <Link className="button-link" href="/" prefetch>
                     Return to Feed
                 </Link>
             </div>

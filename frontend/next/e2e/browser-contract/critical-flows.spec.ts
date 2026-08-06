@@ -832,6 +832,44 @@ test("public client navigation preserves the root shell, auth request, Feed page
     ).toHaveCount(0);
 });
 
+test("the safe public Feed link consumes its completed full prefetch", async ({
+    page,
+}, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-1440");
+    let delayLaterFeedRsc = false;
+    let feedRscRequests = 0;
+
+    await page.route("**/*", async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        const isFeedRsc = url.pathname === "/" && request.headers().rsc === "1";
+        if (isFeedRsc) {
+            feedRscRequests += 1;
+            if (delayLaterFeedRsc) {
+                await new Promise((resolve) => setTimeout(resolve, 2_000));
+            }
+        }
+        await route.continue();
+    });
+
+    await page.goto("/bridge");
+    await expectBridgeContent(page);
+    await expect
+        .poll(() => feedRscRequests, { timeout: 10_000 })
+        .toBeGreaterThan(0);
+    await page.waitForLoadState("networkidle");
+    const completedPrefetchRequests = feedRscRequests;
+    delayLaterFeedRsc = true;
+
+    const startedAt = Date.now();
+    await page.getByRole("link", { name: "Feed", exact: true }).click();
+    await expect(page).toHaveURL("/");
+    await expect(page.locator(".feed-entry")).not.toHaveCount(0);
+
+    expect(Date.now() - startedAt).toBeLessThan(1_000);
+    expect(feedRscRequests).toBe(completedPrefetchRequests);
+});
+
 test("Search and Bridge use perceptible contourless focus in both themes", async ({
     page,
 }) => {

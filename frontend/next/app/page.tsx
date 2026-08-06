@@ -54,7 +54,7 @@ function InvalidFeedUrl() {
             >
                 <h1 id="empty-feed-title">Invalid Feed URL</h1>
                 <p>Check the search parameter and try again.</p>
-                <Link className="button-link" href="/">
+                <Link className="button-link" href="/" prefetch>
                     Return to Feed
                 </Link>
             </section>
