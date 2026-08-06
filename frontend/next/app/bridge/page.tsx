@@ -35,6 +35,8 @@ export default function BridgePage() {
                                 aria-hidden="true"
                                 width="42"
                                 height="42"
+                                loading="lazy"
+                                decoding="async"
                             />
                         </a>
                     </li>

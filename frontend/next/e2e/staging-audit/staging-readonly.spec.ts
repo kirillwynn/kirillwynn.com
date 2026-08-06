@@ -10,6 +10,9 @@ import {
     type TestInfo,
 } from "@playwright/test";
 
+const LIVE_ROUTE_SETTLE_TIMEOUT_MS = 15_000;
+const EXTERNAL_MEDIA_TIMEOUT_MS = 15_000;
+
 function observeBrowserFailures(page: Page) {
     const failures: string[] = [];
     page.on("console", (message) => {
@@ -325,10 +328,12 @@ test("client navigation, infinite Feed, Unicode history, legacy normalization, s
     const appendedFeedCount = await page.locator(".feed-entry").count();
     expect(appendedFeedCount).toBeGreaterThanOrEqual(initialFeedCount);
 
-    await page.locator("header").evaluate((element) => {
+    const shellHeader = page.getByRole("banner");
+    const shellFooter = page.getByRole("contentinfo");
+    await shellHeader.evaluate((element) => {
         element.setAttribute("data-stage19-shell", "persistent");
     });
-    await page.locator("footer").evaluate((element) => {
+    await shellFooter.evaluate((element) => {
         element.setAttribute("data-stage19-shell", "persistent");
     });
     const postLink = page.locator(".feed-entry-title a").last();
@@ -337,7 +342,9 @@ test("client navigation, infinite Feed, Unicode history, legacy normalization, s
     const postNavigationStartedAt = Date.now();
     await postLink.click();
     const postArticle = page.locator("article:has(h1)");
-    await expect(postArticle).toBeVisible();
+    await expect(postArticle).toBeVisible({
+        timeout: LIVE_ROUTE_SETTLE_TIMEOUT_MS,
+    });
     await expect(page.locator(".feed-entry:visible")).toHaveCount(0);
     const postClientNavigationMs = Date.now() - postNavigationStartedAt;
     const postBackStartedAt = Date.now();
@@ -351,11 +358,11 @@ test("client navigation, infinite Feed, Unicode history, legacy normalization, s
         })
         .toBe(true);
     const postBackMs = Date.now() - postBackStartedAt;
-    await expect(page.locator("header")).toHaveAttribute(
+    await expect(shellHeader).toHaveAttribute(
         "data-stage19-shell",
         "persistent",
     );
-    await expect(page.locator("footer")).toHaveAttribute(
+    await expect(shellFooter).toHaveAttribute(
         "data-stage19-shell",
         "persistent",
     );
@@ -493,7 +500,9 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     await expect(postLink).toBeVisible();
     await postLink.click();
     const postArticle = page.locator("article:has(h1)");
-    await expect(postArticle).toBeVisible();
+    await expect(postArticle).toBeVisible({
+        timeout: LIVE_ROUTE_SETTLE_TIMEOUT_MS,
+    });
     await expect(page.locator(".feed-entry:visible")).toHaveCount(0);
     await expect(postArticle.locator("time").first()).toBeVisible();
     await expect(
@@ -678,7 +687,9 @@ test("repeatable public API and media cache baseline", async ({
         if (!rendition?.url) {
             throw new Error(`Lead image did not expose its ${key} rendition`);
         }
-        const media = await page.request.head(rendition.url);
+        const media = await page.request.head(rendition.url, {
+            timeout: EXTERNAL_MEDIA_TIMEOUT_MS,
+        });
         expect(media.status()).toBeLessThan(400);
         expect(media.headers()["content-type"] ?? "").toMatch(/^image\//);
         expect(media.headers()["cache-control"] ?? "").toMatch(

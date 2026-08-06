@@ -60,6 +60,9 @@ describe("Bridge configuration", () => {
         expect(html.match(/target="_blank"/g)).toHaveLength(8);
         expect(html.match(/rel="noopener noreferrer"/g)).toHaveLength(8);
         expect(html.match(/alt="" aria-hidden="true"/g)).toHaveLength(8);
+        expect(html.match(/loading="lazy"/g)).toHaveLength(8);
+        expect(html.match(/decoding="async"/g)).toHaveLength(8);
+        expect(html).not.toContain('rel="preload"');
         expect(
             html.match(/aria-label="[^"]+ \(opens in a new tab\)"/g),
         ).toHaveLength(8);

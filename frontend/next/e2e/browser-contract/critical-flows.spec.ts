@@ -672,12 +672,12 @@ test("manual infinite Feed fallback covers observer, data-saving, reduced-motion
         const candidate = await context.newPage();
         await manualCase.prepare(candidate);
         await candidate.goto("http://localhost:3100/");
-        const loadOlder = candidate.locator(".feed-load-more button");
+        const loadOlder = candidate.locator(".feed-load-more button:visible");
         await expect(loadOlder).toHaveText("Load older posts");
         await candidate.waitForTimeout(350);
-        await expect(candidate.locator(".feed-entry")).toHaveCount(1);
+        await expect(candidate.locator(".feed-entry:visible")).toHaveCount(1);
         await loadOlder.click();
-        await expect(candidate.locator(".feed-entry")).toHaveCount(2);
+        await expect(candidate.locator(".feed-entry:visible")).toHaveCount(2);
         await expect(loadOlder).toBeFocused();
         await context.close();
     }
@@ -696,10 +696,10 @@ test("manual infinite Feed fallback covers observer, data-saving, reduced-motion
         await route.continue();
     });
     await page.goto("/");
-    const retry = page.locator(".feed-load-more button");
+    const retry = page.locator(".feed-load-more button:visible");
     await expect(retry).toHaveText("Try loading older posts again");
     await retry.click();
-    await expect(page.locator(".feed-entry")).toHaveCount(2);
+    await expect(page.locator(".feed-entry:visible")).toHaveCount(2);
     await expect(retry).toBeFocused();
     await expectAccessible(page);
 });

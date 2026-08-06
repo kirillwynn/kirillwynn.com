@@ -397,6 +397,10 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert "buffered: true" in live_spec
     assert "layout_shift_supported" in live_spec
     assert live_spec.count('page.locator("article:has(h1)")') == 2
+    assert 'const shellHeader = page.getByRole("banner");' in live_spec
+    assert 'const shellFooter = page.getByRole("contentinfo");' in live_spec
+    assert "LIVE_ROUTE_SETTLE_TIMEOUT_MS" in live_spec
+    assert "EXTERNAL_MEDIA_TIMEOUT_MS" in live_spec
     assert (
         live_spec.count(
             'await expect(page.locator(".feed-entry:visible")).toHaveCount(0);'
