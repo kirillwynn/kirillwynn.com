@@ -336,7 +336,9 @@ test("client navigation, infinite Feed, Unicode history, legacy normalization, s
     const feedScrollBeforePost = await page.evaluate(() => window.scrollY);
     const postNavigationStartedAt = Date.now();
     await postLink.click();
-    await expect(page.locator("article")).toBeVisible();
+    const postArticle = page.locator("article:has(h1)");
+    await expect(postArticle).toBeVisible();
+    await expect(page.locator(".feed-entry")).toHaveCount(0);
     const postClientNavigationMs = Date.now() - postNavigationStartedAt;
     const postBackStartedAt = Date.now();
     await page.goBack();
@@ -490,8 +492,10 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     const postLink = page.locator(".feed-entry h2 a").first();
     await expect(postLink).toBeVisible();
     await postLink.click();
-    await expect(page.locator("article")).toBeVisible();
-    await expect(page.locator("article time").first()).toBeVisible();
+    const postArticle = page.locator("article:has(h1)");
+    await expect(postArticle).toBeVisible();
+    await expect(page.locator(".feed-entry")).toHaveCount(0);
+    await expect(postArticle.locator("time").first()).toBeVisible();
     await expect(
         page.getByRole("textbox", { name: "Email address" }),
     ).toHaveCount(0);
@@ -768,7 +772,14 @@ test("personalized APIs are private and Bridge remains icon-only", async ({
     await page.getByRole("link", { name: "Bridge", exact: true }).click();
     await expect(page).toHaveURL(/\/bridge$/);
     const main = page.locator("#main-content");
-    await expect(main.locator("h1")).toHaveClass(/sr-only/);
+    const bridgeHeading = main.getByRole("heading", {
+        level: 1,
+        name: "Bridge",
+    });
+    await expect(bridgeHeading).toHaveClass(/sr-only/);
+    await expect(
+        main.getByRole("heading", { level: 1, name: "Feed" }),
+    ).toHaveCount(0);
     await expect(main.locator("p")).toHaveCount(0);
     await expect(main.locator(".bridge-link")).toHaveCount(8);
     for (const link of await main.locator(".bridge-link").all()) {

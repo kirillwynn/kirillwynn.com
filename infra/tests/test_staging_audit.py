@@ -396,6 +396,17 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert 'type: "layout-shift"' in live_spec
     assert "buffered: true" in live_spec
     assert "layout_shift_supported" in live_spec
+    assert live_spec.count('page.locator("article:has(h1)")') == 2
+    assert (
+        live_spec.count(
+            'await expect(page.locator(".feed-entry")).toHaveCount(0);'
+        )
+        >= 2
+    )
+    assert 'name: "Bridge"' in live_spec
+    assert (
+        'await expect(main.locator("h1")).toHaveClass(/sr-only/);' not in live_spec
+    )
     assert "Unicode staging fixture did not expose a responsive lead image" in live_spec
     assert 'for (const key of ["480w", "960w", "1440w"] as const)' in live_spec
     assert 'page.locator(".feed-entry-image img").first()' in live_spec
