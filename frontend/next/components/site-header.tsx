@@ -25,7 +25,7 @@ export function SiteHeaderFallback() {
                             onClick={() => {
                                 scheduleFeedScrollRestoration("");
                             }}
-                            prefetch
+                            prefetch={false}
                             scroll={false}
                         >
                             Feed
@@ -163,7 +163,7 @@ export function SiteHeader() {
                             onClick={() => {
                                 scheduleFeedScrollRestoration("");
                             }}
-                            prefetch
+                            prefetch={pathname !== "/"}
                             scroll={false}
                         >
                             Feed

@@ -51,7 +51,12 @@ export function scheduleFeedScrollRestoration(query: string): void {
             window.location.pathname === "/" &&
             (currentQuery ?? "") === query
         ) {
-            window.scrollTo({ top: saved });
+            // Feed restoration is state reconciliation, not an optional visual
+            // transition. The root document deliberately uses smooth scrolling
+            // for user-initiated movement, but allowing that behavior here emits
+            // intermediate scroll events that can overwrite the saved position
+            // before a later restoration scheduler runs.
+            window.scrollTo({ behavior: "instant", top: saved });
             if (Math.abs(window.scrollY - saved) <= 2) {
                 return;
             }

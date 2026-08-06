@@ -708,6 +708,7 @@ test("public client navigation preserves the root shell, auth request, Feed page
     page,
 }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop-1440");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     const documents: string[] = [];
     const meRequests: string[] = [];
     page.on("request", (request) => {
@@ -721,6 +722,11 @@ test("public client navigation preserves the root shell, auth request, Feed page
     });
 
     await page.goto("/");
+    expect(
+        await page.evaluate(
+            () => getComputedStyle(document.documentElement).scrollBehavior,
+        ),
+    ).toBe("smooth");
     await expect(
         page.getByRole("link", { name: "Login", exact: true }),
     ).toBeVisible();
@@ -765,6 +771,12 @@ test("public client navigation preserves the root shell, auth request, Feed page
     await page.getByRole("link", { name: "Feed", exact: true }).click();
     await expect(page).toHaveURL("/");
     await expect(page.locator(".feed-entry")).toHaveCount(8);
+    expect(
+        await page.evaluate(
+            (saved) => Math.abs(window.scrollY - saved),
+            bridgeDepartureScroll,
+        ),
+    ).toBeLessThanOrEqual(2);
     await expect
         .poll(() =>
             page.evaluate(
@@ -796,6 +808,12 @@ test("public client navigation preserves the root shell, auth request, Feed page
     await page.goBack();
     await expect(page).toHaveURL("/");
     await expect(page.locator(".feed-entry")).toHaveCount(8);
+    expect(
+        await page.evaluate(
+            (saved) => Math.abs(window.scrollY - saved),
+            postDepartureScroll,
+        ),
+    ).toBeLessThanOrEqual(2);
     await expect
         .poll(() =>
             page.evaluate(

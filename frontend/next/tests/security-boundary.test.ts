@@ -240,16 +240,29 @@ describe("server-only security boundary", () => {
         const header = source("components/site-header.tsx");
         const postCard = source("components/post-card.tsx");
 
-        for (const href of ['href="/"', 'href="/bridge"']) {
-            const publicLinks = Array.from(
-                header.matchAll(/<Link[\s\S]*?>\s*(?:Feed|Bridge)\s*<\/Link>/g),
-                (match) => match[0],
-            ).filter((link) => link.includes(href));
-            expect(publicLinks).toHaveLength(2);
-            for (const link of publicLinks) {
-                expect(link).toMatch(/\bprefetch\b/);
-                expect(link).not.toContain("prefetch={false}");
-            }
+        const publicLinks = Array.from(
+            header.matchAll(/<Link[\s\S]*?>\s*(?:Feed|Bridge)\s*<\/Link>/g),
+            (match) => match[0],
+        );
+        const feedLinks = publicLinks.filter((link) =>
+            link.includes('href="/"'),
+        );
+        const bridgeLinks = publicLinks.filter((link) =>
+            link.includes('href="/bridge"'),
+        );
+        expect(feedLinks).toHaveLength(2);
+        expect(
+            feedLinks.filter((link) => link.includes("prefetch={false}")),
+        ).toHaveLength(1);
+        expect(
+            feedLinks.filter((link) =>
+                link.includes('prefetch={pathname !== "/"}'),
+            ),
+        ).toHaveLength(1);
+        expect(bridgeLinks).toHaveLength(2);
+        for (const link of bridgeLinks) {
+            expect(link).toMatch(/\bprefetch\b/);
+            expect(link).not.toContain("prefetch={false}");
         }
         expect(postCard.match(/\bprefetch\b/g)).toHaveLength(2);
 
