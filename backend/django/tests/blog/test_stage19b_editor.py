@@ -74,7 +74,16 @@ def all_block_values(image_id, internal_page_id):
 
 
 def canonical_stream_json(value):
-    return json.dumps(list(value), ensure_ascii=False, separators=(",", ":"))
+    # PostgreSQL stores JSONField values as JSONB and is free to reorder object
+    # keys. Object-key order is not part of JSON or the StreamField storage
+    # contract; block/list order, IDs, types, and values are. Sorting keys gives
+    # both database engines the same byte-level comparison for that contract.
+    return json.dumps(
+        list(value),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
 
 
 def edited_block_value(block_type, image_id):
