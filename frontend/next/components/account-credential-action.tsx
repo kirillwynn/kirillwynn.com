@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
     type FormEvent,
     useEffect,
@@ -199,17 +200,18 @@ export function EmailVerificationAction() {
                 </button>
             ) : null}
             {state === "expired" || state === "invalid" ? (
-                <a className="button-link" href="/account">
+                <Link className="button-link" href="/account" prefetch={false}>
                     Request another verification email
-                </a>
+                </Link>
             ) : null}
             {state === "success" ? (
-                <a
+                <Link
                     className="button-link"
                     href={me?.authenticated ? "/account" : "/login"}
+                    prefetch={false}
                 >
                     {me?.authenticated ? "Open account" : "Continue to login"}
-                </a>
+                </Link>
             ) : null}
         </div>
     );
@@ -383,14 +385,18 @@ export function PasswordResetConfirmationForm() {
                 <p role="status">Changing password…</p>
             ) : null}
             {state === "success" ? (
-                <a className="button-link" href="/login">
+                <Link className="button-link" href="/login" prefetch={false}>
                     Login with the new password
-                </a>
+                </Link>
             ) : null}
             {state === "expired" || state === "used" || state === "invalid" ? (
-                <a className="button-link" href="/account/password/reset">
+                <Link
+                    className="button-link"
+                    href="/account/password/reset"
+                    prefetch={false}
+                >
                     Request a new reset email
-                </a>
+                </Link>
             ) : null}
         </div>
     );

@@ -1,10 +1,13 @@
 import "server-only";
 
+import { cacheLife, cacheTag } from "next/cache";
+
 import type {
     AvailableTagResponse,
     PostDetail,
     PostListResponse,
 } from "@/lib/content-contract";
+import { checkedNextFeedPath } from "@/lib/feed-browser";
 import { feedHref, type FeedState } from "@/lib/feed-state";
 import { djangoApiUrl, publicSiteUrl } from "@/lib/server/config";
 
@@ -56,6 +59,9 @@ export async function resolvePreview(credential: string): Promise<PostDetail> {
 export async function getPublicPosts(
     state: FeedState,
 ): Promise<PostListResponse | null> {
+    "use cache";
+    cacheLife({ stale: 30, revalidate: 60, expire: 86_400 });
+    cacheTag("posts");
     assertPositivePage(state.page);
     const query = feedHref(state).slice(2);
     const suffix = query ? `?${query}` : "";
@@ -69,10 +75,22 @@ export async function getPublicPosts(
     if (!response.ok) {
         throw new ContentApiError();
     }
-    return (await response.json()) as PostListResponse;
+    const page = (await response.json()) as PostListResponse;
+    return {
+        ...page,
+        next: checkedNextFeedPath(
+            page.next,
+            state.q ?? "",
+            publicSiteUrl(),
+            state.tag,
+        ),
+    };
 }
 
 export async function getAvailableTags(): Promise<AvailableTagResponse> {
+    "use cache";
+    cacheLife({ stale: 30, revalidate: 60, expire: 86_400 });
+    cacheTag("posts");
     const response = await fetch(`${djangoApiUrl()}/api/v1/tags/`, {
         headers: upstreamHeaders(),
         next: { tags: ["posts"] },
@@ -84,6 +102,9 @@ export async function getAvailableTags(): Promise<AvailableTagResponse> {
 }
 
 export async function getPublicPost(slug: string): Promise<PostDetail | null> {
+    "use cache";
+    cacheLife({ stale: 30, revalidate: 60, expire: 86_400 });
+    cacheTag("posts", `post-slug:${slug}`);
     const response = await fetch(
         `${djangoApiUrl()}/api/v1/posts/${encodeURIComponent(slug)}/`,
         {
@@ -97,5 +118,7 @@ export async function getPublicPost(slug: string): Promise<PostDetail | null> {
     if (!response.ok) {
         throw new ContentApiError();
     }
-    return (await response.json()) as PostDetail;
+    const post = (await response.json()) as PostDetail;
+    cacheTag(`post:${String(post.id)}`);
+    return post;
 }

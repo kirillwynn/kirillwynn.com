@@ -1,18 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { LoginPanel } from "@/components/login-panel";
+import { LoginRoutePanel } from "@/components/auth-route-panels";
 
 export const metadata: Metadata = {
     title: "Login",
     robots: { index: false, follow: false },
 };
 
-export default async function LoginPage({
-    searchParams,
-}: {
-    searchParams: Promise<{ error?: string; next?: string }>;
-}) {
-    const params = await searchParams;
+export default function LoginPage() {
     return (
         <section className="mx-auto max-w-md">
             <p className="eyebrow">Account</p>
@@ -23,7 +19,9 @@ export default async function LoginPage({
                 Use email and password, or continue with Google or GitHub.
                 Provider access tokens are not retained.
             </p>
-            <LoginPanel error={params.error} next={params.next} />
+            <Suspense fallback={null}>
+                <LoginRoutePanel />
+            </Suspense>
         </section>
     );
 }

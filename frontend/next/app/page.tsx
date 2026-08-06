@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { draftMode } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { FeedControls } from "@/components/feed-controls";
 import { FeedStream } from "@/components/feed-stream";
-import { Pagination } from "@/components/pagination";
-import { SubscriptionForm } from "@/components/subscription-form";
-import { parseFeedState } from "@/lib/feed-state";
-import { getAvailableTags, getPublicPosts } from "@/lib/server/django";
+import { feedHref, parseFeedState } from "@/lib/feed-state";
+import { getPublicPosts } from "@/lib/server/django";
 
 type HomeSearchParams = Record<string, string | string[] | undefined>;
 
@@ -28,122 +27,92 @@ export async function generateMetadata({
     searchParams: Promise<HomeSearchParams>;
 }): Promise<Metadata> {
     const parsed = parseFeedState(await searchParams);
-    const variant =
-        !parsed.valid ||
-        parsed.state.page > 1 ||
-        Boolean(parsed.state.q || parsed.state.tag);
+    const variant = !parsed.valid || Boolean(parsed.state.q);
     return {
         ...FEED_METADATA,
         ...(variant ? { robots: { index: false, follow: true } } : {}),
     };
 }
 
-function EmptyState({
-    title,
-    children,
-    actionHref,
-    actionLabel,
-    headingLevel = "h2",
-}: {
-    title: string;
-    children: string;
-    actionHref?: string;
-    actionLabel?: string;
-    headingLevel?: "h1" | "h2";
-}) {
-    const Heading = headingLevel;
+function legacyFeedHref(parameters: HomeSearchParams): string | null {
+    if (!("tag" in parameters) && !("page" in parameters)) {
+        return null;
+    }
+    const parsed = parseFeedState({ q: parameters.q });
+    return feedHref({
+        page: 1,
+        ...(parsed.valid && parsed.state.q ? { q: parsed.state.q } : {}),
+    });
+}
 
+function InvalidFeedUrl() {
     return (
-        <section
-            className="state-panel feed-empty"
-            aria-labelledby="empty-feed-title"
-        >
-            <Heading id="empty-feed-title">{title}</Heading>
-            <p>{children}</p>
-            {actionHref && actionLabel ? (
-                <a className="button-link" href={actionHref}>
-                    {actionLabel}
-                </a>
-            ) : null}
-        </section>
+        <div className="state-page">
+            <section
+                className="state-panel feed-empty"
+                aria-labelledby="empty-feed-title"
+            >
+                <h1 id="empty-feed-title">Invalid Feed URL</h1>
+                <p>Check the search parameter and try again.</p>
+                <Link className="button-link" href="/">
+                    Return to Feed
+                </Link>
+            </section>
+        </div>
     );
 }
 
-export default async function HomePage({
+export async function FeedPage({
     searchParams,
 }: {
     searchParams: Promise<HomeSearchParams>;
 }) {
-    const parsed = parseFeedState(await searchParams);
-    if (!parsed.valid) {
-        return (
-            <div className="state-page">
-                <EmptyState
-                    title="Invalid Feed URL"
-                    actionHref="/"
-                    actionLabel="Return to Feed"
-                    headingLevel="h1"
-                >
-                    Check the search, tag, and page parameters and try again.
-                </EmptyState>
-            </div>
-        );
+    const parameters = await searchParams;
+    const legacyHref = legacyFeedHref(parameters);
+    if (legacyHref !== null) {
+        redirect(legacyHref);
+    }
+
+    const parsed = parseFeedState(parameters);
+    if (!parsed.valid || parsed.state.tag || parsed.state.page !== 1) {
+        return <InvalidFeedUrl />;
     }
 
     const state = parsed.state;
-    const [feed, tagResponse, draft] = await Promise.all([
+    const [feed, draft] = await Promise.all([
         getPublicPosts(state),
-        getAvailableTags(),
         draftMode(),
     ]);
     if (!feed) {
         notFound();
     }
 
-    const unknownTag =
-        state.tag !== undefined &&
-        !tagResponse.results.some((tag) => tag.slug === state.tag);
-    const filtered = Boolean(state.q || state.tag);
-
     return (
         <div className="page-shell">
             <h1 className="sr-only">Feed</h1>
-
-            <FeedControls state={state} tags={tagResponse.results} />
-
-            {unknownTag ? (
-                <EmptyState
-                    title="Unknown tag"
-                    actionHref="/"
-                    actionLabel="View all posts"
-                >
-                    This tag is not attached to any published post.
-                </EmptyState>
-            ) : feed.results.length === 0 && filtered ? (
-                <EmptyState title="No posts found">
-                    No published posts match the active search and tag filters.
-                </EmptyState>
-            ) : feed.results.length === 0 ? (
-                <EmptyState title="No published posts yet">
-                    New writing will appear here after it is published.
-                </EmptyState>
-            ) : (
-                <FeedStream
-                    loadReactions={!draft.isEnabled}
-                    posts={feed.results}
-                />
-            )}
-
-            {feed.results.length > 0 &&
-            (feed.previous !== null || feed.next !== null) ? (
-                <Pagination
-                    state={state}
-                    hasPrevious={feed.previous !== null}
-                    hasNext={feed.next !== null}
-                />
-            ) : null}
-
-            {!draft.isEnabled ? <SubscriptionForm /> : null}
+            <FeedStream
+                initialFeed={feed}
+                initialQuery={state.q ?? ""}
+                loadReactions={!draft.isEnabled}
+            />
         </div>
+    );
+}
+
+export default function HomePage({
+    searchParams,
+}: {
+    searchParams: Promise<HomeSearchParams>;
+}) {
+    return (
+        <Suspense
+            fallback={
+                <div className="page-shell">
+                    <h1 className="sr-only">Feed</h1>
+                </div>
+            }
+        >
+            <FeedPage searchParams={searchParams} />
+        </Suspense>
     );
 }

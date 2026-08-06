@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { ProviderForm } from "@/components/provider-form";
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -31,9 +33,9 @@ export function LoginPanel({ error, next }: { error?: string; next?: string }) {
                     </span>
                     .
                 </p>
-                <a className="button-link" href="/account">
+                <Link className="button-link" href="/account" prefetch={false}>
                     Open account
-                </a>
+                </Link>
             </div>
         );
     }

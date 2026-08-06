@@ -1,12 +1,18 @@
 "use client";
 
 import {
+    QueryClient,
+    QueryClientProvider,
+    useQueryClient,
+} from "@tanstack/react-query";
+import {
     createContext,
     type ReactNode,
     useCallback,
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 
@@ -15,16 +21,37 @@ import type { MeResponse } from "@/lib/auth";
 type AuthStatus = "loading" | "ready" | "error";
 
 type AuthContextValue = {
+    clearSessionCache: () => void;
+    identityKey: string;
     me: MeResponse | null;
     refresh: () => Promise<boolean>;
     status: AuthStatus;
 };
 
 const AuthContext = createContext<AuthContextValue>({
+    clearSessionCache: () => undefined,
+    identityKey: "pending",
     me: null,
     refresh: () => Promise.resolve(false),
     status: "loading",
 });
+
+export const ME_QUERY_KEY = ["auth", "me"] as const;
+
+function makeQueryClient(): QueryClient {
+    return new QueryClient({
+        defaultOptions: {
+            queries: {
+                gcTime: 30 * 60 * 1000,
+                refetchOnReconnect: false,
+                refetchOnWindowFocus: false,
+                retry: false,
+                staleTime: 5 * 60 * 1000,
+            },
+            mutations: { retry: false },
+        },
+    });
+}
 
 function isMeResponse(value: unknown): value is MeResponse {
     if (!value || typeof value !== "object") {
@@ -71,24 +98,50 @@ function isMeResponse(value: unknown): value is MeResponse {
     );
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-    const [me, setMe] = useState<MeResponse | null>(null);
-    const [status, setStatus] = useState<AuthStatus>("loading");
+async function fetchMe(): Promise<MeResponse> {
+    const response = await fetch("/api/me/", {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+        throw new Error("Current-user request failed");
+    }
+    const payload: unknown = await response.json();
+    if (!isMeResponse(payload)) {
+        throw new Error("Current-user response was invalid");
+    }
+    return payload;
+}
+
+function AuthStateProvider({ children }: { children: ReactNode }) {
+    const queryClient = useQueryClient();
+    const previousIdentityRef = useRef<string | null>(null);
+    const [me, setMe] = useState<MeResponse | null>(
+        () => queryClient.getQueryData<MeResponse>(ME_QUERY_KEY) ?? null,
+    );
+    const [status, setStatus] = useState<AuthStatus>(() =>
+        queryClient.getQueryData(ME_QUERY_KEY) ? "ready" : "loading",
+    );
+    const identityKey =
+        status === "ready"
+            ? me?.authenticated && me.user
+                ? `user:${String(me.user.id)}`
+                : "anonymous"
+            : "pending";
 
     const refresh = useCallback(async (): Promise<boolean> => {
+        await queryClient.invalidateQueries({
+            queryKey: ME_QUERY_KEY,
+            exact: true,
+            refetchType: "none",
+        });
         try {
-            const response = await fetch("/api/me/", {
-                cache: "no-store",
-                credentials: "same-origin",
-                headers: { Accept: "application/json" },
+            const payload = await queryClient.fetchQuery({
+                queryKey: ME_QUERY_KEY,
+                queryFn: fetchMe,
+                staleTime: 0,
             });
-            if (!response.ok) {
-                throw new Error("Current-user request failed");
-            }
-            const payload: unknown = await response.json();
-            if (!isMeResponse(payload)) {
-                throw new Error("Current-user response was invalid");
-            }
             setMe(payload);
             setStatus("ready");
             return true;
@@ -97,18 +150,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setStatus("error");
             return false;
         }
-    }, []);
+    }, [queryClient]);
+
+    const clearSessionCache = useCallback(() => {
+        queryClient.removeQueries({ queryKey: ["viewer"] });
+        queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+        setMe(null);
+        setStatus("loading");
+    }, [queryClient]);
 
     useEffect(() => {
-        void refresh();
-    }, [refresh]);
+        if (status === "loading") {
+            void refresh();
+        }
+    }, [refresh, status]);
+
+    useEffect(() => {
+        if (status === "loading") {
+            return;
+        }
+        if (previousIdentityRef.current !== identityKey) {
+            queryClient.removeQueries({
+                predicate: (query) =>
+                    query.queryKey[0] === "viewer" &&
+                    query.queryKey[1] !== identityKey,
+            });
+            previousIdentityRef.current = identityKey;
+        }
+    }, [identityKey, queryClient, status]);
 
     const value = useMemo(
-        () => ({ me, refresh, status }),
-        [me, refresh, status],
+        () => ({ clearSessionCache, identityKey, me, refresh, status }),
+        [clearSessionCache, identityKey, me, refresh, status],
     );
     return (
         <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    );
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+    const [queryClient] = useState(makeQueryClient);
+    return (
+        <QueryClientProvider client={queryClient}>
+            <AuthStateProvider>{children}</AuthStateProvider>
+        </QueryClientProvider>
     );
 }
 

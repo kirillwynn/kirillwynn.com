@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -27,6 +29,7 @@ import {
     type PublicComment,
 } from "@/lib/comments";
 import type { ReactionChange } from "@/lib/reactions";
+import { queryKeys } from "@/lib/query-keys";
 
 function returnTo(slug: string, threadId: number): string {
     return `/posts/${slug}?thread=${String(threadId)}`;
@@ -55,7 +58,8 @@ export function ThreadPanel({
     onRootChange: (root: PublicComment) => void;
     onRootReactionChange: (commentId: number, change: ReactionChange) => void;
 }) {
-    const { me, refresh, status: authStatus } = useAuth();
+    const { identityKey, me, refresh, status: authStatus } = useAuth();
+    const queryClient = useQueryClient();
     const [root, setRoot] = useState(initialRoot);
     const [replies, setReplies] = useState<PublicComment[]>([]);
     const [next, setNext] = useState<string | null>(null);
@@ -69,6 +73,7 @@ export function ThreadPanel({
     const panelRef = useRef<HTMLDivElement>(null);
     const closeRef = useRef<HTMLButtonElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const readGenerationRef = useRef(0);
 
     const user = me?.authenticated ? me.user : null;
     const canInteract = Boolean(user?.can_interact);
@@ -77,10 +82,21 @@ export function ThreadPanel({
         : root.status !== "hidden";
 
     useEffect(() => {
+        if (authStatus !== "ready") {
+            return;
+        }
         let active = true;
-        void getThread(initialRoot.id)
+        const readGeneration = readGenerationRef.current + 1;
+        readGenerationRef.current = readGeneration;
+        void queryClient
+            .fetchQuery({
+                queryKey: queryKeys.thread(identityKey, initialRoot.id, null),
+                queryFn: ({ signal }) =>
+                    getThread(initialRoot.id, undefined, signal),
+                staleTime: 60 * 1000,
+            })
             .then((page) => {
-                if (!active) {
+                if (!active || readGeneration !== readGenerationRef.current) {
                     return;
                 }
                 setRoot((current) => reconcileComment(current, page.root));
@@ -90,15 +106,26 @@ export function ThreadPanel({
                 onRootChange(page.root);
             })
             .catch((caught: unknown) => {
-                if (active) {
+                if (active && readGeneration === readGenerationRef.current) {
                     setError(message(caught));
                     setStatus("error");
                 }
             });
         return () => {
             active = false;
+            readGenerationRef.current += 1;
         };
-    }, [initialRoot.id, onRootChange]);
+    }, [authStatus, identityKey, initialRoot.id, onRootChange, queryClient]);
+
+    function clearThreadCache(): void {
+        readGenerationRef.current += 1;
+        void queryClient.cancelQueries({
+            queryKey: ["viewer", identityKey, "thread", root.id],
+        });
+        queryClient.removeQueries({
+            queryKey: ["viewer", identityKey, "thread", root.id],
+        });
+    }
 
     useEffect(() => {
         if (authStatus === "loading") {
@@ -158,6 +185,7 @@ export function ThreadPanel({
             return;
         }
         setRoot((current) => reconcileComment(current, changed));
+        clearThreadCache();
         onRootChange(changed);
     }
 
@@ -166,6 +194,7 @@ export function ThreadPanel({
             return;
         }
         setReplies((current) => reconcileReplies(current, [changed]));
+        clearThreadCache();
     }
 
     function changeRootReaction(
@@ -177,6 +206,7 @@ export function ThreadPanel({
                 ? applyCommentReactionChange(current, change)
                 : current,
         );
+        clearThreadCache();
         onRootReactionChange(commentId, change);
     }
 
@@ -187,19 +217,33 @@ export function ThreadPanel({
         setReplies((current) =>
             applyCommentReactionChangeToList(current, commentId, change),
         );
+        clearThreadCache();
     }
 
     async function loadMore(): Promise<void> {
         if (!next) {
             return;
         }
+        const cursor = next;
+        const readGeneration = readGenerationRef.current + 1;
+        readGenerationRef.current = readGeneration;
         try {
-            const page = await getThread(root.id, next);
+            const page = await queryClient.fetchQuery({
+                queryKey: queryKeys.thread(identityKey, root.id, cursor),
+                queryFn: ({ signal }) => getThread(root.id, cursor, signal),
+                staleTime: 60 * 1000,
+            });
+            if (readGeneration !== readGenerationRef.current) {
+                return;
+            }
             setReplies((current) => reconcileReplies(current, page.results));
             setRoot((current) => reconcileComment(current, page.root));
             onRootChange(page.root);
             setNext(page.next);
         } catch (caught) {
+            if (readGeneration !== readGenerationRef.current) {
+                return;
+            }
             setError(message(caught));
         }
     }
@@ -216,6 +260,7 @@ export function ThreadPanel({
                 body,
                 me.csrf_token,
             );
+            clearThreadCache();
             const isNew = !replies.some((current) => current.id === reply.id);
             setReplies((current) => reconcileReplies(current, [reply]));
             const changedRoot = isNew
@@ -450,9 +495,10 @@ export function ThreadPanel({
                                             {sending ? "Sending…" : "Reply"}
                                         </button>
                                     ) : (
-                                        <a
+                                        <Link
                                             className="button-link"
                                             href={`/login?next=${encodeURIComponent(returnTo(slug, root.id))}`}
+                                            prefetch={false}
                                             onClick={() => {
                                                 saveCommentDraft({
                                                     slug,
@@ -464,7 +510,7 @@ export function ThreadPanel({
                                             }}
                                         >
                                             Login to reply
-                                        </a>
+                                        </Link>
                                     )}
                                 </div>
                             </div>

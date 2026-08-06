@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { useAuth } from "@/components/auth-provider";
 import { ReactionBar } from "@/components/reaction-bar";
+import { queryKeys } from "@/lib/query-keys";
 import {
     getPostReactions,
     type ReactionGroup,
@@ -10,40 +12,20 @@ import {
 } from "@/lib/reactions";
 
 export function PostReactions({ id, slug }: { id: number; slug: string }) {
+    const { identityKey, status: authStatus } = useAuth();
+    const queryClient = useQueryClient();
     const target: Extract<ReactionTarget, { kind: "post" }> = {
         kind: "post",
         id,
         slug,
         returnTo: `/posts/${slug}`,
     };
-    const [reactions, setReactions] = useState<ReactionGroup[]>([]);
-    const [status, setStatus] = useState<"loading" | "ready" | "error">(
-        "loading",
-    );
-
-    useEffect(() => {
-        let active = true;
-        void getPostReactions({
-            kind: "post",
-            id,
-            slug,
-            returnTo: `/posts/${slug}`,
-        })
-            .then((groups) => {
-                if (active) {
-                    setReactions(groups);
-                    setStatus("ready");
-                }
-            })
-            .catch(() => {
-                if (active) {
-                    setStatus("error");
-                }
-            });
-        return () => {
-            active = false;
-        };
-    }, [id, slug]);
+    const queryKey = queryKeys.postReactions(identityKey, id);
+    const reactionQuery = useQuery<ReactionGroup[]>({
+        enabled: authStatus === "ready",
+        queryKey,
+        queryFn: () => getPostReactions(target),
+    });
 
     return (
         <section
@@ -56,22 +38,24 @@ export function PostReactions({ id, slug }: { id: number; slug: string }) {
             >
                 Reactions
             </h2>
-            {status === "loading" ? (
+            {authStatus === "loading" || reactionQuery.isPending ? (
                 <p className="mt-2 text-sm text-stone-500" role="status">
                     Loading reactions…
                 </p>
-            ) : status === "error" ? (
+            ) : authStatus === "error" || reactionQuery.isError ? (
                 <p className="mt-2 text-sm text-red-700" role="alert">
                     Reactions could not be loaded.
                 </p>
             ) : (
                 <div className="mt-2">
                     <ReactionBar
-                        initialReactions={reactions}
+                        initialReactions={reactionQuery.data}
                         onChange={(change) => {
-                            setReactions(change.reactions);
+                            queryClient.setQueryData(
+                                queryKey,
+                                change.reactions,
+                            );
                         }}
-                        slackPills
                         target={target}
                     />
                 </div>

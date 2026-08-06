@@ -579,60 +579,41 @@ img {
     padding-block: var(--space-4);
 }
 
+.feed-controls-row {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
 .feed-search {
     display: flex;
     min-width: 0;
-    gap: var(--space-2);
-}
-
-.feed-filter {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
-}
-
-.feed-tag-list {
-    display: flex;
-    min-width: 0;
     flex: 1;
-    gap: var(--space-1);
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    padding: var(--space-1);
-    scrollbar-width: thin;
+    gap: var(--space-2);
 }
 
-.feed-tag {
+.feed-subscribe-link {
     display: inline-flex;
     min-height: 2.75rem;
-    flex: 0 0 auto;
     align-items: center;
-    gap: 0.375rem;
+    align-self: flex-start;
     border-radius: var(--radius-md);
-    padding-inline: 0.625rem;
+    padding-inline: var(--space-2);
     color: var(--color-muted);
     font-size: var(--type-sm);
-    font-weight: 600;
-    text-decoration: none;
+    font-weight: 650;
+    text-underline-offset: 0.2em;
 }
 
-.feed-tag:hover {
-    background: var(--color-surface-subtle);
+.feed-subscribe-link:hover {
     color: var(--color-ink);
 }
 
-.feed-tag-active {
-    background: var(--color-accent-soft);
-    color: var(--color-accent-strong);
-}
-
-.feed-tag-count {
+.feed-search-status {
+    margin: var(--space-2) 0 0;
     color: var(--color-muted);
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 500;
+    font-size: var(--type-xs);
 }
 
 .feed-stream {
@@ -659,19 +640,6 @@ img {
     font-family: var(--font-mono);
     font-size: var(--type-xs);
     line-height: 1.5;
-}
-
-.feed-entry-tags {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    color: var(--color-accent-strong);
-    font-family: var(--font-sans);
-    font-weight: 600;
-    list-style: none;
 }
 
 .feed-entry-layout {
@@ -735,35 +703,38 @@ img {
     opacity: 0.84;
 }
 
-.feed-pagination {
+.feed-load-more {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: var(--space-3);
-    padding-top: var(--space-5);
+    min-height: 5rem;
+    place-items: center;
+    padding-block: var(--space-5);
+    color: var(--color-muted);
+    font-size: var(--type-sm);
 }
 
-.feed-pagination .button-link:last-child {
-    justify-self: end;
+.feed-sentinel {
+    width: 100%;
+    height: 1px;
 }
 
-.feed-page-number {
+.feed-archive-beginning {
+    margin: 0;
+    padding-block: var(--space-8) var(--space-2);
     color: var(--color-muted);
     font-family: var(--font-mono);
     font-size: var(--type-xs);
+    text-align: center;
 }
 
 .subscription-panel {
-    margin-block: var(--space-12) 0;
-    border-top: var(--border-thin) solid var(--color-border);
-    padding-top: var(--space-6);
+    margin: 0;
 }
 
-.subscription-panel h2 {
-    margin: 0;
+.subscription-panel h1 {
+    margin: var(--space-2) 0 0;
     color: var(--color-ink);
-    font-size: var(--type-lg);
-    font-weight: 650;
+    font-size: var(--type-2xl);
+    font-weight: 700;
 }
 
 .subscription-panel > p {
@@ -799,6 +770,10 @@ img {
 
 .subscription-status {
     min-height: 1.5rem;
+}
+
+.subscription-page {
+    width: min(100%, 38rem);
 }
 
 .state-page {
@@ -898,14 +873,22 @@ img {
 
 .site-footer {
     margin-top: auto;
-    border-top: var(--border-thin) solid var(--color-border);
 }
 
 .site-footer__inner {
+    --footer-gutter: max(
+        var(--space-4),
+        env(safe-area-inset-left, 0px),
+        env(safe-area-inset-right, 0px)
+    );
     display: flex;
+    width: calc(100% - var(--footer-gutter) - var(--footer-gutter));
+    max-width: 34rem;
     flex-direction: column;
     align-items: center;
     gap: var(--space-2);
+    margin-inline: auto;
+    border-top: var(--border-thin) solid var(--color-border);
     padding-block: var(--space-6);
     color: var(--color-muted);
     font-size: var(--type-xs);
@@ -969,12 +952,6 @@ img {
 
 .skeleton-block {
     height: 2.75rem;
-}
-
-.feed-skeleton-image {
-    width: 5.25rem;
-    height: 5.25rem;
-    flex: 0 0 auto;
 }
 
 .skeleton-pulse {
@@ -1265,6 +1242,25 @@ img {
     z-index: 1;
 }
 
+.dismiss-icon {
+    display: inline-flex;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--color-muted);
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.dismiss-icon:hover,
+.dismiss-icon:focus-visible {
+    background: var(--color-surface-subtle);
+    color: var(--color-ink);
+}
+
 .reaction-notice {
     display: flex;
     margin-top: 0.75rem;
@@ -1288,19 +1284,27 @@ img {
     text-decoration: underline;
 }
 
+.reaction-picker-layer,
+.reaction-participant-layer {
+    position: fixed;
+    z-index: 70;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    background: rgb(26 26 26 / 28%);
+}
+
 .reaction-picker {
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + 0.5rem);
-    left: 0;
-    width: min(23rem, calc(100vw - 2rem));
-    max-height: min(34rem, 72vh);
+    width: 100%;
+    max-height: min(38rem, 78dvh);
     overflow: auto;
-    border: var(--border-thin) solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-top: var(--border-thin) solid var(--color-border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     background: var(--color-surface);
-    padding: 0.75rem;
-    box-shadow: var(--shadow-menu);
+    padding: 0.75rem max(0.75rem, env(safe-area-inset-right))
+        max(0.75rem, env(safe-area-inset-bottom))
+        max(0.75rem, env(safe-area-inset-left));
+    box-shadow: var(--shadow-participants);
 }
 
 .reaction-picker__search {
@@ -1310,6 +1314,17 @@ img {
     border: var(--border-thin) solid var(--color-border-strong);
     border-radius: var(--radius-md);
     padding-inline: 0.75rem;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    caret-color: var(--color-accent-strong);
+}
+
+.reaction-picker .reaction-picker__search:focus,
+.reaction-picker .reaction-picker__search:focus-visible {
+    border-color: var(--color-border-strong);
+    outline: 0;
+    background: var(--color-surface-subtle);
+    box-shadow: none;
 }
 
 .reaction-picker__grid {
@@ -1338,16 +1353,15 @@ img {
 }
 
 .reaction-participants {
-    position: fixed;
-    z-index: 70;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    width: 100%;
     max-height: 60dvh;
     overflow: auto;
     border-top: var(--border-thin) solid var(--color-border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     background: var(--color-surface);
-    padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
+    padding: 1rem max(1rem, env(safe-area-inset-right))
+        max(1rem, env(safe-area-inset-bottom))
+        max(1rem, env(safe-area-inset-left));
     box-shadow: var(--shadow-participants);
 }
 
@@ -1492,9 +1506,13 @@ img {
         flex: 0 1 auto;
     }
 
-    .feed-tag-list {
-        flex-wrap: wrap;
-        overflow-x: visible;
+    .feed-controls-row {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .feed-subscribe-link {
+        align-self: center;
     }
 
     .feed-entry {
@@ -1505,14 +1523,17 @@ img {
         width: 7.5rem;
     }
 
-    .feed-skeleton-image {
-        width: 7.5rem;
-        height: 7.5rem;
-    }
-
     .subscription-form {
         flex-direction: row;
         align-items: end;
+    }
+
+    .site-footer__inner {
+        --footer-gutter: max(
+            var(--space-6),
+            env(safe-area-inset-left, 0px),
+            env(safe-area-inset-right, 0px)
+        );
     }
 
     .bridge-grid {
@@ -1528,19 +1549,35 @@ img {
 }
 
 @media (min-width: 48rem) {
-    .reaction-participants {
+    .reaction-picker-layer,
+    .reaction-participant-layer {
         position: absolute;
         z-index: 40;
         top: calc(100% + 0.5rem);
         right: auto;
         bottom: auto;
         left: 0;
+        display: block;
+        width: auto;
+        background: transparent;
+        pointer-events: none;
+    }
+
+    .reaction-picker,
+    .reaction-participants {
         width: 20rem;
         max-height: 24rem;
         border: var(--border-thin) solid var(--color-border);
         border-radius: var(--radius-lg);
         padding: 1rem;
         box-shadow: var(--shadow-menu);
+        pointer-events: auto;
+    }
+
+    .reaction-picker {
+        width: min(23rem, calc(100vw - 2rem));
+        max-height: min(34rem, 72vh);
+        padding: 0.75rem;
     }
 
     .thread-panel {

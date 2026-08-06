@@ -24,6 +24,7 @@ function djangoProxyOrigin(): string {
 }
 
 const nextConfig: NextConfig = {
+    cacheComponents: true,
     output: "standalone",
     skipTrailingSlashRedirect: true,
     rewrites() {
@@ -136,6 +137,10 @@ const nextConfig: NextConfig = {
             {
                 source: "/api/v1/subscriptions/unsubscribe/one-click/",
                 destination: `${django}/api/v1/subscriptions/unsubscribe/one-click/`,
+            },
+            {
+                source: "/api/v1/posts/",
+                destination: `${django}/api/v1/posts/`,
             },
             {
                 source: "/api/v1/email/webhooks/resend/",

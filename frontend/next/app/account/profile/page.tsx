@@ -1,18 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { ProfileForm } from "@/components/local-auth-forms";
+import { ProfileRouteForm } from "@/components/auth-route-panels";
 
 export const metadata: Metadata = {
     title: "Public profile",
     robots: { index: false, follow: false },
 };
 
-export default async function ProfilePage({
-    searchParams,
-}: {
-    searchParams: Promise<{ next?: string }>;
-}) {
-    const params = await searchParams;
+export default function ProfilePage() {
     return (
         <section className="account-page" aria-labelledby="profile-title">
             <p className="eyebrow">Account</p>
@@ -24,7 +20,9 @@ export default async function ProfilePage({
                 change is available in 30 days.
             </p>
             <div className="account-card">
-                <ProfileForm next={params.next} />
+                <Suspense fallback={null}>
+                    <ProfileRouteForm />
+                </Suspense>
             </div>
         </section>
     );

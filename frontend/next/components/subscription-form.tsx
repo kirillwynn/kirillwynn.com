@@ -6,7 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 
 type SubmissionState = "idle" | "pending" | "success" | "error" | "rate-limit";
 
-export function SubscriptionForm({ compact = false }: { compact?: boolean }) {
+export function SubscriptionForm() {
     const { me, status: authStatus } = useAuth();
     const [email, setEmail] = useState("");
     const [submission, setSubmission] = useState<SubmissionState>("idle");
@@ -47,16 +47,11 @@ export function SubscriptionForm({ compact = false }: { compact?: boolean }) {
     const unavailable = authStatus !== "ready" || !me?.csrf_token;
     return (
         <section
-            className={`subscription-panel ${
-                compact ? "subscription-panel-post" : "subscription-panel-feed"
-            }`}
-            aria-labelledby={
-                compact ? "post-subscribe-title" : "feed-subscribe-title"
-            }
+            className="subscription-panel subscription-panel-page state-panel"
+            aria-labelledby="subscription-title"
         >
-            <h2 id={compact ? "post-subscribe-title" : "feed-subscribe-title"}>
-                Get new posts by email
-            </h2>
+            <p className="eyebrow">Subscriptions</p>
+            <h1 id="subscription-title">Get new posts by email</h1>
             <p>
                 One email per new publication. Confirm your address before the
                 subscription starts, and unsubscribe anytime.
@@ -66,21 +61,9 @@ export function SubscriptionForm({ compact = false }: { compact?: boolean }) {
                 onSubmit={(event) => void submit(event)}
             >
                 <div className="subscription-field">
-                    <label
-                        htmlFor={
-                            compact
-                                ? "post-subscription-email"
-                                : "feed-subscription-email"
-                        }
-                    >
-                        Email address
-                    </label>
+                    <label htmlFor="subscription-email">Email address</label>
                     <input
-                        id={
-                            compact
-                                ? "post-subscription-email"
-                                : "feed-subscription-email"
-                        }
+                        id="subscription-email"
                         className="feed-search-input"
                         type="email"
                         name="email"

@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -29,6 +31,7 @@ import {
     type PublicComment,
 } from "@/lib/comments";
 import type { ReactionChange } from "@/lib/reactions";
+import { queryKeys } from "@/lib/query-keys";
 
 function returnTo(slug: string): string {
     return `/posts/${slug}`;
@@ -52,7 +55,8 @@ function queryThreadId(): number | null {
 }
 
 export function CommentsSection({ slug }: { slug: string }) {
-    const { me, refresh, status: authStatus } = useAuth();
+    const { identityKey, me, refresh, status: authStatus } = useAuth();
+    const queryClient = useQueryClient();
     const [comments, setComments] = useState<PublicComment[]>([]);
     const [next, setNext] = useState<string | null>(null);
     const [status, setStatus] = useState<"loading" | "ready" | "error">(
@@ -65,32 +69,73 @@ export function CommentsSection({ slug }: { slug: string }) {
     const triggerRef = useRef<HTMLButtonElement | null>(null);
     const pushedThreadRef = useRef(false);
     const handledInitialThreadRef = useRef(false);
+    const readGenerationRef = useRef(0);
     const user = me?.authenticated ? me.user : null;
 
     const load = useCallback(
         async (cursor?: string, append = false) => {
+            if (authStatus !== "ready") {
+                return;
+            }
+            const readGeneration = readGenerationRef.current + 1;
+            readGenerationRef.current = readGeneration;
             if (!append) {
                 setStatus("loading");
             }
             setError(null);
             try {
-                const page = await getComments(slug, cursor);
+                const page = await queryClient.fetchQuery({
+                    queryKey: queryKeys.comments(
+                        identityKey,
+                        slug,
+                        cursor ?? null,
+                    ),
+                    queryFn: ({ signal }) => getComments(slug, cursor, signal),
+                    staleTime: 60 * 1000,
+                });
+                if (readGeneration !== readGenerationRef.current) {
+                    return;
+                }
                 setComments((current) =>
                     reconcileRoots(append ? current : [], page.results),
                 );
                 setNext(page.next);
                 setStatus("ready");
             } catch (caught) {
+                if (readGeneration !== readGenerationRef.current) {
+                    return;
+                }
                 setError(errorMessage(caught));
                 setStatus("error");
             }
         },
-        [slug],
+        [authStatus, identityKey, queryClient, slug],
     );
 
     useEffect(() => {
-        void load();
-    }, [load]);
+        if (authStatus === "ready") {
+            setComments([]);
+            setNext(null);
+            void load();
+        }
+    }, [authStatus, identityKey, load]);
+
+    const clearCommentsCache = useCallback(() => {
+        readGenerationRef.current += 1;
+        void queryClient.cancelQueries({
+            queryKey: ["viewer", identityKey, "comments", slug],
+        });
+        queryClient.removeQueries({
+            queryKey: ["viewer", identityKey, "comments", slug],
+        });
+    }, [identityKey, queryClient, slug]);
+
+    useEffect(
+        () => () => {
+            readGenerationRef.current += 1;
+        },
+        [identityKey, slug],
+    );
 
     useEffect(() => {
         if (authStatus === "loading") {
@@ -105,20 +150,25 @@ export function CommentsSection({ slug }: { slug: string }) {
         );
     }, [authStatus, slug, user?.id]);
 
-    const replaceComment = useCallback((changed: PublicComment | null) => {
-        if (!changed) {
-            return;
-        }
-        setComments((current) => reconcileRoots(current, [changed]));
-        setOpenRoot((current) =>
-            current?.id === changed.id
-                ? reconcileComment(current, changed)
-                : current,
-        );
-    }, []);
+    const replaceComment = useCallback(
+        (changed: PublicComment | null) => {
+            if (!changed) {
+                return;
+            }
+            clearCommentsCache();
+            setComments((current) => reconcileRoots(current, [changed]));
+            setOpenRoot((current) =>
+                current?.id === changed.id
+                    ? reconcileComment(current, changed)
+                    : current,
+            );
+        },
+        [clearCommentsCache],
+    );
 
     const changeCommentReaction = useCallback(
         (commentId: number, change: ReactionChange) => {
+            clearCommentsCache();
             setComments((current) =>
                 applyCommentReactionChangeToList(current, commentId, change),
             );
@@ -128,7 +178,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                     : current,
             );
         },
-        [],
+        [clearCommentsCache],
     );
 
     const closeFromHistory = useCallback(() => {
@@ -169,11 +219,24 @@ export function CommentsSection({ slug }: { slug: string }) {
             setOpenRoot(root);
             return;
         }
-        void getThread(threadId)
+        const readGeneration = readGenerationRef.current + 1;
+        readGenerationRef.current = readGeneration;
+        void queryClient
+            .fetchQuery({
+                queryKey: queryKeys.thread(identityKey, threadId, null),
+                queryFn: ({ signal }) => getThread(threadId, undefined, signal),
+                staleTime: 60 * 1000,
+            })
             .then((thread) => {
+                if (readGeneration !== readGenerationRef.current) {
+                    return;
+                }
                 setOpenRoot(thread.root);
             })
             .catch(() => {
+                if (readGeneration !== readGenerationRef.current) {
+                    return;
+                }
                 const url = new URL(window.location.href);
                 url.searchParams.delete("thread");
                 window.history.replaceState(
@@ -182,7 +245,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                     `${url.pathname}${url.search}`,
                 );
             });
-    }, [comments, status]);
+    }, [comments, identityKey, queryClient, status]);
 
     function openThread(
         comment: PublicComment,
@@ -236,6 +299,7 @@ export function CommentsSection({ slug }: { slug: string }) {
         setError(null);
         try {
             const comment = await createComment(slug, body, me.csrf_token);
+            clearCommentsCache();
             setComments((current) => reconcileRoots(current, [comment]));
             setBody("");
             clearCommentDraft({
@@ -327,9 +391,10 @@ export function CommentsSection({ slug }: { slug: string }) {
                                         {submitting ? "Posting…" : "Comment"}
                                     </button>
                                 ) : (
-                                    <a
+                                    <Link
                                         className="button-link"
                                         href={`/login?next=${encodeURIComponent(returnTo(slug))}`}
+                                        prefetch={false}
                                         onClick={() => {
                                             saveCommentDraft({
                                                 slug,
@@ -340,7 +405,7 @@ export function CommentsSection({ slug }: { slug: string }) {
                                         }}
                                     >
                                         Login to comment
-                                    </a>
+                                    </Link>
                                 )}
                             </div>
                         </div>

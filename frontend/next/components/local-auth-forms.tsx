@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -214,10 +215,15 @@ export function LocalLoginForm({ next }: { next?: string }) {
                 {pending ? "Signing in…" : "Login with email"}
             </button>
             <div className="flex flex-wrap justify-between gap-3 text-sm">
-                <a href={`/signup?next=${encodeURIComponent(destination)}`}>
+                <Link
+                    href={`/signup?next=${encodeURIComponent(destination)}`}
+                    prefetch={false}
+                >
                     Create an account
-                </a>
-                <a href="/account/password/reset">Forgot password?</a>
+                </Link>
+                <Link href="/account/password/reset" prefetch={false}>
+                    Forgot password?
+                </Link>
             </div>
         </form>
     );
@@ -294,12 +300,13 @@ export function SignupForm({ next }: { next?: string }) {
                     If the address can be registered, a verification email will
                     be sent. Open that message before signing in.
                 </p>
-                <a
+                <Link
                     className="button-link"
                     href={`/login?next=${encodeURIComponent(destination)}`}
+                    prefetch={false}
                 >
                     Continue to login
-                </a>
+                </Link>
             </div>
         );
     }
@@ -414,12 +421,13 @@ export function SignupForm({ next }: { next?: string }) {
             >
                 {pending ? "Creating account…" : "Create account"}
             </button>
-            <a
+            <Link
                 className="text-sm"
                 href={`/login?next=${encodeURIComponent(destination)}`}
+                prefetch={false}
             >
                 Already have an account? Login
-            </a>
+            </Link>
         </form>
     );
 }
@@ -573,9 +581,13 @@ export function AccountPasswordForm({ mode }: { mode: "set" | "change" }) {
     }
     if (!user) {
         return (
-            <a className="button-link" href="/login?next=%2Faccount">
+            <Link
+                className="button-link"
+                href="/login?next=%2Faccount"
+                prefetch={false}
+            >
                 Login to manage your password
-            </a>
+            </Link>
         );
     }
     if (success) {
@@ -588,9 +600,9 @@ export function AccountPasswordForm({ mode }: { mode: "set" | "change" }) {
                     {mode === "set" ? "Password set." : "Password changed."}{" "}
                     Other sessions are no longer valid.
                 </p>
-                <a className="button-link" href="/account">
+                <Link className="button-link" href="/account" prefetch={false}>
                     Return to account
-                </a>
+                </Link>
             </div>
         );
     }
@@ -598,7 +610,10 @@ export function AccountPasswordForm({ mode }: { mode: "set" | "change" }) {
         return (
             <p>
                 A password is already set.{" "}
-                <a href="/account/password/change">Change it</a>.
+                <Link href="/account/password/change" prefetch={false}>
+                    Change it
+                </Link>
+                .
             </p>
         );
     }
@@ -614,7 +629,10 @@ export function AccountPasswordForm({ mode }: { mode: "set" | "change" }) {
         return (
             <p>
                 This account has no local password.{" "}
-                <a href="/account/password/set">Set one</a>.
+                <Link href="/account/password/set" prefetch={false}>
+                    Set one
+                </Link>
+                .
             </p>
         );
     }
@@ -786,12 +804,13 @@ export function ProfileForm({ next }: { next?: string }) {
     if (!user) {
         return (
             <p>
-                <a
+                <Link
                     className="button-link"
                     href={`/login?next=${encodeURIComponent(destination)}`}
+                    prefetch={false}
                 >
                     Login to manage your nickname
-                </a>
+                </Link>
             </p>
         );
     }
@@ -926,7 +945,7 @@ export function ResendVerificationButton() {
 }
 
 export function AccountLogoutButton() {
-    const { me, refresh } = useAuth();
+    const { clearSessionCache, me, refresh } = useAuth();
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -943,8 +962,8 @@ export function AccountLogoutButton() {
                     setPending(true);
                     setError(null);
                     void authMutation(authApiPaths.logout, {}, me.csrf_token)
-                        .then(async () => {
-                            await refresh();
+                        .then(() => {
+                            clearSessionCache();
                             window.location.assign("/");
                         })
                         .catch(async (caught: unknown) => {

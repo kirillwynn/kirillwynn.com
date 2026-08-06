@@ -15,12 +15,14 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:bundle-contract": "node ../../infra/tests/verify-reaction-picker-bundle.mjs .",
     "test:browser-contract": "playwright test --config=playwright.browser-contract.config.ts",
     "test:cross-stack": "playwright test --config=playwright.cross-stack.config.ts",
     "test:staging-audit": "playwright test --config=playwright.staging-audit.config.ts",
     "test:e2e": "npm run test:browser-contract && npm run test:cross-stack"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.101.4",
     "next": "16.2.11",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -44,7 +46,7 @@
     "vitest": "4.1.10"
   },
   "overrides": {
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     "playwright-core": "1.62.0",
     "postcss": "8.5.23",
     "sharp": "0.35.3"

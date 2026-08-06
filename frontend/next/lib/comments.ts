@@ -151,14 +151,26 @@ function mutationOptions(
 export function getComments(
     slug: string,
     cursorUrl?: string,
+    signal?: AbortSignal,
 ): Promise<CommentPage> {
     const path = commentListPath(slug);
-    return request<CommentPage>(cursorUrl ? cursorPath(cursorUrl, path) : path);
+    return request<CommentPage>(
+        cursorUrl ? cursorPath(cursorUrl, path) : path,
+        {
+            signal,
+        },
+    );
 }
 
-export function getThread(id: number, cursorUrl?: string): Promise<ThreadPage> {
+export function getThread(
+    id: number,
+    cursorUrl?: string,
+    signal?: AbortSignal,
+): Promise<ThreadPage> {
     const path = threadPath(id);
-    return request<ThreadPage>(cursorUrl ? cursorPath(cursorUrl, path) : path);
+    return request<ThreadPage>(cursorUrl ? cursorPath(cursorUrl, path) : path, {
+        signal,
+    });
 }
 
 export function createComment(

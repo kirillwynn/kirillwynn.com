@@ -1,10 +1,15 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import {
     lazy,
+    type RefObject,
     Suspense,
     useCallback,
     useEffect,
+    useId,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -12,6 +17,12 @@ import {
 
 import { useAuth } from "@/components/auth-provider";
 import { ReactionImage } from "@/components/reaction-image";
+import { queryKeys } from "@/lib/query-keys";
+import {
+    loadReactionPickerModule,
+    preloadReactionPickerResources,
+    scheduleReactionPickerPreload,
+} from "@/lib/reaction-picker-loader";
 import {
     clearPendingReaction,
     loadPendingReaction,
@@ -35,7 +46,7 @@ import {
     type ReactionTarget,
 } from "@/lib/reactions";
 
-const ReactionPicker = lazy(() => import("@/components/reaction-picker"));
+const ReactionPickerResults = lazy(loadReactionPickerModule);
 
 function reactionError(error: unknown): string {
     if (error instanceof ReactionApiError) {
@@ -57,24 +68,195 @@ function reactionControlLabel(label: string): string {
         : `${trimmed} reaction`;
 }
 
+function focusableElements(root: HTMLElement): HTMLElement[] {
+    return Array.from(
+        root.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+    ).filter((element) => !element.hasAttribute("hidden"));
+}
+
+function trapFocus(event: KeyboardEvent, root: HTMLElement): void {
+    if (event.key !== "Tab") {
+        return;
+    }
+    const focusable = focusableElements(root);
+    if (focusable.length === 0) {
+        event.preventDefault();
+        root.focus();
+        return;
+    }
+    const first = focusable[0];
+    const last = focusable.at(-1) ?? first;
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+function intentionalOutsideFocus(target: EventTarget | null): boolean {
+    return (
+        target instanceof HTMLElement &&
+        Boolean(
+            target.closest(
+                'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+        ) &&
+        !target.closest(".reaction-bar")
+    );
+}
+
+function intentionalParticipantOutsideFocus(
+    target: EventTarget | null,
+): boolean {
+    return (
+        (target instanceof HTMLElement &&
+            Boolean(target.closest(".reaction-pill__count"))) ||
+        intentionalOutsideFocus(target)
+    );
+}
+
+function ReactionPickerShell({
+    onClose,
+    onSelect,
+    triggerRef,
+}: {
+    onClose: (restoreFocus: boolean) => void;
+    onSelect: (reaction: ReactionDescriptor) => void;
+    triggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+    const [query, setQuery] = useState("");
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const searchRef = useRef<HTMLInputElement>(null);
+    const searchId = useId();
+
+    useEffect(() => {
+        searchRef.current?.focus();
+    }, []);
+
+    useEffect(() => {
+        const keydown = (event: KeyboardEvent): void => {
+            const dialog = dialogRef.current;
+            if (!dialog) {
+                return;
+            }
+            if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                onClose(true);
+                return;
+            }
+            trapFocus(event, dialog);
+        };
+        const pointerdown = (event: PointerEvent): void => {
+            const dialog = dialogRef.current;
+            const trigger = triggerRef.current;
+            if (
+                !dialog ||
+                dialog.contains(event.target as Node) ||
+                trigger?.contains(event.target as Node)
+            ) {
+                return;
+            }
+            const allowFocus = intentionalOutsideFocus(event.target);
+            onClose(!allowFocus);
+            if (!allowFocus) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+        document.addEventListener("keydown", keydown, true);
+        document.addEventListener("pointerdown", pointerdown, true);
+        return () => {
+            document.removeEventListener("keydown", keydown, true);
+            document.removeEventListener("pointerdown", pointerdown, true);
+        };
+    }, [onClose, triggerRef]);
+
+    return (
+        <div
+            className="reaction-picker-layer"
+            onPointerDown={(event) => {
+                if (event.target !== event.currentTarget) {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                onClose(true);
+            }}
+        >
+            <div
+                aria-label="Choose a reaction"
+                aria-modal="true"
+                className="reaction-picker"
+                ref={dialogRef}
+                role="dialog"
+                tabIndex={-1}
+            >
+                <div className="flex items-center gap-2">
+                    <label className="sr-only" htmlFor={searchId}>
+                        Search reaction names
+                    </label>
+                    <input
+                        className="reaction-picker__search"
+                        id={searchId}
+                        onChange={(event) => {
+                            setQuery(event.target.value);
+                        }}
+                        placeholder="Search reactions"
+                        ref={searchRef}
+                        type="search"
+                        value={query}
+                    />
+                    <button
+                        aria-label="Close reaction picker"
+                        className="dismiss-icon"
+                        onClick={() => {
+                            onClose(true);
+                        }}
+                        type="button"
+                    >
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <Suspense
+                    fallback={
+                        <p
+                            className="mt-3 text-sm text-stone-500"
+                            role="status"
+                        >
+                            Loading reactions…
+                        </p>
+                    }
+                >
+                    <ReactionPickerResults onSelect={onSelect} query={query} />
+                </Suspense>
+            </div>
+        </div>
+    );
+}
+
 export function ReactionBar({
-    compact = false,
+    hidePicker = false,
     initialReactions,
     onChange,
-    participantsRequireActivation = false,
-    slackPills = false,
     target,
 }: {
-    compact?: boolean;
+    hidePicker?: boolean;
     initialReactions: ReactionGroup[];
     onChange?: (change: ReactionChange) => void;
-    participantsRequireActivation?: boolean;
-    slackPills?: boolean;
     target: ReactionTarget;
 }) {
-    const { me, refresh, status: authStatus } = useAuth();
+    const { identityKey, me, refresh, status: authStatus } = useAuth();
+    const queryClient = useQueryClient();
     const [reactions, setReactions] = useState(initialReactions);
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [activeReactionId, setActiveReactionId] = useState<string | null>(
+        null,
+    );
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -91,16 +273,13 @@ export function ReactionBar({
     >("idle");
     const pickerTrigger = useRef<HTMLButtonElement>(null);
     const restorePickerFocusRef = useRef(false);
+    const [pickerFocusRevision, setPickerFocusRevision] = useState(0);
     const busyRef = useRef(false);
     const participantRequestRef = useRef(0);
-    const participantAbortRef = useRef<AbortController | null>(null);
     const participantGroupRef = useRef<string | null>(null);
     const participantTriggerRef = useRef<HTMLButtonElement | null>(null);
-    const suppressParticipantFocusRef = useRef(false);
-    const participantButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+    const participantSurfaceRef = useRef<HTMLDivElement>(null);
     const mountedRef = useRef(true);
-    const pointerTypeRef = useRef<string | null>(null);
-    const lastTouchAtRef = useRef(0);
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
     const initialReactionsRef = useRef(initialReactions);
@@ -117,10 +296,15 @@ export function ReactionBar({
     const canInteract = Boolean(user?.can_interact);
     const interactionDisabled = Boolean(user && !canInteract);
 
+    const closePicker = useCallback((restoreFocus: boolean): void => {
+        setPickerOpen(false);
+        if (restoreFocus) {
+            pickerTrigger.current?.focus();
+        }
+    }, []);
+
     const closeParticipants = useCallback((restoreFocus: boolean): void => {
         participantRequestRef.current += 1;
-        participantAbortRef.current?.abort();
-        participantAbortRef.current = null;
         participantGroupRef.current = null;
         const trigger = participantTriggerRef.current;
         participantTriggerRef.current = null;
@@ -129,9 +313,7 @@ export function ReactionBar({
         setParticipantsNext(null);
         setParticipantsStatus("idle");
         if (restoreFocus && trigger) {
-            suppressParticipantFocusRef.current = true;
             trigger.focus();
-            suppressParticipantFocusRef.current = false;
         }
     }, []);
 
@@ -140,13 +322,32 @@ export function ReactionBar({
         return () => {
             mountedRef.current = false;
             participantRequestRef.current += 1;
-            participantAbortRef.current?.abort();
         };
     }, []);
 
+    useLayoutEffect(() => {
+        if (
+            restorePickerFocusRef.current &&
+            !busy &&
+            !pickerOpen &&
+            pickerTrigger.current
+        ) {
+            restorePickerFocusRef.current = false;
+            pickerTrigger.current.focus();
+        }
+    }, [busy, pickerFocusRevision, pickerOpen]);
+
     useEffect(() => {
+        closePicker(false);
         closeParticipants(false);
-    }, [closeParticipants, instanceTargetKey]);
+    }, [closeParticipants, closePicker, instanceTargetKey]);
+
+    useEffect(() => {
+        if (hidePicker) {
+            return;
+        }
+        return scheduleReactionPickerPreload(queryClient);
+    }, [hidePicker, queryClient]);
 
     useEffect(
         () =>
@@ -164,6 +365,15 @@ export function ReactionBar({
                     setBusy(snapshot.busy);
                     if (change && participantGroupRef.current !== null) {
                         closeParticipants(false);
+                        queryClient.removeQueries({
+                            queryKey: [
+                                "viewer",
+                                identityKey,
+                                "reaction-participants",
+                                target.kind,
+                                target.id,
+                            ],
+                        });
                     }
                     setReactions(snapshot.reactions);
                     if (change) {
@@ -180,7 +390,15 @@ export function ReactionBar({
                     }
                 },
             ),
-        [closeParticipants, instanceTargetKey, mutationTarget],
+        [
+            closeParticipants,
+            identityKey,
+            instanceTargetKey,
+            mutationTarget,
+            queryClient,
+            target.id,
+            target.kind,
+        ],
     );
 
     useEffect(() => {
@@ -188,32 +406,53 @@ export function ReactionBar({
     }, [initialReactions, mutationTarget, mutationTargetKey]);
 
     useEffect(() => {
-        if (
-            restorePickerFocusRef.current &&
-            !pickerOpen &&
-            !busy &&
-            pickerTrigger.current
-        ) {
-            restorePickerFocusRef.current = false;
-            pickerTrigger.current.focus();
+        if (!participantGroup) {
+            return;
         }
-    }, [busy, pickerOpen]);
-
-    useEffect(() => {
-        function keydown(event: KeyboardEvent): void {
-            if (
-                event.key === "Escape" &&
-                participantGroupRef.current !== null
-            ) {
-                event.preventDefault();
-                closeParticipants(true);
+        const frame = window.requestAnimationFrame(() => {
+            const surface = participantSurfaceRef.current;
+            if (surface) {
+                focusableElements(surface)[0]?.focus();
             }
-        }
-        document.addEventListener("keydown", keydown);
-        return () => {
-            document.removeEventListener("keydown", keydown);
+        });
+        const keydown = (event: KeyboardEvent): void => {
+            const surface = participantSurfaceRef.current;
+            if (!surface) {
+                return;
+            }
+            if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                closeParticipants(true);
+                return;
+            }
+            trapFocus(event, surface);
         };
-    }, [closeParticipants]);
+        const pointerdown = (event: PointerEvent): void => {
+            const surface = participantSurfaceRef.current;
+            const trigger = participantTriggerRef.current;
+            if (
+                !surface ||
+                surface.contains(event.target as Node) ||
+                trigger?.contains(event.target as Node)
+            ) {
+                return;
+            }
+            const allowFocus = intentionalParticipantOutsideFocus(event.target);
+            closeParticipants(!allowFocus);
+            if (!allowFocus) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+        document.addEventListener("keydown", keydown, true);
+        document.addEventListener("pointerdown", pointerdown, true);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            document.removeEventListener("keydown", keydown, true);
+            document.removeEventListener("pointerdown", pointerdown, true);
+        };
+    }, [closeParticipants, participantGroup]);
 
     useEffect(() => {
         if (authStatus !== "ready") {
@@ -236,7 +475,12 @@ export function ReactionBar({
             return;
         }
         let active = true;
-        void getReactionCatalog()
+        void queryClient
+            .fetchQuery({
+                queryKey: queryKeys.reactionCatalog,
+                queryFn: getReactionCatalog,
+                staleTime: 5 * 60 * 1000,
+            })
             .then((catalog) => {
                 if (!active) {
                     return;
@@ -259,7 +503,7 @@ export function ReactionBar({
         return () => {
             active = false;
         };
-    }, [authStatus, mutationTarget, reactions, user?.id]);
+    }, [authStatus, mutationTarget, queryClient, reactions, user?.id]);
 
     async function performToggle(
         reaction: ReactionDescriptor,
@@ -304,17 +548,16 @@ export function ReactionBar({
             }
             return true;
         }
-        if (outcome.status === "rollback") {
-            if (
-                mountedRef.current &&
-                initiatingTargetKey === latestTargetKeyRef.current &&
-                outcome.error instanceof ReactionApiError &&
-                outcome.error.status === 403
-            ) {
-                savePendingReaction(target, reaction.id, Date.now(), user.id);
-                setPendingReaction(reaction);
-                await refresh();
-            }
+        if (
+            outcome.status === "rollback" &&
+            mountedRef.current &&
+            initiatingTargetKey === latestTargetKeyRef.current &&
+            outcome.error instanceof ReactionApiError &&
+            outcome.error.status === 403
+        ) {
+            savePendingReaction(target, reaction.id, Date.now(), user.id);
+            setPendingReaction(reaction);
+            await refresh();
         }
         return false;
     }
@@ -344,18 +587,9 @@ export function ReactionBar({
         cursor?: string,
         trigger?: HTMLButtonElement | null,
     ): Promise<void> {
-        if (!cursor && participantGroupRef.current === group.reaction.id) {
-            if (trigger) {
-                participantTriggerRef.current = trigger;
-            }
-            return;
-        }
         participantGroupRef.current = group.reaction.id;
         const requestId = participantRequestRef.current + 1;
         participantRequestRef.current = requestId;
-        participantAbortRef.current?.abort();
-        const controller = new AbortController();
-        participantAbortRef.current = controller;
         if (trigger) {
             participantTriggerRef.current = trigger;
         }
@@ -366,13 +600,24 @@ export function ReactionBar({
             setParticipantsNext(null);
         }
         try {
-            const page = await getReactionParticipants(
-                target,
-                group.reaction.id,
-                group.participants,
-                cursor,
-                controller.signal,
-            );
+            const page = await queryClient.fetchQuery({
+                queryKey: queryKeys.reactionParticipants(
+                    identityKey,
+                    target.kind,
+                    target.id,
+                    group.reaction.id,
+                    cursor ?? null,
+                ),
+                queryFn: ({ signal }) =>
+                    getReactionParticipants(
+                        target,
+                        group.reaction.id,
+                        group.participants,
+                        cursor,
+                        signal,
+                    ),
+                staleTime: 5 * 60 * 1000,
+            });
             if (
                 !mountedRef.current ||
                 requestId !== participantRequestRef.current ||
@@ -396,49 +641,16 @@ export function ReactionBar({
             if (
                 !mountedRef.current ||
                 requestId !== participantRequestRef.current ||
-                controller.signal.aborted ||
                 instanceTargetKey !== latestTargetKeyRef.current
             ) {
                 return;
             }
             setParticipantsStatus("error");
-        } finally {
-            if (requestId === participantRequestRef.current) {
-                participantAbortRef.current = null;
-            }
-        }
-    }
-
-    function pointerDown(pointerType: string): void {
-        pointerTypeRef.current = pointerType;
-        if (pointerType === "touch") {
-            lastTouchAtRef.current = Date.now();
-        }
-    }
-
-    function pointerUp(): void {
-        window.setTimeout(() => {
-            pointerTypeRef.current = null;
-        }, 0);
-    }
-
-    function hoverParticipants(group: ReactionGroup): void {
-        if (
-            window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
-            Date.now() - lastTouchAtRef.current > 1000
-        ) {
-            void openParticipants(
-                group,
-                undefined,
-                participantButtonRefs.current.get(group.reaction.id),
-            );
         }
     }
 
     return (
-        <div
-            className={`reaction-bar ${compact ? "reaction-bar-compact" : ""} ${slackPills ? "reaction-bar-slack-pills" : ""}`}
-        >
+        <div className="reaction-bar reaction-bar-compact reaction-bar-slack-pills">
             <div
                 aria-label="Reactions"
                 className="reaction-bar__group flex flex-wrap items-center gap-2"
@@ -448,34 +660,32 @@ export function ReactionBar({
                     <span
                         className={`reaction-pill ${group.viewer_reacted ? "reaction-pill-active" : ""}`}
                         key={group.reaction.id}
-                        onFocus={(event) => {
+                        onBlur={(event) => {
                             if (
-                                !participantsRequireActivation &&
-                                pointerTypeRef.current !== "touch" &&
-                                !suppressParticipantFocusRef.current
+                                !event.currentTarget.contains(
+                                    event.relatedTarget,
+                                )
                             ) {
-                                void openParticipants(
-                                    group,
-                                    undefined,
-                                    event.target instanceof HTMLButtonElement
-                                        ? event.target
-                                        : undefined,
+                                setActiveReactionId((current) =>
+                                    current === group.reaction.id
+                                        ? null
+                                        : current,
                                 );
                             }
                         }}
-                        onPointerCancel={pointerUp}
-                        onPointerDownCapture={(event) => {
-                            pointerDown(event.pointerType);
+                        onFocus={() => {
+                            setActiveReactionId(group.reaction.id);
                         }}
                         onPointerEnter={(event) => {
-                            if (
-                                !participantsRequireActivation &&
-                                event.pointerType === "mouse"
-                            ) {
-                                hoverParticipants(group);
+                            if (event.pointerType === "mouse") {
+                                setActiveReactionId(group.reaction.id);
                             }
                         }}
-                        onPointerUpCapture={pointerUp}
+                        onPointerLeave={() => {
+                            setActiveReactionId((current) =>
+                                current === group.reaction.id ? null : current,
+                            );
+                        }}
                     >
                         <button
                             aria-label={`${group.viewer_reacted ? "Remove" : "Add"} ${reactionControlLabel(group.reaction.label)}`}
@@ -485,32 +695,33 @@ export function ReactionBar({
                             type="button"
                         >
                             <ReactionImage
+                                animate={activeReactionId === group.reaction.id}
                                 className="reaction-pill__asset"
                                 reaction={group.reaction}
                             />
                         </button>
                         <button
+                            aria-expanded={
+                                participantGroup?.reaction.id ===
+                                group.reaction.id
+                            }
+                            aria-haspopup="dialog"
                             aria-label={`View ${String(group.count)} participant${group.count === 1 ? "" : "s"} for ${group.reaction.label}`}
                             className="reaction-pill__count"
                             disabled={busy}
-                            onClick={(event) =>
+                            onClick={(event) => {
+                                if (
+                                    participantGroupRef.current ===
+                                    group.reaction.id
+                                ) {
+                                    closeParticipants(true);
+                                    return;
+                                }
                                 void openParticipants(
                                     group,
                                     undefined,
                                     event.currentTarget,
-                                )
-                            }
-                            ref={(node) => {
-                                if (node) {
-                                    participantButtonRefs.current.set(
-                                        group.reaction.id,
-                                        node,
-                                    );
-                                } else {
-                                    participantButtonRefs.current.delete(
-                                        group.reaction.id,
-                                    );
-                                }
+                                );
                             }}
                             type="button"
                         >
@@ -519,7 +730,7 @@ export function ReactionBar({
                     </span>
                 ))}
 
-                {!compact ? (
+                {!hidePicker ? (
                     <button
                         aria-expanded={pickerOpen}
                         aria-haspopup="dialog"
@@ -528,13 +739,34 @@ export function ReactionBar({
                         disabled={busy || interactionDisabled}
                         key="reaction-picker-trigger"
                         onClick={() => {
-                            setPickerOpen((open) => !open);
+                            if (pickerOpen) {
+                                closePicker(false);
+                            } else {
+                                preloadReactionPickerResources(
+                                    queryClient,
+                                    "intent",
+                                );
+                                setPickerOpen(true);
+                            }
                         }}
-                        onKeyDown={(event) => {
-                            if (event.key === "Escape" && pickerOpen) {
-                                event.preventDefault();
-                                setPickerOpen(false);
-                                pickerTrigger.current?.focus();
+                        onFocus={() => {
+                            preloadReactionPickerResources(
+                                queryClient,
+                                "intent",
+                            );
+                        }}
+                        onPointerDown={() => {
+                            preloadReactionPickerResources(
+                                queryClient,
+                                "intent",
+                            );
+                        }}
+                        onPointerEnter={(event) => {
+                            if (event.pointerType === "mouse") {
+                                preloadReactionPickerResources(
+                                    queryClient,
+                                    "hover",
+                                );
                             }
                         }}
                         ref={pickerTrigger}
@@ -576,11 +808,12 @@ export function ReactionBar({
                                 Sign in to add your {pendingReaction.name}{" "}
                                 reaction.
                             </span>
-                            <a
+                            <Link
                                 href={`/login?next=${encodeURIComponent(target.returnTo)}`}
+                                prefetch={false}
                             >
                                 Login
-                            </a>
+                            </Link>
                         </>
                     )}
                     <button
@@ -606,92 +839,110 @@ export function ReactionBar({
                 </p>
             ) : null}
 
-            {!compact && pickerOpen ? (
-                <Suspense
-                    fallback={
-                        <p
-                            className="mt-3 text-sm text-stone-500"
-                            role="status"
-                        >
-                            Loading reaction picker…
-                        </p>
-                    }
-                >
-                    <ReactionPicker
-                        onClose={() => {
-                            setPickerOpen(false);
-                            pickerTrigger.current?.focus();
-                        }}
-                        onSelect={(reaction) => {
+            {!hidePicker && pickerOpen ? (
+                <ReactionPickerShell
+                    onClose={closePicker}
+                    onSelect={(reaction) => {
+                        const selectedTargetKey = instanceTargetKey;
+                        closePicker(false);
+                        void performToggle(reaction).finally(() => {
+                            if (
+                                !mountedRef.current ||
+                                selectedTargetKey !== latestTargetKeyRef.current
+                            ) {
+                                return;
+                            }
                             restorePickerFocusRef.current = true;
-                            setPickerOpen(false);
-                            void performToggle(reaction);
-                        }}
-                    />
-                </Suspense>
+                            setPickerFocusRevision((revision) => revision + 1);
+                        });
+                    }}
+                    triggerRef={pickerTrigger}
+                />
             ) : null}
 
             {participantGroup ? (
                 <div
-                    aria-label={`${reactionControlLabel(participantGroup.reaction.label)} participants`}
-                    className="reaction-participants"
-                    role="dialog"
+                    className="reaction-participant-layer"
+                    onPointerDown={(event) => {
+                        if (event.target !== event.currentTarget) {
+                            return;
+                        }
+                        event.preventDefault();
+                        event.stopPropagation();
+                        closeParticipants(true);
+                    }}
                 >
-                    <div className="flex items-center justify-between gap-3">
-                        <strong>
-                            {participantGroup.reaction.name}{" "}
-                            {participantGroup.count}{" "}
-                            {participantGroup.count === 1 ? "person" : "people"}
-                        </strong>
-                        <button
-                            aria-label="Close reaction participants"
-                            className="comment-action"
-                            onClick={() => {
-                                closeParticipants(true);
-                            }}
-                            type="button"
-                        >
-                            Close
-                        </button>
+                    <div
+                        aria-label={`${reactionControlLabel(participantGroup.reaction.label)} participants`}
+                        aria-modal="true"
+                        className="reaction-participants"
+                        ref={participantSurfaceRef}
+                        role="dialog"
+                        tabIndex={-1}
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <strong>
+                                {participantGroup.reaction.name}{" "}
+                                {participantGroup.count}{" "}
+                                {participantGroup.count === 1
+                                    ? "person"
+                                    : "people"}
+                            </strong>
+                            <button
+                                aria-label="Close reaction participants"
+                                className="dismiss-icon"
+                                onClick={() => {
+                                    closeParticipants(true);
+                                }}
+                                type="button"
+                            >
+                                <span aria-hidden="true">×</span>
+                            </button>
+                        </div>
+                        {participantsStatus === "loading" &&
+                        participants.length === 0 ? (
+                            <p
+                                className="mt-2 text-sm text-stone-500"
+                                role="status"
+                            >
+                                Loading participants…
+                            </p>
+                        ) : null}
+                        {participantsStatus === "error" ? (
+                            <p
+                                className="mt-2 text-sm text-red-700"
+                                role="alert"
+                            >
+                                Participants could not be loaded.
+                            </p>
+                        ) : null}
+                        <ul className="mt-2 space-y-1 text-sm">
+                            {participants.map((participant) => (
+                                <li key={participant.id}>
+                                    {participant.display_name}
+                                    {participant.is_site_author
+                                        ? " · Author"
+                                        : ""}
+                                </li>
+                            ))}
+                        </ul>
+                        {participantsNext ? (
+                            <button
+                                className="comment-action mt-2"
+                                disabled={participantsStatus === "loading"}
+                                onClick={() =>
+                                    void openParticipants(
+                                        participantGroup,
+                                        participantsNext,
+                                        participantTriggerRef.current,
+                                    )
+                                }
+                                type="button"
+                            >
+                                Load more
+                            </button>
+                        ) : null}
                     </div>
-                    {participantsStatus === "loading" &&
-                    participants.length === 0 ? (
-                        <p
-                            className="mt-2 text-sm text-stone-500"
-                            role="status"
-                        >
-                            Loading participants…
-                        </p>
-                    ) : null}
-                    {participantsStatus === "error" ? (
-                        <p className="mt-2 text-sm text-red-700" role="alert">
-                            Participants could not be loaded.
-                        </p>
-                    ) : null}
-                    <ul className="mt-2 space-y-1 text-sm">
-                        {participants.map((participant) => (
-                            <li key={participant.id}>
-                                {participant.display_name}
-                                {participant.is_site_author ? " · Author" : ""}
-                            </li>
-                        ))}
-                    </ul>
-                    {participantsNext ? (
-                        <button
-                            className="comment-action mt-2"
-                            disabled={participantsStatus === "loading"}
-                            onClick={() =>
-                                void openParticipants(
-                                    participantGroup,
-                                    participantsNext,
-                                    participantTriggerRef.current,
-                                )
-                            }
-                            type="button"
-                        >
-                            Load more
-                        </button>
-                    ) : null}
                 </div>
             ) : null}
         </div>

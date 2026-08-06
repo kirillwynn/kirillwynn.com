@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { ProviderForm } from "@/components/provider-form";
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -47,9 +49,13 @@ export function AccountPanel({
                 <p className="text-stone-700">
                     Sign in to view connected providers.
                 </p>
-                <a className="button-link" href="/login?next=%2Faccount">
+                <Link
+                    className="button-link"
+                    href="/login?next=%2Faccount"
+                    prefetch={false}
+                >
                     Login
-                </a>
+                </Link>
             </div>
         );
     }
@@ -82,12 +88,13 @@ export function AccountPanel({
                         Your public profile is incomplete, so comments and
                         reactions are disabled.
                     </p>
-                    <a
+                    <Link
                         className="mt-3 inline-block font-semibold"
                         href="/account/profile"
+                        prefetch={false}
                     >
                         Finish profile
-                    </a>
+                    </Link>
                 </div>
             ) : null}
             {!me.user.email_verified ? (
@@ -136,22 +143,31 @@ export function AccountPanel({
                     Profile and password
                 </h2>
                 <div className="mt-4 flex flex-wrap gap-3">
-                    <a className="button-link" href="/account/profile">
+                    <Link
+                        className="button-link"
+                        href="/account/profile"
+                        prefetch={false}
+                    >
                         {me.user.profile_complete
                             ? "Change nickname"
                             : "Finish profile"}
-                    </a>
+                    </Link>
                     {me.user.has_usable_password ? (
-                        <a
+                        <Link
                             className="button-link"
                             href="/account/password/change"
+                            prefetch={false}
                         >
                             Change password
-                        </a>
+                        </Link>
                     ) : canSetOAuthPassword ? (
-                        <a className="button-link" href="/account/password/set">
+                        <Link
+                            className="button-link"
+                            href="/account/password/set"
+                            prefetch={false}
+                        >
                             Set password
-                        </a>
+                        </Link>
                     ) : (
                         <span className="text-sm text-stone-600">
                             Password setup requires a verified connected

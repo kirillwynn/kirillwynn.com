@@ -1,31 +1,27 @@
 "use client";
 
-import {
-    type KeyboardEvent,
-    useEffect,
-    useId,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
+import { useQuery } from "@tanstack/react-query";
+import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 
 import { ReactionImage } from "@/components/reaction-image";
+import { queryKeys } from "@/lib/query-keys";
 import { loadRecentReactions } from "@/lib/reaction-storage";
 import { getReactionCatalog, type ReactionDescriptor } from "@/lib/reactions";
 
-export default function ReactionPicker({
-    onClose,
+export default function ReactionPickerResults({
     onSelect,
+    query,
 }: {
-    onClose: () => void;
     onSelect: (reaction: ReactionDescriptor) => void;
+    query: string;
 }) {
-    const [catalog, setCatalog] = useState<ReactionDescriptor[]>([]);
-    const [query, setQuery] = useState("");
-    const [error, setError] = useState(false);
+    const catalogQuery = useQuery({
+        queryKey: queryKeys.reactionCatalog,
+        queryFn: getReactionCatalog,
+        staleTime: 5 * 60 * 1000,
+    });
+    const catalog = catalogQuery.data?.results ?? [];
     const [activeId, setActiveId] = useState<string | null>(null);
-    const searchId = useId();
-    const searchRef = useRef<HTMLInputElement>(null);
     const pickerRef = useRef<HTMLDivElement>(null);
     const recentIds = useMemo(loadRecentReactions, []);
     const catalogById = useMemo(
@@ -52,25 +48,6 @@ export default function ReactionPicker({
         );
     }, [catalog, query, recentIds]);
 
-    useEffect(() => {
-        let active = true;
-        searchRef.current?.focus();
-        void getReactionCatalog()
-            .then((loaded) => {
-                if (active) {
-                    setCatalog(loaded.results);
-                }
-            })
-            .catch(() => {
-                if (active) {
-                    setError(true);
-                }
-            });
-        return () => {
-            active = false;
-        };
-    }, []);
-
     function gridKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
         if (
             !["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(
@@ -87,7 +64,7 @@ export default function ReactionPicker({
         const current = buttons.indexOf(
             document.activeElement as HTMLButtonElement,
         );
-        if (current < 0) {
+        if (current < 0 || buttons.length === 0) {
             return;
         }
         const columns =
@@ -149,43 +126,7 @@ export default function ReactionPicker({
     }
 
     return (
-        <div
-            aria-label="Choose a reaction"
-            className="reaction-picker"
-            onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                    event.preventDefault();
-                    onClose();
-                }
-            }}
-            ref={pickerRef}
-            role="dialog"
-        >
-            <div className="flex items-center gap-2">
-                <label className="sr-only" htmlFor={searchId}>
-                    Search reaction names
-                </label>
-                <input
-                    className="reaction-picker__search"
-                    id={searchId}
-                    onChange={(event) => {
-                        setQuery(event.target.value);
-                    }}
-                    placeholder="Search reactions"
-                    ref={searchRef}
-                    type="search"
-                    value={query}
-                />
-                <button
-                    aria-label="Close reaction picker"
-                    className="comment-action"
-                    onClick={onClose}
-                    type="button"
-                >
-                    Close
-                </button>
-            </div>
-
+        <div ref={pickerRef}>
             {!query && recent.length ? (
                 <div className="mt-3">
                     <p className="text-xs font-semibold text-stone-600">
@@ -202,11 +143,11 @@ export default function ReactionPicker({
                 </div>
             ) : null}
 
-            {error ? (
+            {catalogQuery.isError ? (
                 <p className="mt-3 text-sm text-red-700" role="alert">
                     The reaction catalog could not be loaded.
                 </p>
-            ) : catalog.length === 0 ? (
+            ) : catalogQuery.isPending ? (
                 <p className="mt-3 text-sm text-stone-500" role="status">
                     Loading reactions…
                 </p>

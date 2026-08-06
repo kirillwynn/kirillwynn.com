@@ -1,18 +1,61 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { authApiPaths, safeReturnTo } from "@/lib/auth";
+import { PUBLIC_URL_CHANGE_EVENT, queryFromLocation } from "@/lib/feed-browser";
+import { scheduleFeedScrollRestoration } from "@/lib/feed-scroll-cache";
+
+export function SiteHeaderFallback() {
+    return (
+        <header className="site-header">
+            <div className="site-container site-header__inner">
+                <nav
+                    className="site-navigation"
+                    aria-label="Primary navigation"
+                >
+                    <div className="site-header__controls">
+                        <Link
+                            className="nav-link"
+                            href="/"
+                            onClick={() => {
+                                scheduleFeedScrollRestoration("");
+                            }}
+                            scroll={false}
+                        >
+                            Feed
+                        </Link>
+                        <Link
+                            className="nav-link"
+                            href="/bridge"
+                            prefetch={false}
+                        >
+                            Bridge
+                        </Link>
+                        <ThemeToggle />
+                        <div className="account-slot">
+                            <span
+                                aria-label="Loading account"
+                                className="account-placeholder"
+                                role="status"
+                            >
+                                Account
+                            </span>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </header>
+    );
+}
 
 export function SiteHeader() {
-    const { me, refresh, status } = useAuth();
+    const { clearSessionCache, me, refresh, status } = useAuth();
     const pathname = usePathname();
-    const searchParameters = useSearchParams();
-    const search =
-        (searchParameters as { toString(): string } | null)?.toString() ?? "";
     const [menuOpen, setMenuOpen] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [returnTo, setReturnTo] = useState("/");
@@ -21,9 +64,32 @@ export function SiteHeader() {
 
     useEffect(() => {
         setMenuOpen(false);
-        const current = `${pathname}${search ? `?${search}` : ""}`;
-        setReturnTo(safeReturnTo(current));
-    }, [pathname, search]);
+        const updateReturnTo = () => {
+            setReturnTo(
+                safeReturnTo(
+                    `${window.location.pathname}${window.location.search}`,
+                ),
+            );
+        };
+        const restoreFeedOnHistory = () => {
+            updateReturnTo();
+            if (window.location.pathname === "/") {
+                scheduleFeedScrollRestoration(
+                    queryFromLocation(window.location),
+                );
+            }
+        };
+        updateReturnTo();
+        if (window.location.pathname === "/") {
+            scheduleFeedScrollRestoration(queryFromLocation(window.location));
+        }
+        window.addEventListener("popstate", restoreFeedOnHistory);
+        window.addEventListener(PUBLIC_URL_CHANGE_EVENT, updateReturnTo);
+        return () => {
+            window.removeEventListener("popstate", restoreFeedOnHistory);
+            window.removeEventListener(PUBLIC_URL_CHANGE_EVENT, updateReturnTo);
+        };
+    }, [pathname]);
 
     useEffect(() => {
         if (!menuOpen) {
@@ -69,6 +135,7 @@ export function SiteHeader() {
                 body: JSON.stringify({}),
             });
             if (response.ok) {
+                clearSessionCache();
                 window.location.assign(returnTo);
                 return;
             }
@@ -92,22 +159,27 @@ export function SiteHeader() {
                     aria-label="Primary navigation"
                 >
                     <div className="site-header__controls">
-                        <a
+                        <Link
                             className="nav-link"
                             aria-current={pathname === "/" ? "page" : undefined}
                             href="/"
+                            onClick={() => {
+                                scheduleFeedScrollRestoration("");
+                            }}
+                            scroll={false}
                         >
                             Feed
-                        </a>
-                        <a
+                        </Link>
+                        <Link
                             className="nav-link"
                             aria-current={
                                 pathname === "/bridge" ? "page" : undefined
                             }
                             href="/bridge"
+                            prefetch={false}
                         >
                             Bridge
-                        </a>
+                        </Link>
                         <ThemeToggle />
                         <div className="account-slot" ref={menuRef}>
                             {status === "loading" ? (
@@ -140,7 +212,7 @@ export function SiteHeader() {
                                             role="menu"
                                             aria-label="User menu"
                                         >
-                                            <a
+                                            <Link
                                                 className="nav-link"
                                                 aria-current={
                                                     pathname === "/account"
@@ -148,10 +220,11 @@ export function SiteHeader() {
                                                         : undefined
                                                 }
                                                 href="/account"
+                                                prefetch={false}
                                                 role="menuitem"
                                             >
                                                 Account
-                                            </a>
+                                            </Link>
                                             <form
                                                 onSubmit={(event) => {
                                                     void submitLogout(event);
@@ -172,7 +245,7 @@ export function SiteHeader() {
                                     ) : null}
                                 </>
                             ) : (
-                                <a
+                                <Link
                                     className="nav-link justify-center font-semibold"
                                     aria-current={
                                         pathname === "/login"
@@ -180,9 +253,10 @@ export function SiteHeader() {
                                             : undefined
                                     }
                                     href={`/login?next=${encodeURIComponent(returnTo)}`}
+                                    prefetch={false}
                                 >
                                     Login
-                                </a>
+                                </Link>
                             )}
                         </div>
                     </div>

@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { DateTime } from "@/components/date-time";
 import { CommentsSection } from "@/components/comments-section";
 import { PostBody } from "@/components/post-body";
 import { PostReactions } from "@/components/post-reactions";
-import { Tags } from "@/components/tags";
-import { SubscriptionForm } from "@/components/subscription-form";
 import { postMetadata } from "@/lib/metadata";
 import { loadPost } from "@/lib/server/post-loader";
 
@@ -27,7 +26,7 @@ export async function generateMetadata({
     return postMetadata(loaded.post, loaded.preview);
 }
 
-export default async function PostPage({ params }: PostPageProps) {
+async function Post({ params }: PostPageProps) {
     const loaded = await loadPost((await params).slug);
     if (loaded.status === "not-found") {
         notFound();
@@ -57,9 +56,6 @@ export default async function PostPage({ params }: PostPageProps) {
                     ) : null}
                     <span>by {post.author.display_name}</span>
                 </div>
-                <div className="mt-5">
-                    <Tags tags={post.tags} />
-                </div>
             </header>
 
             <div className="mt-10">
@@ -68,11 +64,18 @@ export default async function PostPage({ params }: PostPageProps) {
 
             {!preview ? (
                 <>
-                    <SubscriptionForm compact />
                     <PostReactions id={post.id} slug={post.slug} />
                     <CommentsSection slug={post.slug} />
                 </>
             ) : null}
         </article>
+    );
+}
+
+export default function PostPage({ params }: PostPageProps) {
+    return (
+        <Suspense fallback={<article className="mx-auto max-w-3xl" />}>
+            <Post params={params} />
+        </Suspense>
     );
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ContentImage } from "@/components/content-image";
@@ -72,9 +73,9 @@ function SafeLink({
             return <span className="text-stone-500">{value.text}</span>;
         }
         return (
-            <a className="content-link" href={value.href}>
+            <Link className="content-link" href={value.href} prefetch={false}>
                 {value.text}
-            </a>
+            </Link>
         );
     }
 

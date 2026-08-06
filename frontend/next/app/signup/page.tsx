@@ -1,18 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { SignupForm } from "@/components/local-auth-forms";
+import { SignupRouteForm } from "@/components/auth-route-panels";
 
 export const metadata: Metadata = {
     title: "Create account",
     robots: { index: false, follow: false },
 };
 
-export default async function SignupPage({
-    searchParams,
-}: {
-    searchParams: Promise<{ next?: string }>;
-}) {
-    const params = await searchParams;
+export default function SignupPage() {
     return (
         <section className="account-page" aria-labelledby="signup-title">
             <p className="eyebrow">Account</p>
@@ -24,7 +20,9 @@ export default async function SignupPage({
                 with posts, comments and reactions.
             </p>
             <div className="account-card">
-                <SignupForm next={params.next} />
+                <Suspense fallback={null}>
+                    <SignupRouteForm />
+                </Suspense>
             </div>
         </section>
     );

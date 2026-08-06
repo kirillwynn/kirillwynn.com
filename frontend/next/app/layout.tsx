@@ -1,18 +1,16 @@
 import type { Metadata } from "next";
 import { draftMode } from "next/headers";
 import { connection } from "next/server";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 
 import { AuthProvider } from "@/components/auth-provider";
 import { PreviewBanner } from "@/components/preview-banner";
 import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
+import { SiteHeader, SiteHeaderFallback } from "@/components/site-header";
 import { publicSiteUrl } from "@/lib/server/config";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 import "./globals.css";
-
-export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
     await connection();
@@ -34,11 +32,19 @@ export async function generateMetadata(): Promise<Metadata> {
     };
 }
 
-export default async function RootLayout({
+async function DraftPreviewSlot() {
+    await connection();
+    const draft = await draftMode();
+    return draft.isEnabled ? (
+        <div className="site-container preview-container">
+            <PreviewBanner />
+        </div>
+    ) : null;
+}
+
+export default function RootLayout({
     children,
 }: Readonly<{ children: ReactNode }>) {
-    const draft = await draftMode();
-
     return (
         <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
             <head>
@@ -52,12 +58,12 @@ export default async function RootLayout({
                     Skip to content
                 </a>
                 <AuthProvider>
-                    <SiteHeader />
-                    {draft.isEnabled ? (
-                        <div className="site-container preview-container">
-                            <PreviewBanner />
-                        </div>
-                    ) : null}
+                    <Suspense fallback={<SiteHeaderFallback />}>
+                        <SiteHeader />
+                    </Suspense>
+                    <Suspense fallback={null}>
+                        <DraftPreviewSlot />
+                    </Suspense>
                     <main
                         id="main-content"
                         className="site-container site-main"
