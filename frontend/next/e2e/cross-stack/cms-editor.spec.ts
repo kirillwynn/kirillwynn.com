@@ -382,10 +382,16 @@ test("Stage 19B schedules future publication and expiry through Wagtail", async 
     await scheduleDialog
         .getByRole("textbox", { name: "Go live date/time" })
         .fill("2030-08-07 10:00");
-    await scheduleDialog
-        .getByRole("textbox", { name: "Expiry date/time" })
-        .fill("2030-08-08 10:00");
-    await scheduleDialog.getByRole("button", { name: "Save schedule" }).click();
+    const expiryField = scheduleDialog.getByRole("textbox", {
+        name: "Expiry date/time",
+    });
+    await expiryField.fill("2030-08-08 10:00");
+    const saveSchedule = scheduleDialog.getByRole("button", {
+        name: "Save schedule",
+    });
+    await expiryField.press("Tab");
+    await expect(saveSchedule).toBeFocused();
+    await saveSchedule.press("Enter");
 
     await expect(page.getByText(/Once scheduled:/)).toBeVisible();
     await page.getByRole("button", { name: "More actions" }).click();
