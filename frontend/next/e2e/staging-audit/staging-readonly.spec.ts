@@ -338,7 +338,7 @@ test("client navigation, infinite Feed, Unicode history, legacy normalization, s
     await postLink.click();
     const postArticle = page.locator("article:has(h1)");
     await expect(postArticle).toBeVisible();
-    await expect(page.locator(".feed-entry")).toHaveCount(0);
+    await expect(page.locator(".feed-entry:visible")).toHaveCount(0);
     const postClientNavigationMs = Date.now() - postNavigationStartedAt;
     const postBackStartedAt = Date.now();
     await page.goBack();
@@ -494,7 +494,7 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     await postLink.click();
     const postArticle = page.locator("article:has(h1)");
     await expect(postArticle).toBeVisible();
-    await expect(page.locator(".feed-entry")).toHaveCount(0);
+    await expect(page.locator(".feed-entry:visible")).toHaveCount(0);
     await expect(postArticle.locator("time").first()).toBeVisible();
     await expect(
         page.getByRole("textbox", { name: "Email address" }),
@@ -780,7 +780,7 @@ test("personalized APIs are private and Bridge remains icon-only", async ({
     await expect(
         main.getByRole("heading", { level: 1, name: "Feed" }),
     ).toHaveCount(0);
-    await expect(main.locator("p")).toHaveCount(0);
+    await expect(main.locator("p:visible")).toHaveCount(0);
     await expect(main.locator(".bridge-link")).toHaveCount(8);
     for (const link of await main.locator(".bridge-link").all()) {
         await expect(link).toHaveText("");

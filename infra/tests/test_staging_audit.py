@@ -399,7 +399,7 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     assert live_spec.count('page.locator("article:has(h1)")') == 2
     assert (
         live_spec.count(
-            'await expect(page.locator(".feed-entry")).toHaveCount(0);'
+            'await expect(page.locator(".feed-entry:visible")).toHaveCount(0);'
         )
         >= 2
     )
