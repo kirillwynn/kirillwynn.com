@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-01
+Last updated: 2026-08-06
 
 Integration branch: `rewrite/wagtail-next`
 
@@ -52,7 +52,7 @@ OAuth profile completion, authoritative public nicknames, and post authors are
 active. Controlled real-email and browser acceptance passed. Production
 remains absent, and the shared production edge was not replaced or changed.
 
-Stage 18 post-MVP stabilization is a completion candidate from the independently
+Stage 18 post-MVP stabilization was completed from the independently
 verified clean/docs-only baseline
 `ac0a7cd1cc5c386e9b9a74e299ea51d8cd3e792f`. The controlled application
 release remains active on staging as
@@ -70,10 +70,287 @@ gate restoration, and targeted live acceptance passed. Final workflow
 `restore_stage18_30754896193_1`, migration/system/data/query-count checks,
 exact worker restoration, and five-viewport read-only browser audit. Its
 sanitized recovery/browser artifacts are `8835686488` and `8835715340`.
-Only closed-gate CI for the documentation-only completion commit remains.
-See `docs/staging-stabilization-audit.md`. Production and the reaction catalog
-remain untouched; all 228 custom emoji rights remain
+The closing Stage 18 documentation-only push/PR CI `30755730841` /
+`30755732446` passed with deployment, attestation, and catalog mutation steps
+skipped. See `docs/staging-stabilization-audit.md`. Production and the reaction
+catalog remain untouched; all 228 custom emoji rights remain
 `staging-only/unverified` and an explicit production blocker.
+
+Stage 19A public performance is accepted on staging as application release
+`f59c6cf0139490e4b8da6e130cd45ef37f8c4b35`. Persistent client navigation,
+explicit Next.js public cache scopes, an SSR-first infinite Feed and client
+search, identity-partitioned browser queries, Slack-like reaction sizing and
+dismissal, one subscription page, and the narrower footer passed required CI,
+an immutable controlled rollout, schema-3 attestation, and live Chrome QA.
+No migration, CMS-editor change, catalog sync, production operation, or `main`
+change occurred.
+
+## Stage 19A public performance, infinite Feed, and reaction UX
+
+### Baseline and confirmed causes
+
+Stage 19A began from clean synchronized local/origin
+`5a02444930ff8bd73c3fcce11aabd84b000ff1ef`; `origin/main` was and remains
+`1d02912430277cdf5465f856b158a6820bc12be4`. Active staging was
+`07542f5a90d2849577219ed74a1628ba39555674`, both deploy variables and the
+reaction-catalog sync variable were false, no one-shot resolution variable was
+present, and production application state was absent.
+
+The audit confirmed ordinary anchors on Feed, Bridge, and post cards caused a
+new document for each internal transition. That remounted the root
+`AuthProvider`, repeated `/api/me/`, discarded Feed/reaction state, and exposed
+the route-agnostic Feed skeleton. Cache tags on dynamic server fetches did not
+prove a reusable public boundary. Picker opening could serialize lazy chunk,
+catalog, and image work, and duplicate bars had no persistent catalog owner.
+Final staging measurement also found that React 19 emitted preload links for
+all eight eager Bridge images when Feed safely prefetched Bridge RSC data. The
+images now use native lazy loading and asynchronous decoding, so route-data
+prefetch no longer pulls Bridge media into the Feed critical path.
+
+Baseline live navigation took approximately 1,956 ms Feed → Bridge, 2,021 ms
+Bridge → Feed, and 2,544 ms Feed → post; each was a document navigation and the
+shell repeated `/api/me/`. The cold picker trace requested its chunk, catalog,
+and 54 reaction images in sequence; warm opening was about 293 ms but still
+depended on remount lifetime. The Stage 18 restored backend baseline remained
+bounded: page-one list 8,472 bytes / 14.664 ms median, page two 5,345 bytes /
+11.477 ms, detail 1,015 bytes / 8.497 ms, and private Feed reactions 3,360
+bytes / 16.742 ms across three samples.
+
+### Implemented boundaries
+
+- Safe same-origin product routes use Next client navigation. Feed, Bridge,
+  and posts may fully prefetch; private/session-sensitive pages use
+  `prefetch={false}`. OAuth POST initiation, logout, Draft Mode, revalidation,
+  and credential mutations keep their security-sensitive semantics.
+- One root React Query client persists `/api/me/`, Feed/search pages, Feed/post/
+  comment/thread reaction reads, catalog, and participants. Viewer keys include
+  `anonymous` or `user:<id>` and the old viewer namespace is removed on login,
+  logout, expiry, or identity change. The mutation coordinator and comment
+  reconciliation layers remain authoritative.
+- Next.js `cacheComponents` plus supported `"use cache"`, `cacheLife`, and
+  `cacheTag` scopes cache public list/search/tag metadata/detail. Signed
+  publish/update/unpublish/expiry/rename events derive `posts`, stable page ID,
+  current slug, and previous-slug invalidation. Draft resolution remains
+  `private, no-store`; auth, comments, aggregates, toggles, and participants do
+  not enter a shared server cache.
+- Page one remains SSR. A single-flight, abortable `useInfiniteQuery` follows
+  only validated same-origin relative `next`, deduplicates stable post IDs, and
+  supplies observer and manual/retry paths. Search is IME-safe with 275 ms
+  debounce, immediate submit, native history synchronization, abort/stale
+  defense, Unicode single encoding, direct-URL SSR, canonical `/`, and
+  `noindex`. It makes no cursor/snapshot guarantee.
+- Visible tags, hashtag navigation, invisible legacy tag filters, page numbers,
+  Next, Previous, global Feed loading, and embedded Feed/post subscription
+  forms are gone. `/subscriptions/` owns the unchanged double-opt-in form.
+- The reaction shell opens synchronously. Module and catalog prefetch in
+  parallel after idle or intent, respect Save-Data, do not prefetch images, and
+  share a persistent module/query cache. Only the exact catalog endpoint keeps
+  public ETag/max-age/SWR headers at Nginx; every viewer endpoint remains
+  private. Desktop popover and mobile sheet share outside/backdrop/Escape/
+  trigger/selection dismissal, click-through prevention, focus rules, and
+  stale/unmounted guards.
+- Every post/comment/reply/thread reaction uses the same computed 30 px visual,
+  15–16 px image, 12–13 px count, and at least 44 px target. Participants open
+  only by click/tap/Enter/Space. Reaction search uses a soft surface change with
+  no orange outline, border recolor, glow, or shadow.
+- The footer is one centered semantic two-row `dl` containing exactly the
+  `Current Team: Yandex` and `Previous Team: Deeplay` rows, with a 34 rem
+  maximum width and no copyright, tagline, Subscribe, or other links.
+
+ADR 0009 records the public navigation/cache/Feed decision. ADR 0006 and the
+API contract record the amended reaction/browser and exact edge-cache rules.
+
+### Additive history and verification
+
+The application history was not rewritten:
+
+- `d6a7cc68636dd951ff12c02be488448fabb7d74e` (parent `5a024449...`)
+  implements Stage 19A;
+- `ad3854ffd23ec95fa42c2a18ff54c68d4956d650` (parent `d6a7cc6...`)
+  adds the browser, cache, edge, and cross-stack regressions;
+- `0fd027aad93257ff578827f346ae64cac453af0f` (parent `ad3854f...`) is the
+  first immutable release marker;
+- `586bf995f3110d635c0dbf4a7343326d49a12e87` (parent `0fd027a...`)
+  makes safe dynamic-route prefetch complete rather than partial;
+- `272b17d272cfaf26c1dead65597049da8ca7d5ef` (parent `586bf99...`) is its
+  release marker;
+- `43ef548de29aa74ebd9bcb4c59325c6bca74438f` (parent `272b17d...`)
+  restores scroll immediately despite global smooth scrolling and removes the
+  redundant Feed self-prefetch request overlap;
+- `72e37799a72bac1fcc16d4f9a8e09c0054109fd9` (parent `43ef548...`) is the
+  first live-accepted code release marker;
+- `1cc5f3b8318dbd265b00b8bf49ce7a6731162fe1` (parent `72e3779...`) waits for
+  settled visible route landmarks in staging acceptance;
+- `5b0f55e54d0f25d30b14c9825e1d675746291aa5` (parent `1cc5f3b...`) tests the
+  visible route while Next deliberately preserves hidden Feed state;
+- `1a699be2a9b9907a9a835ce6d31232698c879ed1` (parent `5b0f55e...`) keeps the
+  eight Bridge media assets out of Feed prefetch and hardens the live audit;
+- `f59c6cf0139490e4b8da6e130cd45ef37f8c4b35` (parent `1a699be...`) is the
+  empty final performance-remediation rollout marker.
+
+Local verification passed uv lock, Ruff format/lint, Django system and deploy
+checks, migration drift and a clean empty chain, 715 SQLite tests, clean
+`npm ci`, Prettier, ESLint, TypeScript, 192 Vitest tests, production Next build,
+zero-vulnerability npm audit, bundle secret/origin/picker scans, 74 browser
+tests with 16 intentional viewport skips, real-Django cross-stack tests, and
+246 infrastructure/state-machine tests. CI supplied mandatory PostgreSQL,
+Docker, Nginx, container, and image coverage without skips; no migration was
+created.
+
+Closed-gate and rollout runs all passed:
+
+- first candidate push/PR `31081128516` / `31081130523`, first rollout
+  `31081860209` / `31081868742`;
+- prefetch remediation push/PR `31083605615` / `31083611290`, rollout
+  `31084236053` / `31084237986`;
+- scroll/request remediation push/PR `31086667434` / `31086669301`;
+- first live-accepted code rollout push/PR `31087305916` / `31087307577`;
+- settled-route test push/PR `31090717125` / `31090719773`;
+- preserved-route test push/PR `31092724686` / `31092728558`;
+- final performance candidate push/PR `31095278866` / `31095281894`;
+- controlled final rollout push/PR `31096039620` / `31096043313`.
+
+The final run passed browser `92569705257`, infrastructure `92569705297`,
+SQLite `92569705305`, cross-stack `92569705344`, frontend `92569705358`,
+mandatory PostgreSQL `92569705360`, aggregate `92570947769`, all three image
+builds, preflight, manifest, and deploy `92571197647`. Catalog sync
+`92570966932` was skipped.
+
+### Active staging evidence and live acceptance
+
+Operation
+`deploy-31096039620-staging-f59c6cf0139490e4b8da6e130cd45ef37f8c4b35`
+activated immutable digests:
+
+- Django `sha256:d090dad73973dc7ae7b845ec8fbf9971753d1716fac5e416d51f7aabf883d6a7`;
+- Next `sha256:9b48254b5d9819afb717c930cc0fe22dc06cc4ac2ab58e28da60b43a93d3446c`;
+- edge `sha256:bc34a07c11a280b464090869e31e66ed3dfbc4ece73217932cfd9e9dfa4c1904`.
+
+Manifest artifact `8965657910` has GitHub archive SHA-256
+`9fe66e78041fc962f5650077da63b8b7ce7ac5460852a1a3578c04bdccd4ebaf`
+and independently computed JSON SHA-256
+`f07774b364f284fbb89380ba7ffc486cf23b2ba25b655bcf0c3437b9881febfb`.
+Schema-3 attestation artifact `8965877502` has GitHub archive SHA-256
+`873b14bf17019f660fb3504f5860a439bf8030b62e87d08355bc5324a1067cf4`
+and independently computed JSON SHA-256
+`0ff0d403b8a6b7751558fdb54468e83dd984d8576254f7353267624077b939f6`.
+It passed active-digest, Django readiness, edge Nginx, Next health, public
+smoke, worker egress, and heartbeat checks. The ordinary backup was created;
+there were no migrations to apply.
+
+Automated browser evidence records exactly one document and one `/api/me/`
+through Feed → Bridge → Feed and Feed → post → Back, stable header/footer/body
+node identity, eight retained fixture posts, no warm skeleton, and scroll
+restoration within two pixels. A completed Feed prefetch remains under one
+second even when any later RSC response is deliberately delayed two seconds,
+with no second Feed RSC request. Search/append concurrency never exceeded one
+post-list request.
+
+Controlled live Chrome on the first live-accepted `72e37799...` release loaded
+all 13 staging posts,
+returned from a visible post with scroll `1539 → 1539`, restored ordinary and
+Unicode Tokyo search across Back/Forward, and kept account state ready across
+client navigation. Cold picker shell/loading appeared immediately; after
+settlement it exposed all 228 controls with one catalog request and 51 bounded
+reaction media requests. Warm reopen had no loading and remained at one catalog
+and 51 media requests. A fresh Feed resource inventory contained 14 scripts,
+one stylesheet, 11 images, and 18 other resources; only three visible aggregate
+reaction images were present and no picker/catalog resource or picker-named
+critical script was loaded.
+
+The first three post-rollout audit attempts were retained as useful fail-closed
+evidence rather than hidden: `31089355239` used route-generic `article`/`h1`
+selectors during a supported Next transition, `31091269943` incorrectly treated
+the hidden preserved Feed as a visible route, and `31093238428` exposed both a
+generic nested `header` selector and the genuine Bridge-image preloads. Commits
+`1cc5f3b`, `5b0f55e`, and `1a699be` separately corrected those contracts and the
+runtime preload cause. The third audit still recorded zero axe/console errors,
+no overflow, CLS from `0.008777` to `0.072587` across the five viewports, cold
+picker shell appearance in `11`–`20` ms, warm picker opening in `47`–`66` ms,
+and a 1440 px initial payload of 12 assets / 191,303 transferred bytes before
+the Bridge remediation.
+
+Three subsequent exact-release audit dispatches, `31100766387`, `31100929537`,
+and `31101343007`, failed before the remote audit command could run because the
+GitHub runner timed out opening TCP/22 to staging. They produced no evidence
+artifact and performed no recovery, browser, catalog, deploy, or application
+mutation. HTTPS remained healthy, the SSH path recovered, and the unchanged
+exact-release rerun `31102339480` passed recovery job `92618743291` and
+live-browser job `92622704847`.
+
+The successful final recovery artifact `8968487935` has GitHub archive SHA-256
+`a49ab147797ae5860636e9133df88f004cc77db75af054cd49ca4b5807165d70`.
+It restored backup
+`20260806T124651Z_f59c6cf0139490e4b8da6e130cd45ef37f8c4b35_manual_stage18-audit-31102339480-1.dump`
+only into scratch database `restore_stage18_31102339480_1`, matched all 43
+snapshot values with zero mismatch or concurrent change, passed migration,
+Django, deploy, query-count, worker restoration, and heartbeat checks, and
+left the active release-state JSON byte-for-byte semantically unchanged.
+Production rollout state, Compose containers, database/cache volumes, and
+application-private networks were all absent; the retained scratch database is
+the audit's documented recovery-evidence policy, not a public attachment.
+
+The exact-release browser artifact `8968587476` has GitHub archive SHA-256
+`010aeb367f101f84f07bc6c72ef02ae6e4f28699f4a59134322088374b7eccde`.
+All five viewports loaded 12 initial Next assets, 191,303 transferred bytes, and
+187,703 encoded bytes. CLS ranged from `0.008777` to `0.034958`; axe violations,
+console failures, and horizontal overflow were zero. Every viewport appended
+Feed `10 → 13`, used one catalog request, showed the cold picker shell in
+`8`–`10` ms, and reopened it warm in `42`–`47` ms. Bridge client navigation
+took `56`–`73` ms and its return `8`–`21` ms. Post navigation varied from
+`79` to `857` ms with live detail API/network latency, while Back restored the
+preserved Feed in `14`–`115` ms; no delay is hidden behind a long transition.
+The sampled 1440 px API medians were 880 ms for Feed, 704 ms for Unicode search,
+and 672 ms for detail.
+
+Direct Chrome acceptance on active `f59c6cf...` then proved the remediation
+itself: after idle Bridge prefetch, Feed contained zero image preload links;
+Bridge exposed exactly eight visible social images and every one was
+`loading=lazy` plus `decoding=async`. Infinite Feed appended `10 → 13` and
+showed its terminal state. Feed → post → Back restored `13` entries and scroll
+`1539 → 1539`. Unicode `東京` produced exactly
+`?q=%E6%9D%B1%E4%BA%AC`; ordinary keyboard deletion removed `q`, and native
+Back/Forward restored the empty and Tokyo result sets. Account arrived ready,
+not at `Loading account`; `/subscriptions/` had one visible form, while the
+post had none.
+
+The active-release picker showed its lightweight shell and loading status
+immediately, then `228` reaction choices with `51` visible images. Warm reopen
+had no loading status. Escape restored the exact trigger; trigger toggle and an
+outside heading click dismissed without changing the existing pressed
+reaction; the participant dialog opened by explicit count click and Escape
+restored that count trigger. Live element geometry was a 30 px visual reaction
+control inside a 44 px target, 16 px image, and 44 px count target. Light and
+dark screenshots showed the soft focused surface with no orange outline or
+glow. Controller calls include a fixed post-action settle and are therefore not
+reported as route-latency measurements.
+
+Light/dark, keyboard, focus restoration, explicit participants, subscription,
+account, 404 return action, and 320×812, 375×812, 768×1024, 1440×900, and
+1920×1080 layouts passed without horizontal overflow or console warning/error.
+The live subscription page was read-only to preserve user data; confirmation,
+unsubscribe, no-GET-mutation, cache invalidation, Draft isolation, and identity
+change are covered by the required automated/cross-stack suites rather than a
+real staging mutation.
+
+Both deploy variables were immediately restored to false and reread; catalog
+sync remains false, one-shot variables remain absent, and production state
+remains absent. No real post, comment, reaction, user, subscriber, catalog row,
+catalog object, OAuth/Resend/DNS/TLS setting, `main`, or production state was
+changed.
+
+### Remaining scope
+
+Page-number pagination plus ID deduplication is deliberately not snapshot
+consistent during a concurrent publication. Exact live navigation duration is
+reported from the baseline trace and deterministic Playwright network gates,
+not Chrome-control click wall time, because that controller adds a fixed
+post-action delay. Production and all reaction rights remain unverified.
+
+Stage 19B is a separate, unstarted Reddit-like Wagtail CMS editor stage:
+writing-first layout, compact Rich Text toolbar, supported Wagtail 7.4 extension
+points, and preservation of all 13 StreamField blocks, revisions, preview,
+scheduling, and rollback. Stage 19A does not change the CMS editor.
 
 ## Stage 18 staging stabilization
 
@@ -81,10 +358,8 @@ Stage 18 does not add a feature milestone or authorize production. The audit
 record, issue matrix, local/live evidence, performance baseline, recovery
 evidence, remaining backlog, and production blockers are maintained in
 `docs/staging-stabilization-audit.md`. Every substantive implementation,
-rollout, recovery, and live-acceptance gate has passed. This completion
-candidate becomes complete only when the documentation-only commit containing
-this status passes required push/PR CI with deployment, attestation, and
-catalog sync skipped.
+rollout, recovery, live-acceptance, and closing documentation gate passed with
+deployment, attestation, and catalog sync skipped in the documentation run.
 
 ## Stage 17 local identity, nicknames, and authors
 
@@ -1478,424 +1753,422 @@ Commit, CI, deployment, and acceptance evidence:
 - [x] Pytest, pytest-django, Ruff, system checks, and smoke tests added.
 - [x] Local PostgreSQL/Django Compose stack documented.
 - [x] Milestone 1 audit remediated: Django security patch, production Wagtail
-  URL validation, Docker context exclusions, and configuration coverage added.
+      URL validation, Docker context exclusions, and configuration coverage added.
 - [x] Singleton root-level `BlogIndexPage` and child-only `BlogPostPage` added.
 - [x] Required excerpt, structured body, normalized tags, SEO, canonical, and
-  Open Graph authoring fields added.
+      Open Graph authoring fields added.
 - [x] All 13 first-version StreamField block types added with explicit rich-text
-  features and no raw HTML or embeds.
+      features and no raw HTML or embeds.
 - [x] Wagtail Images alt/decorative validation and local rendition-backed
-  backend preview added.
+      backend preview added.
 - [x] Draft revisions, preview, immediate publication, revision restoration,
-  scheduled publication, and scheduled unpublication verified.
+      scheduled publication, and scheduled unpublication verified.
 - [x] Blog migration, model constraints, page hierarchy, admin form, and block
-  validation coverage added.
+      validation coverage added.
 - [x] Versioned anonymous live-only post list and slug detail API added.
 - [x] One reusable public visibility policy excludes draft, unpublished,
-  future, expired, and restricted pages.
+      future, expired, and restricted pages.
 - [x] Stable version 1.0 serialization covers metadata, deterministic tags,
-  fixed image renditions, and all 13 StreamField blocks.
+      fixed image renditions, and all 13 StreamField blocks.
 - [x] `wagtail-headless-preview` 0.9.0 integrated with Wagtail 7.4 redirect
-  previews while retaining the backend-template fallback mode.
+      previews while retaining the backend-template fallback mode.
 - [x] Opaque ten-minute credentials bind one immutable preview snapshot and
-  resolve with private/no-store responses.
+      resolve with private/no-store responses.
 - [x] Wagtail publish, update, slug change, unpublish, and expiry events create
-  signed revalidation records in a durable database outbox.
+      signed revalidation records in a durable database outbox.
 - [x] Retryable revalidation delivery and the
-  `process_revalidation_outbox` management command added.
+      `process_revalidation_outbox` management command added.
 - [x] Minimal Next.js 16.2.11 / React 19.2.8 App Router scaffold added with
-  strict TypeScript, Draft Mode entry/exit, diagnostic post preview, and HMAC
-  revalidation.
+      strict TypeScript, Draft Mode entry/exit, diagnostic post preview, and HMAC
+      revalidation.
 - [x] API contract and ADR 0002 documented.
 - [x] Milestone 3 audit remediated: explicit public-origin URLs, relative
-  pagination, end-to-end Unicode slugs, aligned stable-ID/current/previous-slug
-  cache tags, 32-byte revalidation secrets, environment-derived preview cookie
-  security, and expanded Docker build-context exclusions.
+      pagination, end-to-end Unicode slugs, aligned stable-ID/current/previous-slug
+      cache tags, 32-byte revalidation secrets, environment-derived preview cookie
+      security, and expanded Docker build-context exclusions.
 - [x] Tailwind CSS 4.3.3 and its PostCSS integration added without upgrading
-  Next.js 16.2.11 or React 19.2.8.
+      Next.js 16.2.11 or React 19.2.8.
 - [x] Mobile-first public shell added with system fonts, Feed/Bridge
-  navigation, an honestly disabled Login control, footer, skip link, visible
-  focus, and reduced-motion handling.
+      navigation, an honestly disabled Login control, footer, skip link, visible
+      focus, and reduced-motion handling.
 - [x] Typed public post-list client added with positive-page validation, the
-  `posts` list cache tag, granular detail cache tags, Unicode route boundaries,
-  and distinct 404/upstream handling.
+      `posts` list cache tag, granular detail cache tags, Unicode route boundaries,
+      and distinct 404/upstream handling.
 - [x] Server-rendered Feed added with semantic post cards, lead renditions,
-  tags as metadata, accessible pagination, and empty/loading/error/not-found
-  states.
+      tags as metadata, accessible pagination, and empty/loading/error/not-found
+      states.
 - [x] Public and Draft Mode post pages now share one exhaustive renderer for all
-  13 StreamField blocks; diagnostic JSON and internal identifiers were removed.
+      13 StreamField blocks; diagnostic JSON and internal identifiers were removed.
 - [x] Fixed responsive image renditions, decorative/contextual alt behavior,
-  accessible table headers, read-only checklists, safe links, and server-side
-  code highlighting with an unknown-language plain-text fallback added.
+      accessible table headers, read-only checklists, safe links, and server-side
+      code highlighting with an unknown-language plain-text fallback added.
 - [x] Per-post SEO, canonical, Open Graph article metadata, timestamps, tags,
-  images, and Draft Mode noindex metadata added.
+      images, and Draft Mode noindex metadata added.
 - [x] Bridge added with exactly eight approved external links, the reused
-  legacy SVG assets, and Yandex/Deeplay team labels.
+      legacy SVG assets, and Yandex/Deeplay team labels.
 - [x] Frontend coverage expanded from 37 to 65 Vitest tests, including every
-  block type, Feed/client/cache behavior, metadata, preview, Bridge, disabled
-  Login, and browser-bundle security boundaries.
+      block type, Feed/client/cache behavior, metadata, preview, Bridge, disabled
+      Login, and browser-bundle security boundaries.
 - [x] django-allauth 65.18.0 socialaccount integration added for Google and
-  GitHub with settings-only `APPS`, minimal scopes, Google PKCE/online access,
-  POST-only initiation, provider timeouts, and no retained tokens.
+      GitHub with settings-only `APPS`, minimal scopes, Google PKCE/online access,
+      POST-only initiation, provider timeouts, and no retained tokens.
 - [x] Public local allauth password/signup flows disabled with
-  `SOCIALACCOUNT_ONLY`; Django `ModelBackend` remains available for Wagtail and
-  Django administrator password login.
+      `SOCIALACCOUNT_ONLY`; Django `ModelBackend` remains available for Wagtail and
+      Django administrator password login.
 - [x] Verified provider emails safely match and connect existing users,
-  unverified emails are rejected, repeated login is idempotent, explicit
-  second-provider connection is available, and provider identities cannot be
-  reassigned between users.
+      unverified emails are rejected, repeated login is idempotent, explicit
+      second-provider connection is available, and provider identities cannot be
+      reassigned between users.
 - [x] Django database sessions, hardened production `__Host-` cookies, masked
-  CSRF delivery, one-proxy allauth client-IP trust, login session rotation, and
-  explicit production trusted-origin/credential requirements added.
+      CSRF delivery, one-proxy allauth client-IP trust, login session rotation, and
+      explicit production trusted-origin/credential requirements added.
 - [x] `GET /api/me/` and CSRF-protected `POST /api/auth/logout/` added with
-  private/no-store responses and minimal current-user/provider data.
+      private/no-store responses and minimal current-user/provider data.
 - [x] Backend-only canonical return-to validation requires exactly one leading
-  slash before and after strict decoding, then allowlists `/`, `/bridge`,
-  `/account`, and Unicode `/posts/<slug>` while rejecting network-path,
-  malformed/double-encoded, backslash, control-character, fragment, extra-path,
-  and internal-service targets.
+      slash before and after strict decoding, then allowlists `/`, `/bridge`,
+      `/account`, and Unicode `/posts/<slug>` while rejecting network-path,
+      malformed/double-encoded, backslash, control-character, fragment, extra-path,
+      and internal-service targets.
 - [x] Google and GitHub OAuth initiation/state/callback regression coverage
-  proves malicious `next` values are discarded and callbacks fall back to `/`.
+      proves malicious `next` values are discarded and callbacks fall back to `/`.
 - [x] Production OAuth credential validation trims values before fail-fast
-  checks, rejects missing/empty/whitespace-only values, guarantees both provider
-  `APPS`, and requires a finite positive provider timeout.
+      checks, rejects missing/empty/whitespace-only values, guarantees both provider
+      `APPS`, and requires a finite positive provider timeout.
 - [x] Fixed Next.js same-origin rewrites added only for `/accounts/*`,
-  `/api/me/`, and `/api/auth/logout/`, preserving the existing frontend API
-  routes.
+      `/api/me/`, and `/api/auth/logout/`, preserving the existing frontend API
+      routes.
 - [x] `/login`, `/account`, provider POST forms, connected-provider state,
-  unavailable/error states, responsive header auth state, accessible user menu,
-  expired-session recovery, and CSRF logout added.
+      unavailable/error states, responsive header auth state, accessible user menu,
+      expired-session recovery, and CSRF logout added.
 - [x] `promote_site_owner` safely and idempotently promotes only an existing
-  verified Google/GitHub user selected through `SITE_OWNER_EMAIL`.
+      verified Google/GitHub user selected through `SITE_OWNER_EMAIL`.
 - [x] OAuth setup, callback URLs, GitHub Environment names, session/API
-  contracts, and external application tasks documented without creating or
-  modifying provider applications or deployment secrets.
+      contracts, and external application tasks documented without creating or
+      modifying provider applications or deployment secrets.
 - [x] Concrete `Comment` model added with protected post/user identities,
-  direct top-level roots, derived reply mentions, soft deletion, moderation
-  state, UTC timestamps, database constraints, and stable indexes.
+      direct top-level roots, derived reply mentions, soft deletion, moderation
+      state, UTC timestamps, database constraints, and stable indexes.
 - [x] Anonymous comment/thread reads and session/CSRF-protected create, reply,
-  edit, and delete APIs added under exact versioned routes.
+      edit, and delete APIs added under exact versioned routes.
 - [x] The canonical public post visibility service gates every discussion
-  route; draft, unpublished, future, expired, and restricted posts remain 404.
+      route; draft, unpublished, future, expired, and restricted posts remain 404.
 - [x] Cursor pagination provides newest-first roots, oldest-first one-level
-  replies, relative links, and annotated reply counts/activity without N+1.
+      replies, relative links, and annotated reply counts/activity without N+1.
 - [x] Plain-text normalization, 5000-code-point limit, control-character
-  rejection, escaped React text rendering, hidden/deleted tombstones, and
-  no-op edit behavior added.
+      rejection, escaped React text rendering, hidden/deleted tombstones, and
+      no-op edit behavior added.
 - [x] Django Admin hide/unhide and user ban/unban actions added with ordinary
-  hard comment deletion disabled.
+      hard comment deletion disabled.
 - [x] Database-backed fixed-window per-user mutation limits added with one row
-  per `(user, scope)`, row locking, race-safe unique creation, `429`, and
-  `Retry-After`.
+      per `(user, scope)`, row locking, race-safe unique creation, `429`, and
+      `Retry-After`.
 - [x] Public post comments UI added with anonymous, authenticated, banned,
-  loading, empty, retry, validation, edit/delete, and cursor load-more states.
+      loading, empty, retry, validation, edit/delete, and cursor load-more states.
 - [x] Slack-style desktop drawer and mobile full-screen thread layer added with
-  pinned root/composer, one-level replies, mention labels, query-string
-  navigation, Escape/focus handling, safe-area padding, and scroll containment.
+      pinned root/composer, one-level replies, mention labels, query-string
+      navigation, Escape/focus handling, safe-area padding, and scroll containment.
 - [x] Comment and reply drafts survive OAuth/session expiry through bounded,
-  TTL-scoped `sessionStorage` namespaces and are never submitted automatically.
+      TTL-scoped `sessionStorage` namespaces and are never submitted automatically.
 - [x] Milestone 6 frontend remediation gives anonymous readers real root/reply
-  textareas, saves every change under `pending-auth`, migrates the newest draft
-  to the authenticated user after OAuth, and clears it only on submit/discard.
+      textareas, saves every change under `pending-auth`, migrates the newest draft
+      to the authenticated user after OAuth, and clears it only on submit/discard.
 - [x] Root, reply, edit, paste, counter, and draft paths share a 5000 Unicode
-  code-point limit without UTF-16 `maxlength` truncation or split surrogate
-  pairs.
+      code-point limit without UTF-16 `maxlength` truncation or split surrogate
+      pairs.
 - [x] Stable-ID reconciliation deduplicates optimistic and cursor-loaded
-  comments, refreshes server objects, preserves root/reply ordering, and
-  replaces thread activity summaries without double increments.
+      comments, refreshes server objects, preserves root/reply ordering, and
+      replaces thread activity summaries without double increments.
 - [x] Exact comment rewrites added without a generic `/api/:path*` proxy or
-  collision with auth, Draft Mode, or revalidation.
+      collision with auth, Draft Mode, or revalidation.
 - [x] Concrete protected `PostReaction` and `CommentReaction` tables added with
-  canonical emoji keys, uniqueness constraints, and aggregation/participant
-  indexes.
+      canonical emoji keys, uniqueness constraints, and aggregation/participant
+      indexes.
 - [x] NFC normalization and `emoji` 2.15.0 RGI validation support ZWJ,
-  modifiers, flags, keycaps, gender/variation sequences, while rejecting text,
-  multiple emoji, controls/bidi, lone components, and malformed input.
+      modifiers, flags, keycaps, gender/variation sequences, while rejecting text,
+      multiple emoji, controls/bidi, lone components, and malformed input.
 - [x] Anonymous aggregate reads, session/CSRF-protected transactional toggles,
-  exact private participant endpoints, stable relative cursors, and minimal
-  participant identity added.
+      exact private participant endpoints, stable relative cursors, and minimal
+      participant identity added.
 - [x] Target-row PostgreSQL locking, unique-constraint fallback, and a
-  database-backed 60-per-60-second reaction toggle limiter added.
+      database-backed 60-per-60-second reaction toggle limiter added.
 - [x] Comment/thread contracts embed reaction groups and viewer state through
-  bounded page-level queries; tombstones suppress UI, aggregates, participants,
-  and new toggles while retaining rows.
+      bounded page-level queries; tombstones suppress UI, aggregates, participants,
+      and new toggles while retaining rows.
 - [x] Wagtail `ReactionSettings` exposes exactly three validated distinct quick
-  reactions through a minimal public config endpoint.
+      reactions through a minimal public config endpoint.
 - [x] Post, top-level comment, and reply pills added with `aria-pressed`,
-  touch-sized quick/picker/participant controls, optimistic rollback, a
-  synchronous double-click guard, and authoritative response replacement.
+      touch-sized quick/picker/participant controls, optimistic rollback, a
+      synchronous double-click guard, and authoritative response replacement.
 - [x] The locally bundled Unicode 15 Emoji Mart dataset lazy-loads only when the
-  searchable keyboard picker opens; recent emoji are bounded and contain no
-  identity/session data.
+      searchable keyboard picker opens; recent emoji are bounded and contain no
+      identity/session data.
 - [x] OAuth reaction intent is TTL-scoped in `sessionStorage` by Unicode slug,
-  target type/ID, and emoji, then restored as an explicit confirmation instead
-  of an automatically replayed toggle.
+      target type/ID, and emoji, then restored as an explicit confirmation instead
+      of an automatically replayed toggle.
 - [x] Exact reaction rewrites preserve auth, comments, Draft Mode, preview, and
-  revalidation boundaries; Draft Mode renders no reaction UI.
+      revalidation boundaries; Draft Mode renders no reaction UI.
 - [x] ADR 0003 and the complete reaction API/security/concurrency contract are
-  documented.
+      documented.
 - [x] Milestone 7 remediation rejects every surrogate before UTF-8 encoding,
-  returns stable JSON 400 responses, and applies the same safe validator to
-  reaction model and Wagtail setting saves.
+      returns stable JSON 400 responses, and applies the same safe validator to
+      reaction model and Wagtail setting saves.
 - [x] Compact deterministic frontend sequence validation rejects malformed
-  stored ZWJ/flag/variation forms while preserving the full Emoji Mart dataset
-  behind its lazy picker boundary.
+      stored ZWJ/flag/variation forms while preserving the full Emoji Mart dataset
+      behind its lazy picker boundary.
 - [x] Pending reaction intent storage keeps one newest `createdAt` entry per
-  Unicode slug/target, clears the whole target on confirm/discard, and isolates
-  other targets.
+      Unicode slug/target, clears the whole target on confirm/discard, and isolates
+      other targets.
 - [x] Participant requests use abort/request identities, current-group cursor
-  checks, ID deduplication, target/close/unmount invalidation, Escape focus
-  restoration, and mouse/fine-pointer-only hover.
+      checks, ID deduplication, target/close/unmount invalidation, Escape focus
+      restoration, and mouse/fine-pointer-only hover.
 - [x] Comment reaction reconciliation now uses mutation revisions with
-  transient optimistic markers; matching authoritative/rollback results settle
-  them, later server aggregates refresh normally, and tombstones always win.
+      transient optimistic markers; matching authoritative/rollback results settle
+      them, later server aggregates refresh normally, and tombstones always win.
 - [x] A shared per-target frontend coordinator now gives duplicate list/thread
-  reaction controls one single-flight request, one globally unique mutation
-  revision, and lifecycle-independent authoritative/rollback settlement.
+      reaction controls one single-flight request, one globally unique mutation
+      revision, and lifecycle-independent authoritative/rollback settlement.
 - [x] Wagtail's current database search backend configured for PostgreSQL FTS
-  with the multilingual `simple` configuration and SQLite FTS5 test fallback.
+      with the multilingual `simple` configuration and SQLite FTS5 test fallback.
 - [x] Blog search weights fixed at title 10, excerpt 7, body 4, and related tag
-  names 2, with meaningful StreamField text extraction and service values
-  excluded.
+      names 2, with meaningful StreamField text extraction and service values
+      excluded.
 - [x] `/api/v1/posts/` now combines bounded Unicode `q`, exact Unicode `tag`,
-  page, and page-size parameters under the canonical live-only policy.
+      page, and page-size parameters under the canonical live-only policy.
 - [x] `/api/v1/tags/` returns stable live-only distinct post counts without
-  per-post/per-tag queries.
+      per-post/per-tag queries.
 - [x] Search/tag pagination stays relative, retains active parameters, uses
-  relevance plus `-pk` for search, and preserves publication ordering without
-  a query.
+      relevance plus `-pk` for search, and preserves publication ordering without
+      a query.
 - [x] The Feed is URL-driven for query, tag, and page; it includes accessible
-  submit/clear controls, semantic active tags, safe URL serialization,
-  noindex variants, and distinct invalid/empty/unknown/out-of-range/error
-  states.
+      submit/clear controls, semantic active tags, safe URL serialization,
+      noindex variants, and distinct invalid/empty/unknown/out-of-range/error
+      states.
 - [x] Every Feed list/search/filter/tag-count request keeps the existing
-  `posts` cache tag; publication reindexes tags after cluster relations commit
-  and uses the existing signed revalidation flow.
+      `posts` cache tag; publication reindexes tags after cluster relations commit
+      and uses the existing signed revalidation flow.
 - [x] Separate `subscriptions` app added with constrained/protected Subscriber,
-  EmailOutbox, EmailDelivery, EmailWebhookEvent, and HMAC-keyed anonymous
-  rate-limit persistence.
+      EmailOutbox, EmailDelivery, EmailWebhookEvent, and HMAC-keyed anonymous
+      rate-limit persistence.
 - [x] Trim/casefold/IDNA email normalization, case-insensitive database
-  uniqueness, 48-hour versioned purpose-bound confirmation, revocable
-  unsubscribe, cooldown, resubscribe, and non-bypassable suppression added.
+      uniqueness, 48-hour versioned purpose-bound confirmation, revocable
+      unsubscribe, cooldown, resubscribe, and non-bypassable suppression added.
 - [x] JSON-only same-origin CSRF APIs added for subscribe, confirm, and
-  unsubscribe with generic 202 enumeration resistance and `Retry-After`
-  database limits for anonymous email/IP scopes.
+      unsubscribe with generic 202 enumeration resistance and `Retry-After`
+      database limits for anonymous email/IP scopes.
 - [x] First-public-publication outbox trigger added with one-event database
-  uniqueness, immutable audience cutoff, and draft/future/republish/restricted
-  exclusions including due Wagtail scheduled publication.
+      uniqueness, immutable audience cutoff, and draft/future/republish/restricted
+      exclusions including due Wagtail scheduled publication.
 - [x] Bounded email worker added with PostgreSQL skip-locked claims, stale
-  reclaim, unique delivery creation, capped exponential retry, terminal
-  failure, per-delivery UUID idempotency keys, and a 23-hour ambiguity guard
-  under Resend's 24-hour key retention.
+      reclaim, unique delivery creation, capped exponential retry, terminal
+      failure, per-delivery UUID idempotency keys, and a 23-hour ambiguity guard
+      under Resend's 24-hour key retention.
 - [x] Replaceable memory/Resend adapters and escaped multipart confirmation and
-  publication templates added; publication mail contains title, excerpt,
-  canonical URL, normal unsubscribe, and RFC 8058 one-click headers.
+      publication templates added; publication mail contains title, excerpt,
+      canonical URL, normal unsubscribe, and RFC 8058 one-click headers.
 - [x] Bounded raw-body Svix webhook verification, replay window, durable event
-  ID deduplication, provider-message-only lookup, out-of-order-safe delivered /
-  bounce / complaint state, and subscriber suppression added without raw
-  provider payload retention.
+      ID deduplication, provider-message-only lookup, out-of-order-safe delivered /
+      bounce / complaint state, and subscriber suppression added without raw
+      provider payload retention.
 - [x] Read-only Django Admin history plus explicit unsubscribe/suppress/
-  unsuppress actions added with hard delete disabled.
+      unsuppress actions added with hard delete disabled.
 - [x] Accessible Feed/post forms and explicit fragment-credential confirmation
-  and unsubscribe pages added with generic states, CSRF, no browser
-  persistence, noindex/no-referrer, exact rewrites, and Draft Mode exclusion.
+      and unsubscribe pages added with generic states, CSRF, no browser
+      persistence, noindex/no-referrer, exact rewrites, and Draft Mode exclusion.
 - [x] Milestone 9 remediation snapshots message schema/FROM/origin/subject and
-  publication inputs on the outbox plus recipient/credential issue inputs on
-  each delivery; the exact compact Resend JSON fingerprint gates every retry
-  without persisting a raw signed credential.
+      publication inputs on the outbox plus recipient/credential issue inputs on
+      each delivery; the exact compact Resend JSON fingerprint gates every retry
+      without persisting a raw signed credential.
 - [x] Provider ambiguity now starts at immutable
-  `first_provider_attempt_at`, remains independent of mutable reclaim leases,
-  and enters explicit `manual_review` without provider I/O at the absolute
-  23-hour safety deadline or on payload mismatch.
+      `first_provider_attempt_at`, remains independent of mutable reclaim leases,
+      and enters explicit `manual_review` without provider I/O at the absolute
+      23-hour safety deadline or on payload mismatch.
 - [x] Resend response reads are bounded and official 409 variants are split:
-  `invalid_idempotent_request` is terminal,
-  `concurrent_idempotent_requests` is retryable, and unknown conflicts are
-  conservatively terminal without persisting provider bodies.
+      `invalid_idempotent_request` is terminal,
+      `concurrent_idempotent_requests` is retryable, and unknown conflicts are
+      conservatively terminal without persisting provider bodies.
 - [x] Authenticated recognized webhooks can wait durably for provider-ID
-  correlation, apply deterministically after worker settlement, suppress on
-  early bounce/complaint, and expire through a bounded seven-day
-  correlation/30-day retention command without storing raw payloads.
+      correlation, apply deterministically after worker settlement, suppress on
+      early bounce/complaint, and expire through a bounded seven-day
+      correlation/30-day retention command without storing raw payloads.
 - [x] Unsubscribe skips only unclaimed delivery work; row-locked settlement
-  records an accepted in-flight call honestly while the subscriber remains
-  unsubscribed and excluded from every later claim/publication.
+      records an accepted in-flight call honestly while the subscriber remains
+      unsubscribed and excluded from every later claim/publication.
 - [x] Publication delivery rechecks the canonical visibility policy immediately
-  before its first provider call and skips unpublished, expired, restricted,
-  future-scheduled, or no-longer-public posts without mutating the immutable
-  email snapshot.
+      before its first provider call and skips unpublished, expired, restricted,
+      future-scheduled, or no-longer-public posts without mutating the immutable
+      email snapshot.
 - [x] The second Milestone 9 remediation makes `EMAIL_FROM_ADDRESS` a
-  provider-independent, normalized, mandatory production message input while
-  keeping Resend API/webhook credentials conditional on the Resend adapter.
+      provider-independent, normalized, mandatory production message input while
+      keeping Resend API/webhook credentials conditional on the Resend adapter.
 - [x] Provider adapters now fingerprint their own exact deterministic request
-  bytes before I/O; Resend uses those bytes as its HTTP body, memory remains
-  local/test-only, and a replacement adapter must implement the same explicit
-  serialization boundary.
+      bytes before I/O; Resend uses those bytes as its HTTP body, memory remains
+      local/test-only, and a replacement adapter must implement the same explicit
+      serialization boundary.
 - [x] The third Milestone 9 remediation pins adapter contract identifier,
-  serializer contract version, and non-secret idempotency namespace on every
-  delivery; any provider/account/environment/version drift enters
-  `manual_review` before provider I/O even when body bytes match.
+      serializer contract version, and non-secret idempotency namespace on every
+      delivery; any provider/account/environment/version drift enters
+      `manual_review` before provider I/O even when body bytes match.
 - [x] Provider preparation now serializes exactly once per attempt into a
-  frozen bounded request; worker verification and Resend
-  `urllib.request.Request.data` use those same bytes, and `send()` cannot
-  reconstruct a body from mutable message inputs.
+      frozen bounded request; worker verification and Resend
+      `urllib.request.Request.data` use those same bytes, and `send()` cannot
+      reconstruct a body from mutable message inputs.
 - [x] Snapshot boundaries now store the full 265-character maximum publication
-  subject and long Unicode-slug fallback URLs without truncation, with
-  deterministic fail-fast limits independent of SQLite varchar behavior.
+      subject and long Unicode-slug fallback URLs without truncation, with
+      deterministic fail-fast limits independent of SQLite varchar behavior.
 - [x] `subscriptions.0002_harden_email_delivery` adds the snapshot,
-  fingerprint, ambiguity, manual-review, webhook-correlation, constraint, and
-  reconciliation indexes without modifying `0001_initial`; before any
-  push/deployment it was amended to create sender/subject at 512 characters and
-  post URL as text before its existing-data backfill.
+      fingerprint, ambiguity, manual-review, webhook-correlation, constraint, and
+      reconciliation indexes without modifying `0001_initial`; before any
+      push/deployment it was amended to create sender/subject at 512 characters and
+      post URL as text before its existing-data backfill.
 - [x] Additive `subscriptions.0003_bind_delivery_transport_identity` preserves
-  terminal legacy history under an explicit marker and quarantines legacy
-  `pending`/`processing` rows as `manual_review`; its reverse data operation
-  safely reduces retryable rows and transport-specific mismatch reasons to the
-  `0002`-compatible `manual_review`/`payload_mismatch` quarantine before
-  restoring old constraints.
+      terminal legacy history under an explicit marker and quarantines legacy
+      `pending`/`processing` rows as `manual_review`; its reverse data operation
+      safely reduces retryable rows and transport-specific mismatch reasons to the
+      `0002`-compatible `manual_review`/`payload_mismatch` quarantine before
+      restoring old constraints.
 - [x] ADR 0005 fixes one host-port-owning edge project plus separate staging
-  and production application projects, networks, volumes, databases, aliases,
-  S3/provider namespaces, and secrets without `container_name`.
+      and production application projects, networks, volumes, databases, aliases,
+      S3/provider namespaces, and secrets without `container_name`.
 - [x] Production non-root Django/worker, Node 24 Next standalone, and Nginx
-  edge images added with locked dependencies, exec-form commands, liveness
-  checks, immutable runtime filesystems, and no build-time production secrets.
+      edge images added with locked dependencies, exec-form commands, liveness
+      checks, immutable runtime filesystems, and no build-time production secrets.
 - [x] Runtime-dynamic Next metadata and routes allow one standalone artifact to
-  run with staging and production origins without embedding either origin or
-  the internal Django URL in browser assets.
+      run with staging and production origins without embedding either origin or
+      the internal Django URL in browser assets.
 - [x] Exact edge routes preserve Next Draft Mode/revalidation exceptions,
-  Django session/CSRF/OAuth/API ownership, S3 media redirects, immutable
-  collectstatic assets, trusted forwarding headers, and narrow staging Basic
-  Auth exceptions.
+      Django session/CSRF/OAuth/API ownership, S3 media redirects, immutable
+      collectstatic assets, trusted forwarding headers, and narrow staging Basic
+      Auth exceptions.
 - [x] Production S3-compatible Wagtail media storage added with separate
-  static/media backends, fail-fast environment validation, absolute public
-  URLs, and filesystem storage retained for local/test.
+      static/media backends, fail-fast environment validation, absolute public
+      URLs, and filesystem storage retained for local/test.
 - [x] One bounded management-command scheduler per environment independently
-  runs scheduled publishing, revalidation, email delivery, and webhook
-  reconciliation with structured output, capped backoff, SIGTERM, and atomic
-  heartbeat.
+      runs scheduled publishing, revalidation, email delivery, and webhook
+      reconciliation with structured output, capped backoff, SIGTERM, and atomic
+      heartbeat.
 - [x] Immutable release manifests, build-once digest publication, gated staging
-  rollout, staging attestation, and manual no-rebuild production promotion
-  replace the active Flask and migration-generation workflows.
+      rollout, staging attestation, and manual no-rebuild production promotion
+      replace the active Flask and migration-generation workflows.
 - [x] CI retains a fast SQLite job and adds PostgreSQL concurrency/search plus
-  empty/reverse/forward migration checks, frontend/audit/build checks, image
-  builds, Compose isolation, Nginx validation, and container smoke.
+      empty/reverse/forward migration checks, frontend/audit/build checks, image
+      builds, Compose isolation, Nginx validation, and container smoke.
 - [x] Repository scripts and runbooks cover bounded secret transfer, migration
-  order, custom-format PostgreSQL backup/integrity/retention, scratch-first
-  restore, staging drills, and image/database rollback separation.
+      order, custom-format PostgreSQL backup/integrity/retention, scratch-first
+      restore, staging drills, and image/database rollback separation.
 - [x] Milestone 10 remediation separates database/application/egress/edge
-  networks; worker outbound no longer depends on edge and integration has an
-  egress-only HTTP provider regression.
+      networks; worker outbound no longer depends on edge and integration has an
+      egress-only HTTP provider regression.
 - [x] Database-only Compose owns bootstrap/backup/restore without Django/Next
-  image interpolation; restore authenticates required metadata and SHA-256
-  before `createdb`, and first production backs up pinned PostgreSQL before its
-  first migration or public application start.
+      image interpolation; restore authenticates required metadata and SHA-256
+      before `createdb`, and first production backs up pinned PostgreSQL before its
+      first migration or public application start.
 - [x] Docker DNS, shared upstream zones, and resolving Nginx 1.29 servers remove
-  stale container IPs and keep absent staging/production hosts independent.
+      stale container IPs and keep absent staging/production hosts independent.
 - [x] Raw role-scoped control/PostgreSQL/Django/worker/Next env contracts
-  preserve bounded single-line bytes while preventing cross-service secret
-  exposure; Docker Compose 2.30.0 is the explicit minimum.
+      preserve bounded single-line bytes while preventing cross-service secret
+      exposure; Docker Compose 2.30.0 is the explicit minimum.
 - [x] Rollout is backup-first, one-migration, bounded-wait, readiness/health/
-  heartbeat/egress/digest gated and two-phase. Versioned bundles/runtime,
-  cross-workflow/server locking, and monotonic staging sequences make
-  activation and rollback independent of a server Git checkout.
+      heartbeat/egress/digest gated and two-phase. Versioned bundles/runtime,
+      cross-workflow/server locking, and monotonic staging sequences make
+      activation and rollback independent of a server Git checkout.
 - [x] Milestone 10 rollout-state remediation uses one fsynced atomic
-  `rollout-state.json`, immutable operation IDs/manifests, idempotent finalize,
-  exact application/edge component snapshots, retained failure evidence, and
-  explicit reviewed abort/recovery. First bootstrap refuses an unbound existing
-  PostgreSQL volume and resumes only the recorded attempt; backup metadata
-  distinguishes initial-empty, pre-migration, recovery, and manual evidence.
+      `rollout-state.json`, immutable operation IDs/manifests, idempotent finalize,
+      exact application/edge component snapshots, retained failure evidence, and
+      explicit reviewed abort/recovery. First bootstrap refuses an unbound existing
+      PostgreSQL volume and resumes only the recorded attempt; backup metadata
+      distinguishes initial-empty, pre-migration, recovery, and manual evidence.
 - [x] The remaining Milestone 10 bootstrap crash gap is closed: authorization
-  is durable before an explicit labeled `docker volume create`, PostgreSQL
-  Compose treats the volume as external, exact environment/role/bootstrap
-  operation/volume labels are verified on every use, authorized absence may
-  resume, and confirmed-ready disappearance or foreign adoption fails closed.
+      is durable before an explicit labeled `docker volume create`, PostgreSQL
+      Compose treats the volume as external, exact environment/role/bootstrap
+      operation/volume labels are verified on every use, authorized absence may
+      resume, and confirmed-ready disappearance or foreign adoption fails closed.
 - [x] Schema-3 `rollout-state.json` owns a database snapshot independent of
-  active application state, including absent/authorized/ready/migrated
-  lifecycle, volume/PostgreSQL/bootstrap identity, initial/last backup, and the
-  latest confirmed migration boundary.
+      active application state, including absent/authorized/ready/migrated
+      lifecycle, volume/PostgreSQL/bootstrap identity, initial/last backup, and the
+      latest confirmed migration boundary.
 - [x] Idempotent bounded failure evidence now closes every in-progress runtime
-  phase, releases the mutation lease, preserves candidate/base/database and
-  possible-side-effect snapshots, and transfers reviewed ownership to active-A
-  recovery, exact-candidate retry, or new-release fix-forward. Failed first
-  deployments remain recoverable with `active=null`; fix-forward takes a
-  recovery backup and cannot repeat initial-empty backup over an existing DB.
+      phase, releases the mutation lease, preserves candidate/base/database and
+      possible-side-effect snapshots, and transfers reviewed ownership to active-A
+      recovery, exact-candidate retry, or new-release fix-forward. Failed first
+      deployments remain recoverable with `active=null`; fix-forward takes a
+      recovery backup and cannot repeat initial-empty backup over an existing DB.
 - [x] CI remote rollout failure handling records evidence under the server lock
-  without replacing the original exit status; active-A internal recovery and
-  first-deploy retry/fix-forward repeat application, edge, health, and public
-  gates before idempotent finalize.
+      without replacing the original exit status; active-A internal recovery and
+      first-deploy retry/fix-forward repeat application, edge, health, and public
+      gates before idempotent finalize.
 - [x] The final two Milestone 10 resolution defects are closed: retry and
-  fix-forward accept a reviewed deployment sequence outside immutable runtime,
-  bind it to their operation ID, and preserve runtime bytes; schema-3 attempts
-  carry deep-validated activation policy so recovery retry lineages preserve
-  previous while deploy/rollback/fix-forward lineages rotate active to
-  previous.
+      fix-forward accept a reviewed deployment sequence outside immutable runtime,
+      bind it to their operation ID, and preserve runtime bytes; schema-3 attempts
+      carry deep-validated activation policy so recovery retry lineages preserve
+      previous while deploy/rollback/fix-forward lineages rotate active to
+      previous.
 - [x] Milestone 11 began with the baseline coverage matrix in
-  `docs/testing-security.md`; existing post/comment/thread/reaction/auth/
-  subscription and infrastructure proofs are reused rather than duplicated.
+      `docs/testing-security.md`; existing post/comment/thread/reaction/auth/
+      subscription and infrastructure proofs are reused rather than duplicated.
 - [x] Backend security gaps now cover CSRF-cookie-secret mismatch and
-  cross-origin CSRF (without incorrectly binding standard Django CSRF to the
-  login session), expired sessions, forbidden Unicode scalars,
-  site-author/owner/moderator
-  permissions, upload format/size/pixel limits, and metadata-free image
-  originals.
+      cross-origin CSRF (without incorrectly binding standard Django CSRF to the
+      login session), expired sessions, forbidden Unicode scalars,
+      site-author/owner/moderator
+      permissions, upload format/size/pixel limits, and metadata-free image
+      originals.
 - [x] PostgreSQL search, comment/reaction/rate-limit locking, and outbox claim
-  races are an explicit marker-selected CI suite; `PYTEST_FAIL_ON_SKIP=1`
-  turns any PostgreSQL skip into a required-job failure.
+      races are an explicit marker-selected CI suite; `PYTEST_FAIL_ON_SKIP=1`
+      turns any PostgreSQL skip into a required-job failure.
 - [x] The fast Playwright browser-contract matrix exercises anonymous reading,
-  mock Google/GitHub login, comments/threads/reactions, subscription
-  confirmation and unsubscribe, Draft Mode isolation, Feed
-  search/tags/pagination, keyboard traps/Escape/focus restoration, and axe at
-  375x812, 768x1024, 1440x900, and 1920x1080.
+      mock Google/GitHub login, comments/threads/reactions, subscription
+      confirmation and unsubscribe, Draft Mode isolation, Feed
+      search/tags/pagination, keyboard traps/Escape/focus restoration, and axe at
+      375x812, 768x1024, 1440x900, and 1920x1080.
 - [x] A separate required cross-stack Playwright suite uses real Django API
-  views, SQLite database sessions, standard CSRF, Next rewrites, and
-  persistence for Google/GitHub allauth callbacks, comment/reply/reaction,
-  subscription confirm/unsubscribe, and Draft Mode. Only OAuth provider and
-  email-transport inspection boundaries are test doubles; no production URL or
-  production setting includes a test helper.
+      views, SQLite database sessions, standard CSRF, Next rewrites, and
+      persistence for Google/GitHub allauth callbacks, comment/reply/reaction,
+      subscription confirm/unsubscribe, and Draft Mode. Only OAuth provider and
+      email-transport inspection boundaries are test doubles; no production URL or
+      production setting includes a test helper.
 - [x] Browser screenshots and traces are failure-only, video is disabled, and
-  retained artifacts are streamed and scanned (including ZIP entries and raw
-  image bytes) for Playwright URL/JSON cookie/header representations, OAuth and
-  signed credentials, provider sentinels, secret names, and internal origins.
-  Plain/ZIP/entry/count/declared/actual limits, encryption, corruption, and
-  short reads fail closed without whole-file decompression. Unsafe files are
-  removed before a second scan. Upload still requires
-  `artifacts.outcome == success`; any enumeration/ZIP/read/removal/scanner
-  failure skips upload and fails CI. Raw binary string search is not represented
-  as visual pixel/OCR inspection.
+      retained artifacts are streamed and scanned (including ZIP entries and raw
+      image bytes) for Playwright URL/JSON cookie/header representations, OAuth and
+      signed credentials, provider sentinels, secret names, and internal origins.
+      Plain/ZIP/entry/count/declared/actual limits, encryption, corruption, and
+      short reads fail closed without whole-file decompression. Unsafe files are
+      removed before a second scan. Upload still requires
+      `artifacts.outcome == success`; any enumeration/ZIP/read/removal/scanner
+      failure skips upload and fails CI. Raw binary string search is not represented
+      as visual pixel/OCR inspection.
 - [x] CI retains the exact Next.js proxy allowlist without a broad `/api/*`
-  rewrite, runs the full Compose/Nginx/PostgreSQL/backup-recovery/MinIO/egress/
-  restart suite, and exposes one `ci-required` result that fails unless every
-  mandatory Milestone 11 job succeeds.
+      rewrite, runs the full Compose/Nginx/PostgreSQL/backup-recovery/MinIO/egress/
+      restart suite, and exposes one `ci-required` result that fails unless every
+      mandatory Milestone 11 job succeeds.
 - [x] Stage 14A part 1 establishes shared visual tokens, responsive shell,
-  mandatory light/dark themes, navigation/footer, compact Feed, Bridge, and
-  their shared UI states.
+      mandatory light/dark themes, navigation/footer, compact Feed, Bridge, and
+      their shared UI states.
 - [x] Theme selection follows the first-visit system preference, persists only
-  after a manual choice, initializes before paint without a hydration mismatch,
-  and remains keyboard-accessible beside anonymous and authenticated controls.
+      after a manual choice, initializes before paint without a hydration mismatch,
+      and remains keyboard-accessible beside anonymous and authenticated controls.
 - [x] Bridge team history moved out of main content into a semantic,
-  route-specific footer that is regression-tested against ordinary routes.
+      route-specific footer that is regression-tested against ordinary routes.
 
 ## Milestone transition
 
-Milestone 11, functional Stage 13A acceptance, Stages 14A–14C, and Stage 16
-staging acceptance are complete. Stage 15 is implemented and moving through
-its final verification and staging-only acceptance sequence. The pre-Stage-15
-active staging release is
-`43f5a05213f13d7c5129ddebd05955fc3186de82`.
+Milestone 11, functional Stage 13A acceptance, Stages 14A–18, and Stage 19A
+staging acceptance are complete. The active application release is
+`f59c6cf0139490e4b8da6e130cd45ef37f8c4b35`.
 
 ### Next recommended session
 
-After Stage 15 acceptance, perform the separately scoped small Stage 16
-remediation: remove the three suggested/quick reactions and retain one picker
-button. Then proceed to Stage 17. Do not combine either task with Stage 15.
+Stage 19B is the next separately scoped session: a Reddit-like Wagtail CMS
+editor with a writing-first layout and compact Rich Text toolbar, using only
+supported Wagtail 7.4 extension points while preserving all 13 StreamField
+blocks, revisions, preview, scheduling, and rollback. Do not combine it with
+Stage 19A remediation or public-cache work.
 
 ### Exit criteria
 
-- Stage 15 required CI and mandatory PostgreSQL coverage pass.
-- A checked staging PostgreSQL backup precedes the migration.
-- The immutable staging-only rollout and schema-3 attestation pass with both
-  staging gates restored to false.
-- Controlled no-notification CMS QA proves archive dates, preview, publication,
-  revisions, cache movement, and durable suppression without changing real
-  user posts or provider state.
+- Stage 19B retains every existing public/Draft/revalidation contract and all
+  Wagtail publication/revision behavior.
+- All 13 StreamField block types remain round-trip compatible.
+- Required CI, controlled staging-only CMS acceptance, closed gates, and
+  production/catalog/data boundaries pass independently of Stage 19A.
 
 ## Milestone queue
 
@@ -1913,17 +2186,25 @@ button. Then proceed to Stage 17. Do not combine either task with Stage 15.
 - [x] Functional staging acceptance and launch.
 - [ ] Milestone 12 — visual design and polish.
   - [x] Stage 14A part 1 — tokens, light/dark themes, shell, Feed, Bridge, and
-    shared states.
+        shared states.
   - [x] Stage 14B — mobile shell/gutters, simplified header/Feed/icon-only
-    Bridge, Bridge footer rows, and Feed post reaction hydration; accepted on
-    staging.
-  - [ ] Stage 15 — implementation complete; CI/staging acceptance in progress.
+        Bridge, Bridge footer rows, and Feed post reaction hydration; accepted on
+        staging.
+  - [x] Stage 15 — editorial workflow and archive publications accepted on
+        staging.
   - [x] Stage 16 — custom static/animated reaction catalog accepted on staging.
   - [x] Stage 16 remediation — remove three suggested reactions and retain one
-    picker button; explicitly outside Stage 15.
+        picker button; explicitly outside Stage 15.
   - [x] Stage 17 — expansion, compatibility, activation, exact-routing
-    remediation, required CI, attested staging rollout, and controlled live
-    account/email acceptance completed.
+        remediation, required CI, attested staging rollout, and controlled live
+        account/email acceptance completed.
+  - [x] Stage 18 — post-MVP stabilization, recovery/browser audit, and closing
+        docs-only CI completed.
+  - [x] Stage 19A — public navigation/cache, infinite Feed/search, reaction UX,
+        subscriptions/footer, required CI, attested rollout, and live acceptance.
+  - [ ] Stage 19B — Reddit-like Wagtail CMS editor; writing-first layout,
+        compact Rich Text toolbar, supported Wagtail 7.4 extension points, and all
+        13 blocks/revisions/preview/scheduling/rollback preserved.
 
 ## Known risks
 
@@ -1934,10 +2215,12 @@ button. Then proceed to Stage 17. Do not combine either task with Stage 15.
   batch read leaves the public post cards usable and emits no repeated
   card-level error, so aggregate state can be temporarily absent during a
   reaction-service failure.
-- Detailed post blocks, comments/threads, reaction/participant surfaces,
-  login/account, and the subscription flow intentionally retain their prior
-  structure until later visual slices; shared tokens affect their base colors
-  but do not constitute detailed redesign acceptance.
+- Infinite Feed still consumes the page-number API. Stable-ID deduplication
+  prevents duplicates in the rendered list but cannot guarantee a gap-free
+  snapshot if publication reorders pages between requests.
+- Detailed post blocks, comment composition/thread structure, and login/account
+  forms retain their prior information architecture; Stage 19A changed public
+  performance and compact reaction behavior, not those product flows.
 - Feed titles are a deliberately restrained experiment. The owner may remove
   them after judging real content density against the intended Slack-channel
   rhythm.

@@ -25,6 +25,7 @@ local development stack.
 - `/` — searchable feed of published posts
 - `/posts/<slug>` — full post, reactions, comments, and Slack-style threads
 - `/bridge` — links to external profiles
+- `/subscriptions/` — anonymous double-opt-in subscription entry
 - Local email/password accounts plus Google and GitHub login
 - Required unique public nicknames and verified-email interaction boundary
 - Wagtail desktop authoring with revisions, preview, and scheduling
@@ -54,6 +55,7 @@ Do not copy that note into the repository.
 - [ADR 0006: Manifest-managed custom reaction catalog](docs/decisions/0006-manifest-managed-reaction-catalog.md)
 - [ADR 0007: Editorial dates and publication-email decisions](docs/decisions/0007-editorial-dates-and-publication-email-decision.md)
 - [ADR 0008: Local identity, nicknames, and auth email](docs/decisions/0008-local-identity-nicknames-and-auth-email.md)
+- [ADR 0009: Public navigation, cache, and infinite Feed](docs/decisions/0009-public-navigation-cache-and-infinite-feed.md)
 - [Reaction catalog asset runbook](docs/reaction-catalog-runbook.md)
 - [Email provider and DNS setup](docs/email-setup.md)
 - [Deployment and rollback](docs/deployment-runbook.md)
@@ -100,9 +102,10 @@ The implemented rewrite is available under `backend/django/`,
 - public-origin canonical/media URLs through `PUBLIC_SITE_URL`, with
   origin-independent relative pagination links;
 - a public Next.js 16.2.11 App Router shell with Tailwind CSS 4.3.3;
-- a server-rendered URL-driven searchable/tag-filtered Feed with accessible
-  controls and pagination, plus full post pages with all 13 typed StreamField
-  renderers;
+- an SSR-first searchable Feed with persistent client navigation, infinite
+  page loading, accessible manual fallback, browser-history restoration, and
+  no visible tag or page controls, plus full post pages with all 13 typed
+  StreamField renderers;
 - responsive 480/960/1440 rendition rendering, accessible content tables,
   read-only checklists, and server-rendered syntax highlighting with a safe
   plain-text fallback;
@@ -121,10 +124,10 @@ The implemented rewrite is available under `backend/django/`,
 - concrete post/comment catalog reactions with transactional target locks,
   grouped descriptors/viewer state, private cursor-paginated participants,
   preserved legacy Unicode rows, and Wagtail quick-reaction settings;
-- accessible post/comment/reply reaction pills, lazy static/animated assets, a
-  lazy searchable custom picker, bounded catalog-ID recents, reduced-motion
-  poster enforcement, optimistic rollback, and confirmation-based OAuth
-  continuation;
+- accessible compact post/comment/reply reaction pills, lazy static/animated
+  assets, a persistent prefetched searchable custom picker with dismissable
+  desktop/mobile layers, bounded catalog-ID recents, reduced-motion poster
+  enforcement, optimistic rollback, and confirmation-based OAuth continuation;
 - an accessible desktop thread drawer and mobile full-screen thread layer with
   pinned root/composer, focus restoration, query-string navigation, and
   sessionStorage-backed pending OAuth drafts;
@@ -147,9 +150,9 @@ The implemented rewrite is available under `backend/django/`,
   `EMAIL_FROM_ADDRESS`, multipart templates, Resend idempotency keys, RFC 8058
   one-click headers, and delivery, bounce/complaint webhook handling through
   exact raw-body Svix verification;
-- accessible Feed/post subscription forms and explicit noindex/no-referrer
-  confirmation and unsubscribe pages with no Draft Mode requests or browser
-  credential persistence;
+- one accessible `/subscriptions/` entry form and explicit
+  noindex/no-referrer confirmation and unsubscribe pages with no Draft Mode
+  requests or browser credential persistence;
 - locked production and development dependencies;
 - non-root Django/worker and Node 24 standalone images plus a shared Nginx
   edge image;
@@ -359,12 +362,14 @@ npm run dev
 
 The public frontend includes:
 
-- `/` — the server-rendered URL-driven public Feed with accessible search,
-  tag filters, and pagination;
+- `/` — the SSR-first public Feed with IME-safe client search, infinite loading,
+  an accessible manual fallback, and no visible hashtags or page controls;
 - `/posts/[slug]` — public and private Draft Mode post rendering;
 - `/bridge` — an icon-only grid of eight accessible profile links; the shared
   footer on this and every other public route contains only the two team
   history rows;
+- `/subscriptions/` — the only public subscription form; Feed and post pages
+  link to it rather than embedding a form;
 - `/api/draft` and `/api/draft/disable`;
 - signed `POST /api/revalidate`;
 - `/login`, `/signup`, `/account`, `/account/profile`, email verification,
@@ -372,17 +377,22 @@ The public frontend includes:
   forms plus Google/GitHub POST initiation and provider connection state;
 - client-side comments below public posts and a responsive Slack-style thread
   layer; comments are deliberately omitted from Draft Mode;
-- post, comment, and reply reactions with quick actions, local lazy picker,
-  participants, recent catalog reactions, and no Draft Mode reaction UI;
+- post, comment, and reply aggregate reactions with one picker trigger,
+  explicit-activation participants, shared warm catalog/module caches, and no
+  suggested/quick or Draft Mode reaction UI;
 - a keyboard/touch accessible current-user menu and CSRF-protected logout;
 - loading, upstream error, empty, and not-found states.
 
 OAuth initiation is a normal CSRF-protected browser POST to django-allauth. The
 OAuth redirect is never sent through client-side fetch.
 
-Every Feed list/search/tag-count fetch uses only the `posts` cache tag. Public
-post details use only `post-slug:<slug>`. Draft snapshots are resolved
-server-to-server with `cache: "no-store"` and never enter the public cache.
+Next.js Cache Components place Feed list/search/tag metadata and post detail in
+explicit `"use cache"` scopes. Public scopes carry `posts`, detail slug, and
+stable post-ID tags for signed publish/update/unpublish/expiry/rename
+invalidation. Draft snapshots are resolved server-to-server with
+`cache: "no-store"` and never enter the public cache. Viewer-specific auth,
+comments, reactions, and participants remain private browser queries segmented
+by authenticated identity.
 
 `REVALIDATION_SECRET` must contain at least 32 UTF-8 bytes. Django and Next.js
 reject a shorter runtime production value. Production preview cookies are

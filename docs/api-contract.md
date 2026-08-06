@@ -58,6 +58,14 @@ The list never contains `body`. `next` and `previous` are relative API URLs,
 such as `/api/v1/posts/?q=django&tag=python&page=2`; they never include an
 origin and preserve every active supported parameter.
 
+The page-number and tag parameters remain a backward-compatible transport and
+backend-filtering contract. The Stage 19A public UI does not expose tags,
+hashtags, page numbers, Next, or Previous. It server-renders page one and then
+follows only a validated same-origin relative `next` through an infinite Feed.
+It deduplicates by stable post ID but does not claim snapshot consistency when
+publication occurs between page reads. A legacy browser URL removes `tag` and
+`page`, preserves a single valid `q`, and does not submit an invisible filter.
+
 ```json
 {
   "count": 1,
@@ -80,8 +88,8 @@ origin and preserve every active supported parameter.
         "is_site_author": true
       },
       "tags": [
-        {"name": "Django", "slug": "django"},
-        {"name": "Wagtail", "slug": "wagtail"}
+        { "name": "Django", "slug": "django" },
+        { "name": "Wagtail", "slug": "wagtail" }
       ],
       "canonical_path": "/posts/stable-api-contract",
       "canonical_url": "https://kirillwynn.com/posts/stable-api-contract",
@@ -112,12 +120,12 @@ perform language-specific stemming.
 
 `BlogPostPage` uses these explicit boosts:
 
-| Content | Boost |
-| --- | ---: |
-| title | 10 |
-| excerpt | 7 |
-| body text | 4 |
-| tag names | 2 |
+| Content   | Boost |
+| --------- | ----: |
+| title     |    10 |
+| excerpt   |     7 |
+| body text |     4 |
+| tag names |     2 |
 
 PostgreSQL maps all project boost values into its four A/B/C/D weight levels.
 Body indexing includes rich text with markup stripped, headings, image
@@ -182,8 +190,8 @@ request URL resolve the same resource. A slug never contains `/`.
     "is_site_author": true
   },
   "tags": [
-    {"name": "Django", "slug": "django"},
-    {"name": "Wagtail", "slug": "wagtail"}
+    { "name": "Django", "slug": "django" },
+    { "name": "Wagtail", "slug": "wagtail" }
   ],
   "canonical_path": "/posts/stable-api-contract",
   "canonical_url": "https://kirillwynn.com/posts/stable-api-contract",
@@ -200,12 +208,12 @@ request URL resolve the same resource. A slug never contains `/`.
     {
       "id": "018f7279-2fdb-7ad0-84e3-fd935f078be5",
       "type": "heading",
-      "value": {"level": "h2", "text": "Contract"}
+      "value": { "level": "h2", "text": "Contract" }
     },
     {
       "id": "018f7279-5f7a-740c-b3ec-a76d4f424875",
       "type": "rich_text",
-      "value": {"html": "<p>Expanded display HTML.</p>"}
+      "value": { "html": "<p>Expanded display HTML.</p>" }
     }
   ]
 }
@@ -233,6 +241,31 @@ permissions, and moderation metadata are never serialized. A nickname change
 invalidates Feed and every live post owned by that user through the durable
 post revalidation boundary; preview resolution remains private and uncached.
 
+### Public frontend cache consumer
+
+The Next.js 16 frontend enables Cache Components. List/search, available-tag
+metadata, and detail fetchers execute inside explicit `"use cache"` scopes with
+30-second stale, 60-second revalidation, and 24-hour expiry values. Lists,
+searches, and tag metadata use `posts`; details use `posts`,
+`post-slug:<slug>`, and the response-derived `post:<page-id>` tag. Cache tags on
+an inner `fetch` are retained for compatibility but are not treated as the
+cache boundary by themselves.
+
+The first Feed/search page is SSR data and seeds a persistent browser query.
+Later pages are viewer-independent public queries. Search query keys use the
+normalized Unicode text, and a query change aborts or isolates old requests so
+a stale response cannot replace the current result. Browser URL synchronization
+uses `history.pushState`/`popstate` and does not start an RSC navigation per
+keystroke. Direct search URLs remain server-rendered, canonicalize to `/`, and
+are `noindex`.
+
+Authenticated/session data is never stored in this shared cache. `/api/me/` is
+a private root-session query that is removed or refreshed at every known
+identity boundary. Comments, threads, reaction aggregates, toggles, and
+participants remain private browser queries whose keys include `anonymous` or
+`user:<stable-id>`; login, logout, session expiry, or an identity change removes
+the previous viewer namespace.
+
 ## Session authentication
 
 Browser authentication uses Django database-backed sessions and standard Django
@@ -252,8 +285,8 @@ Anonymous response:
   "authenticated": false,
   "user": null,
   "providers": {
-    "google": {"available": true, "connected": false},
-    "github": {"available": true, "connected": false}
+    "google": { "available": true, "connected": false },
+    "github": { "available": true, "connected": false }
   },
   "csrf_token": "<masked token>"
 }
@@ -279,8 +312,8 @@ Authenticated response:
     "can_interact": true
   },
   "providers": {
-    "google": {"available": true, "connected": true},
-    "github": {"available": true, "connected": false}
+    "google": { "available": true, "connected": true },
+    "github": { "available": true, "connected": false }
   },
   "csrf_token": "<masked token>"
 }
@@ -358,7 +391,12 @@ inactive account, and banned account return the same generic 400. A successful
 login rotates the database session and returns:
 
 ```json
-{"status":"authenticated","next":"/","requires_profile_completion":false,"csrf_token":"<new masked token>"}
+{
+  "status": "authenticated",
+  "next": "/",
+  "requires_profile_completion": false,
+  "csrf_token": "<new masked token>"
+}
 ```
 
 For an incomplete migrated local profile,
@@ -503,7 +541,7 @@ mutation returns `403`.
 Replies use `kind: "reply"`, the direct top-level `thread_root_id`, and:
 
 ```json
-{"reply_to": {"id": 43, "display_name": "Selected participant"}}
+{ "reply_to": { "id": 43, "display_name": "Selected participant" } }
 ```
 
 The backend derives `reply_to` from the selected comment. Caller-supplied
@@ -534,7 +572,7 @@ Cursor links are relative. Page size is fixed at 20. `reply_count` and
 `POST` accepts exactly:
 
 ```json
-{"body": "A plain-text comment"}
+{ "body": "A plain-text comment" }
 ```
 
 Success is `201`. Publication is immediate. Body normalization changes CRLF and
@@ -639,7 +677,7 @@ expired, restricted, and unknown targets return 404.
 Toggle payloads accept exactly:
 
 ```json
-{"reaction_id": "pepeclap"}
+{ "reaction_id": "pepeclap" }
 ```
 
 Unexpected or missing fields are rejected. `reaction_id` must be the exact
@@ -688,7 +726,7 @@ with `alt=""`.
 The GET response is:
 
 ```json
-{"reactions": []}
+{ "reactions": [] }
 ```
 
 Toggle adds the viewer's `(post, catalog item)` row when absent and removes it
@@ -824,11 +862,13 @@ the previous request; stale successes and failures cannot update the current
 group.
 Cursor pages are accepted only for the current group and are deduplicated by
 participant ID. Escape closes the participant surface and returns focus to its
-trigger. Post-detail, comment, and thread surfaces retain their fine-pointer
-hover/focus behavior. The compact Feed surface is stricter: hover,
+trigger. On every post, Feed, comment, reply, and thread surface, hover,
 `pointerenter`, focus alone, and a synthetic mouse event after touch neither
-open participants nor issue a participant request. Feed participants open only
-after click/tap or the native Enter/Space activation of the count button.
+open participants nor issue a participant request. Participants open only
+after click/tap or native Enter/Space activation of the exact count button.
+Outside pointer dismissal consumes the closing event so it cannot activate an
+underlying reaction control; an intentional click on another focusable element
+is not overridden by forced restoration to the old trigger.
 Any reaction mutation event for the displayed target closes the current
 participant surface before applying the optimistic or authoritative snapshot,
 so a removed or replaced aggregate cannot leave a stale participant dialog.
@@ -900,6 +940,10 @@ ETag: "<sha256>"
 ```
 
 They do not vary on `Cookie`; an exact `If-None-Match` receives `304`.
+The staging/integration edge has an exact allowlisted catalog location that
+preserves this upstream ETag and cache policy. The general `/api/v1/` private
+policy still applies to reaction aggregates, participants, comments, and
+session data; no wildcard public reaction exception exists.
 
 Post detail, top-level comment, reply, and thread instances render only
 existing aggregate pills with counts plus exactly one compact `Choose
@@ -907,9 +951,13 @@ reaction` picker trigger. A surface with no aggregate renders only that
 trigger. No suggested reaction descriptor or image is rendered before the
 picker opens. Feed remains aggregate-only and has no picker trigger.
 
-The picker is lazy-loaded and fetches the catalog only after explicit opening,
-or when a valid pending catalog ID is not already present in the current
-aggregate groups and therefore needs restoration. Pending restoration uses the
+The picker shell is part of the reaction bar and appears before its lazy module
+or catalog resolves. The lazy module and catalog query are started in parallel
+after browser idle or pointer-enter/focus/pointer-down intent; Save-Data skips
+idle/hover prefetch but an explicit opening may load them. Neither prefetch
+loads reaction images. One persistent module promise and one shared React Query
+catalog key serve duplicate bars and survive public route navigation. A valid
+pending catalog ID not present in aggregate groups restores through this same
 catalog endpoint, never the deprecated config endpoint.
 Search uses display and accessibility labels. Posters and static assets are
 intersection-gated: an offscreen picker item has no image element or `src`,
@@ -958,7 +1006,10 @@ initialization. A limit response is 429 with integer `Retry-After`.
 Subscription responses are `private, no-store`, JSON-only, and never return an
 email, subscriber UUID, provider data, or internal lifecycle state.
 
-This remediation does not change any public route or response shape.
+Stage 19A does not change an API response shape. It moves the anonymous form to
+the public `/subscriptions/` page; Feed and post pages no longer embed it.
+Viewing that page performs no subscription mutation. Confirmation and
+unsubscribe paths and their explicit POST-only mutation boundary are unchanged.
 Production email configuration uses provider-independent
 `EMAIL_FROM_ADDRESS`; it is snapshotted before outbox creation and validated
 before a transaction can reach a database constraint. Maximum authored titles
@@ -972,7 +1023,7 @@ This anonymous browser endpoint still requires the normal same-origin CSRF
 token. It accepts exactly:
 
 ```json
-{"email": "reader@example.com"}
+{ "email": "reader@example.com" }
 ```
 
 Email input is trimmed, limited to 320 Unicode code points, validated, and
@@ -995,7 +1046,7 @@ suppressed identities cannot self-reactivate.
 Accepts exactly:
 
 ```json
-{"credential": "<opaque confirmation credential>"}
+{ "credential": "<opaque confirmation credential>" }
 ```
 
 The credential is purpose-bound, subscriber-bound, versioned, and expires
@@ -1077,21 +1128,21 @@ payloads are never stored.
 Every block has exactly `id`, `type`, and `value`. `id` is Wagtail's stable
 StreamField block UUID.
 
-| `type` | Exact `value` shape |
-| --- | --- |
-| `rich_text` | `{"html": "<p>Wagtail-expanded display HTML</p>"}` |
-| `heading` | `{"level": "h2" \| "h3" \| "h4", "text": "..."}` |
-| `image` | image representation below |
-| `gallery` | `{"images": [<image>, ...]}` |
-| `quote` | `{"text": "...", "attribution": "..." \| null}` |
-| `bulleted_list` | `{"items": ["...", "..."]}` |
-| `numbered_list` | `{"items": ["...", "..."]}` |
-| `checklist` | `{"items": [{"text": "...", "checked": true}]}` |
-| `inline_code` | `{"code": "..."}` |
-| `code_block` | `{"language": "python", "code": "..."}` |
-| `table` | `{"rows": [["A", "B"]], "header": {"row": true, "column": false}}` |
-| `horizontal_divider` | `{}` |
-| `link` | link representation below |
+| `type`               | Exact `value` shape                                                |
+| -------------------- | ------------------------------------------------------------------ |
+| `rich_text`          | `{"html": "<p>Wagtail-expanded display HTML</p>"}`                 |
+| `heading`            | `{"level": "h2" \| "h3" \| "h4", "text": "..."}`                   |
+| `image`              | image representation below                                         |
+| `gallery`            | `{"images": [<image>, ...]}`                                       |
+| `quote`              | `{"text": "...", "attribution": "..." \| null}`                    |
+| `bulleted_list`      | `{"items": ["...", "..."]}`                                        |
+| `numbered_list`      | `{"items": ["...", "..."]}`                                        |
+| `checklist`          | `{"items": [{"text": "...", "checked": true}]}`                    |
+| `inline_code`        | `{"code": "..."}`                                                  |
+| `code_block`         | `{"language": "python", "code": "..."}`                            |
+| `table`              | `{"rows": [["A", "B"]], "header": {"row": true, "column": false}}` |
+| `horizontal_divider` | `{}`                                                               |
+| `link`               | link representation below                                          |
 
 Rich text uses Wagtail `expand_db_html`. The authoring block enables only bold,
 italic, and link features; there is no raw HTML block.
@@ -1103,7 +1154,7 @@ Internal links use frontend routes:
   "text": "Read next",
   "kind": "internal",
   "href": "/posts/next-post",
-  "target": {"id": 43, "type": "blog.blogpostpage", "slug": "next-post"}
+  "target": { "id": 43, "type": "blog.blogpostpage", "slug": "next-post" }
 }
 ```
 
@@ -1152,7 +1203,7 @@ HTTP(S) S3/CDN URLs are returned unchanged.
 `POST /api/v1/preview/resolve/`
 
 ```json
-{"credential": "<opaque short-lived credential>"}
+{ "credential": "<opaque short-lived credential>" }
 ```
 
 On success, the response body is exactly the detail contract. It always sends:
@@ -1166,7 +1217,7 @@ Invalid, expired, tampered, wrong-page, and wrong-content-type credentials all
 return:
 
 ```json
-{"detail": "Preview is unavailable."}
+{ "detail": "Preview is unavailable." }
 ```
 
 with status 404. Public post endpoints do not accept preview credentials.
@@ -1212,13 +1263,13 @@ Next.js accepts the default 300-second window and derives only:
 - `post-slug:<previous_slug>` when a rename supplies a distinct previous slug;
 - paths `/`, `/posts/<slug>`, and the optional previous-slug post path.
 
-All list/search/filter variants and the available-tag fetch use `posts`;
-detail fetches use their `post-slug:<slug>` tag without the global list tag.
-Stable-ID tags remain available to caches keyed by page identity. Publication,
-update (including body, tags, or original publication date), privacy
-transitions, unpublication, and expiry therefore invalidate Feed results
-without accepting tags or paths from a browser. This keeps one post update
-from evicting every cached detail.
+All list/search/filter variants and the available-tag fetch use `posts`.
+Stage 19A detail scopes also use `posts`, `post-slug:<slug>`, and the
+response-derived stable `post:<page_id>` tag. Publication, update (including
+body, tags, author display, or original publication date), privacy transitions,
+unpublication, expiry, and slug rename therefore invalidate the shared Feed and
+the affected current/previous detail identities without accepting tags or
+paths from a browser.
 
 Current and previous slugs may use Unicode letters and numbers, `-`, and `_`,
 up to 255 Unicode code points. Slash, backslash, control characters, empty

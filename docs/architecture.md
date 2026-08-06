@@ -276,7 +276,7 @@ Next.js owns all public presentation.
 
 Use Server Components for:
 
-- feed;
+- the first Feed/search page;
 - bridge;
 - post content;
 - metadata.
@@ -288,13 +288,15 @@ Use Client Components only where browser interaction is required:
 - comments;
 - thread panels;
 - reactions;
+- infinite Feed pages and browser-history search;
 - subscription forms.
 
 Public routes:
 
 - `/`;
 - `/posts/[slug]`;
-- `/bridge`.
+- `/bridge`;
+- `/subscriptions/`.
 
 ### Responsive behavior
 
@@ -302,6 +304,7 @@ The public interface is mobile-first.
 
 Required reference viewports:
 
+- 320x812;
 - 375x812;
 - 768x1024;
 - 1440x900;
@@ -323,6 +326,18 @@ Preview endpoints must:
 
 Publishing and unpublishing trigger signed on-demand revalidation in Next.js.
 At the initial single-instance scale, no distributed cache is required.
+
+Next.js 16 Cache Components provide the explicit shared public scope for list,
+search, tag metadata, and detail. Draft resolution is `private, no-store`.
+Viewer-specific auth, comments, reaction aggregates, toggles, and participants
+stay outside that scope and remain identity-partitioned browser queries. The
+SSR first Feed page seeds a persistent infinite query; subsequent page-number
+API reads are single-flight, abortable, same-origin-relative, and deduplicated
+by post ID without claiming snapshot consistency. ADR 0009 defines client
+navigation, search history, scroll restoration, prefetch, and cache ownership.
+Safe route-data prefetch does not authorize eager destination media: Bridge
+images remain lazy/async so a Feed-side RSC prefetch cannot emit or consume all
+eight image preloads.
 
 ### Milestone 3 content boundary
 

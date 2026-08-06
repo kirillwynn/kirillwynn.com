@@ -7,6 +7,9 @@ Date: 2026-07-29
 Amended: 2026-07-31 (retired suggested reactions from the public UI while
 retaining rollback compatibility)
 
+Amended: 2026-08-06 (persistent catalog/module cache, Slack-like sizing, and
+coherent light-dismiss behavior)
+
 Supersedes: ADR 0003's public Unicode identity, picker, and storage contract.
 ADR 0003 remains the historical contract for preserved legacy rows and the
 concurrency, privacy, visibility, pagination, and OAuth safeguards retained
@@ -97,14 +100,14 @@ checks source SHA-256; identifies PNG, WebP, and GIF by bytes rather than
 extension; validates exact container EOF; and fully verifies/decodes every
 frame. Limits are:
 
-| Boundary | Limit |
-| --- | ---: |
-| source and each normalized object | 512 KiB |
-| width or height | 512 px |
-| source animation frames | 160 |
-| normalized duration | 10 seconds |
-| cumulative decoded RGBA cost | 64 MiB |
-| minimum normalized frame delay | 20 ms |
+| Boundary                          |      Limit |
+| --------------------------------- | ---------: |
+| source and each normalized object |    512 KiB |
+| width or height                   |     512 px |
+| source animation frames           |        160 |
+| normalized duration               | 10 seconds |
+| cumulative decoded RGBA cost      |     64 MiB |
+| minimum normalized frame delay    |      20 ms |
 
 Static PNG/WebP becomes lossless sRGB WebP. Animated input must be GIF and
 becomes a looping, optimized sRGB GIF plus a lossless WebP first-frame poster.
@@ -158,7 +161,7 @@ quick item is rejected until another quick set is chosen.
 Mutations accept exactly:
 
 ```json
-{"reaction_id": "pepeclap"}
+{ "reaction_id": "pepeclap" }
 ```
 
 Unicode, shortcodes, filenames, URLs, keys, and client objects are rejected.
@@ -192,6 +195,9 @@ toggles, and participants remain `private, no-store` and `Vary: Cookie`. ADR
 anonymous reads, Django session/CSRF mutation boundary, active/non-banned
 policy, canonical visibility, hidden/deleted behavior, rate limit,
 target-row locking, bounded Feed batch, and participant pagination continue.
+The edge preserves the catalog headers through one exact allowlisted route;
+the general API policy remains private and no viewer endpoint inherits this
+exception.
 
 ### Frontend and browser storage
 
@@ -210,10 +216,29 @@ it cannot present an active feature. Physical removal is deferred to a
 separate cleanup migration after the rollback window; this amendment performs
 no data migration or catalog sync.
 
-The picker is a lazy application chunk and fetches only the enabled catalog.
-Search uses names/labels; keyboard, touch, Escape, and focus restoration are
-supported. Catalog pages use lazy images, and full-size binaries are not part
-of the initial route or browser bundle.
+The picker content is a lazy application chunk and fetches only the enabled
+catalog, while its lightweight shell opens synchronously. Browser idle or
+pointer-enter/focus/pointer-down intent starts the module and public catalog in
+parallel; Save-Data suppresses speculative idle/hover work. The module promise
+and React Query catalog entry are shared by duplicate bars and persist through
+Feed, Bridge, and post client navigation. Prefetch never starts image requests.
+
+Desktop uses an anchored dismissable popover and mobile uses a focus-trapped,
+safe-area-aware bottom sheet. Outside pointer/backdrop, Escape, trigger toggle,
+icon-only close, and selection dismiss it. Inside clicking, typing, and
+scrolling do not. The outside event cannot click through to a covered reaction
+button. Escape and selection restore the exact trigger; an intentional click
+on another focusable element keeps that new focus. Request generations prevent
+a late catalog or mutation result from updating a closed/unmounted instance.
+
+Aggregate pills and the sole picker trigger use one base visual contract on
+post, top-level comment, reply, thread root, and thread reply: approximately
+30 px visual size, 16 px image, 12 px count, and at least 44 by 44 px
+interactive area. Search uses names/labels; keyboard and touch are supported.
+The search field keeps a visible caret and a soft surface change without an
+orange outline, recolored border, glow, or shadow. Catalog pages use
+intersection-gated images, and full-size binaries are not part of the initial
+route or browser bundle.
 
 Static assets render directly. Animated reactions render their poster until
 visible/active. Picker animation is limited to the focused, hovered, or
@@ -226,7 +251,8 @@ Recent reactions and OAuth pending intent use versioned catalog-ID-only
 storage. Legacy Unicode entries are removed/ignored without mapping. TTL,
 target isolation, explicit confirm/discard, no automatic replay, optimistic
 rollback, shared target coordinator, stale settlement defense, duplicate
-instances, participant abort/dedupe/focus, Feed explicit activation,
+instances, participant abort/dedupe/focus, explicit click/tap/Enter/Space-only
+participant activation on every surface,
 tombstones, and Draft Mode suppression remain.
 
 ### Staging activation outcome
