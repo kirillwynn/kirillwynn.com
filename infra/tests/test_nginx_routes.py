@@ -36,6 +36,24 @@ def test_exact_frontend_api_exceptions_precede_django_api_prefixes():
             ) < contents.index("location ^~ /api/v1/")
 
 
+def test_staging_catalog_is_the_only_public_api_v1_cache_exception():
+    contents = config("staging.conf")
+    exact = "location = /api/v1/reactions/catalog/"
+    assert contents.index(exact) < contents.index("location ^~ /api/v1/")
+    block = contents[contents.index(exact) :]
+    block = block[: block.index("\n    }")]
+    assert "proxy_pass http://staging_django;" in block
+    assert "proxy_hide_header" not in block
+    assert "add_header Cache-Control" not in block
+
+    generic = contents[contents.index("location ^~ /api/v1/") :]
+    generic = generic[: generic.index("\n    }")]
+    assert 'add_header Cache-Control "private, no-store" always;' in generic
+
+    integration = (ROOT / "infra" / "nginx" / "integration.conf").read_text()
+    assert integration.index(exact) < integration.index("location ^~ /api/v1/")
+
+
 def test_django_and_static_routes_are_explicit():
     for name in ("production.conf", "staging.conf"):
         contents = config(name)

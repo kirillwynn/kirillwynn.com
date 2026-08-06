@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { createServer } from "node:http";
+import { setTimeout as delay } from "node:timers/promises";
 import { URL, URLSearchParams } from "node:url";
 
 const host = "127.0.0.1";
@@ -10,6 +11,12 @@ let state;
 
 function reset() {
     state = {
+        requests: [],
+        activePostListRequests: 0,
+        maxConcurrentPostListRequests: 0,
+        publicPostPublished: true,
+        publicPostSlug: "testing-secure-systems",
+        publicPostTitle: "Testing secure systems",
         nextCommentId: 20,
         postReactionCount: 1,
         localAccount: null,
@@ -158,7 +165,42 @@ const posts = [
         tags: [{ name: "Django", slug: "django" }],
         body: "Delivery remains idempotent.",
     }),
+    ...Array.from({ length: 6 }, (_, index) => {
+        const ordinal = index + 3;
+        return post({
+            id: ordinal,
+            slug: `archive-entry-${String(ordinal)}`,
+            title: `Archive entry ${String(ordinal)}`,
+            excerpt: `A deterministic older Feed page ${String(ordinal)}.`,
+            tags: [{ name: "Archive", slug: "archive" }],
+            body: `Archive body ${String(ordinal)}.`,
+        });
+    }),
 ];
+
+function currentPosts() {
+    return posts
+        .filter((value) => value.id !== 1 || state.publicPostPublished)
+        .map((value) =>
+            value.id === 1
+                ? {
+                      ...value,
+                      slug: state.publicPostSlug,
+                      title: state.publicPostTitle,
+                      canonical_path: `/posts/${state.publicPostSlug}`,
+                      canonical_url: `http://localhost:3100/posts/${state.publicPostSlug}`,
+                      seo: {
+                          ...value.seo,
+                          title: state.publicPostTitle,
+                      },
+                      open_graph: {
+                          ...value.open_graph,
+                          title: state.publicPostTitle,
+                      },
+                  }
+                : value,
+        );
+}
 
 const previewPost = post({
     id: 1,
@@ -194,10 +236,17 @@ async function body(request) {
 
 function withViewer(request, value) {
     const owner = value.author.id === 2;
-    return { ...value, viewer: viewer(request, owner) };
+    return {
+        ...value,
+        reactions:
+            value.id === 10 || value.id === 11
+                ? [commentReactionGroup(request, value.id)]
+                : value.reactions,
+        viewer: viewer(request, owner),
+    };
 }
 
-const reactionCatalog = [
+const primaryReactionCatalog = [
     {
         id: "pepeclap",
         name: "Pepe clap",
@@ -233,6 +282,24 @@ const reactionCatalog = [
     },
 ];
 
+const reactionCatalog = [
+    ...primaryReactionCatalog,
+    ...Array.from({ length: 225 }, (_, index) => {
+        const ordinal = index + 4;
+        return {
+            id: `catalog-${String(ordinal).padStart(3, "0")}`,
+            name: `Catalog reaction ${String(ordinal)}`,
+            label: `Catalog reaction ${String(ordinal)}`,
+            kind: "static",
+            asset_url: `/media/reactions/catalog-${String(ordinal)}/hash/asset.webp`,
+            poster_url: `/media/reactions/catalog-${String(ordinal)}/hash/asset.webp`,
+            width: 64,
+            height: 64,
+            version: `sha256-catalog-${String(ordinal)}`,
+        };
+    }),
+];
+
 function reactionGroup(request) {
     return {
         reaction: reactionCatalog[0],
@@ -240,6 +307,15 @@ function reactionGroup(request) {
         viewer_reacted: isAuthenticated(request) && state.postReactionCount > 1,
         participants:
             "/api/v1/posts/testing-secure-systems/reactions/pepeclap/participants/",
+    };
+}
+
+function commentReactionGroup(request, commentId) {
+    return {
+        reaction: reactionCatalog[0],
+        count: 1,
+        viewer_reacted: false,
+        participants: `/api/v1/comments/${String(commentId)}/reactions/pepeclap/participants/`,
     };
 }
 
@@ -270,6 +346,35 @@ createServer(async (request, response) => {
         json(response, 200, { ok: true });
         return;
     }
+    if (path === "/__metrics") {
+        json(response, 200, {
+            max_concurrent_post_list_requests:
+                state.maxConcurrentPostListRequests,
+            requests: state.requests,
+        });
+        return;
+    }
+    if (path === "/__content" && request.method === "POST") {
+        const payload = JSON.parse(await body(request));
+        if (typeof payload.published === "boolean") {
+            state.publicPostPublished = payload.published;
+        }
+        if (typeof payload.slug === "string" && payload.slug) {
+            state.publicPostSlug = payload.slug;
+        }
+        if (typeof payload.title === "string" && payload.title) {
+            state.publicPostTitle = payload.title;
+        }
+        json(response, 200, {
+            published: state.publicPostPublished,
+            slug: state.publicPostSlug,
+            title: state.publicPostTitle,
+        });
+        return;
+    }
+    state.requests.push(
+        `${request.method ?? "GET"} ${url.pathname}${url.search}`,
+    );
     if (path === "/__oauth-incomplete" && request.method === "POST") {
         state.providerProfileComplete = false;
         json(response, 200, { ok: true });
@@ -528,35 +633,48 @@ createServer(async (request, response) => {
         return;
     }
     if (path === "/api/v1/posts/" && request.method === "GET") {
-        const query = url.searchParams.get("q")?.toLocaleLowerCase() ?? "";
-        if (query === "force-upstream-error") {
-            json(response, 503, { detail: "Deterministic upstream failure" });
-            return;
-        }
-        const tag = url.searchParams.get("tag");
-        const page = Number(url.searchParams.get("page") ?? "1");
-        const filtered = posts.filter(
-            (value) =>
-                (!query ||
-                    `${value.title} ${value.excerpt}`
-                        .toLocaleLowerCase()
-                        .includes(query)) &&
-                (!tag || value.tags.some((item) => item.slug === tag)),
+        state.activePostListRequests += 1;
+        state.maxConcurrentPostListRequests = Math.max(
+            state.maxConcurrentPostListRequests,
+            state.activePostListRequests,
         );
-        const pageResults =
-            query || tag ? filtered : filtered.slice(page - 1, page);
-        json(response, 200, {
-            count: filtered.length,
-            next:
-                !query && !tag && page < filtered.length
-                    ? `/api/v1/posts/?page=${String(page + 1)}`
-                    : null,
-            previous:
-                !query && !tag && page > 1
-                    ? `/api/v1/posts/?page=${String(page - 1)}`
-                    : null,
-            results: pageResults.map(listItem),
-        });
+        const query = url.searchParams.get("q")?.toLocaleLowerCase() ?? "";
+        await delay(query === "slow archive" ? 800 : 40);
+        try {
+            if (query === "force-upstream-error") {
+                json(response, 503, {
+                    detail: "Deterministic upstream failure",
+                });
+                return;
+            }
+            const tag = url.searchParams.get("tag");
+            const page = Number(url.searchParams.get("page") ?? "1");
+            const availablePosts = currentPosts();
+            const filtered = availablePosts.filter(
+                (value) =>
+                    (!query ||
+                        `${value.title} ${value.excerpt}`
+                            .toLocaleLowerCase()
+                            .includes(query)) &&
+                    (!tag || value.tags.some((item) => item.slug === tag)),
+            );
+            const pageResults =
+                query || tag ? filtered : filtered.slice(page - 1, page);
+            json(response, 200, {
+                count: filtered.length,
+                next:
+                    !query && !tag && page < filtered.length
+                        ? `/api/v1/posts/?page=${String(page + 1)}`
+                        : null,
+                previous:
+                    !query && !tag && page > 1
+                        ? `/api/v1/posts/?page=${String(page - 1)}`
+                        : null,
+                results: pageResults.map(listItem),
+            });
+        } finally {
+            state.activePostListRequests -= 1;
+        }
         return;
     }
     if (path === "/api/v1/tags/" && request.method === "GET") {
@@ -581,7 +699,9 @@ createServer(async (request, response) => {
     }
     const postDetail = path.match(/^\/api\/v1\/posts\/([^/]+)\/$/);
     if (postDetail && request.method === "GET") {
-        const found = posts.find((value) => value.slug === postDetail[1]);
+        const found = currentPosts().find(
+            (value) => value.slug === postDetail[1],
+        );
         json(response, found ? 200 : 404, found ?? { detail: "Not found" });
         return;
     }
@@ -590,10 +710,19 @@ createServer(async (request, response) => {
         return;
     }
     if (path === "/api/v1/reactions/catalog/" && request.method === "GET") {
-        json(response, 200, {
-            version: "sha256-browser-contract",
-            results: reactionCatalog,
-        });
+        json(
+            response,
+            200,
+            {
+                version: "sha256-browser-contract",
+                results: reactionCatalog,
+            },
+            {
+                "Cache-Control":
+                    "public, max-age=300, stale-while-revalidate=3600",
+                ETag: '"sha256-browser-contract"',
+            },
+        );
         return;
     }
     if (path === "/api/v1/reactions/posts/" && request.method === "GET") {
@@ -602,7 +731,7 @@ createServer(async (request, response) => {
             .map((value) => Number(value));
         json(response, 200, {
             results: ids
-                .map((id) => posts.find((value) => value.id === id))
+                .map((id) => currentPosts().find((value) => value.id === id))
                 .filter(Boolean)
                 .map((value) => ({
                     post_id: value.id,
@@ -740,7 +869,10 @@ createServer(async (request, response) => {
         /^\/api\/v1\/comments\/\d+\/reactions\/$/.test(path) &&
         request.method === "GET"
     ) {
-        json(response, 200, { reactions: [] });
+        const commentId = Number(path.split("/")[4]);
+        json(response, 200, {
+            reactions: [commentReactionGroup(request, commentId)],
+        });
         return;
     }
     if (
@@ -766,6 +898,20 @@ createServer(async (request, response) => {
         request.method === "POST"
     ) {
         json(response, 200, { status: "unsubscribed" });
+        return;
+    }
+
+    if (path.startsWith("/media/reactions/") && request.method === "GET") {
+        response.writeHead(200, {
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Type": "image/gif",
+        });
+        response.end(
+            Buffer.from(
+                "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "base64",
+            ),
+        );
         return;
     }
 

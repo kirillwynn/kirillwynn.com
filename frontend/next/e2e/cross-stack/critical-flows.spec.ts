@@ -387,7 +387,7 @@ test("real subscription endpoints persist confirm and unsubscribe transitions", 
     page,
 }, testInfo) => {
     const email = `cross-stack-${String(testInfo.retry)}@example.test`;
-    await page.goto("/");
+    await page.goto("/subscriptions/");
     await page.getByRole("textbox", { name: "Email address" }).fill(email);
     await page.getByRole("button", { name: "Subscribe" }).click();
     await expect(page.getByText("Check your inbox.")).toBeVisible();

@@ -7,8 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/components/auth-provider";
 import { FeedStream } from "@/components/feed-stream";
 import type { MeResponse } from "@/lib/auth";
-import type { PostListItem } from "@/lib/content-contract";
+import type { PostListItem, PostListResponse } from "@/lib/content-contract";
 import { resetReactionMutationCoordinatorForTests } from "@/lib/reaction-mutation-coordinator";
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
 const signedIn: MeResponse = {
     authenticated: true,
@@ -117,10 +119,20 @@ function renderFeed(
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
+    const initialFeed: PostListResponse = {
+        count: posts.length,
+        next: null,
+        previous: null,
+        results: posts,
+    };
     act(() => {
         root.render(
             <AuthProvider>
-                <FeedStream loadReactions={loadReactions} posts={posts} />
+                <FeedStream
+                    initialFeed={initialFeed}
+                    initialQuery=""
+                    loadReactions={loadReactions}
+                />
             </AuthProvider>,
         );
     });
@@ -129,7 +141,16 @@ function renderFeed(
 
 beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("scrollTo", vi.fn());
     resetReactionMutationCoordinatorForTests();
+    vi.stubGlobal(
+        "matchMedia",
+        vi.fn().mockReturnValue({
+            matches: false,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        }),
+    );
     (
         globalThis as typeof globalThis & {
             IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -253,26 +274,8 @@ describe("Feed reaction hydration", () => {
             container,
             "View 1 participant for Clapping",
         );
-        const pill = participants?.closest(".reaction-pill");
         act(() => {
             participants?.focus();
-            const touchDown = new Event("pointerdown", { bubbles: true });
-            Object.defineProperty(touchDown, "pointerType", {
-                value: "touch",
-            });
-            pill?.dispatchEvent(touchDown);
-            const touchUp = new Event("pointerup", { bubbles: true });
-            Object.defineProperty(touchUp, "pointerType", {
-                value: "touch",
-            });
-            pill?.dispatchEvent(touchUp);
-            const syntheticMouse = new Event("pointerover", {
-                bubbles: true,
-            });
-            Object.defineProperty(syntheticMouse, "pointerType", {
-                value: "mouse",
-            });
-            pill?.dispatchEvent(syntheticMouse);
         });
         await waitFor(() => document.activeElement === participants);
         expect(

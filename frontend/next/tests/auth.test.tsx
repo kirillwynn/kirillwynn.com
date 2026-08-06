@@ -10,6 +10,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { ProviderForm } from "@/components/provider-form";
 import { SiteHeader } from "@/components/site-header";
 import { authErrorMessage, type MeResponse, safeReturnTo } from "@/lib/auth";
+import { PUBLIC_URL_CHANGE_EVENT } from "@/lib/feed-browser";
 
 let currentPath = "/";
 let currentSearch = "";
@@ -83,6 +84,7 @@ async function flushEffects(): Promise<void> {
 beforeEach(() => {
     currentPath = "/";
     currentSearch = "";
+    window.history.replaceState({}, "", "/");
     vi.stubGlobal("fetch", vi.fn());
     (
         globalThis as typeof globalThis & {
@@ -212,7 +214,7 @@ describe("header auth behavior", () => {
     });
 
     it("keeps the anonymous Login return route synchronized with live search", async () => {
-        currentSearch = "q=%E6%97%A5%E6%9C%AC";
+        window.history.replaceState({}, "", "/?q=%E6%97%A5%E6%9C%AC");
         const { container, root } = await renderWithAuth(
             <SiteHeader />,
             anonymous,
@@ -227,11 +229,9 @@ describe("header auth behavior", () => {
         };
         expect(loginTarget()).toBe("/?q=日本");
 
-        currentSearch = "q=stage18-no-result";
+        window.history.pushState({}, "", "/?q=stage18-no-result");
         act(() => {
-            root.render(
-                createElement(AuthProvider, null, createElement(SiteHeader)),
-            );
+            window.dispatchEvent(new Event(PUBLIC_URL_CHANGE_EVENT));
         });
         await flushEffects();
 

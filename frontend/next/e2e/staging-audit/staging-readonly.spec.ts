@@ -2,7 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import {
+    expect,
+    test,
+    type Locator,
+    type Page,
+    type TestInfo,
+} from "@playwright/test";
 
 function observeBrowserFailures(page: Page) {
     const failures: string[] = [];
@@ -32,6 +38,31 @@ async function expectNoOverflow(page: Page) {
 async function expectAccessible(page: Page) {
     const result = await new AxeBuilder({ page }).analyze();
     expect(result.violations).toEqual([]);
+}
+
+async function expectSlackReactionGeometry(pill: Locator) {
+    await expect(pill).toBeVisible();
+    const geometry = await pill.evaluate((element) => {
+        const target = element.getBoundingClientRect();
+        const visual = getComputedStyle(element, "::before");
+        const asset = element.querySelector(".reaction-pill__asset");
+        const count = element.querySelector(".reaction-pill__count");
+        return {
+            asset: asset ? Number.parseFloat(getComputedStyle(asset).width) : 0,
+            count: count
+                ? Number.parseFloat(getComputedStyle(count).fontSize)
+                : 0,
+            target: target.height,
+            visual: Number.parseFloat(visual.height),
+        };
+    });
+    expect(geometry.target).toBeGreaterThanOrEqual(44);
+    expect(geometry.visual).toBeGreaterThanOrEqual(28);
+    expect(geometry.visual).toBeLessThanOrEqual(32);
+    expect(geometry.asset).toBeGreaterThanOrEqual(15);
+    expect(geometry.asset).toBeLessThanOrEqual(16);
+    expect(geometry.count).toBeGreaterThanOrEqual(12);
+    expect(geometry.count).toBeLessThanOrEqual(13);
 }
 
 async function expectHydrated(page: Page) {
@@ -76,17 +107,17 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
 }, testInfo) => {
     await page.addInitScript(() => {
         const auditWindow = window as Window & {
-            __stage18LayoutShift?: number;
-            __stage18LayoutShiftObserver?: PerformanceObserver;
-            __stage18LayoutShiftSupported?: boolean;
+            __stage19LayoutShift?: number;
+            __stage19LayoutShiftObserver?: PerformanceObserver;
+            __stage19LayoutShiftSupported?: boolean;
         };
-        auditWindow.__stage18LayoutShift = 0;
-        auditWindow.__stage18LayoutShiftSupported =
+        auditWindow.__stage19LayoutShift = 0;
+        auditWindow.__stage19LayoutShiftSupported =
             PerformanceObserver.supportedEntryTypes.includes("layout-shift");
-        if (!auditWindow.__stage18LayoutShiftSupported) {
+        if (!auditWindow.__stage19LayoutShiftSupported) {
             return;
         }
-        auditWindow.__stage18LayoutShiftObserver = new PerformanceObserver(
+        auditWindow.__stage19LayoutShiftObserver = new PerformanceObserver(
             (list) => {
                 for (const entry of list.getEntries()) {
                     const shift = entry as PerformanceEntry & {
@@ -94,14 +125,14 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
                         value?: number;
                     };
                     if (!shift.hadRecentInput) {
-                        auditWindow.__stage18LayoutShift =
-                            (auditWindow.__stage18LayoutShift ?? 0) +
+                        auditWindow.__stage19LayoutShift =
+                            (auditWindow.__stage19LayoutShift ?? 0) +
                             (shift.value ?? 0);
                     }
                 }
             },
         );
-        auditWindow.__stage18LayoutShiftObserver.observe({
+        auditWindow.__stage19LayoutShiftObserver.observe({
             type: "layout-shift",
             buffered: true,
         });
@@ -221,12 +252,12 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
     );
     const layoutShift = await page.evaluate(() => {
         const auditWindow = window as Window & {
-            __stage18LayoutShift?: number;
-            __stage18LayoutShiftSupported?: boolean;
+            __stage19LayoutShift?: number;
+            __stage19LayoutShiftSupported?: boolean;
         };
         return {
-            supported: auditWindow.__stage18LayoutShiftSupported ?? false,
-            value: auditWindow.__stage18LayoutShift ?? 0,
+            supported: auditWindow.__stage19LayoutShiftSupported ?? false,
+            value: auditWindow.__stage19LayoutShift ?? 0,
         };
     });
     expect(layoutShift.supported).toBe(true);
@@ -262,12 +293,72 @@ test("public shell, security headers, focus, theme, and accessibility", async ({
     expect(failures).toEqual([]);
 });
 
-test("Unicode live search, history, filters, pagination, empty and 404 states", async ({
+test("client navigation, infinite Feed, Unicode history, legacy normalization, subscriptions, and 404", async ({
     page,
-}) => {
+}, testInfo) => {
     const failures = observeBrowserFailures(page);
+    const documents: string[] = [];
+    const requests: string[] = [];
+    page.on("request", (request) => {
+        const url = new URL(request.url());
+        requests.push(url.pathname + url.search);
+        if (request.resourceType() === "document") {
+            documents.push(url.pathname);
+        }
+    });
+
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expectHydrated(page);
+    const initialFeedCount = await page.locator(".feed-entry").count();
+    expect(initialFeedCount).toBeGreaterThan(0);
+    await expect(page.locator(".feed-tag, .feed-pagination")).toHaveCount(0);
+    await expect(page.getByText(/^Page \d+$/)).toHaveCount(0);
+    await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Previous", { exact: true })).toHaveCount(0);
+    await expect(
+        page.getByRole("textbox", { name: "Email address" }),
+    ).toHaveCount(0);
+    await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+    await page.waitForTimeout(750);
+    const appendedFeedCount = await page.locator(".feed-entry").count();
+    expect(appendedFeedCount).toBeGreaterThanOrEqual(initialFeedCount);
+
+    await page.locator("header").evaluate((element) => {
+        element.setAttribute("data-stage19-shell", "persistent");
+    });
+    await page.locator("footer").evaluate((element) => {
+        element.setAttribute("data-stage19-shell", "persistent");
+    });
+    const postLink = page.locator(".feed-entry-title a").last();
+    await postLink.scrollIntoViewIfNeeded();
+    const feedScrollBeforePost = await page.evaluate(() => window.scrollY);
+    const postNavigationStartedAt = Date.now();
+    await postLink.click();
+    await expect(page.locator("article")).toBeVisible();
+    const postClientNavigationMs = Date.now() - postNavigationStartedAt;
+    const postBackStartedAt = Date.now();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator(".feed-entry")).toHaveCount(appendedFeedCount);
+    await expect
+        .poll(async () => {
+            const restored = await page.evaluate(() => window.scrollY);
+            return Math.abs(restored - feedScrollBeforePost) <= 3;
+        })
+        .toBe(true);
+    const postBackMs = Date.now() - postBackStartedAt;
+    await expect(page.locator("header")).toHaveAttribute(
+        "data-stage19-shell",
+        "persistent",
+    );
+    await expect(page.locator("footer")).toHaveAttribute(
+        "data-stage19-shell",
+        "persistent",
+    );
+    await expect(page.getByLabel("Loading account")).toHaveCount(0);
+
     const search = page.getByRole("searchbox", { name: "Search posts" });
     await search.fill("東京");
     await expect(page).toHaveURL(/\?q=%E6%9D%B1%E4%BA%AC$/);
@@ -283,41 +374,77 @@ test("Unicode live search, history, filters, pagination, empty and 404 states", 
         })
         .toBe("/?q=東京");
 
+    const meBeforeNavigation = requests.filter(
+        (request) => request === "/api/me/",
+    ).length;
+    const bridgeNavigationStartedAt = Date.now();
     await page.getByRole("link", { name: "Bridge", exact: true }).click();
+    await expect(page).toHaveURL(/\/bridge$/);
+    const bridgeClientNavigationMs = Date.now() - bridgeNavigationStartedAt;
+    const bridgeBackStartedAt = Date.now();
     await page.goBack();
     await expect(page).toHaveURL(/\?q=%E6%9D%B1%E4%BA%AC$/);
+    await expect(search).toHaveValue("東京");
+    const bridgeBackMs = Date.now() - bridgeBackStartedAt;
     await page.goForward();
     await expect(page).toHaveURL(/\/bridge$/);
     await page.goBack();
+    expect(documents).toEqual(["/"]);
+    expect(requests.filter((request) => request === "/api/me/").length).toBe(
+        meBeforeNavigation,
+    );
+    await expect(
+        page.locator('[class*="skeleton"], [aria-label="Loading feed"]'),
+    ).toHaveCount(0);
 
-    await search.fill("stage18-no-result-7f3e");
-    await expect(page).toHaveURL(/stage18-no-result-7f3e$/);
+    await search.fill("stage19-no-result-7f3e");
+    await expect(page).toHaveURL(/stage19-no-result-7f3e$/);
     await expect(page.getByText(/No posts/i)).toBeVisible();
     await expect(page.getByText("Clear search", { exact: true })).toHaveCount(
         0,
     );
 
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-    await expectHydrated(page);
-    const firstTag = page.locator(".feed-tag").nth(1);
-    await expect(firstTag).toBeVisible();
-    await firstTag.click();
-    await expect(page).toHaveURL(/\?tag=/);
-    const nextPage = page.getByRole("link", { name: "Next →" });
-    if (await nextPage.isVisible().catch(() => false)) {
-        await nextPage.click();
-        await expect(page).toHaveURL(/(?:\?|&)page=2(?:&|$)/);
-    }
+    await page.goto("/?tag=django&page=2&q=東京", {
+        waitUntil: "domcontentloaded",
+    });
+    await expect(page).toHaveURL(/\?q=%E6%9D%B1%E4%BA%AC$/);
+    await expect(page.locator(".feed-tag, .feed-pagination")).toHaveCount(0);
+    await page.getByRole("link", { name: "Subscribe", exact: true }).click();
+    await expect(page).toHaveURL(/\/subscriptions\/$/);
+    await expect(
+        page.getByRole("heading", { name: "Get new posts by email" }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("textbox", { name: "Email address" }),
+    ).toBeVisible();
+    await expectNoOverflow(page);
 
-    await page.goto("/stage18-read-only-missing-route");
+    await page.goto("/stage19-read-only-missing-route");
     await expect(
         page.getByRole("heading", { name: /not found/i }),
     ).toBeVisible();
     await expectNoOverflow(page);
     await expectAccessible(page);
-    expect(failures).toEqual([
-        "error:Failed to load resource: the server responded with a status of 404 ()",
-    ]);
+    writeMetrics(testInfo, {
+        appended_feed_count: appendedFeedCount,
+        bridge_back_ms: bridgeBackMs,
+        bridge_client_navigation_ms: bridgeClientNavigationMs,
+        document_requests_before_direct_404: documents.length - 1,
+        feed_scroll_before_post: feedScrollBeforePost,
+        initial_feed_count: initialFeedCount,
+        me_requests_before_client_navigation: meBeforeNavigation,
+        post_back_ms: postBackMs,
+        post_client_navigation_ms: postClientNavigationMs,
+        public_list_requests: requests.filter((request) =>
+            request.startsWith("/api/v1/posts/"),
+        ).length,
+    });
+    expect(
+        failures.filter(
+            (failure) =>
+                !failure.includes("server responded with a status of 404"),
+        ),
+    ).toEqual([]);
 });
 
 test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe", async ({
@@ -365,6 +492,10 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     await postLink.click();
     await expect(page.locator("article")).toBeVisible();
     await expect(page.locator("article time").first()).toBeVisible();
+    await expect(
+        page.getByRole("textbox", { name: "Email address" }),
+    ).toHaveCount(0);
+    await expect(page.locator(".post-tags, .feed-entry-tags")).toHaveCount(0);
 
     const postGroup = page.getByRole("group", { name: "Reactions" }).first();
     const trigger = postGroup.getByRole("button", { name: "Choose reaction" });
@@ -372,15 +503,23 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     await expect(
         page.getByRole("button", { name: /^React with / }),
     ).toHaveCount(0);
-    expect(
-        reactionRequests.filter((request) =>
-            request.endsWith("/reactions/catalog/"),
-        ),
-    ).toHaveLength(0);
+    const surfacePills = page.locator(".reaction-pill:visible");
+    const surfacePillCount = await surfacePills.count();
+    expect(surfacePillCount).toBeGreaterThan(0);
+    for (let index = 0; index < surfacePillCount; index += 1) {
+        await expectSlackReactionGeometry(surfacePills.nth(index));
+    }
+    const catalogBeforeOpen = reactionRequests.filter((request) =>
+        request.endsWith("/reactions/catalog/"),
+    ).length;
+    expect(catalogBeforeOpen).toBeLessThanOrEqual(1);
 
+    const coldStartedAt = Date.now();
     await trigger.press("Enter");
     const picker = page.getByRole("dialog", { name: "Choose a reaction" });
     await expect(picker).toBeVisible();
+    const coldShellMs = Date.now() - coldStartedAt;
+    expect(coldShellMs).toBeLessThan(500);
     await expect(
         picker.getByRole("button", { name: /^React with / }),
     ).toHaveCount(228);
@@ -392,6 +531,27 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
     await expect(
         picker.locator('.reaction-image[data-animated="true"]'),
     ).toHaveCount(0);
+    const pickerSearch = picker.getByRole("searchbox", {
+        name: "Search reaction names",
+    });
+    await pickerSearch.focus();
+    const searchFocus = await pickerSearch.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+            border: style.borderColor,
+            outline: style.outlineWidth,
+            shadow: style.boxShadow,
+        };
+    });
+    await pickerSearch.evaluate((element) => {
+        element.blur();
+    });
+    const restingBorder = await pickerSearch.evaluate(
+        (element) => getComputedStyle(element).borderColor,
+    );
+    expect(searchFocus.border).toBe(restingBorder);
+    expect(searchFocus.outline).toBe("0px");
+    expect(searchFocus.shadow).toBe("none");
     const pickerImages = await picker.locator("img").count();
     const loadedImages = await page.evaluate(
         () =>
@@ -409,9 +569,34 @@ test("detail and reaction surfaces stay lazy, explicit, and reduced-motion safe"
         image_resources_after_picker_open: loadedImages,
         catalog_requests_after_open: 1,
         animated_assets_started_with_reduced_motion: 0,
+        cold_picker_shell_ms: coldShellMs,
     });
     await page.keyboard.press("Escape");
     await expect(trigger).toBeFocused();
+
+    await page.getByRole("link", { name: "Bridge", exact: true }).click();
+    await expect(page).toHaveURL(/\/bridge$/);
+    await page.goBack();
+    const warmTrigger = page
+        .getByRole("group", { name: "Reactions" })
+        .first()
+        .getByRole("button", { name: "Choose reaction" });
+    const warmStartedAt = Date.now();
+    await warmTrigger.click();
+    const warmPicker = page.getByRole("dialog", {
+        name: "Choose a reaction",
+    });
+    await expect(
+        warmPicker.getByRole("button", { name: /^React with / }),
+    ).toHaveCount(228);
+    const warmPickerMs = Date.now() - warmStartedAt;
+    expect(
+        reactionRequests.filter((request) =>
+            request.endsWith("/reactions/catalog/"),
+        ),
+    ).toHaveLength(1);
+    writeMetrics(testInfo, { warm_picker_ms: warmPickerMs });
+    await page.keyboard.press("Escape");
 
     await expectNoOverflow(page);
     await expectAccessible(page);
@@ -553,7 +738,35 @@ test("personalized APIs are private and Bridge remains icon-only", async ({
     expect(cacheControl).toContain("no-store");
     expect(meResponse.headers().vary).toMatch(/Cookie/i);
 
-    await page.goto("/bridge", { waitUntil: "domcontentloaded" });
+    const catalog = await page.request.get("/api/v1/reactions/catalog/");
+    expect(catalog.status()).toBe(200);
+    expect(catalog.headers()["cache-control"] ?? "").toMatch(
+        /public.*max-age=.*stale-while-revalidate/,
+    );
+    expect(catalog.headers().etag).toBeTruthy();
+
+    const listing = await page.request.get("/api/v1/posts/?page=1");
+    expect(listing.status()).toBe(200);
+    const listingPayload = (await listing.json()) as {
+        results?: Array<{ slug?: string }>;
+    };
+    const slug = listingPayload.results?.[0]?.slug;
+    if (!slug) {
+        throw new Error("Staging Feed did not expose a post slug");
+    }
+    for (const endpoint of [
+        `/api/v1/posts/${encodeURIComponent(slug)}/reactions/`,
+        `/api/v1/posts/${encodeURIComponent(slug)}/comments/`,
+    ]) {
+        const personalized = await page.request.get(endpoint);
+        expect(personalized.status()).toBe(200);
+        expect(personalized.headers()["cache-control"] ?? "").toContain(
+            "no-store",
+        );
+    }
+
+    await page.getByRole("link", { name: "Bridge", exact: true }).click();
+    await expect(page).toHaveURL(/\/bridge$/);
     const main = page.locator("#main-content");
     await expect(main.locator("h1")).toHaveClass(/sr-only/);
     await expect(main.locator("p")).toHaveCount(0);

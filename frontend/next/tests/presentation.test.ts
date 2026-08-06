@@ -2,13 +2,11 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Pagination } from "@/components/pagination";
 import { PostCard } from "@/components/post-card";
 import { PreviewBanner } from "@/components/preview-banner";
 import { FooterContent } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import type { ContentImage, PostListItem } from "@/lib/content-contract";
-import { parsePageParam } from "@/lib/pagination";
 
 export const image: ContentImage = {
     id: 7,
@@ -67,15 +65,6 @@ function summary(overrides: Partial<PostListItem> = {}): PostListItem {
 }
 
 describe("feed presentation", () => {
-    it("accepts only positive integer page query values", () => {
-        expect(parsePageParam(undefined)).toBe(1);
-        expect(parsePageParam("2")).toBe(2);
-        expect(parsePageParam("0")).toBeNull();
-        expect(parsePageParam("01")).toBeNull();
-        expect(parsePageParam("1.5")).toBeNull();
-        expect(parsePageParam(["1", "2"])).toBeNull();
-    });
-
     it("percent-encodes Unicode post links once", () => {
         const html = renderToStaticMarkup(
             createElement(PostCard, { post: summary() }),
@@ -85,7 +74,7 @@ describe("feed presentation", () => {
         );
         expect(html).not.toContain("%25D0");
         expect(html).toContain('class="feed-entry"');
-        expect(html).toContain("#Django");
+        expect(html).not.toContain("#Django");
         expect(html).toContain("by Kirill Wynn");
     });
 
@@ -102,40 +91,6 @@ describe("feed presentation", () => {
 
         expect(html).toContain('<time dateTime="2014-03-02T10:00:00Z">');
         expect(html).not.toContain('<time dateTime="2026-07-26T17:00:00Z">');
-    });
-
-    it("renders accessible previous and next controls", () => {
-        const html = renderToStaticMarkup(
-            createElement(Pagination, {
-                state: { page: 2 },
-                hasPrevious: true,
-                hasNext: true,
-            }),
-        );
-        expect(html).toContain('aria-label="Feed pagination"');
-        expect(html).toContain('href="/"');
-        expect(html).toContain('href="/?page=3"');
-        expect(html).toContain('rel="prev"');
-        expect(html).toContain('rel="next"');
-    });
-
-    it("preserves search and tag filters in pagination links", () => {
-        const html = renderToStaticMarkup(
-            createElement(Pagination, {
-                state: { page: 2, q: "русский Django", tag: "питон" },
-                hasPrevious: true,
-                hasNext: true,
-            }),
-        );
-
-        expect(html).toContain(
-            'href="/?q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django&amp;tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD"',
-        );
-        expect(html).toContain(
-            "q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django&amp;tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD&amp;page=3",
-        );
-        expect(html).not.toContain("page=1");
-        expect(html).not.toContain("%25D1");
     });
 });
 

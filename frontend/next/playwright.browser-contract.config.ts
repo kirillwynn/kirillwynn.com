@@ -1,5 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
+const nextServerCommand =
+    process.env.BROWSER_CONTRACT_DEV === "1"
+        ? "npm run dev -- --hostname 127.0.0.1 --port 3100"
+        : "npm run build && npm run start -- --hostname 127.0.0.1 --port 3100";
+
 const viewports = [
     { name: "mobile-320", viewport: { width: 320, height: 812 } },
     { name: "mobile-375", viewport: { width: 375, height: 812 } },
@@ -42,7 +47,7 @@ export default defineConfig({
             timeout: 30_000,
         },
         {
-            command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
+            command: nextServerCommand,
             url: "http://127.0.0.1:3100",
             reuseExistingServer: !process.env.CI,
             timeout: 120_000,
@@ -51,6 +56,7 @@ export default defineConfig({
                 PUBLIC_SITE_URL: "http://localhost:3100",
                 PREVIEW_COOKIE_SECURE: "false",
                 PREVIEW_TOKEN_TTL_SECONDS: "600",
+                REVALIDATION_SECRET: "browser-contract-revalidation-secret-42",
             },
         },
     ],

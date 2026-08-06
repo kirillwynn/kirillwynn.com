@@ -37,7 +37,7 @@ export default defineConfig({
     },
     outputDir:
         process.env.STAGING_AUDIT_OUTPUT_DIR ??
-        "/tmp/kirillwynn-stage18-playwright",
+        "/tmp/kirillwynn-stage19-playwright",
     projects: viewports.map((project) => ({
         name: project.name,
         use: { viewport: project.viewport },

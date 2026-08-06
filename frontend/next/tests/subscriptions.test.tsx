@@ -319,11 +319,17 @@ describe("same-origin route boundary", () => {
         expect(config).not.toContain('source: "/api/v1/:path*"');
     });
 
-    it("keeps the post subscription form inside the Draft Mode exclusion", () => {
+    it("moves the form to the dedicated Draft Mode-aware page", () => {
         const postPage = readFileSync("app/posts/[slug]/page.tsx", "utf8");
-
-        expect(postPage).toMatch(
-            /!preview\s*\?\s*\(\s*<>\s*<SubscriptionForm compact \/>/,
+        const feedPage = readFileSync("app/page.tsx", "utf8");
+        const subscriptionsPage = readFileSync(
+            "app/subscriptions/page.tsx",
+            "utf8",
         );
+
+        expect(postPage).not.toContain("SubscriptionForm");
+        expect(feedPage).not.toContain("SubscriptionForm");
+        expect(subscriptionsPage).toContain("<SubscriptionForm />");
+        expect(subscriptionsPage).toContain("draft.isEnabled");
     });
 });

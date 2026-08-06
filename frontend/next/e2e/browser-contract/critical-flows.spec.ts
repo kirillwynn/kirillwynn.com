@@ -1,10 +1,68 @@
+import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { signBody } from "../../lib/revalidation-contract";
 import { THEME_STORAGE_KEY } from "../../lib/theme";
 
+const BACKEND_ORIGIN = "http://127.0.0.1:3101";
+const REVALIDATION_SECRET = "browser-contract-revalidation-secret-42";
+
+type BackendMetrics = {
+    max_concurrent_post_list_requests: number;
+    requests: string[];
+};
+
 async function reset(page: Page) {
-    await page.request.post("http://127.0.0.1:3101/__reset");
+    await page.request.post(`${BACKEND_ORIGIN}/__reset`);
+}
+
+async function backendMetrics(page: Page): Promise<BackendMetrics> {
+    const response = await page.request.get(`${BACKEND_ORIGIN}/__metrics`);
+    expect(response.ok()).toBe(true);
+    return (await response.json()) as BackendMetrics;
+}
+
+async function changeMockContent(
+    page: Page,
+    content: { published?: boolean; slug?: string; title?: string },
+) {
+    const response = await page.request.post(`${BACKEND_ORIGIN}/__content`, {
+        data: content,
+    });
+    expect(response.ok()).toBe(true);
+}
+
+async function revalidatePublicContent(
+    page: Page,
+    event: {
+        action: "published" | "updated" | "unpublished" | "expired";
+        page_id: number;
+        slug: string;
+        previous_slug?: string;
+    },
+) {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const body = JSON.stringify({
+        ...event,
+        event_id: randomUUID(),
+        occurred_at: new Date().toISOString(),
+    });
+    const response = await page.request.post("/api/revalidate", {
+        data: body,
+        headers: {
+            "Content-Type": "application/json",
+            "X-Revalidation-Signature": signBody(
+                body,
+                timestamp,
+                REVALIDATION_SECRET,
+            ),
+            "X-Revalidation-Timestamp": timestamp,
+        },
+    });
+    expect(response.ok()).toBe(true);
 }
 
 async function expectAccessible(page: Page) {
@@ -47,11 +105,7 @@ async function expectSharedContentBounds(page: Page) {
     if (!viewport) {
         return;
     }
-    const selectors = [
-        ".site-header__inner",
-        "#main-content",
-        ".site-footer__inner",
-    ];
+    const selectors = [".site-header__inner:visible", "#main-content:visible"];
     const boxes = [];
     for (const selector of selectors) {
         const box = await page.locator(selector).boundingBox();
@@ -68,6 +122,20 @@ async function expectSharedContentBounds(page: Page) {
         expect(Math.abs(box.x - boxes[0].x)).toBeLessThanOrEqual(0.5);
         expect(
             Math.abs(box.x + box.width - (boxes[0].x + boxes[0].width)),
+        ).toBeLessThanOrEqual(0.5);
+    }
+    const footer = await page
+        .locator(".site-footer__inner:visible")
+        .boundingBox();
+    expect(footer).not.toBeNull();
+    if (footer) {
+        expect(footer.x).toBeGreaterThanOrEqual(15.5);
+        expect(viewport.width - footer.x - footer.width).toBeGreaterThanOrEqual(
+            15.5,
+        );
+        expect(footer.width).toBeLessThanOrEqual(544.5);
+        expect(
+            Math.abs(footer.x + footer.width / 2 - viewport.width / 2),
         ).toBeLessThanOrEqual(0.5);
     }
 }
@@ -257,65 +325,235 @@ async function login(page: Page, provider: "Google" | "GitHub" = "Google") {
 }
 
 test.beforeEach(async ({ page }) => {
+    await page.route(/\/media\/reactions\//, async (route) => {
+        await route.fulfill({
+            body: Buffer.from(
+                "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "base64",
+            ),
+            contentType: "image/gif",
+            status: 200,
+        });
+    });
     await reset(page);
 });
 
-test("anonymous reader, feed search, tags, and pagination", async ({
+test("public list/detail cache is reused and signed invalidation covers publish lifecycle", async ({
     page,
-}) => {
-    await page.goto("/");
-    await expectVisuallyHidden(
-        page.getByRole("heading", { level: 1, name: "Feed" }),
-    );
-    await expect(
-        page.getByRole("link", { name: "Testing secure systems" }),
-    ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Login" })).toBeVisible({
-        timeout: 15_000,
+}, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-1440");
+
+    const token = `cache-contract-${randomUUID().slice(0, 8)}`;
+    const originalSlug = `${token}-original`;
+    const renamedSlug = `${token}-renamed`;
+    await changeMockContent(page, {
+        slug: originalSlug,
+        title: `Cache contract ${token}`,
     });
 
-    await page
-        .getByRole("searchbox", { name: "Search posts" })
-        .fill("delivery");
-    await page.getByRole("button", { name: "Search" }).click();
+    const listPath = `/?q=${encodeURIComponent(token)}`;
+    const detailPath = `/posts/${originalSlug}`;
+    const firstList = await page.request.get(listPath);
+    const secondList = await page.request.get(listPath);
+    expect(firstList.status()).toBe(200);
+    expect(secondList.status()).toBe(200);
+    expect(await secondList.text()).toContain(`Cache contract ${token}`);
+
+    const firstDetail = await page.request.get(detailPath);
+    const secondDetail = await page.request.get(detailPath);
+    expect(firstDetail.status()).toBe(200);
+    expect(secondDetail.status()).toBe(200);
+
+    let metrics = await backendMetrics(page);
+    expect(
+        metrics.requests.filter(
+            (request) =>
+                request === `GET /api/v1/posts/?q=${encodeURIComponent(token)}`,
+        ),
+    ).toHaveLength(1);
+    expect(
+        metrics.requests.filter(
+            (request) => request === `GET /api/v1/posts/${originalSlug}/`,
+        ),
+    ).toHaveLength(1);
+
+    await changeMockContent(page, { title: `Invalidated ${token}` });
+    await revalidatePublicContent(page, {
+        action: "updated",
+        page_id: 1,
+        slug: originalSlug,
+    });
+    await expect
+        .poll(async () => (await page.request.get(listPath)).text())
+        .toContain(`Invalidated ${token}`);
+    await expect
+        .poll(async () => (await page.request.get(detailPath)).text())
+        .toContain(`Invalidated ${token}`);
+
+    await changeMockContent(page, { slug: renamedSlug });
+    await revalidatePublicContent(page, {
+        action: "updated",
+        page_id: 1,
+        previous_slug: originalSlug,
+        slug: renamedSlug,
+    });
+    await expect
+        .poll(
+            async () =>
+                (await page.request.get(`/posts/${renamedSlug}`)).status(),
+            { timeout: 10_000 },
+        )
+        .toBe(200);
+    await expect
+        .poll(async () => (await page.request.get(detailPath)).text(), {
+            timeout: 10_000,
+        })
+        .toContain("Page not found");
+
+    await changeMockContent(page, { published: false });
+    await revalidatePublicContent(page, {
+        action: "unpublished",
+        page_id: 1,
+        slug: renamedSlug,
+    });
+    await expect
+        .poll(
+            async () =>
+                (await page.request.get(`/posts/${renamedSlug}`)).text(),
+            { timeout: 10_000 },
+        )
+        .toContain("Page not found");
+
+    await changeMockContent(page, {
+        published: true,
+        slug: "testing-secure-systems",
+        title: "Testing secure systems",
+    });
+    await revalidatePublicContent(page, {
+        action: "published",
+        page_id: 1,
+        previous_slug: renamedSlug,
+        slug: "testing-secure-systems",
+    });
+    await expect
+        .poll(
+            async () =>
+                (
+                    await page.request.get("/posts/testing-secure-systems")
+                ).status(),
+            { timeout: 10_000 },
+        )
+        .toBe(200);
+
+    await changeMockContent(page, { published: false });
+    await revalidatePublicContent(page, {
+        action: "expired",
+        page_id: 1,
+        slug: "testing-secure-systems",
+    });
+    await expect
+        .poll(
+            async () =>
+                (
+                    await page.request.get("/posts/testing-secure-systems")
+                ).text(),
+            { timeout: 10_000 },
+        )
+        .toContain("Page not found");
+
+    await changeMockContent(page, { published: true });
+    await revalidatePublicContent(page, {
+        action: "published",
+        page_id: 1,
+        slug: "testing-secure-systems",
+    });
+    await expect
+        .poll(
+            async () =>
+                (
+                    await page.request.get("/posts/testing-secure-systems")
+                ).status(),
+            { timeout: 10_000 },
+        )
+        .toBe(200);
+
+    metrics = await backendMetrics(page);
+    expect(
+        metrics.requests.filter(
+            (request) =>
+                request === `GET /api/v1/posts/?q=${encodeURIComponent(token)}`,
+        ).length,
+    ).toBeGreaterThanOrEqual(2);
+});
+
+test("anonymous infinite Feed, live search, IME, history, and legacy URL normalization", async ({
+    page,
+}) => {
+    const feedRequests: string[] = [];
+    const failedFeedRequests: string[] = [];
+    page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.pathname === "/api/v1/posts/") {
+            feedRequests.push(url.pathname + url.search);
+        }
+    });
+    page.on("requestfailed", (request) => {
+        const url = new URL(request.url());
+        if (url.pathname === "/api/v1/posts/") {
+            failedFeedRequests.push(url.pathname + url.search);
+        }
+    });
+
+    await page.goto("/?tag=django&page=2&q=delivery");
     await expect(page).toHaveURL("/?q=delivery");
     await expect(
         page.getByRole("link", { name: "Django delivery notes" }),
     ).toBeVisible();
+    await expect(page.locator(".feed-tag, .feed-pagination")).toHaveCount(0);
+    await expect(page.getByText(/^Page \d+$/)).toHaveCount(0);
+    await expect(
+        page.getByRole("link", { name: "Subscribe", exact: true }),
+    ).toHaveAttribute("href", "/subscriptions/");
+    await expect(
+        page.getByRole("textbox", { name: "Email address" }),
+    ).toHaveCount(0);
 
-    await page.getByRole("link", { name: "Django 2 posts" }).click();
-    await expect(page).toHaveURL("/?q=delivery&tag=django");
     const search = page.getByRole("searchbox", { name: "Search posts" });
     await search.fill("");
-    await expect(page).toHaveURL("/?tag=django");
-    await page.getByRole("link", { name: "All", exact: true }).click();
-    await page.getByRole("link", { name: "Next →" }).click();
-    await expect(page).toHaveURL("/?page=2");
-    await expect(
-        page.locator("#main-content").getByText("Page 2", { exact: true }),
-    ).toBeVisible();
+    await expect(page).toHaveURL("/");
+    await expect
+        .poll(async () => {
+            await page.evaluate(() => {
+                window.scrollTo(0, document.body.scrollHeight);
+            });
+            return page.locator(".feed-entry").count();
+        })
+        .toBe(8);
+    await expect(page.getByText("Beginning of the archive")).toBeVisible();
+    const feedIds = await page
+        .locator(".feed-entry h2 a")
+        .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+    expect(new Set(feedIds).size).toBe(8);
+    const metrics = await backendMetrics(page);
+    expect(metrics.max_concurrent_post_list_requests).toBe(1);
 
-    await search.pressSequentially("delivery", { delay: 25 });
+    await search.fill("delivery");
     await expect(page).toHaveURL("/?q=delivery");
-    await expect(search).toHaveValue("delivery");
+    await expect(
+        page.getByRole("link", { name: "Django delivery notes" }),
+    ).toBeVisible();
+    await expect(page.locator(".feed-entry")).toHaveCount(1);
+    expect(
+        feedRequests.filter(
+            (request) => request === "/api/v1/posts/?q=delivery",
+        ).length,
+    ).toBeLessThanOrEqual(1);
     await expect(page.getByText("Clear search", { exact: true })).toHaveCount(
         0,
     );
     await expect(page.getByText("Clear filters", { exact: true })).toHaveCount(
         0,
     );
-    await expect(page.getByText("Clear tag", { exact: true })).toHaveCount(0);
-
-    await page.getByRole("link", { name: "Bridge", exact: true }).click();
-    await page.goBack();
-    await expect(page).toHaveURL("/?q=delivery");
-    await expect(
-        page.getByRole("searchbox", { name: "Search posts" }),
-    ).toHaveValue("delivery");
-    await page.goForward();
-    await expect(page).toHaveURL("/bridge");
-    await page.goBack();
-    await expect(page).toHaveURL("/?q=delivery");
 
     const compositionInput = page.getByRole("searchbox", {
         name: "Search posts",
@@ -350,9 +588,7 @@ test("anonymous reader, feed search, tags, and pagination", async ({
         );
     });
     await expect(page).toHaveURL("/?q=%E6%97%A5%E6%9C%AC");
-    await expect(
-        page.getByRole("searchbox", { name: "Search posts" }),
-    ).toHaveValue("日本");
+    await expect(compositionInput).toHaveValue("日本");
     await expect
         .poll(async () => {
             const href = await page
@@ -364,7 +600,236 @@ test("anonymous reader, feed search, tags, and pagination", async ({
             ).searchParams.get("next");
         })
         .toBe("/?q=日本");
+
+    await page.goBack();
+    await expect(page).toHaveURL("/?q=delivery");
+    await expect(compositionInput).toHaveValue("delivery");
+    await page.goForward();
+    await expect(page).toHaveURL("/?q=%E6%97%A5%E6%9C%AC");
+    await expect(compositionInput).toHaveValue("日本");
+
+    await compositionInput.fill("slow archive");
+    await expect
+        .poll(
+            () =>
+                feedRequests.filter(
+                    (request) => request === "/api/v1/posts/?q=slow+archive",
+                ).length,
+        )
+        .toBe(1);
+    await compositionInput.fill("delivery");
+    await expect(page).toHaveURL("/?q=delivery");
+    await expect(
+        page.getByRole("link", { name: "Django delivery notes" }),
+    ).toBeVisible();
+    await expect
+        .poll(() =>
+            failedFeedRequests.includes("/api/v1/posts/?q=slow+archive"),
+        )
+        .toBe(true);
+    await page.waitForTimeout(850);
+    await expect(page.getByText("No posts found")).toHaveCount(0);
+    await expect(
+        page.getByRole("link", { name: "Django delivery notes" }),
+    ).toBeVisible();
     await expectAccessible(page);
+});
+
+test("manual infinite Feed fallback covers observer, data-saving, reduced-motion, and retry", async ({
+    browser,
+    page,
+}, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-1440");
+
+    const manualCases: Array<{
+        prepare: (candidate: Page) => Promise<unknown>;
+    }> = [
+        {
+            prepare: (candidate) =>
+                candidate.addInitScript(() => {
+                    Reflect.deleteProperty(window, "IntersectionObserver");
+                }),
+        },
+        {
+            prepare: (candidate) =>
+                candidate.addInitScript(() => {
+                    Object.defineProperty(navigator, "connection", {
+                        configurable: true,
+                        value: { saveData: true },
+                    });
+                }),
+        },
+        {
+            prepare: (candidate) =>
+                candidate.emulateMedia({ reducedMotion: "reduce" }),
+        },
+    ];
+
+    for (const manualCase of manualCases) {
+        const context = await browser.newContext({
+            viewport: { height: 900, width: 1440 },
+        });
+        const candidate = await context.newPage();
+        await manualCase.prepare(candidate);
+        await candidate.goto("http://localhost:3100/");
+        const loadOlder = candidate.locator(".feed-load-more button");
+        await expect(loadOlder).toHaveText("Load older posts");
+        await candidate.waitForTimeout(350);
+        await expect(candidate.locator(".feed-entry")).toHaveCount(1);
+        await loadOlder.click();
+        await expect(candidate.locator(".feed-entry")).toHaveCount(2);
+        await expect(loadOlder).toBeFocused();
+        await context.close();
+    }
+
+    let failedPageOnce = false;
+    await page.route(/\/api\/v1\/posts\/\?page=2$/, async (route) => {
+        if (!failedPageOnce) {
+            failedPageOnce = true;
+            await route.fulfill({
+                body: JSON.stringify({ detail: "Temporary Feed failure" }),
+                contentType: "application/json",
+                status: 503,
+            });
+            return;
+        }
+        await route.continue();
+    });
+    await page.goto("/");
+    const retry = page.locator(".feed-load-more button");
+    await expect(retry).toHaveText("Try loading older posts again");
+    await retry.click();
+    await expect(page.locator(".feed-entry")).toHaveCount(2);
+    await expect(retry).toBeFocused();
+    await expectAccessible(page);
+});
+
+test("public client navigation preserves the root shell, auth request, Feed pages, and scroll", async ({
+    page,
+}, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop-1440");
+    const documents: string[] = [];
+    const meRequests: string[] = [];
+    page.on("request", (request) => {
+        const path = new URL(request.url()).pathname;
+        if (request.resourceType() === "document") {
+            documents.push(path);
+        }
+        if (path === "/api/me/") {
+            meRequests.push(path);
+        }
+    });
+
+    await page.goto("/");
+    await expect(
+        page.getByRole("link", { name: "Login", exact: true }),
+    ).toBeVisible();
+    await expect
+        .poll(async () => {
+            await page.evaluate(() => {
+                window.scrollTo(0, document.body.scrollHeight);
+            });
+            return page.locator(".feed-entry").count();
+        })
+        .toBe(8);
+    await page.evaluate(() => {
+        const auditWindow = window as Window & {
+            __stage19Shell?: {
+                body: HTMLElement | null;
+                footer: HTMLElement | null;
+                header: HTMLElement | null;
+            };
+        };
+        auditWindow.__stage19Shell = {
+            body: document.body,
+            footer: document.querySelector(".site-footer"),
+            header: document.querySelector(".site-header"),
+        };
+    });
+    const feedScroll = await page.evaluate(() => window.scrollY);
+    expect(feedScroll).toBeGreaterThan(0);
+
+    await page
+        .getByRole("link", { name: "Bridge", exact: true })
+        .evaluate((link: HTMLAnchorElement) => {
+            link.click();
+        });
+    await expect(page).toHaveURL("/bridge");
+    await expectBridgeContent(page);
+    const bridgeDepartureScroll = Number(
+        await page.evaluate(() =>
+            window.sessionStorage.getItem("kirillwynn:feed-scroll:"),
+        ),
+    );
+    expect(bridgeDepartureScroll).toBeGreaterThan(0);
+    await page.getByRole("link", { name: "Feed", exact: true }).click();
+    await expect(page).toHaveURL("/");
+    await expect(page.locator(".feed-entry")).toHaveCount(8);
+    await expect
+        .poll(() =>
+            page.evaluate(
+                (saved) => Math.abs(window.scrollY - saved),
+                bridgeDepartureScroll,
+            ),
+        )
+        .toBeLessThanOrEqual(2);
+
+    const visiblePost = page.getByRole("link", {
+        name: "Archive entry 8",
+        exact: true,
+    });
+    await expect(visiblePost).toBeVisible();
+    await visiblePost.click();
+    await expect(page).toHaveURL("/posts/archive-entry-8");
+    await expect(
+        page.getByRole("heading", {
+            level: 1,
+            name: "Archive entry 8",
+        }),
+    ).toBeVisible();
+    const postDepartureScroll = Number(
+        await page.evaluate(() =>
+            window.sessionStorage.getItem("kirillwynn:feed-scroll:"),
+        ),
+    );
+    expect(postDepartureScroll).toBeGreaterThan(0);
+    await page.goBack();
+    await expect(page).toHaveURL("/");
+    await expect(page.locator(".feed-entry")).toHaveCount(8);
+    await expect
+        .poll(() =>
+            page.evaluate(
+                (saved) => Math.abs(window.scrollY - saved),
+                postDepartureScroll,
+            ),
+        )
+        .toBeLessThanOrEqual(2);
+
+    expect(documents).toEqual(["/"]);
+    expect(meRequests).toEqual(["/api/me/"]);
+    expect(
+        await page.evaluate(() => {
+            const auditWindow = window as Window & {
+                __stage19Shell?: {
+                    body: HTMLElement | null;
+                    footer: HTMLElement | null;
+                    header: HTMLElement | null;
+                };
+            };
+            const shell = auditWindow.__stage19Shell;
+            if (!shell) {
+                return false;
+            }
+            return (
+                shell.body === document.body &&
+                shell.footer === document.querySelector(".site-footer") &&
+                shell.header === document.querySelector(".site-header")
+            );
+        }),
+    ).toBe(true);
+    await expect(
+        page.locator('[class*="skeleton"], [aria-label="Loading feed"]'),
+    ).toHaveCount(0);
 });
 
 test("Search and Bridge use perceptible contourless focus in both themes", async ({
@@ -476,6 +941,7 @@ test("Search and Bridge use perceptible contourless focus in both themes", async
 test("Feed hydrates existing reactions once without card-level requests or picker UI", async ({
     page,
 }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const reactionRequests: string[] = [];
     page.on("request", (request) => {
         const path = new URL(request.url()).pathname;
@@ -484,8 +950,8 @@ test("Feed hydrates existing reactions once without card-level requests or picke
         }
     });
 
-    await page.goto("/?tag=django");
-    await expect(page.locator(".feed-entry")).toHaveCount(2);
+    await page.goto("/");
+    await expect(page.locator(".feed-entry")).toHaveCount(1);
     const feedReactions = page
         .locator(".feed-entry")
         .first()
@@ -503,6 +969,13 @@ test("Feed hydrates existing reactions once without card-level requests or picke
     await expectSlackReactionGeometry(
         feedReactions.locator(".reaction-pill").first(),
     );
+    await feedReactions.locator(".reaction-pill").first().hover();
+    await page.waitForTimeout(50);
+    expect(
+        reactionRequests.filter((request) =>
+            request.endsWith("/animation.gif"),
+        ),
+    ).toHaveLength(0);
     expect(
         reactionRequests.filter(
             (request) => request === "GET /api/v1/reactions/posts/",
@@ -562,7 +1035,7 @@ test("Feed hydrates existing reactions once without card-level requests or picke
         }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
-    expect(participantRequests()).toHaveLength(3);
+    expect(participantRequests()).toHaveLength(1);
 
     await page.route(/\/api\/v1\/reactions\/posts\/\?ids=/, async (route) => {
         await route.fulfill({
@@ -571,8 +1044,8 @@ test("Feed hydrates existing reactions once without card-level requests or picke
             body: JSON.stringify({ detail: "Unavailable" }),
         });
     });
-    await page.goto("/?tag=django");
-    await expect(page.locator(".feed-entry")).toHaveCount(2);
+    await page.goto("/");
+    await expect(page.locator(".feed-entry")).toHaveCount(1);
     await expect(page.locator(".feed-entry-reactions")).toHaveCount(0);
     await expect(page.locator('.feed-entry [role="alert"]')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
@@ -581,8 +1054,28 @@ test("Feed hydrates existing reactions once without card-level requests or picke
 
 test("reaction surfaces expose only aggregates and one lazy picker trigger", async ({
     page,
-}) => {
+}, testInfo) => {
     const requests: string[] = [];
+    const imageRequests: string[] = [];
+    let releaseCatalog: (() => void) | undefined;
+    const catalogGate = new Promise<void>((resolve) => {
+        releaseCatalog = resolve;
+    });
+    await page.route(/\/api\/v1\/reactions\/catalog\/$/, async (route) => {
+        await catalogGate;
+        await route.continue();
+    });
+    await page.route(/\/media\/reactions\//, async (route) => {
+        imageRequests.push(new URL(route.request().url()).pathname);
+        await route.fulfill({
+            body: Buffer.from(
+                "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+                "base64",
+            ),
+            contentType: "image/gif",
+            status: 200,
+        });
+    });
     page.on("request", (request) => {
         requests.push(new URL(request.url()).pathname);
     });
@@ -598,7 +1091,8 @@ test("reaction surfaces expose only aggregates and one lazy picker trigger", asy
 
     const comment = page.locator('article[data-comment-id="10"]').first();
     const commentGroup = comment.getByRole("group", { name: "Reactions" });
-    await expect(commentGroup.locator(".reaction-pill")).toHaveCount(0);
+    await expect(commentGroup.locator(".reaction-pill")).toHaveCount(1);
+    await expectSlackReactionGeometry(commentGroup.locator(".reaction-pill"));
     await expect(
         commentGroup.getByRole("button", { name: "Choose reaction" }),
     ).toHaveCount(1);
@@ -608,11 +1102,22 @@ test("reaction surfaces expose only aggregates and one lazy picker trigger", asy
     expect(
         requests.filter((path) => path === "/api/v1/reactions/config/"),
     ).toHaveLength(0);
-    expect(
-        requests.filter((path) => path === "/api/v1/reactions/catalog/"),
-    ).toHaveLength(0);
     expect(requests.some((path) => path.includes("/pepehmm/"))).toBe(false);
     expect(requests.some((path) => path.includes("/pepelove/"))).toBe(false);
+    const initialAggregateImageRequestCount = imageRequests.length;
+    expect(initialAggregateImageRequestCount).toBeGreaterThan(0);
+    expect(
+        imageRequests.filter((path) => path.endsWith("/animation.gif")),
+    ).toHaveLength(0);
+    await postGroup.locator(".reaction-pill").hover();
+    await expect
+        .poll(
+            () =>
+                imageRequests.filter((path) => path.endsWith("/animation.gif"))
+                    .length,
+        )
+        .toBe(1);
+    const prePickerImageRequestCount = imageRequests.length;
 
     const triggerGeometry = await postTrigger.evaluate((element) => {
         const target = element.getBoundingClientRect();
@@ -648,19 +1153,86 @@ test("reaction surfaces expose only aggregates and one lazy picker trigger", asy
         }),
     ).toBe(false);
 
+    const openedAt = Date.now();
     await postTrigger.press("Enter");
     const picker = page.getByRole("dialog", { name: "Choose a reaction" });
     await expect(picker).toBeVisible();
+    expect(Date.now() - openedAt).toBeLessThan(500);
     await expect(postTrigger).toHaveAttribute("aria-expanded", "true");
+    await expect(picker.getByText("Loading reactions…")).toBeVisible();
+    expect(imageRequests).toHaveLength(prePickerImageRequestCount);
+    releaseCatalog?.();
     await expect(
         picker.getByRole("button", { name: "React with Clapping" }),
     ).toBeVisible();
+    await expect(
+        picker.getByRole("button", { name: /^React with / }),
+    ).toHaveCount(228);
+    await expect.poll(() => picker.locator("img").count()).toBeGreaterThan(0);
+    expect(await picker.locator("img").count()).toBeLessThan(228);
+    expect(imageRequests.length - prePickerImageRequestCount).toBeLessThan(228);
     expect(
         requests.filter((path) => path === "/api/v1/reactions/catalog/"),
     ).toHaveLength(1);
     expect(
         requests.filter((path) => path === "/api/v1/reactions/config/"),
     ).toHaveLength(0);
+
+    const pickerSearch = picker.getByRole("searchbox", {
+        name: "Search reaction names",
+    });
+    const focusedSearchStyle = await pickerSearch.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+            borderColor: style.borderColor,
+            boxShadow: style.boxShadow,
+            outlineColor: style.outlineColor,
+            outlineStyle: style.outlineStyle,
+            outlineWidth: style.outlineWidth,
+        };
+    });
+    await pickerSearch.evaluate((element) => {
+        element.blur();
+    });
+    const restingSearchBorder = await pickerSearch.evaluate(
+        (element) => getComputedStyle(element).borderColor,
+    );
+    await pickerSearch.focus();
+    expect(focusedSearchStyle.borderColor).toBe(restingSearchBorder);
+    expect(focusedSearchStyle.boxShadow).toBe("none");
+    expect(focusedSearchStyle.outlineStyle).toBe("none");
+    expect(focusedSearchStyle.outlineWidth).toBe("0px");
+    expect(focusedSearchStyle.outlineColor).not.toMatch(/rgb\(255, 165, 0\)/i);
+    await pickerSearch.fill("catalog reaction 200");
+    await expect(picker).toBeVisible();
+    await expect(
+        picker.getByRole("button", { name: "React with Catalog reaction 200" }),
+    ).toBeVisible();
+    await pickerSearch.fill("");
+
+    if (testInfo.project.name.startsWith("mobile")) {
+        await page.locator(".reaction-picker-layer").click({
+            position: { x: 2, y: 2 },
+        });
+        await expect(picker).toBeHidden();
+        await expect(postTrigger).toBeFocused();
+        await postTrigger.click();
+        await expect(picker).toBeVisible();
+    } else {
+        const triggerBox = await postTrigger.boundingBox();
+        const pickerBox = await picker.boundingBox();
+        expect(triggerBox).not.toBeNull();
+        expect(pickerBox).not.toBeNull();
+        if (triggerBox && pickerBox) {
+            expect(pickerBox.x).toBeLessThanOrEqual(
+                triggerBox.x + triggerBox.width,
+            );
+            expect(pickerBox.x + pickerBox.width).toBeGreaterThanOrEqual(
+                triggerBox.x,
+            );
+            expect(pickerBox.y).toBeGreaterThanOrEqual(triggerBox.y + 43);
+        }
+    }
     await page.keyboard.press("Escape");
     await expect(picker).toBeHidden();
     await expect(postTrigger).toBeFocused();
@@ -672,11 +1244,65 @@ test("reaction surfaces expose only aggregates and one lazy picker trigger", asy
 
     await postTrigger.click();
     await expect(picker).toBeVisible();
-    await postTrigger.click();
+    if (testInfo.project.name.startsWith("mobile")) {
+        await page.locator(".reaction-picker-layer").click({
+            position: { x: 2, y: 2 },
+        });
+    } else {
+        await postTrigger.click();
+    }
     await expect(picker).toBeHidden();
     await expect(postTrigger).toHaveAttribute("aria-expanded", "false");
+    await expect(postTrigger).toBeFocused();
 
-    const threadTrigger = comment
+    await postTrigger.click();
+    await expect(picker).toBeVisible();
+    const beforeBlockedClick = await postGroup
+        .getByRole("button", { name: "Add Clapping reaction" })
+        .getAttribute("aria-pressed");
+    await postGroup
+        .getByRole("button", { name: "Add Clapping reaction" })
+        .click({ force: true });
+    await expect(picker).toBeHidden();
+    await expect(
+        postGroup.getByRole("button", { name: "Add Clapping reaction" }),
+    ).toHaveAttribute("aria-pressed", beforeBlockedClick ?? "false");
+
+    await postTrigger.click();
+    await expect(picker).toBeVisible();
+    const bridgeLink = page.getByRole("link", {
+        name: "Bridge",
+        exact: true,
+    });
+    if (testInfo.project.name.startsWith("mobile")) {
+        await bridgeLink.evaluate((link: HTMLAnchorElement) => {
+            link.click();
+        });
+    } else {
+        await bridgeLink.click();
+    }
+    await expect(page).toHaveURL("/bridge");
+    await page.goBack();
+    await expect(page).toHaveURL("/posts/testing-secure-systems");
+    const warmTrigger = page
+        .getByRole("group", { name: "Reactions" })
+        .first()
+        .getByRole("button", { name: "Choose reaction" });
+    await warmTrigger.click();
+    await expect(
+        page
+            .getByRole("dialog", { name: "Choose a reaction" })
+            .getByRole("button", { name: "React with Clapping" }),
+    ).toBeVisible();
+    expect(
+        requests.filter((path) => path === "/api/v1/reactions/catalog/"),
+    ).toHaveLength(1);
+    await page.keyboard.press("Escape");
+
+    const restoredComment = page
+        .locator('article[data-comment-id="10"]')
+        .first();
+    const threadTrigger = restoredComment
         .getByRole("button", { name: /^(Reply|View thread)$/ })
         .first();
     await threadTrigger.click();
@@ -687,6 +1313,12 @@ test("reaction surfaces expose only aggregates and one lazy picker trigger", asy
     await expect(
         thread.getByRole("button", { name: "Choose reaction" }),
     ).toHaveCount(2);
+    await expect(thread.locator(".reaction-pill")).toHaveCount(2);
+    for (const index of [0, 1]) {
+        await expectSlackReactionGeometry(
+            thread.locator(".reaction-pill").nth(index),
+        );
+    }
     await expect(
         thread.getByRole("button", { name: /^React with / }),
     ).toHaveCount(0);
@@ -821,6 +1453,7 @@ test("responsive shell, right header group, skip link, and universal team footer
         "/account/password/reset/confirm",
         "/account/password/set",
         "/account/password/change",
+        "/subscriptions/",
         "/subscriptions/confirm",
         "/subscriptions/unsubscribe",
         "/missing-footer-route",
@@ -834,9 +1467,11 @@ test("responsive shell, right header group, skip link, and universal team footer
         ).toHaveCount(0);
         await expectSharedContentBounds(page);
         await expectNoHorizontalOverflow(page);
-        const header = await page.locator(".site-header__inner").boundingBox();
+        const header = await page
+            .locator(".site-header__inner:visible")
+            .boundingBox();
         const controls = await page
-            .locator(".site-header__controls")
+            .locator(".site-header__controls:visible")
             .boundingBox();
         expect(header).not.toBeNull();
         expect(controls).not.toBeNull();
@@ -881,7 +1516,7 @@ test("responsive shell, right header group, skip link, and universal team footer
         await expectSharedContentBounds(page);
         await expectNoHorizontalOverflow(page);
         const headerBounds = await page
-            .locator(".site-header__inner")
+            .locator(".site-header__inner:visible")
             .boundingBox();
         expect(headerBounds).not.toBeNull();
         for (const control of [
@@ -1018,6 +1653,7 @@ test("theme follows the system, persists, and remains beside account", async ({
         "/account/password/reset/confirm",
         "/account/password/set",
         "/account/password/change",
+        "/subscriptions/",
         "/subscriptions/confirm",
         "/subscriptions/unsubscribe",
         "/missing-theme-route",
@@ -1110,11 +1746,18 @@ test("local signup, verification, login, nickname interaction, reset, and change
     const firstPassword = "Stage17 browser passphrase 42!";
     const changedPassword = "Stage17 changed passphrase 84!";
     const resetPassword = "Stage17 reset passphrase 126!";
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Public nickname").fill("Stage Reader");
-    await page.getByLabel("Password", { exact: true }).fill(firstPassword);
-    await page.getByLabel("Confirm password").fill(firstPassword);
-    await page.getByRole("button", { name: "Create account" }).click();
+    const createAccount = page.getByRole("button", {
+        name: "Create account",
+    });
+    await expect(createAccount).toBeVisible();
+    const signupForm = createAccount.locator("xpath=ancestor::form");
+    await signupForm.locator('input[name="email"]').fill(email);
+    await signupForm.locator('input[name="nickname"]').fill("Stage Reader");
+    await signupForm.locator('input[name="password"]').fill(firstPassword);
+    await signupForm
+        .locator('input[name="password_confirmation"]')
+        .fill(firstPassword);
+    await createAccount.click();
     await expect(
         page.getByText(/If the address can be registered/),
     ).toBeVisible();
@@ -1355,12 +1998,30 @@ test("comment, thread, reaction, keyboard trap, Escape, and focus restoration", 
 test("subscription confirm and unsubscribe mutate only after explicit actions", async ({
     page,
 }) => {
+    const subscriptionMutations: string[] = [];
+    page.on("request", (request) => {
+        if (
+            request.method() !== "GET" &&
+            new URL(request.url()).pathname.startsWith("/api/v1/subscriptions/")
+        ) {
+            subscriptionMutations.push(
+                `${request.method()} ${new URL(request.url()).pathname}`,
+            );
+        }
+    });
     await page.goto("/");
+    await expect(
+        page.getByRole("textbox", { name: "Email address" }),
+    ).toHaveCount(0);
+    await page.getByRole("link", { name: "Subscribe", exact: true }).click();
+    await expect(page).toHaveURL("/subscriptions/");
+    expect(subscriptionMutations).toHaveLength(0);
     await page
         .getByRole("textbox", { name: "Email address" })
         .fill("reader@example.test");
     await page.getByRole("button", { name: "Subscribe" }).click();
     await expect(page.getByText("Check your inbox.")).toBeVisible();
+    expect(subscriptionMutations).toEqual(["POST /api/v1/subscriptions/"]);
 
     await page.goto("/subscriptions/confirm#credential=e2e-confirm");
     await expect(page).not.toHaveURL(/credential=/);

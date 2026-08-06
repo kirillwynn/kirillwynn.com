@@ -378,12 +378,10 @@ def test_stabilization_workflow_is_manual_staging_only_and_never_deploys():
     )
     assert 'getByRole("link", { name: "Login", exact: true })' in live_spec
     assert 'headerControls.nth(3)).toHaveAccessibleName("Login")' not in live_spec
-    assert (
-        '"error:Failed to load resource: the server responded with a status of 404 ()"'
-        in live_spec
-    )
-    assert live_spec.index("const feedParticipant =") < live_spec.index(
-        "await postLink.click()"
+    assert '!failure.includes("server responded with a status of 404")' in live_spec
+    feed_participant = live_spec.index("const feedParticipant =")
+    assert feed_participant < live_spec.index(
+        "await postLink.click()", feed_participant
     )
     assert 'const unicodeListing = listings["/api/v1/posts/?q=東京"];' in live_spec
     theme_reload = live_spec.index(

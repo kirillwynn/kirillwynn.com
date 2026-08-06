@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const cacheMocks = vi.hoisted(() => ({
+    cacheLife: vi.fn(),
+    cacheTag: vi.fn(),
+}));
+
+vi.mock("next/cache", () => cacheMocks);
+
 import {
     ContentApiError,
     getAvailableTags,
@@ -11,6 +18,8 @@ import {
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    cacheMocks.cacheLife.mockClear();
+    cacheMocks.cacheTag.mockClear();
 });
 
 describe("Django content client", () => {
@@ -29,6 +38,13 @@ describe("Django content client", () => {
         vi.stubGlobal("fetch", fetchMock);
 
         await getPublicPosts({ page: 2 });
+
+        expect(cacheMocks.cacheLife).toHaveBeenCalledWith({
+            stale: 30,
+            revalidate: 60,
+            expire: 86_400,
+        });
+        expect(cacheMocks.cacheTag).toHaveBeenCalledWith("posts");
 
         expect(fetchMock).toHaveBeenCalledWith(
             "http://localhost:8000/api/v1/posts/?page=2",
@@ -123,6 +139,13 @@ describe("Django content client", () => {
         vi.stubGlobal("fetch", fetchMock);
 
         await getPublicPost("привет-мир");
+
+        expect(cacheMocks.cacheTag).toHaveBeenNthCalledWith(
+            1,
+            "posts",
+            "post-slug:привет-мир",
+        );
+        expect(cacheMocks.cacheTag).toHaveBeenNthCalledWith(2, "post:42");
 
         expect(fetchMock).toHaveBeenCalledWith(
             "http://localhost:8000/api/v1/posts/%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80/",

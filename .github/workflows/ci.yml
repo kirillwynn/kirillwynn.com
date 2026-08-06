@@ -127,6 +127,7 @@ jobs:
           npm run typecheck
           npm test
           npm run build
+          npm run test:bundle-contract
           npm audit --audit-level=high
       - run: node infra/tests/verify-next-runtime-origins.mjs frontend/next/.next/standalone
       - name: Scan browser assets

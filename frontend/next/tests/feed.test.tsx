@@ -5,59 +5,45 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import HomePage, { generateMetadata } from "@/app/page";
+import { FeedPage, generateMetadata } from "@/app/page";
+import { AuthProvider } from "@/components/auth-provider";
 import { FeedControls } from "@/components/feed-controls";
-import type {
-    AvailableTagResponse,
-    PostListItem,
-    PostListResponse,
-} from "@/lib/content-contract";
+import type { PostListItem, PostListResponse } from "@/lib/content-contract";
+import {
+    checkedNextFeedPath,
+    feedApiPath,
+    queryFromLocation,
+} from "@/lib/feed-browser";
 import {
     feedHref,
     MAX_QUERY_CODE_POINTS,
     parseFeedState,
 } from "@/lib/feed-state";
-import {
-    ContentApiError,
-    getAvailableTags,
-    getPublicPosts,
-} from "@/lib/server/django";
+import { ContentApiError, getPublicPosts } from "@/lib/server/django";
 
-const { notFound, replace, draftState } = vi.hoisted(() => {
-    return {
-        replace: vi.fn(),
-        draftState: { isEnabled: false },
-        notFound: vi.fn(() => {
-            throw new Error("NEXT_NOT_FOUND");
-        }),
-    };
-});
-
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ replace }),
-    notFound,
+const { draftState, notFound, redirect } = vi.hoisted(() => ({
+    draftState: { isEnabled: false },
+    notFound: vi.fn(() => {
+        throw new Error("NEXT_NOT_FOUND");
+    }),
+    redirect: vi.fn((href: string) => {
+        throw new Error(`NEXT_REDIRECT:${href}`);
+    }),
 }));
 
+vi.mock("next/navigation", () => ({
+    notFound,
+    redirect,
+    usePathname: () => "/",
+}));
 vi.mock("next/headers", () => ({
     draftMode: () => Promise.resolve(draftState),
 }));
-
 vi.mock("@/lib/server/django", async (importOriginal) => {
     const original =
         await importOriginal<typeof import("@/lib/server/django")>();
-    return {
-        ...original,
-        getPublicPosts: vi.fn(),
-        getAvailableTags: vi.fn(),
-    };
+    return { ...original, getPublicPosts: vi.fn() };
 });
-
-const availableTags: AvailableTagResponse = {
-    results: [
-        { name: "Django", slug: "django", count: 3 },
-        { name: "Питон", slug: "питон", count: 2 },
-    ],
-};
 
 function feed(overrides: Partial<PostListResponse> = {}): PostListResponse {
     return {
@@ -85,7 +71,7 @@ function postSummary(overrides: Partial<PostListItem> = {}): PostListItem {
             display_name: "Kirill Wynn",
             is_site_author: true,
         },
-        tags: [{ name: "Notes", slug: "notes" }],
+        tags: [{ name: "Invisible tag", slug: "invisible-tag" }],
         canonical_path: "/posts/quiet-feed",
         canonical_url: "https://example.com/posts/quiet-feed",
         seo: {
@@ -102,23 +88,31 @@ function postSummary(overrides: Partial<PostListItem> = {}): PostListItem {
     };
 }
 
-function renderControls(): {
+function renderControls(
+    query = "old query",
+    onSearch = vi.fn<(query: string) => void>(),
+): {
     container: HTMLDivElement;
+    onSearch: typeof onSearch;
+    render: (query: string) => void;
     root: Root;
-    render: (state: { page: number; q?: string; tag?: string }) => void;
 } {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
-    const render = (state: { page: number; q?: string; tag?: string }) => {
+    const render = (nextQuery: string) => {
         act(() => {
             root.render(
-                <FeedControls state={state} tags={availableTags.results} />,
+                <FeedControls
+                    onSearch={onSearch}
+                    query={nextQuery}
+                    searching={false}
+                />,
             );
         });
     };
-    render({ page: 4, q: "old query", tag: "питон" });
-    return { container, root, render };
+    render(query);
+    return { container, onSearch, render, root };
 }
 
 function setInputValue(input: HTMLInputElement | null, value: string): void {
@@ -128,7 +122,6 @@ function setInputValue(input: HTMLInputElement | null, value: string): void {
             "value",
         );
         if (descriptor?.set && input) {
-            // The native prototype setter intentionally bypasses React's value tracker.
             // eslint-disable-next-line @typescript-eslint/unbound-method
             Reflect.apply(descriptor.set, input, [value]);
         }
@@ -139,40 +132,21 @@ function setInputValue(input: HTMLInputElement | null, value: string): void {
 function submit(form: HTMLFormElement | null): void {
     act(() => {
         form?.dispatchEvent(
-            new SubmitEvent("submit", {
-                bubbles: true,
-                cancelable: true,
-            }),
+            new SubmitEvent("submit", { bubbles: true, cancelable: true }),
         );
     });
 }
 
-function startComposition(input: HTMLInputElement | null): void {
-    act(() => {
-        input?.dispatchEvent(
-            new CompositionEvent("compositionstart", {
-                bubbles: true,
-            }),
-        );
-    });
-}
-
-function endComposition(input: HTMLInputElement | null): void {
-    act(() => {
-        input?.dispatchEvent(
-            new CompositionEvent("compositionend", {
-                bubbles: true,
-            }),
-        );
-    });
+function renderHome(element: React.ReactNode): string {
+    return renderToStaticMarkup(<AuthProvider>{element}</AuthProvider>);
 }
 
 beforeEach(() => {
     draftState.isEnabled = false;
-    replace.mockReset();
     notFound.mockClear();
+    redirect.mockClear();
     vi.mocked(getPublicPosts).mockReset();
-    vi.mocked(getAvailableTags).mockReset();
+    window.history.replaceState({}, "", "/");
     (
         globalThis as typeof globalThis & {
             IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -185,8 +159,8 @@ afterEach(() => {
     document.body.replaceChildren();
 });
 
-describe("Feed URL state", () => {
-    it("parses, trims, and rejects ambiguous or invalid parameter shapes", () => {
+describe("Feed URL and transport state", () => {
+    it("keeps backend tag/page parsing compatible while encoding Unicode once", () => {
         expect(
             parseFeedState({
                 q: "  русский Django  ",
@@ -200,332 +174,207 @@ describe("Feed URL state", () => {
         expect(parseFeedState({ q: ["one", "two"] })).toEqual({
             valid: false,
         });
-        expect(parseFeedState({ tag: "not a slug" })).toEqual({
-            valid: false,
-        });
         expect(parseFeedState({ q: "safe\u0000hidden" })).toEqual({
             valid: false,
         });
         expect(
             parseFeedState({ q: "🔥".repeat(MAX_QUERY_CODE_POINTS + 1) }),
         ).toEqual({ valid: false });
-        expect(parseFeedState({ page: "01" })).toEqual({ valid: false });
         expect(parseFeedState({ page_size: "5" })).toEqual({ valid: false });
-    });
 
-    it("serializes Unicode once and omits page one", () => {
-        const href = feedHref({
-            q: "русский Django",
-            tag: "питон",
-            page: 1,
-        });
-
+        const href = feedHref({ q: "русский Django", page: 1 });
         expect(href).toBe(
-            "/?q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
+            "/?q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django",
         );
         expect(href).not.toContain("page=1");
         expect(href).not.toContain("%25D1");
     });
+
+    it("accepts only a verified same-origin post-list continuation", () => {
+        expect(feedApiPath("日本語")).toBe(
+            "/api/v1/posts/?q=%E6%97%A5%E6%9C%AC%E8%AA%9E",
+        );
+        expect(
+            checkedNextFeedPath(
+                "https://example.com/api/v1/posts/?q=%E6%97%A5%E6%9C%AC%E8%AA%9E&page=2",
+                "日本語",
+                "https://example.com",
+            ),
+        ).toBe("/api/v1/posts/?q=%E6%97%A5%E6%9C%AC%E8%AA%9E&page=2");
+        for (const unsafe of [
+            "https://evil.example/api/v1/posts/?page=2",
+            "//evil.example/api/v1/posts/?page=2",
+            "/api/v1/comments/?page=2",
+            "/api/v1/posts/?page=2&tag=hidden",
+            "/api/v1/posts/?page=2&q=other",
+        ]) {
+            expect(() =>
+                checkedNextFeedPath(unsafe, "", "https://example.com"),
+            ).toThrow();
+        }
+    });
+
+    it("reads a single Unicode q value from browser history", () => {
+        window.history.replaceState({}, "", "/?q=%E6%97%A5%E6%9C%AC");
+        expect(queryFromLocation(window.location)).toBe("日本");
+        window.history.replaceState({}, "", "/?q=one&q=two");
+        expect(queryFromLocation(window.location)).toBe("");
+    });
 });
 
-describe("Feed search and tag controls", () => {
-    it("debounces rapid Unicode input, preserves tag, resets page, and encodes once", () => {
+describe("client-cached Feed search controls", () => {
+    it("debounces Unicode input for 275ms and submits immediately", () => {
         vi.useFakeTimers();
-        const { container, root } = renderControls();
+        const { container, onSearch, root } = renderControls();
         const input = container.querySelector<HTMLInputElement>("#feed-search");
+        const form = container.querySelector<HTMLFormElement>("form");
         expect(input?.value).toBe("old query");
 
-        const values = ["н", "но", "нов", "  новый Django  "];
-        for (const [index, value] of values.entries()) {
-            setInputValue(input, value);
-            if (index < values.length - 1) {
-                act(() => {
-                    vi.advanceTimersByTime(100);
-                });
-            }
-        }
-        expect(replace).not.toHaveBeenCalled();
+        setInputValue(input, "  новый Django  ");
         act(() => {
-            vi.advanceTimersByTime(299);
+            vi.advanceTimersByTime(274);
         });
-        expect(replace).not.toHaveBeenCalled();
+        expect(onSearch).not.toHaveBeenCalled();
         act(() => {
             vi.advanceTimersByTime(1);
         });
+        expect(onSearch).toHaveBeenCalledWith("новый Django");
 
-        expect(replace).toHaveBeenCalledOnce();
-        expect(replace).toHaveBeenCalledWith(
-            "/?q=%D0%BD%D0%BE%D0%B2%D1%8B%D0%B9+Django&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
-        );
-        expect(replace.mock.calls[0]?.[0]).not.toContain("%25D0");
-        act(() => {
-            root.unmount();
-        });
-    });
-
-    it("submits immediately, cancels a stale timer, and avoids duplicate navigation", () => {
-        vi.useFakeTimers();
-        const { container, root, render } = renderControls();
-        const input = container.querySelector<HTMLInputElement>("#feed-search");
-        const form = container.querySelector<HTMLFormElement>("form");
-
-        setInputValue(input, "stale");
-        setInputValue(input, "  immediate query  ");
+        onSearch.mockClear();
+        setInputValue(input, " immediate ");
         submit(form);
-
-        expect(replace).toHaveBeenCalledOnce();
-        expect(replace).toHaveBeenCalledWith(
-            "/?q=immediate+query&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
-        );
+        expect(onSearch).toHaveBeenCalledOnce();
+        expect(onSearch).toHaveBeenCalledWith("immediate");
         act(() => {
             vi.advanceTimersByTime(1_000);
         });
-        expect(replace).toHaveBeenCalledOnce();
-
-        replace.mockClear();
-        render({ page: 1, q: "same", tag: "питон" });
-        setInputValue(input, "same");
-        act(() => {
-            vi.advanceTimersByTime(300);
-        });
-        submit(form);
-        expect(replace).not.toHaveBeenCalled();
-
+        expect(onSearch).toHaveBeenCalledOnce();
         act(() => {
             root.unmount();
         });
     });
 
-    it("removes q when the input is erased and keeps the active tag", () => {
+    it("is IME-safe, clears through ordinary typing, and follows history props", () => {
         vi.useFakeTimers();
-        const { container, root } = renderControls();
+        const { container, onSearch, render, root } = renderControls("日本");
         const input = container.querySelector<HTMLInputElement>("#feed-search");
+        act(() => {
+            input?.dispatchEvent(
+                new CompositionEvent("compositionstart", { bubbles: true }),
+            );
+        });
+        setInputValue(input, "日本語");
+        act(() => {
+            vi.advanceTimersByTime(1_000);
+        });
+        expect(onSearch).not.toHaveBeenCalled();
+        act(() => {
+            input?.dispatchEvent(
+                new CompositionEvent("compositionend", { bubbles: true }),
+            );
+            vi.advanceTimersByTime(275);
+        });
+        expect(onSearch).toHaveBeenCalledWith("日本語");
 
         setInputValue(input, "");
         act(() => {
-            vi.advanceTimersByTime(300);
+            vi.advanceTimersByTime(275);
         });
-
-        expect(replace).toHaveBeenCalledWith(
-            "/?tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
-        );
-        expect(replace.mock.calls[0]?.[0]).not.toContain("q=");
-        expect(replace.mock.calls[0]?.[0]).not.toContain("page=1");
-        act(() => {
-            root.unmount();
-        });
-    });
-
-    it("lets the latest value supersede a navigation already in flight", () => {
-        vi.useFakeTimers();
-        const { container, root, render } = renderControls();
-        const input = container.querySelector<HTMLInputElement>("#feed-search");
-
-        setInputValue(input, "first navigation");
-        act(() => {
-            vi.advanceTimersByTime(300);
-        });
-        expect(replace).toHaveBeenLastCalledWith(
-            "/?q=first+navigation&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
-        );
-
-        setInputValue(input, "old query");
-        render({ page: 1, q: "first navigation", tag: "питон" });
-        expect(input?.value).toBe("old query");
-        act(() => {
-            vi.advanceTimersByTime(300);
-        });
-        expect(replace).toHaveBeenLastCalledWith(
-            "/?q=old+query&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
-        );
-        expect(replace).toHaveBeenCalledTimes(2);
-
-        act(() => {
-            root.unmount();
-        });
-    });
-
-    it("suppresses intermediate IME navigation and starts debounce after composition", () => {
-        vi.useFakeTimers();
-        const { container, root } = renderControls();
-        const input = container.querySelector<HTMLInputElement>("#feed-search");
-
-        startComposition(input);
-        setInputValue(input, "に");
-        setInputValue(input, "日本");
-        act(() => {
-            vi.advanceTimersByTime(1_000);
-        });
-        expect(replace).not.toHaveBeenCalled();
-
-        endComposition(input);
-        act(() => {
-            vi.advanceTimersByTime(299);
-        });
-        expect(replace).not.toHaveBeenCalled();
-        act(() => {
-            vi.advanceTimersByTime(1);
-        });
-        expect(replace).toHaveBeenCalledWith(
-            "/?q=%E6%97%A5%E6%9C%AC&tag=%D0%BF%D0%B8%D1%82%D0%BE%D0%BD",
-        );
-        act(() => {
-            root.unmount();
-        });
-    });
-
-    it("syncs back/forward URL state and cancels the stale pending timer", () => {
-        vi.useFakeTimers();
-        const { container, root, render } = renderControls();
-        const input = container.querySelector<HTMLInputElement>("#feed-search");
-
-        setInputValue(input, "stale pending query");
-        render({ page: 1, q: "back query", tag: "django" });
+        expect(onSearch).toHaveBeenLastCalledWith("");
+        render("back query");
         expect(input?.value).toBe("back query");
         act(() => {
-            vi.advanceTimersByTime(1_000);
-        });
-        expect(replace).not.toHaveBeenCalled();
-
-        render({ page: 2, q: "forward query", tag: "django" });
-        expect(input?.value).toBe("forward query");
-        expect(replace).not.toHaveBeenCalled();
-        act(() => {
             root.unmount();
         });
     });
 
-    it("builds accessible tag links without separate clear controls", () => {
+    it("renders only search and the dedicated Subscribe link", () => {
         const html = renderToStaticMarkup(
             <FeedControls
-                state={{ page: 3, q: "django", tag: "питон" }}
-                tags={availableTags.results}
+                onSearch={() => undefined}
+                query={'"><script>alert(1)</script>'}
+                searching={false}
             />,
         );
-
         expect(html).toContain('role="search"');
-        expect(html).toContain('for="feed-search"');
-        expect(html).toContain('value="django"');
-        expect(html).not.toContain("Clear search");
-        expect(html).not.toContain("Clear filters");
-        expect(html).not.toContain("Clear tag");
-        expect(html).toContain('aria-current="page"');
-        expect(html).toContain('href="/?q=django&amp;tag=django"');
-        expect(html).toContain('href="/?q=django"');
-        expect(html).not.toContain("page=3");
-    });
-
-    it("escapes the current query instead of rendering HTML", () => {
-        const html = renderToStaticMarkup(
-            <FeedControls
-                state={{ page: 1, q: '"><script>alert(1)</script>' }}
-                tags={[]}
-            />,
-        );
-
-        expect(html).not.toContain("<script>");
+        expect(html).toContain('href="/subscriptions"');
         expect(html).toContain(
             'value="&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"',
         );
+        expect(html).not.toContain("<script>");
+        expect(html).not.toContain("#Django");
+        expect(html).not.toContain("Clear search");
+        expect(html).not.toContain("Page ");
     });
 });
 
-describe("Feed response states and metadata", () => {
-    it("renders invalid parameters without calling the backend", async () => {
-        const element = await HomePage({
+describe("Feed SSR response states and metadata", () => {
+    it("renders invalid q without contacting Django", async () => {
+        const element = await FeedPage({
             searchParams: Promise.resolve({ q: ["one", "two"] }),
         });
-
-        const html = renderToStaticMarkup(element);
-        expect(html).toContain("Invalid Feed URL");
-        expect(html).toContain('<h1 id="empty-feed-title">');
-        expect(html).toContain('href="/"');
-        expect(html).toContain("Return to Feed");
+        expect(renderHome(element)).toContain("Invalid Feed URL");
         expect(getPublicPosts).not.toHaveBeenCalled();
-        expect(getAvailableTags).not.toHaveBeenCalled();
     });
 
-    it("renders distinct unknown-tag and filtered no-results states", async () => {
-        vi.mocked(getAvailableTags).mockResolvedValue(availableTags);
-        vi.mocked(getPublicPosts).mockResolvedValue(feed());
-
-        const unknown = await HomePage({
-            searchParams: Promise.resolve({ tag: "unknown" }),
-        });
-        const noResults = await HomePage({
-            searchParams: Promise.resolve({ q: "missing", tag: "django" }),
-        });
-
-        expect(renderToStaticMarkup(unknown)).toContain("Unknown tag");
-        const noResultsHtml = renderToStaticMarkup(noResults);
-        expect(noResultsHtml).toContain("No posts found");
-        expect(noResultsHtml).not.toContain("Clear filters");
-    });
-
-    it("omits the subscription form while Draft Mode is active", async () => {
-        draftState.isEnabled = true;
-        vi.mocked(getAvailableTags).mockResolvedValue(availableTags);
-        vi.mocked(getPublicPosts).mockResolvedValue(feed());
-
-        const element = await HomePage({
-            searchParams: Promise.resolve({}),
-        });
-
-        expect(renderToStaticMarkup(element)).not.toContain(
-            "Get new posts by email",
-        );
-    });
-
-    it("renders a compact stream before subscription and omits dead pagination", async () => {
-        vi.mocked(getAvailableTags).mockResolvedValue(availableTags);
-        vi.mocked(getPublicPosts).mockResolvedValue(
-            feed({
-                count: 1,
-                results: [postSummary()],
+    it("normalizes legacy tag/page URLs to q without a loop", async () => {
+        await expect(
+            FeedPage({
+                searchParams: Promise.resolve({
+                    q: "русский Django",
+                    tag: "питон",
+                    page: "3",
+                }),
             }),
+        ).rejects.toThrow(
+            "NEXT_REDIRECT:/?q=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9+Django",
         );
+        expect(getPublicPosts).not.toHaveBeenCalled();
+        expect(redirect).toHaveBeenCalledOnce();
+    });
 
-        const element = await HomePage({
-            searchParams: Promise.resolve({}),
-        });
-        const html = renderToStaticMarkup(element);
-
+    it("SSR-renders page one without tags, pagination, or subscription form", async () => {
+        vi.mocked(getPublicPosts).mockResolvedValue(
+            feed({ count: 1, results: [postSummary()] }),
+        );
+        const element = await FeedPage({ searchParams: Promise.resolve({}) });
+        const html = renderHome(element);
         expect(html).toContain('<h1 class="sr-only">Feed</h1>');
         expect(html).toContain('aria-label="Latest posts"');
-        expect(html).toContain("feed-entry");
-        expect(html).not.toContain('aria-label="Feed pagination"');
-        expect(html.indexOf("A quiet Feed entry")).toBeLessThan(
-            html.indexOf("Get new posts by email"),
-        );
+        expect(html).toContain("A quiet Feed entry");
+        expect(html).toContain("Beginning of the archive");
+        expect(html).not.toContain("Invisible tag");
+        expect(html).not.toContain("Feed pagination");
+        expect(html).not.toContain("Get new posts by email");
     });
 
-    it("keeps a backend 404 distinct from infrastructure failure", async () => {
-        vi.mocked(getAvailableTags).mockResolvedValue(availableTags);
-        vi.mocked(getPublicPosts).mockResolvedValueOnce(null);
+    it("keeps search no-results, ordinary empty, 404, and infrastructure errors distinct", async () => {
+        vi.mocked(getPublicPosts).mockResolvedValue(feed());
+        const noResults = await FeedPage({
+            searchParams: Promise.resolve({ q: "missing" }),
+        });
+        expect(renderHome(noResults)).toContain("No posts found");
 
+        const empty = await FeedPage({ searchParams: Promise.resolve({}) });
+        expect(renderHome(empty)).toContain("No published posts yet");
+
+        vi.mocked(getPublicPosts).mockResolvedValueOnce(null);
         await expect(
-            HomePage({
-                searchParams: Promise.resolve({ page: "999" }),
-            }),
+            FeedPage({ searchParams: Promise.resolve({}) }),
         ).rejects.toThrow("NEXT_NOT_FOUND");
-        expect(notFound).toHaveBeenCalledOnce();
 
         vi.mocked(getPublicPosts).mockRejectedValueOnce(
             new ContentApiError("upstream unavailable"),
         );
         await expect(
-            HomePage({ searchParams: Promise.resolve({ q: "django" }) }),
+            FeedPage({ searchParams: Promise.resolve({ q: "django" }) }),
         ).rejects.toBeInstanceOf(ContentApiError);
     });
 
-    it("noindexes search/filter variants while keeping the root canonical", async () => {
+    it("noindexes direct search while retaining the root canonical", async () => {
         const metadata = await generateMetadata({
-            searchParams: Promise.resolve({
-                q: "<script>",
-                tag: "django",
-            }),
+            searchParams: Promise.resolve({ q: "<script>" }),
         });
-
         expect(metadata.alternates).toEqual({ canonical: "/" });
         expect(metadata.robots).toEqual({ index: false, follow: true });
         expect(JSON.stringify(metadata)).not.toContain("<script>");

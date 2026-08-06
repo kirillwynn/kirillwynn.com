@@ -18,16 +18,21 @@ describe("promotable runtime origin", () => {
         expect(publicSiteUrl()).toBe("https://kirillwynn.com");
     });
 
-    it("forces the root layout and metadata onto the runtime boundary", () => {
+    it("keeps metadata runtime-bound while allowing explicit public caches", () => {
         const layout = readFileSync(
             new URL("../app/layout.tsx", import.meta.url),
             "utf8",
         );
-        expect(layout).toContain('dynamic = "force-dynamic"');
+        expect(layout).not.toContain('dynamic = "force-dynamic"');
         expect(layout).toContain("await connection()");
         expect(layout).not.toContain("NEXT_PUBLIC_");
         expect(layout).toContain("THEME_INIT_SCRIPT");
         expect(layout).toContain("suppressHydrationWarning");
         expect(layout.indexOf("<head>")).toBeLessThan(layout.indexOf("<body"));
+        const nextConfig = readFileSync(
+            new URL("../next.config.ts", import.meta.url),
+            "utf8",
+        );
+        expect(nextConfig).toContain("cacheComponents: true");
     });
 });

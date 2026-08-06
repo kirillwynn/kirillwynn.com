@@ -804,6 +804,61 @@ describe("comments and Slack-style thread UI", () => {
         });
     });
 
+    it("does not let a stale comment read overwrite an authoritative mutation", async () => {
+        const staleRead = deferred<Response>();
+        const created = comment({
+            id: 99,
+            body: "Authoritative comment",
+            reply_count: 0,
+        });
+        const { container, root } = await renderComments(
+            authenticated,
+            [],
+            undefined,
+            (url, options) => {
+                if (!url.includes("/comments/")) {
+                    return null;
+                }
+                if (options?.method === "POST") {
+                    return Promise.resolve(response(created, 201));
+                }
+                return staleRead.promise;
+            },
+        );
+        const textarea =
+            container.querySelector<HTMLTextAreaElement>("#new-comment");
+        act(() => {
+            typeInTextarea(textarea, created.body ?? "");
+        });
+        const submit = Array.from(container.querySelectorAll("button")).find(
+            (button) => button.textContent === "Comment",
+        );
+        act(() => {
+            submit?.click();
+        });
+        await flush();
+        expect(container.textContent).toContain("Authoritative comment");
+
+        staleRead.resolve(
+            response(
+                page([
+                    comment({
+                        id: 7,
+                        body: "Stale response",
+                        reply_count: 0,
+                    }),
+                ]),
+            ),
+        );
+        await flush();
+
+        expect(container.textContent).toContain("Authoritative comment");
+        expect(container.textContent).not.toContain("Stale response");
+        act(() => {
+            root.unmount();
+        });
+    });
+
     it("uses code-point limits for pasted root, reply, and edit text", async () => {
         const editableRoot = comment({
             viewer: {

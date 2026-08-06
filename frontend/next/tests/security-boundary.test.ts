@@ -253,13 +253,15 @@ describe("server-only security boundary", () => {
         const picker = source("components/reaction-picker.tsx");
         const storage = source("lib/reaction-storage.ts");
 
-        expect(bar).toContain(
-            'lazy(() => import("@/components/reaction-picker"))',
-        );
+        const loader = source("lib/reaction-picker-loader.ts");
+        expect(bar).toContain("lazy(loadReactionPickerModule)");
+        expect(loader).toContain('import("@/components/reaction-picker")');
+        expect(loader).toContain("prefetchQuery");
         expect(picker).toContain("getReactionCatalog");
         expect(picker).not.toContain("@emoji-mart/data");
         expect(storage).not.toContain('from "emoji-regex"');
         expect(storage).not.toContain("@emoji-mart/data");
         expect(bar).not.toContain("@emoji-mart/data");
+        expect(loader).not.toContain("/media/reactions/");
     });
 });

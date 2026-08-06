@@ -831,7 +831,7 @@ describe("post, comment, and reply reaction UI", () => {
             container.querySelector(
                 '[data-comment-id="7"] .reaction-bar-slack-pills',
             ),
-        ).toBeNull();
+        ).not.toBeNull();
         act(() => {
             root.unmount();
         });
@@ -1191,9 +1191,17 @@ describe("participants, picker, and OAuth continuation", () => {
         expect(buttonByLabel(container, "Add Clapping reaction")).toBeDefined();
         expect(container.innerHTML).not.toContain("reaction reaction");
         act(() => {
-            buttonByLabel(container, "Add Clapping reaction")?.focus();
+            buttonByLabel(
+                container,
+                "View 1 participant for Clapping reaction",
+            )?.click();
         });
-        await flush();
+        await waitFor(
+            () =>
+                container.querySelector(
+                    '[aria-label="Clapping reaction participants"]',
+                ) !== null,
+        );
         expect(
             container.querySelector(
                 '[aria-label="Clapping reaction participants"]',
@@ -1240,7 +1248,10 @@ describe("participants, picker, and OAuth continuation", () => {
         );
         const toggle = buttonByLabel(container, "Remove Clapping reaction");
         act(() => {
-            toggle?.focus();
+            buttonByLabel(
+                container,
+                "View 1 participant for Clapping",
+            )?.click();
         });
         await waitFor(
             () =>
@@ -1265,7 +1276,7 @@ describe("participants, picker, and OAuth continuation", () => {
         });
     });
 
-    it("opens minimal participants on focus and mobile count tap", async () => {
+    it("opens participants only from an explicit count activation", async () => {
         defaultFetch(signedIn, (url) =>
             url.includes("/participants/")
                 ? Promise.resolve(
@@ -1290,15 +1301,14 @@ describe("participants, picker, and OAuth continuation", () => {
             buttonByLabel(container, "Add Clapping reaction")?.focus();
         });
         await flush();
-        expect(container.textContent).toContain("Kirill · Author");
-        act(() => {
-            container
-                .querySelector<HTMLButtonElement>(
-                    '[aria-label="Close reaction participants"]',
-                )
-                ?.click();
-        });
-        await flush();
+        expect(container.textContent).not.toContain("Kirill · Author");
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.some(([input]) =>
+                    urlOf(input).includes("/participants/"),
+                ),
+        ).toBe(false);
         const countTrigger = buttonByLabel(
             container,
             "View 1 participant for Clapping",
@@ -1364,11 +1374,17 @@ describe("participants, picker, and OAuth continuation", () => {
         );
 
         act(() => {
-            buttonByLabel(container, "Add Clapping reaction")?.focus();
+            buttonByLabel(
+                container,
+                "View 1 participant for Clapping",
+            )?.click();
         });
         await flush();
         act(() => {
-            buttonByLabel(container, "Add Celebrating reaction")?.focus();
+            buttonByLabel(
+                container,
+                "View 1 participant for Celebrating",
+            )?.click();
         });
         await flush();
         expect(
@@ -1467,11 +1483,17 @@ describe("participants, picker, and OAuth continuation", () => {
             />,
         );
         act(() => {
-            buttonByLabel(container, "Add Clapping reaction")?.focus();
+            buttonByLabel(
+                container,
+                "View 1 participant for Clapping",
+            )?.click();
         });
         await flush();
         act(() => {
-            buttonByLabel(container, "Add Celebrating reaction")?.focus();
+            buttonByLabel(
+                container,
+                "View 1 participant for Celebrating",
+            )?.click();
         });
         await flush();
         await act(async () => {
@@ -1695,7 +1717,7 @@ describe("participants, picker, and OAuth continuation", () => {
         });
     });
 
-    it("limits hover to fine mouse pointers and suppresses touch-triggered focus", async () => {
+    it("never opens participants from hover or focus", async () => {
         let participantCalls = 0;
         let toggleCalls = 0;
         defaultFetch(signedIn, (url, options) => {
@@ -1746,7 +1768,7 @@ describe("participants, picker, and OAuth continuation", () => {
             pill?.dispatchEvent(pointerEvent("pointerover", "mouse"));
         });
         await flush();
-        expect(participantCalls).toBe(1);
+        expect(participantCalls).toBe(0);
         act(() => {
             root.unmount();
         });
@@ -1795,6 +1817,7 @@ describe("participants, picker, and OAuth continuation", () => {
         act(() => {
             buttonByLabel(container, "Close reaction picker")?.click();
         });
+        await flush();
         expect(document.activeElement).toBe(trigger);
         act(() => {
             trigger?.click();
@@ -1845,6 +1868,7 @@ describe("participants, picker, and OAuth continuation", () => {
                     }),
                 );
         });
+        await flush();
         expect(
             container.querySelector('[aria-label="Choose a reaction"]'),
         ).toBeNull();
@@ -1913,6 +1937,7 @@ describe("participants, picker, and OAuth continuation", () => {
         expect(
             buttonByLabel(container, "Remove Thinking reaction"),
         ).toBeDefined();
+        await flush();
         expect(document.activeElement).toBe(trigger);
 
         act(() => {
