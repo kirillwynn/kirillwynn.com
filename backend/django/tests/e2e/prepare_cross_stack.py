@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 
 import django
@@ -13,10 +14,15 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.cross_stack")
 django.setup()
 
+from django.core.files.base import ContentFile  # noqa: E402
 from django.utils import timezone  # noqa: E402
+from PIL import Image as PillowImage  # noqa: E402
+from wagtail.admin.rich_text import get_rich_text_editor_widget  # noqa: E402
+from wagtail.images import get_image_model  # noqa: E402
 from wagtail.models import Page, Site  # noqa: E402
 from wagtail.users.models import UserProfile  # noqa: E402
 
+from apps.blog.blocks import RICH_TEXT_FEATURES  # noqa: E402
 from apps.blog.models import BlogIndexPage, BlogPostPage  # noqa: E402
 from apps.discussions.models import (  # noqa: E402
     Comment,
@@ -75,6 +81,95 @@ def main() -> None:
     post.tags.add("Django", "Security")
     post.save_revision().publish()
     post = BlogPostPage.objects.get(pk=post.pk)
+
+    image_buffer = BytesIO()
+    PillowImage.new("RGB", (32, 24), "#d69e5c").save(image_buffer, format="PNG")
+    editor_image = get_image_model().objects.create(
+        title="Stage 19B editor fixture",
+        file=ContentFile(image_buffer.getvalue(), name="stage19b-editor-fixture.png"),
+    )
+    second_image_buffer = BytesIO()
+    PillowImage.new("RGB", (32, 24), "#356c8c").save(second_image_buffer, format="PNG")
+    second_editor_image = get_image_model().objects.create(
+        title="Stage 19B gallery fixture",
+        file=ContentFile(
+            second_image_buffer.getvalue(),
+            name="stage19b-gallery-fixture.png",
+        ),
+    )
+    image_value = {
+        "image": editor_image,
+        "decorative": False,
+        "alt_text": "Warm rectangle used by the Stage 19B editor fixture.",
+    }
+    second_image_value = {
+        "image": second_editor_image,
+        "decorative": False,
+        "alt_text": "Blue rectangle used by the Stage 19B gallery fixture.",
+    }
+    rich_text_widget = get_rich_text_editor_widget(
+        "default",
+        features=RICH_TEXT_FEATURES,
+    )
+    imported_rich_text = "<p><b>Rich text</b> with <i>independent formatting</i>.</p>"
+    canonical_rich_text = rich_text_widget.value_from_datadict(
+        {"body": rich_text_widget.format_value(imported_rich_text)},
+        {},
+        "body",
+    )
+    all_blocks_post = BlogPostPage(
+        title="Stage 19B all-block editor fixture",
+        slug="stage-19b-all-block-editor-fixture",
+        excerpt="Draft-only fixture for StreamField editor compatibility checks.",
+        body=[
+            ("rich_text", canonical_rich_text),
+            ("heading", {"level": "h2", "text": "All content blocks"}),
+            ("image", image_value),
+            ("gallery", [image_value, second_image_value]),
+            ("quote", {"text": "Writing stays primary.", "attribution": "Stage 19B"}),
+            ("bulleted_list", ["First bullet", "Second bullet"]),
+            ("numbered_list", ["First step", "Second step"]),
+            (
+                "checklist",
+                [
+                    {"text": "Draft", "checked": True},
+                    {"text": "Review", "checked": False},
+                ],
+            ),
+            ("inline_code", "python manage.py check"),
+            (
+                "code_block",
+                {"language": "python", "code": "print('Stage 19B')"},
+            ),
+            (
+                "table",
+                {
+                    "data": [["Contract", "Result"], ["Storage", "Preserved"]],
+                    "table_header_choice": "row",
+                    "first_row_is_table_header": True,
+                    "first_col_is_header": False,
+                },
+            ),
+            ("horizontal_divider", None),
+            (
+                "link",
+                {
+                    "text": "Blog index",
+                    "internal_page": index,
+                    "external_url": "",
+                },
+            ),
+        ],
+        notify_subscribers_on_first_publication=False,
+        owner=cms_owner,
+        live=False,
+    )
+    index.add_child(instance=all_blocks_post)
+    canonical_revision = all_blocks_post.save_revision()
+    all_blocks_post.body = all_blocks_post.body.stream_block.to_python(
+        canonical_revision.content["body"]
+    )
+    all_blocks_post.save(update_fields=("body",))
 
     cms_owner_profile = UserProfile.get_for_user(cms_owner)
     cms_owner_profile.theme = UserProfile.AdminColorThemes.LIGHT
@@ -158,6 +253,8 @@ def main() -> None:
     state = {
         "preview_credential": preview_response.cookies["kw_preview_credential"].value,
         "post_slug": post.slug,
+        "all_blocks_post_id": all_blocks_post.pk,
+        "all_blocks_post_slug": all_blocks_post.slug,
     }
     Path(
         os.environ.get(

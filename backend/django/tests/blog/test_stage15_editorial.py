@@ -250,6 +250,7 @@ def test_dashboard_and_menu_new_post_shortcut_resolve_dynamic_parent(client, blo
     assert dashboard.content.count(b"New post") >= 2
     assert b"Start with the post" in dashboard.content
     assert b"blog/css/editorial-admin.css" in dashboard.content
+    assert b"blog/js/editorial-admin.js" not in dashboard.content
     assert shortcut.status_code == 302
     assert shortcut.headers["Location"] == new_post_add_url(blog_index)
     assert str(blog_index.pk) in shortcut.headers["Location"]
@@ -304,13 +305,35 @@ def test_add_editor_exposes_writing_first_tabs_labels_and_all_block_descriptions
     assert "Write" in content
     assert "Publish" in content
     assert "SEO &amp; sharing" in content
+    assert 'class="w-form-width" data-editorial-surface="writing"' in content
+    assert 'data-editorial-surface="publishing"' in content
+    assert 'data-editorial-surface="sharing"' in content
     assert 'data-editorial-field="title"' in content
     assert 'data-editorial-field="body"' in content
+    assert "blog/js/editorial-admin.js" in content
     assert "Original publication date" in content
     assert "Notify subscribers on first publication" in content
     assert "Newsletter decision" in content
+    assert "internal classification, search relevance, and metadata" in content
+    assert "Feed filters" not in content
     for group in ("Text", "Media", "Lists", "Code / Data", "Structure"):
         assert group in content
+    for block_type in (
+        "rich_text",
+        "heading",
+        "image",
+        "gallery",
+        "quote",
+        "bulleted_list",
+        "numbered_list",
+        "checklist",
+        "inline_code",
+        "code_block",
+        "table",
+        "horizontal_divider",
+        "link",
+    ):
+        assert f"data-editorial-block&quot;: &quot;{block_type}" in content
     for description in (
         "Paragraphs with bold, italic, and links.",
         "One image with contextual alt text.",

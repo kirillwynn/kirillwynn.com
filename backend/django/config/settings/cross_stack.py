@@ -1,7 +1,11 @@
 """Test-only settings for the local Django/Next.js Playwright stack."""
 
+from pathlib import Path
+
 from config.settings.test import *  # noqa: F403
 
+DEBUG = True
+MEDIA_ROOT = Path("/tmp/kirillwynn-cross-stack-media")
 PUBLIC_SITE_URL = "http://localhost:3200"
 FRONTEND_PREVIEW_URL = "http://localhost:3200/api/draft"
 PREVIEW_COOKIE_SECURE = False
