@@ -105,3 +105,11 @@ def insert_editorial_admin_css():
         '<link rel="stylesheet" href="{}">',
         static("blog/css/editorial-admin.css"),
     )
+
+
+@hooks.register("insert_editor_js")
+def insert_editorial_editor_js():
+    return format_html(
+        '<script src="{}" defer></script>',
+        static("blog/js/editorial-admin.js"),
+    )

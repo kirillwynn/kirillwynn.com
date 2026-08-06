@@ -297,6 +297,11 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 WAGTAIL_SITE_NAME = "kirillwynn.com"
+WAGTAILADMIN_RICH_TEXT_EDITORS = {
+    "default": {
+        "WIDGET": "apps.blog.widgets.AccessibleDraftailRichTextArea",
+    },
+}
 WAGTAILIMAGES_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
 WAGTAILIMAGES_MAX_UPLOAD_SIZE = 8 * 1024 * 1024
 WAGTAILIMAGES_MAX_IMAGE_PIXELS = 40_000_000

@@ -105,30 +105,475 @@
     font-weight: 700;
 }
 
+/*
+ * The page-specific attributes below are supplied by supported Wagtail panels.
+ * Keeping every rule beneath those attributes means this stylesheet can be
+ * loaded by Wagtail globally without restyling other page types or Django admin.
+ */
+[data-editorial-surface="writing"] {
+    box-sizing: border-box;
+    width: min(100%, 56rem);
+    max-width: 56rem;
+    min-width: 0;
+    margin-inline: auto;
+    padding-block: clamp(1rem, 2vw, 2rem) 7rem;
+}
+
+[data-editorial-surface="publishing"],
+[data-editorial-surface="sharing"] {
+    box-sizing: border-box;
+    width: min(100%, 60rem);
+    max-width: 60rem;
+    min-width: 0;
+    margin-inline: auto;
+    padding-block: 1rem 7rem;
+}
+
+.editorial-writing-tab,
+.editorial-writing-tab *,
+.editorial-secondary-tab,
+.editorial-secondary-tab * {
+    box-sizing: border-box;
+}
+
 .editorial-title-panel,
 .editorial-excerpt-panel,
 .editorial-body-panel {
     width: 100%;
-    max-width: 86rem;
+    max-width: none;
     min-width: 0;
+    margin: 0;
+}
+
+.editorial-title-panel > .w-panel__header,
+.editorial-excerpt-panel > .w-panel__header,
+.editorial-body-panel > .w-panel__header {
+    min-height: 2rem;
+    color: var(--w-color-text-label);
+}
+
+.editorial-title-panel > .w-panel__header,
+.editorial-excerpt-panel > .w-panel__header {
+    padding-block: 0;
+    border: 0;
+}
+
+.editorial-title-panel > .w-panel__content,
+.editorial-excerpt-panel > .w-panel__content,
+.editorial-body-panel > .w-panel__content {
+    padding-inline: 0;
+}
+
+.editorial-title-panel .w-panel__heading,
+.editorial-excerpt-panel .w-panel__heading,
+.editorial-body-panel > .w-panel__header .w-panel__heading {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.editorial-title-panel .w-panel__anchor,
+.editorial-excerpt-panel .w-panel__anchor,
+.editorial-body-panel > .w-panel__header .w-panel__anchor,
+.editorial-title-panel > .w-panel__header .w-panel__toggle,
+.editorial-excerpt-panel > .w-panel__header .w-panel__toggle,
+.editorial-body-panel > .w-panel__header .w-panel__toggle {
+    opacity: 0.38;
+}
+
+.editorial-title-panel .w-panel__anchor:focus-visible,
+.editorial-excerpt-panel .w-panel__anchor:focus-visible,
+.editorial-body-panel > .w-panel__header .w-panel__anchor:focus-visible,
+.editorial-title-panel > .w-panel__header .w-panel__toggle:focus-visible,
+.editorial-excerpt-panel > .w-panel__header .w-panel__toggle:focus-visible,
+.editorial-body-panel > .w-panel__header .w-panel__toggle:focus-visible,
+.editorial-title-panel:hover > .w-panel__header .w-panel__anchor,
+.editorial-excerpt-panel:hover > .w-panel__header .w-panel__anchor,
+.editorial-body-panel:hover > .w-panel__header .w-panel__anchor,
+.editorial-title-panel:hover > .w-panel__header .w-panel__toggle,
+.editorial-excerpt-panel:hover > .w-panel__header .w-panel__toggle,
+.editorial-body-panel:hover > .w-panel__header .w-panel__toggle {
+    opacity: 1;
+}
+
+.editorial-title-panel .w-field__help,
+.editorial-excerpt-panel .w-field__help {
+    margin: 0 0 0.25rem;
+    color: var(--w-color-text-meta);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+}
+
+.editorial-title-panel input,
+.editorial-excerpt-panel input {
+    width: 100%;
+    max-width: none;
+    border: 0;
+    border-bottom: 1px solid var(--w-color-border-field-default);
+    border-radius: 0;
+    background: transparent;
+    color: var(--w-color-text-context);
+    box-shadow: none;
 }
 
 .editorial-title-panel input {
     min-height: 3.75rem;
-    padding-block: 0.65rem;
-    font-size: clamp(1.75rem, 3vw, 2.65rem);
+    padding: 0.5rem 2.75rem 0.6rem 0;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
     font-weight: 700;
-    line-height: 1.15;
+    line-height: 1.12;
+}
+
+.editorial-excerpt-panel {
+    margin-top: 0.25rem;
 }
 
 .editorial-excerpt-panel input {
     min-height: 3rem;
-    font-size: 1.05rem;
+    padding: 0.45rem 2.75rem 0.55rem 0;
+    color: var(--w-color-text-meta);
+    font-size: 1.0625rem;
+    line-height: 1.45;
+}
+
+.editorial-title-panel input:hover,
+.editorial-excerpt-panel input:hover {
+    border-bottom-color: var(--w-color-border-field-hover);
+}
+
+.editorial-title-panel input:focus,
+.editorial-excerpt-panel input:focus {
+    border-bottom-color: var(--w-color-focus);
+    outline: 0;
+    box-shadow: 0 2px 0 var(--w-color-focus);
+}
+
+.editorial-title-panel input:focus-visible,
+.editorial-excerpt-panel input:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
+.editorial-title-panel .w-field__comment-button,
+.editorial-excerpt-panel .w-field__comment-button {
+    inset-inline-end: 0.25rem;
+}
+
+.editorial-body-panel {
+    margin-top: clamp(1rem, 3vw, 2rem);
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--w-color-border-furniture);
+}
+
+.editorial-body-panel > .w-panel__header {
+    padding-block: 0.25rem;
 }
 
 .editorial-body-panel textarea {
     max-width: 100%;
-    min-height: 14rem;
+}
+
+.editorial-body-panel [data-streamfield-stream-container] {
+    min-width: 0;
+}
+
+.editorial-body-panel [data-streamfield-child] {
+    min-width: 0;
+    margin-block: 0.35rem;
+}
+
+.editorial-body-panel [data-streamfield-child] > .w-panel {
+    min-width: 0;
+    overflow: visible;
+    border: 1px solid color-mix(in srgb, var(--w-color-border-furniture) 72%, transparent);
+    border-radius: 0.55rem;
+    background: color-mix(in srgb, var(--w-color-surface-field) 30%, transparent);
+    box-shadow: none;
+    transition:
+        border-color 120ms ease,
+        background-color 120ms ease,
+        box-shadow 120ms ease;
+}
+
+.editorial-body-panel [data-streamfield-child] > .w-panel:hover {
+    border-color: var(--w-color-border-field-hover);
+}
+
+.editorial-body-panel [data-streamfield-child]:focus-within > .w-panel {
+    border-color: var(--w-color-focus);
+    background: color-mix(in srgb, var(--w-color-surface-field) 68%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--w-color-focus) 28%, transparent);
+}
+
+.editorial-body-panel [data-streamfield-child] > .w-panel > .w-panel__header {
+    min-height: 2.5rem;
+    padding-block: 0.25rem;
+    color: var(--w-color-text-meta);
+}
+
+.editorial-body-panel [data-streamfield-child] .c-sf-block__type {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.editorial-body-panel [data-streamfield-child] .c-sf-block__title {
+    color: var(--w-color-text-meta);
+    font-size: 0.75rem;
+}
+
+.editorial-body-panel [data-streamfield-child] > .w-panel > .w-panel__content {
+    min-width: 0;
+    padding: 0.5rem clamp(0.65rem, 2vw, 1rem) 0.85rem;
+}
+
+.editorial-body-panel [data-streamfield-child] .w-panel__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.125rem;
+}
+
+.editorial-body-panel [data-streamfield-action] {
+    color: var(--w-color-text-meta);
+    opacity: 1;
+    transition:
+        color 120ms ease,
+        opacity 120ms ease,
+        background-color 120ms ease;
+}
+
+.editorial-body-panel [data-streamfield-action="DELETE"] {
+    margin-inline-start: 0.25rem;
+    color: var(--w-color-critical-200);
+}
+
+.editorial-body-panel [data-streamfield-action]:focus-visible {
+    opacity: 1;
+    outline: 3px solid var(--w-color-focus);
+    outline-offset: 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .editorial-body-panel [data-streamfield-child] [data-streamfield-action] {
+        opacity: 0.3;
+    }
+
+    .editorial-body-panel [data-streamfield-child]:hover [data-streamfield-action],
+    .editorial-body-panel [data-streamfield-child]:focus-within [data-streamfield-action],
+    .editorial-body-panel [data-streamfield-action]:focus-visible {
+        opacity: 1;
+    }
+}
+
+.editorial-body-panel .c-sf-add-button {
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-block: 0.15rem;
+    margin-inline-start: 0;
+    border-radius: 999px;
+    background: var(--w-color-surface-page);
+}
+
+.editorial-body-panel .c-sf-add-button .icon {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.editorial-body-panel .c-sf-add-button:focus-visible {
+    outline: 3px solid var(--w-color-focus);
+    outline-offset: 2px;
+}
+
+/* Rich text keeps Wagtail's Draftail widget and database converter intact. */
+.editorial-body-panel [data-streamfield-child]:has([data-draftail-editor-wrapper])
+    > .w-panel
+    > .w-panel__content {
+    padding: 0.25rem;
+}
+
+.editorial-body-panel [data-draftail-editor-wrapper] {
+    max-width: 100%;
+}
+
+.editorial-body-panel .Draftail-Editor {
+    min-height: 7.5rem;
+    overflow: visible;
+    border: 0;
+    border-radius: 0.4rem;
+    background: var(--w-color-surface-field);
+}
+
+.editorial-body-panel .Draftail-Editor--focus {
+    outline: 2px solid var(--w-color-focus);
+    outline-offset: -2px;
+}
+
+.editorial-body-panel .Draftail-Editor .DraftEditor-root {
+    min-height: 7.5rem;
+    overflow: visible;
+    font-size: clamp(1rem, 0.95rem + 0.3vw, 1.1875rem);
+    line-height: 1.65;
+}
+
+.editorial-body-panel .Draftail-Editor .public-DraftEditor-content,
+.editorial-body-panel .Draftail-Editor .public-DraftEditorPlaceholder-root {
+    min-height: 7.5rem;
+    padding: 1rem clamp(1rem, 3vw, 1.5rem) 1.25rem;
+}
+
+.editorial-body-panel .Draftail-Toolbar,
+.editorial-body-panel .Draftail-FloatingToolbar {
+    max-width: min(100%, 26rem);
+    padding: 0.25rem;
+    border: 1px solid var(--w-color-border-furniture);
+    color: var(--w-color-text-context);
+    box-shadow: 0 0.4rem 1.2rem color-mix(in srgb, var(--w-color-black) 14%, transparent);
+}
+
+.editorial-body-panel .Draftail-Toolbar--pin {
+    width: 100%;
+    max-width: 100%;
+    min-height: 2.5rem;
+    align-items: center;
+    padding-inline-end: 1.75rem;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    box-shadow: none;
+    opacity: 0.62;
+}
+
+.editorial-body-panel .Draftail-Editor:focus-within .Draftail-Toolbar--pin {
+    opacity: 1;
+}
+
+.editorial-body-panel .Draftail-ToolbarButton {
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    margin-inline-end: 0.2rem;
+    padding: 0.35rem;
+}
+
+.editorial-body-panel .Draftail-ToolbarButton:focus-visible {
+    outline: 3px solid var(--w-color-focus);
+    outline-offset: 1px;
+}
+
+.editorial-body-panel .Draftail-ToolbarButton--pin {
+    width: 1.65rem;
+    min-width: 1.65rem;
+    height: 1.65rem;
+    margin: 0;
+}
+
+.editorial-body-panel .Draftail-BlockToolbar {
+    inset-inline-start: -1.8rem;
+    width: 1.8rem;
+}
+
+.editorial-body-panel .Draftail-BlockToolbar__trigger:focus-visible {
+    visibility: visible;
+    outline: 3px solid var(--w-color-focus);
+    outline-offset: 2px;
+}
+
+/* Stable block IDs supply calm, content-shaped editing surfaces. */
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="heading"])
+    input[type="text"] {
+    min-height: 3rem;
+    font-size: clamp(1.35rem, 1.1rem + 1vw, 1.85rem);
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="quote"])
+    textarea {
+    min-height: 6rem;
+    border-inline-start: 0.25rem solid var(--w-color-border-field-default);
+    border-radius: 0.25rem;
+    font-size: 1.0625rem;
+    font-style: italic;
+    line-height: 1.6;
+}
+
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="code_block"])
+    textarea,
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="inline_code"])
+    input {
+    font-family: var(--w-font-mono);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    tab-size: 4;
+}
+
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="code_block"])
+    textarea {
+    min-height: 16rem;
+    resize: vertical;
+}
+
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="bulleted_list"]),
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="numbered_list"]),
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="checklist"]),
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="gallery"]) {
+    --editorial-nested-block-gap: 0.25rem;
+}
+
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="bulleted_list"])
+    [data-streamfield-child]
+    > .w-panel,
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="numbered_list"])
+    [data-streamfield-child]
+    > .w-panel,
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="checklist"])
+    [data-streamfield-child]
+    > .w-panel {
+    border-color: color-mix(in srgb, var(--w-color-border-furniture) 48%, transparent);
+    background: transparent;
+}
+
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="horizontal_divider"])
+    > .w-panel
+    > .w-panel__content {
+    min-height: 0;
+    padding-block: 0.25rem;
+}
+
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="horizontal_divider"])
+    .w-field__help,
+.editorial-body-panel
+    [data-streamfield-child]:has([data-editorial-block="horizontal_divider"])
+    .help {
+    margin: 0;
+}
+
+.editorial-body-panel .w-field--error,
+.editorial-body-panel [aria-invalid="true"] {
+    scroll-margin-block: 8rem;
+}
+
+.editorial-body-panel .w-field--error > .w-field__errors,
+.editorial-body-panel .w-field__errors:not(:empty) {
+    color: var(--w-color-critical-200);
+    font-weight: 700;
 }
 
 .editorial-publication-intent {
@@ -144,12 +589,50 @@
     .editorial-home__unavailable {
         width: 100%;
     }
+
+    [data-editorial-surface="writing"],
+    [data-editorial-surface="publishing"],
+    [data-editorial-surface="sharing"] {
+        width: 100%;
+        max-width: none;
+        padding-block-start: 0.75rem;
+    }
+
+    .editorial-title-panel input {
+        min-height: 3.25rem;
+        font-size: clamp(1.65rem, 6vw, 2.1rem);
+    }
+
+    .editorial-body-panel [data-streamfield-child] > .w-panel > .w-panel__header {
+        min-height: 3rem;
+    }
+
+    .editorial-body-panel [data-streamfield-child] .w-panel__controls {
+        max-width: 12rem;
+    }
+
+    .editorial-body-panel .Draftail-BlockToolbar {
+        inset-inline-start: -1.25rem;
+        width: 1.25rem;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .editorial-home *,
     .editorial-home *::before,
     .editorial-home *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+
+    .editorial-writing-tab *,
+    .editorial-writing-tab *::before,
+    .editorial-writing-tab *::after,
+    .editorial-secondary-tab *,
+    .editorial-secondary-tab *::before,
+    .editorial-secondary-tab *::after {
         scroll-behavior: auto !important;
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;

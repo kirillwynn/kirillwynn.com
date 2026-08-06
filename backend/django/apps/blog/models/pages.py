@@ -138,7 +138,9 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
         FieldPanel(
             "tags",
             heading="Tags",
-            help_text="Optional labels used by Feed filters and search.",
+            help_text=(
+                "Optional labels for internal classification, search relevance, and metadata."
+            ),
         ),
         *Page.settings_panels,
     ]
@@ -163,9 +165,24 @@ class BlogPostPage(HeadlessPreviewMixin, Page):
     ]
     edit_handler = TabbedInterface(
         [
-            ObjectList(writing_panels, heading="Write"),
-            ObjectList(publication_panels, heading="Publish"),
-            ObjectList(sharing_panels, heading="SEO & sharing"),
+            ObjectList(
+                writing_panels,
+                heading="Write",
+                classname="editorial-writing-tab",
+                attrs={"data-editorial-surface": "writing"},
+            ),
+            ObjectList(
+                publication_panels,
+                heading="Publish",
+                classname="editorial-secondary-tab",
+                attrs={"data-editorial-surface": "publishing"},
+            ),
+            ObjectList(
+                sharing_panels,
+                heading="SEO & sharing",
+                classname="editorial-secondary-tab",
+                attrs={"data-editorial-surface": "sharing"},
+            ),
         ],
         base_form_class=BlogPostPageForm,
     )

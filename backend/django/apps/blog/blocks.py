@@ -10,6 +10,23 @@ RICH_TEXT_FEATURES = ["bold", "italic", "link"]
 LANGUAGE_IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_+#.-]{0,31}$")
 
 
+def accessible_char_block(*, aria_label, **kwargs):
+    """Return a storage-identical CharBlock with an accessible editor widget."""
+
+    block = blocks.CharBlock(**kwargs)
+    block.field.widget.attrs["aria-label"] = aria_label
+    return block
+
+
+def editorial_block(block, block_type):
+    """Annotate a block through Wagtail's supported form-attrs extension point."""
+
+    form_attrs = dict(block.meta.form_attrs or {})
+    form_attrs["data-editorial-block"] = block_type
+    block.meta.form_attrs = form_attrs
+    return block
+
+
 class LanguageIdentifierBlock(blocks.CharBlock):
     """A storage-safe, frontend-agnostic syntax language identifier."""
 
@@ -121,84 +138,130 @@ class LinkBlock(blocks.StructBlock):
 
 
 class BlogBodyBlock(blocks.StreamBlock):
-    rich_text = blocks.RichTextBlock(
-        features=RICH_TEXT_FEATURES,
-        label="Rich text",
-        group="Text",
-        description="Paragraphs with bold, italic, and links.",
+    rich_text = editorial_block(
+        blocks.RichTextBlock(
+            features=RICH_TEXT_FEATURES,
+            label="Rich text",
+            group="Text",
+            description="Paragraphs with bold, italic, and links.",
+        ),
+        "rich_text",
     )
-    heading = HeadingBlock(
-        group="Text",
-        description="A section heading at level 2, 3, or 4.",
+    heading = editorial_block(
+        HeadingBlock(
+            group="Text",
+            description="A section heading at level 2, 3, or 4.",
+        ),
+        "heading",
     )
-    image = ImageBlock(
-        group="Media",
-        description="One image with contextual alt text.",
+    image = editorial_block(
+        ImageBlock(
+            group="Media",
+            description="One image with contextual alt text.",
+        ),
+        "image",
     )
-    gallery = blocks.ListBlock(
-        ImageBlock(),
-        min_num=2,
-        max_num=12,
-        label="Gallery",
-        group="Media",
-        description="A gallery of 2–12 images.",
+    gallery = editorial_block(
+        blocks.ListBlock(
+            ImageBlock(),
+            min_num=2,
+            max_num=12,
+            label="Gallery",
+            group="Media",
+            description="A gallery of 2–12 images.",
+        ),
+        "gallery",
     )
-    quote = QuoteBlock(
-        group="Text",
-        description="A quotation with optional attribution.",
+    quote = editorial_block(
+        QuoteBlock(
+            group="Text",
+            description="A quotation with optional attribution.",
+        ),
+        "quote",
     )
-    bulleted_list = blocks.ListBlock(
-        blocks.CharBlock(max_length=500),
-        min_num=1,
-        label="Bulleted list",
-        group="Lists",
-        description="An unordered list of short items.",
+    bulleted_list = editorial_block(
+        blocks.ListBlock(
+            accessible_char_block(
+                aria_label="Bulleted list item",
+                max_length=500,
+            ),
+            min_num=1,
+            label="Bulleted list",
+            group="Lists",
+            description="An unordered list of short items.",
+        ),
+        "bulleted_list",
     )
-    numbered_list = blocks.ListBlock(
-        blocks.CharBlock(max_length=500),
-        min_num=1,
-        label="Numbered list",
-        group="Lists",
-        description="An ordered list of short items.",
+    numbered_list = editorial_block(
+        blocks.ListBlock(
+            accessible_char_block(
+                aria_label="Numbered list item",
+                max_length=500,
+            ),
+            min_num=1,
+            label="Numbered list",
+            group="Lists",
+            description="An ordered list of short items.",
+        ),
+        "numbered_list",
     )
-    checklist = blocks.ListBlock(
-        ChecklistItemBlock(),
-        min_num=1,
-        label="Checklist",
-        group="Lists",
-        description="Items with checked or unchecked state.",
+    checklist = editorial_block(
+        blocks.ListBlock(
+            ChecklistItemBlock(),
+            min_num=1,
+            label="Checklist",
+            group="Lists",
+            description="Items with checked or unchecked state.",
+        ),
+        "checklist",
     )
-    inline_code = blocks.CharBlock(
-        max_length=500,
-        icon="code",
-        label="Inline code",
-        group="Code / Data",
-        description="A short code fragment shown inline.",
+    inline_code = editorial_block(
+        accessible_char_block(
+            aria_label="Inline code",
+            max_length=500,
+            icon="code",
+            label="Inline code",
+            group="Code / Data",
+            description="A short code fragment shown inline.",
+        ),
+        "inline_code",
     )
-    code_block = CodeBlock(
-        group="Code / Data",
-        description="A multiline code sample with a language.",
+    code_block = editorial_block(
+        CodeBlock(
+            group="Code / Data",
+            description="A multiline code sample with a language.",
+        ),
+        "code_block",
     )
-    table = TableBlock(
-        table_options={
-            "minSpareRows": 0,
-            "startRows": 3,
-            "startCols": 3,
-        },
-        label="Table",
-        group="Code / Data",
-        description="Structured rows and columns with optional headers.",
+    table = editorial_block(
+        TableBlock(
+            table_options={
+                "minSpareRows": 0,
+                "startRows": 3,
+                "startCols": 3,
+            },
+            label="Table",
+            group="Code / Data",
+            description="Structured rows and columns with optional headers.",
+        ),
+        "table",
     )
-    horizontal_divider = blocks.StaticBlock(
-        admin_text="A horizontal divider.",
-        icon="horizontalrule",
-        label="Horizontal divider",
-        group="Structure",
-        description="A visual break between sections.",
+    horizontal_divider = editorial_block(
+        blocks.StaticBlock(
+            admin_text="A horizontal divider.",
+            icon="horizontalrule",
+            label="Horizontal divider",
+            group="Structure",
+            description="A visual break between sections.",
+        ),
+        "horizontal_divider",
     )
-    link = LinkBlock(
-        group="Structure",
-        description="A labelled link to a page or external URL.",
+    link = editorial_block(
+        LinkBlock(
+            group="Structure",
+            description="A labelled link to a page or external URL.",
+        ),
+        "link",
     )
 
     class Meta:
