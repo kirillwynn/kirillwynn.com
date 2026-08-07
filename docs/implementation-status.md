@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
 Integration branch: `rewrite/wagtail-next`
 
@@ -84,6 +84,15 @@ dismissal, one subscription page, and the narrower footer passed required CI,
 an immutable controlled rollout, schema-3 attestation, and live Chrome QA.
 No migration, CMS-editor change, catalog sync, production operation, or `main`
 change occurred.
+
+Stage 19B is implemented and active on staging as application release
+`0d472e061f7e17c45ea133bf425269c3138c70f9`. The centred writing canvas,
+compact native Draftail toolbar, quieter StreamField chrome, accessible editor
+annotations, updated tag guidance, round-trip/lifecycle regressions, required
+CI, immutable rollout, and schema-3 attestation passed without a migration,
+public frontend change, or content-contract change. Wagtail 7.4 remains the
+owner of drafts, revisions, comments, preview, publication, scheduling,
+expiry, history, restore, permissions, images, choosers, and sanitization.
 
 ## Stage 19A public performance, infinite Feed, and reaction UX
 
@@ -347,10 +356,217 @@ reported from the baseline trace and deterministic Playwright network gates,
 not Chrome-control click wall time, because that controller adds a fixed
 post-action delay. Production and all reaction rights remain unverified.
 
-Stage 19B is a separate, unstarted Reddit-like Wagtail CMS editor stage:
-writing-first layout, compact Rich Text toolbar, supported Wagtail 7.4 extension
-points, and preservation of all 13 StreamField blocks, revisions, preview,
-scheduling, and rollback. Stage 19A does not change the CMS editor.
+Stage 19B was completed independently after this public-only stage; its editor
+contract and evidence follow.
+
+## Stage 19B Wagtail writing experience
+
+### Baseline and UX causes
+
+Stage 19B began from clean synchronized local/origin
+`4cf450479ec6c36b46503c404338fedb54260d8a`; `origin/main` was and remains
+`1d02912430277cdf5465f856b158a6820bc12be4`. Active staging was
+`f59c6cf0139490e4b8da6e130cd45ef37f8c4b35`, operation
+`deploy-31096039620-staging-f59c6cf0139490e4b8da6e130cd45ef37f8c4b35`,
+both deploy variables and the reaction-catalog sync variable were false, no
+one-shot resolution variable was present, production application state was
+absent, and the Stage 19A migration chain was empty.
+
+The local and live audit covered dashboard, New post, add/edit, all three tabs,
+all 13 chooser entries, Rich Text, image/link choosers, gallery, lists, code,
+table, preview, scheduling, and history in both supported themes at 768×1024,
+1024×768, 1440×900, and 1920×1080. It confirmed every preliminary cause:
+
+- the unconstrained writing surface reached about 1,194 px at 1920 and was
+  840 px but left-aligned at 1440; with Wagtail's status panel open it collapsed
+  to about 298 px at 1024;
+- stacked panel borders, headings, accordions, and permanently prominent block
+  actions made StreamField read as a technical constructor;
+- the selection-dependent floating Draftail toolbar was visually large and
+  could compete with block chrome, while Bold, Italic, and Link were not
+  discoverable before a selection;
+- the full-size Add block controls and nested list/gallery cards competed with
+  the authored text; and
+- title, excerpt, and body did not read as one continuous writing surface.
+
+Before/after evidence was captured for all eight theme/viewport combinations
+and a 1440 px chooser. In the normal closed-side-panel writing state the final
+surface measures 728 px at 768, 664 px at 1024, and the capped 896 px at both
+1440 and 1920. Title, toolbar, and chooser stay within the viewport, and
+document `scrollWidth` equals `clientWidth` at every required size.
+
+### Supported editor architecture
+
+ADR 0010 records the durable boundary. Stage 19B uses `TabbedInterface`,
+`ObjectList`, ordinary Wagtail panels, panel `classname`/`attrs`, block
+`form_attrs`, `WAGTAILADMIN_RICH_TEXT_EDITORS`,
+`register_rich_text_features`, `insert_global_admin_css`, and editor-scoped
+`insert_editor_js`. There is no page-edit template fork, copied Wagtail
+template, custom block form template, Telepath adapter, global observer, DOM
+polling, simulated internal click, label-dependent script, React editor, or
+private Draftail state mutation.
+
+`AccessibleDraftailRichTextArea` subclasses Wagtail's widget only to provide the
+stable `Rich text editor` accessible name. It inherits the standard database
+HTML converter, chooser entities, paste sanitization, and revision-comment
+surface. The existing `bold`, `italic`, and `link` feature/storage contract is
+unchanged; underline was not added.
+
+Each Rich Text block keeps its own native Draftail toolbar and state. The
+floating and Wagtail-pinned forms are compact; the focused block is prominent
+and inactive pinned blocks are quieter. Bold, Italic, Link, line break,
+revision comment, native pin, `Cmd/Ctrl+B`, `Cmd/Ctrl+I`, `Cmd/Ctrl+K`,
+undo/redo, Escape, and native chooser behavior remain Draftail-owned. Pinning
+is intentionally a user action because Wagtail exposes no documented setting
+to force the native toolbar pinned without simulating an internal click.
+
+The stable block names, order, values, IDs, JSON, validation, API, and preview
+serialization remain:
+
+1. `rich_text`
+2. `heading`
+3. `image`
+4. `gallery`
+5. `quote`
+6. `bulleted_list`
+7. `numbered_list`
+8. `checklist`
+9. `inline_code`
+10. `code_block`
+11. `table`
+12. `horizontal_divider`
+13. `link`
+
+### Additive history and automated evidence
+
+History is additive and was not rewritten:
+
+- `b0c197df970d45bb31887a2a7a1847dd6aedef2c` (parent `4cf4504...`)
+  implements the supported writing surface;
+- `9c9873764e28bef66ab67b67b4781d34de2964c8` (parent `b0c197d...`)
+  adds storage, lifecycle, browser, and accessibility coverage;
+- `dd1938cf4ff3dfc2a1ab22bb369b25380d0b5915` (parent `9c98737...`)
+  makes JSON assertions database-independent without weakening block order,
+  ID, type, or value checks;
+- `80c944e381c8bbde6b9f678a93b61728f5b11941` (parent `dd1938c...`)
+  exercises Wagtail scheduling through keyboard-safe user input;
+- `6bab816fcaf3911f39d8779bf0f837e039dc44c8` (parent `80c944e...`) is
+  the first empty rollout marker;
+- `0d472e061f7e17c45ea133bf425269c3138c70f9` (parent `6bab816...`) is
+  the empty retry marker after a pre-authentication SSH reset.
+
+Local verification passed uv lock, Ruff format/lint, Django system and deploy
+checks, no migration drift and a clean chain, 732 SQLite tests with the 14
+PostgreSQL-only cases explicitly deselected locally, clean `npm ci`, Prettier,
+ESLint, TypeScript, 192 Vitest tests, production Next build, zero-vulnerability
+npm audit, browser bundle secret/internal-origin scans, 74 browser-contract
+tests with 16 intentional viewport skips, 11 real-Django cross-stack tests,
+and 246 infrastructure/state-machine tests. CI ran the mandatory PostgreSQL,
+Docker, Compose, Nginx, container, image, release-state, and artifact-sanitizer
+coverage without skips. No migration was created.
+
+The Stage 19B backend regressions prove unchanged rich-text database HTML,
+unsafe-markup sanitization, internal/external link entities, canonical
+StreamField JSON, all 13 blocks through add/edit/reorder/duplicate/delete/save/
+reopen/preview/publish, draft revisions, restore/publish/rollback, future
+publish, expiry and scheduled unpublish, revision-aware original dates,
+durable newsletter decisions, and editor-asset isolation from Django admin and
+other page types. Browser coverage proves independent multi-editor state, one
+toolbar per duplicate/reordered block, active-block deletion cleanup, error
+retention/expansion/focus, chooser Escape/focus restoration, image/link
+choosers, four viewports, 200% zoom, both themes, zero axe violations, and zero
+application console errors.
+
+Fresh exact-code push/PR CI `31148496848` / `31148499561` passed at
+`80c944e...`. The first rollout-marker push `31149023742` built and tested the
+candidate but failed closed in server preflight before authentication with an
+SSH `kex_exchange_identification` reset; deploy, remote command, attestation,
+catalog, and application mutation were skipped, the gate was closed
+immediately, and PR `31149026651` passed. The unchanged retry push/PR
+`31149522815` / `31149526207` passed. Its required job IDs are frontend
+`92776099808`, browser `92776099816`, SQLite `92776099819`, infrastructure
+`92776099827`, cross-stack `92776099849`, PostgreSQL `92776099897`, aggregate
+`92776900602`, manifest `92777039457`, and deploy `92777072316`; reaction
+catalog job `92776912274` was skipped.
+
+### Active staging release and live acceptance
+
+Operation
+`deploy-31149522815-staging-0d472e061f7e17c45ea133bf425269c3138c70f9`
+activated immutable digests:
+
+- Django `sha256:836ba073d25743fe27b9b16bf7bd6536551aab45ef7703636f199328514ab110`;
+- Next `sha256:afb12d82403f18c8baace011ecb7bc6087bb2ac28177efde15e7d737c15a1454`;
+- candidate edge `sha256:004348029d7ede921c50a804c6cd0d50743d09e5706bad586c4ec9b1582b10ad`.
+
+Release-manifest artifact `8982870903` has GitHub archive SHA-256
+`136c39c340b8ac3a96a3be71c74c88e48e9b6036c73b424c6d6cac79dcd23f79`
+and independently computed JSON SHA-256
+`3d29a9c0db1dfd1a19288d3b1caeac9bae89a6f9af32455c6e2e8f675532521e`.
+Schema-3 attestation artifact `8982921957` has GitHub archive SHA-256
+`fabbb1023ba9600d011e5b68c6d6c586f315e52e1e3d5cf83f0958313d69e85c`
+and independently computed JSON SHA-256
+`4132d1dbea7ed4c50dddfc2f17cd0d491d34ed03127e3099bd0d79eeb3d9352e`.
+Both passed the repository validators. Attestation status is `passed`; active
+digest, Django readiness, candidate-edge Nginx, Next health, public smoke,
+worker egress, and worker heartbeat are all true.
+The ordinary pre-migration backup is
+`/srv/kirillwynn/backups/staging/20260807T051327Z_f59c6cf0139490e4b8da6e130cd45ef37f8c4b35_pre-migration_deploy-31149522815-staging-0d472e061f7e17c45ea133bf425269c3138c70f9.dump`;
+the empty migration plan required no schema operation.
+
+Live Chrome used only controlled draft page 20, titled
+`Stage 19B QA — editor audit (draft only)`, with publication notification
+disabled. It confirmed dashboard/New post, all three tabs, updated Tags help,
+all 13 chooser options in their five groups, two independent Rich Text blocks,
+mouse and keyboard formatting, internal and external link choosers, image
+chooser, representative Text/Media/Lists/Code-Data/Structure blocks, reorder,
+duplicate, active delete, draft save/reopen, headless preview, history, prior
+revision review and restore, validation alert/focus, and schedule/expiry form
+behavior. Preview rendered the heading, code, image alt text, external URL, and
+the internal page entity. A future 2030 go-live/expiry pair exposed the native
+`Schedule to publish` action; that action was deliberately not invoked, both
+dates were cleared, reload confirmed blank values, and the page remained a
+draft with notification false.
+
+Live geometry in the normal writing state matched 728/664/896/896 px at the
+four required viewports with no overflow. The 768 px chooser measured about
+414 px and stayed inside the viewport. Light and system-dark surfaces retained
+visible focus and contrast. The only later CMS console entry was an expected
+Wagtail editing-session ping `403` after the long-lived authenticated session
+expired; it occurred after editor acceptance and is not emitted by Stage 19B.
+Required local/CI browser coverage separately recorded zero editor console
+errors and zero axe violations.
+
+Read-only public regression passed without changing Stage 19A state: Feed
+appended 10→13, search returned the newsletter post, Feed→Bridge→Feed retained
+the loaded Feed, post/reaction/comment surfaces rendered without interaction,
+`/subscriptions/` retained one form, the footer retained exactly its two team
+rows, and the public console was clean.
+
+The controlled fixture was then deleted through Wagtail's confirmation page.
+Page 20 returns Wagtail 404, the Blog index returned from 15 pages to the exact
+14-page baseline (13 live, one expired, zero draft), and the QA title is absent.
+Django admin counts remained exactly `EmailOutbox=15` and `EmailDelivery=2`
+before and after cleanup, with no Stage 19B editor asset on `/django-admin/`.
+The account theme was restored to the persisted `system` baseline. A fresh
+read-only load of real page 4 after reauthentication had the deployed writing
+surface and a clean browser console; it was not saved. No existing post was
+edited, published, scheduled, restored, or deleted.
+
+The final documentation-only closed-gate CI run is reported in the handoff; its
+deployment, attestation, and catalog mutation steps must remain skipped.
+
+### Boundaries and remaining limitations
+
+Stage 19B did not change the public frontend, content API, rich-text feature
+set, migrations, publication timestamps, newsletter decision model, reaction
+catalog, OAuth, Resend, DNS, TLS, real publications, `main`, or production.
+Toolbar pin state deliberately remains Wagtail user preference. The native
+status side panel can temporarily reduce the available writing width at 1024;
+closing that optional panel restores the accepted 664 px writing column, and
+neither state overflows. More opinionated default pinning or chooser behavior
+would require unsupported internal clicks/state or brittle DOM patches and was
+therefore not added.
 
 ## Stage 18 staging stabilization
 
@@ -2150,25 +2366,23 @@ Commit, CI, deployment, and acceptance evidence:
 
 ## Milestone transition
 
-Milestone 11, functional Stage 13A acceptance, Stages 14A–18, and Stage 19A
-staging acceptance are complete. The active application release is
-`f59c6cf0139490e4b8da6e130cd45ef37f8c4b35`.
+Milestone 11, functional Stage 13A acceptance, Stages 14A–18, and Stages
+19A–19B staging acceptance are complete. The active application release is
+`0d472e061f7e17c45ea133bf425269c3138c70f9`.
 
 ### Next recommended session
 
-Stage 19B is the next separately scoped session: a Reddit-like Wagtail CMS
-editor with a writing-first layout and compact Rich Text toolbar, using only
-supported Wagtail 7.4 extension points while preserving all 13 StreamField
-blocks, revisions, preview, scheduling, and rollback. Do not combine it with
-Stage 19A remediation or public-cache work.
+Any production-readiness or later product-polish stage must be separately
+scoped. Stage 19B does not authorize production infrastructure, catalog work,
+or changes to the accepted Stage 19A public cache/navigation surface.
 
 ### Exit criteria
 
-- Stage 19B retains every existing public/Draft/revalidation contract and all
-  Wagtail publication/revision behavior.
-- All 13 StreamField block types remain round-trip compatible.
-- Required CI, controlled staging-only CMS acceptance, closed gates, and
-  production/catalog/data boundaries pass independently of Stage 19A.
+- [x] Stage 19B retains every existing public/Draft/revalidation contract and
+      all Wagtail publication/revision behavior.
+- [x] All 13 StreamField block types remain round-trip compatible.
+- [x] Required CI, controlled staging-only CMS acceptance, closed gates, and
+      production/catalog/data boundaries pass independently of Stage 19A.
 
 ## Milestone queue
 
@@ -2202,9 +2416,10 @@ Stage 19A remediation or public-cache work.
         docs-only CI completed.
   - [x] Stage 19A — public navigation/cache, infinite Feed/search, reaction UX,
         subscriptions/footer, required CI, attested rollout, and live acceptance.
-  - [ ] Stage 19B — Reddit-like Wagtail CMS editor; writing-first layout,
-        compact Rich Text toolbar, supported Wagtail 7.4 extension points, and all
-        13 blocks/revisions/preview/scheduling/rollback preserved.
+  - [x] Stage 19B — Reddit-like Wagtail CMS editor; writing-first layout,
+        compact native Draftail toolbar, supported Wagtail 7.4 extension
+        points, and all 13 blocks/revisions/preview/scheduling/rollback
+        preserved and accepted on staging.
 
 ## Known risks
 

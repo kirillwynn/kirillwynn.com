@@ -47,6 +47,35 @@ elsewhere in the tree. The dashboard explains whether the Blog index is
 missing, ambiguous, misplaced, or unavailable under the current permissions.
 Repair the tree or permissions first.
 
+## The writing surface
+
+The **Write** tab is a centred, quiet writing column. Title, excerpt, and body
+are still ordinary Wagtail fields in one Django form: browser length counters
+and backend validation remain authoritative. Block borders and controls become
+more prominent on hover or keyboard focus; they remain visible on touch-sized
+layouts. Nothing is automatically collapsed when focus moves elsewhere.
+
+Rich Text is the normal Wagtail Draftail editor. Its compact toolbar contains
+Bold, Italic, Link, line break, revision comment, and Wagtail's toolbar pin
+control. Use `Cmd/Ctrl+B`, `Cmd/Ctrl+I`, and `Cmd/Ctrl+K`; normal undo/redo and
+Escape behavior are unchanged. Pinning is an explicit Wagtail user preference,
+not a project-side simulated click. Each Rich Text block owns exactly one
+toolbar, so duplicate, reorder, and delete remain normal StreamField actions.
+
+The Add block control uses Wagtail's searchable keyboard-accessible chooser and
+the existing groups. The complete stored block contract is unchanged:
+
+- **Text:** Rich text, Heading, Quote;
+- **Media:** Image, Gallery;
+- **Lists:** Bulleted list, Numbered list, Checklist;
+- **Code / Data:** Inline code, Code block, Table;
+- **Structure:** Horizontal divider, Link.
+
+Images and internal links continue to use Wagtail choosers. Pasted Rich Text is
+sanitized by Wagtail's converter; do not paste or hand-author database HTML.
+Move, duplicate, delete, preview, comments, history, and restore remain Wagtail
+operations rather than editor-specific shortcuts.
+
 ## Drafts, schedules, and unpublishing
 
 Drafts and previews do not affect the Feed. A future-scheduled revision stays
@@ -60,6 +89,9 @@ Feed until that revision is published.
 
 The original-date field never schedules, publishes, expires, restricts, or
 unpublishes a page. Those lifecycle controls remain entirely Wagtail-owned.
+
+Tags remain optional backend metadata for internal classification, search
+relevance, and metadata. They are not promised as visible Feed filters.
 
 ## Restore an earlier revision
 

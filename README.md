@@ -56,6 +56,7 @@ Do not copy that note into the repository.
 - [ADR 0007: Editorial dates and publication-email decisions](docs/decisions/0007-editorial-dates-and-publication-email-decision.md)
 - [ADR 0008: Local identity, nicknames, and auth email](docs/decisions/0008-local-identity-nicknames-and-auth-email.md)
 - [ADR 0009: Public navigation, cache, and infinite Feed](docs/decisions/0009-public-navigation-cache-and-infinite-feed.md)
+- [ADR 0010: Wagtail writing experience](docs/decisions/0010-wagtail-writing-experience.md)
 - [Reaction catalog asset runbook](docs/reaction-catalog-runbook.md)
 - [Email provider and DNS setup](docs/email-setup.md)
 - [Deployment and rollback](docs/deployment-runbook.md)
@@ -78,8 +79,9 @@ The implemented rewrite is available under `backend/django/`,
 - a custom `users.User` model in the initial project migration;
 - environment-specific local, test, and production settings;
 - `/api/health/`, Django Admin, and Wagtail Admin smoke coverage;
-- a permission-aware `New post` shortcut and writing-first Wagtail editor for
-  the dynamically resolved singleton Blog index;
+- a permission-aware `New post` shortcut and centred writing-first Wagtail
+  editor with compact native Draftail toolbars for the dynamically resolved
+  singleton Blog index;
 - structured post authoring with normalized tags, revision-aware archive dates,
   durable first-publication newsletter decisions, and clear workflow
   documentation;
