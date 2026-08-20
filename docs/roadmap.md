@@ -10,10 +10,11 @@ Rows labeled `Mxx`, `M02+`, or `Gxx`, including combined labels, are directional
 
 | Phase | Status | Directional scope |
 | --- | --- | --- |
-| M01 | Remediation required | Repository Foundation. |
-| M01-R1 | Review pending | Repository Foundation Governance Remediation. |
+| M01 | Accepted | Repository Foundation. |
+| M01-R1 | Accepted | Repository Foundation Governance Remediation. |
+| M01-R2 | Review pending | Roadmap Acceptance and ADR Alignment. |
 
-Neither milestone is Accepted. Final acceptance belongs to the Control Tower after independent review.
+M01 and M01-R1 are Accepted. M01-R2 awaits independent review and acceptance by the Control Tower.
 
 ## Planned ADR milestones
 
@@ -24,15 +25,16 @@ Each row below is a separate planned milestone. Listing it is not authorization.
 | M02 | Planned | Decide exact stable versions, compatibility, and pin/update policy. |
 | M03 | Planned | Decide the React Router SSR, runtime, and deployment model. |
 | M04 | Planned | Decide the bundler, build, and development model. |
-| M05 | Planned | Decide the backend/API framework and API/error contracts. |
-| M06 | Planned | Decide the ORM, PostgreSQL migrations, and schema compatibility. |
-| M07 | Planned | Decide the sessions, email/password, OAuth, and CSRF architecture. |
-| M08 | Planned | Decide Tiptap schema, versioning, sanitization, and renderer compatibility. |
-| M09 | Planned | Decide the worker, scheduler, durable outbox, and idempotency model. |
-| M10 | Planned | Decide object storage, CDN, and media processing. |
-| M11 | Planned | Decide search, ranking, pagination, and cache model. |
-| M12 | Planned | Decide the testing strategy and required CI jobs. |
-| M13 | Planned | Decide deployment topology, environment isolation, promotion, rollback, backup, and restore. |
+| M05 | Planned | Decide the repository, package, and runtime topology. |
+| M06 | Planned | Decide the backend/API framework and API/error contracts. |
+| M07 | Planned | Decide the ORM, PostgreSQL migrations, and schema compatibility. |
+| M08 | Planned | Decide the sessions, email/password, OAuth, and CSRF architecture. |
+| M09 | Planned | Decide Tiptap schema, versioning, sanitization, and renderer compatibility. |
+| M10 | Planned | Decide the worker, scheduler, durable outbox, and idempotency model. |
+| M11 | Planned | Decide object storage, CDN, and media processing. |
+| M12 | Planned | Decide search, ranking, pagination, and cache model. |
+| M13 | Planned | Decide the testing strategy and required CI jobs. |
+| M14 | Planned | Decide deployment topology, environment isolation, promotion, rollback, backup, and restore. |
 
 ## Directional phase containers
 
@@ -55,4 +57,4 @@ These remaining directions are non-authorizable containers until the Control Tow
 | Gxx/Mxx | Planned | Separately authorized isolated staging, staging acceptance, production readiness, and production promotion. Legacy staging remains unchanged. A separate Release Operator participates only at an agreed checkpoint after explicit Control Tower authorization for that checkpoint; this grants no authority for other external mutations. |
 | Mxx | Planned | Finance only after an accepted, working non-finance production release. |
 
-M01 requires remediation, and M01-R1 awaits review. M02-M13 and all directional containers remain planned and unauthorized.
+M01 and M01-R1 are Accepted. M01-R2 remains review pending. M02-M14 and all directional containers remain planned and unauthorized.
