@@ -8,6 +8,15 @@ The legacy worktree, its Git staging state, all legacy code, and the existing st
 
 The Builder implements only the authorized task contract. The Reviewer is read-only by default, independently verifies the evidence, and classifies findings as P0, P1, P2, or Accepted. An Accepted reviewer verdict still requires the Control Tower's explicit acceptance.
 
+## Review severity
+
+- **P0 — blocking issue:** a security problem, secret exposure, invalid baseline or history, prohibited mutation, or another defect that prevents safe acceptance.
+- **P1 — must fix before acceptance:** a task-contract violation, a missing required contract, or a material contradiction.
+- **P2 — should fix:** a non-blocking issue with accuracy, clarity, or maintainability.
+- **Accepted:** no findings.
+
+If the Reviewer finds any P0, P1, or P2 issue, the verdict is `Remediation required`. Final acceptance belongs to the Control Tower.
+
 ## Sources of truth
 
 - [README.md](README.md) states the repository purpose and current status.
@@ -29,6 +38,38 @@ Do not push, deploy, open or modify a pull request, or mutate GitHub settings, A
 Finance work is prohibited until a complete non-finance production release is working and accepted.
 
 Accepted ADRs are historical records. Change an accepted decision with a new superseding ADR; never rewrite the old decision to change history.
+
+## Documentation-only verification
+
+Until accepted project tooling exists, the minimum reusable evidence set is:
+
+- status, branch, and worktree topology;
+- exact HEAD, parent, tree, and commit count relative to the baseline in the task contract;
+- changed-file set and file modes read directly from Git;
+- whitespace validation with `git diff --check` and inspection of the full diff;
+- resolution of every relative Markdown target from the directory containing its source file;
+- confirmation that the candidate contains no forbidden artifacts, executable or symlink modes, credentials, private-key or token values, or private filesystem paths; and
+- confirmation that legacy-worktree metadata is unchanged.
+
+Use safe read-only templates such as:
+
+```sh
+git --no-optional-locks status --short --branch
+git worktree list --porcelain
+git rev-parse HEAD HEAD^ 'HEAD^{tree}'
+git rev-list --count BASELINE_SHA..HEAD
+git diff --name-status BASELINE_SHA..HEAD
+git diff --summary BASELINE_SHA..HEAD
+git ls-tree -r --full-tree HEAD
+git diff --check BASELINE_SHA..HEAD
+git diff --no-ext-diff BASELINE_SHA..HEAD
+```
+
+Replace `BASELINE_SHA` with the exact SHA from the task contract. The task contract supplies any additional exact commands and expected outcomes. Do not add install, build, test, or run commands until accepted project tooling exists.
+
+## Release Operator
+
+The Release Operator is a separate role, not the Builder or Reviewer. This role participates only after explicit Control Tower authorization and only at agreed staging or production checkpoints. Authorization for one checkpoint grants no authority for any other external mutation. Builders and Reviewers do not receive deployment authority automatically.
 
 ## Definition of Done
 

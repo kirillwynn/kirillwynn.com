@@ -10,7 +10,7 @@ Include:
 - verified baseline commit and tree;
 - worktree and branch;
 - commit SHA, parent SHA, tree SHA, and subject;
-- complete changed-file list;
+- complete changed-file list using repository-relative Git paths;
 - checks with exact commands and results, separated into pre-commit and post-commit evidence;
 - inspected diff stat and concise per-file summary;
 - external changes, explicitly stating `None` when applicable;
@@ -22,6 +22,6 @@ Do not place a handoff that needs its own final commit SHA inside that same comm
 
 ## Reviewer handoff
 
-The Reviewer independently verifies the baseline, diff, and checks. Report every finding as P0, P1, or P2 with reproducible evidence, then give the verdict: `Accepted` or `Remediation required`.
+The Reviewer independently verifies the baseline, diff, and checks and classifies the result using the canonical [review severity definitions](../../AGENTS.md#review-severity). `Accepted` means there are no findings; any P0, P1, or P2 finding requires the verdict `Remediation required`.
 
 The Reviewer is read-only by default and edits, stages, commits, pushes, deploys, or mutates external systems only under separate explicit authorization.

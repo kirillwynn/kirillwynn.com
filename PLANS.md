@@ -27,7 +27,7 @@ The handoff must include milestone and status; verified baseline; worktree and b
 
 ## Review and remediation
 
-The independent Reviewer verifies the baseline, diff, and checks and reports either evidence-backed P0, P1, or P2 findings, or an Accepted verdict. The Reviewer edits nothing by default.
+The independent Reviewer verifies the baseline, diff, and checks and classifies the result using the canonical [review severity definitions](AGENTS.md#review-severity). `Accepted` is permitted only when there are no findings; otherwise the verdict is `Remediation required`. The Reviewer edits nothing by default.
 
 After a commit has been handed off, fixes are additive: create a separately authorized remediation milestone and commit. Never amend, rebase, or otherwise rewrite a handed-off commit.
 
