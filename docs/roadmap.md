@@ -12,9 +12,10 @@ Rows labeled `Mxx`, `M02+`, or `Gxx`, including combined labels, are directional
 | --- | --- | --- |
 | M01 | Accepted | Repository Foundation. |
 | M01-R1 | Accepted | Repository Foundation Governance Remediation. |
-| M01-R2 | Review pending | Roadmap Acceptance and ADR Alignment. |
+| M01-R2 | Accepted | Roadmap Acceptance and ADR Alignment. |
+| M02 | Review pending | Stable Version Baseline and Update Policy. |
 
-M01 and M01-R1 are Accepted. M01-R2 awaits independent review and acceptance by the Control Tower.
+M01, M01-R1, and M01-R2 are Accepted. M02 awaits independent review and acceptance by the Control Tower.
 
 ## Planned ADR milestones
 
@@ -22,7 +23,6 @@ Each row below is a separate planned milestone. Listing it is not authorization.
 
 | Milestone | Status | Testable outcome |
 | --- | --- | --- |
-| M02 | Planned | Decide exact stable versions, compatibility, and pin/update policy. |
 | M03 | Planned | Decide the React Router SSR, runtime, and deployment model. |
 | M04 | Planned | Decide the bundler, build, and development model. |
 | M05 | Planned | Decide the repository, package, and runtime topology. |
@@ -57,4 +57,4 @@ These remaining directions are non-authorizable containers until the Control Tow
 | Gxx/Mxx | Planned | Separately authorized isolated staging, staging acceptance, production readiness, and production promotion. Legacy staging remains unchanged. A separate Release Operator participates only at an agreed checkpoint after explicit Control Tower authorization for that checkpoint; this grants no authority for other external mutations. |
 | Mxx | Planned | Finance only after an accepted, working non-finance production release. |
 
-M01 and M01-R1 are Accepted. M01-R2 remains review pending. M02-M14 and all directional containers remain planned and unauthorized.
+M01, M01-R1, and M01-R2 are Accepted. M02 remains review pending. M03-M14 and all directional containers remain planned and unauthorized.
