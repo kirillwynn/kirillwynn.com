@@ -1,6 +1,6 @@
 # 0001: Version Baseline and Update Policy
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-20
 - **Owners:** Control Tower
 
@@ -23,7 +23,7 @@ Official sources were checked at **2026-08-21T00:17:14Z**. The npm registry is a
 
 ## Considered options
 
-1. **Exact compatibility-first baseline.** Select exact patches that satisfy the published engine and peer constraints, while deferring installation and runtime validation. This is the proposed option.
+1. **Exact compatibility-first baseline.** Select exact patches that satisfy the published engine and peer constraints, while deferring installation and runtime validation. This is the accepted option.
 2. **Always use the newest published line.** This would choose Node.js 26.7.0 Current, TypeScript 7.0.2, or PostgreSQL 19 Beta 3 solely because each is newer. It is rejected for this baseline: Current Node and prerelease PostgreSQL are not the production posture sought here, and TypeScript 7 still has a tooling compatibility gap despite being a stable production release.
 3. **Use semver ranges or dist-tags in future manifests.** This is rejected because resolution could drift without an explicit decision or review.
 4. **Adopt TypeScript 6 and 7 side by side.** The TypeScript team documents this transition path, but it adds two compiler/tooling paths before the project has selected its build and lint tooling. It is not accepted now.
@@ -31,9 +31,9 @@ Official sources were checked at **2026-08-21T00:17:14Z**. The npm registry is a
 
 ## Decision
 
-### Proposed version baseline
+### Accepted version baseline
 
-The following exact versions are the proposed baseline:
+The following exact versions are the accepted baseline:
 
 | Компонент | Выбранная версия |
 | --- | --- |
@@ -131,7 +131,7 @@ This ADR decides only exact starting versions, their published metadata envelope
 - M13: testing strategy and required CI jobs;
 - M14: deployment topology, environment isolation, promotion, rollback, backup, and restore.
 
-No application foundation, dependency installation, runtime topology, package-manager choice, bundler choice, or deployment model follows from this Proposed ADR.
+No application foundation, dependency installation, runtime topology, package-manager choice, bundler choice, or deployment model follows from this Accepted ADR.
 
 ## Consequences
 
@@ -172,7 +172,7 @@ Runtime compatibility remains explicitly unverified until those checks exist and
 
 ## Follow-ups
 
-- M02-A1, if separately authorized after independent review and Control Tower decision, may promote this ADR, link it from architecture, and finalize the roadmap status.
+- M02-A1 records acceptance of this ADR, links it from architecture, and records M02 as Accepted in the roadmap.
 - M03-M05 must make the deferred router, bundler, topology, package-manager, lockfile, and version-carrier decisions.
 - M06-M14 must make the deferred application, data, security, editor, job, storage, search, testing, and deployment decisions.
 - The first dependency-bearing milestone must re-verify every selected version and all relevant engine/peer metadata before adding manifests.
