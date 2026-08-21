@@ -1,12 +1,12 @@
 # 0002: React Router SSR, Runtime, and Deployment Model
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-21
 - **Owners:** Control Tower
 
 ## Context
 
-[ADR 0001](0001-version-baseline-and-update-policy.md) accepts Node.js 24.19.0 LTS, React and React DOM 19.2.8, and `react-router` 8.3.0 as an exact metadata-compatible baseline. It does not select a React Router mode, prove SSR or hydration, choose a bundler or server framework, or establish a deployment model. This ADR proposes the application-facing router, initial-document, request/data, runtime, and hosting-capability contracts needed before those implementation choices. It does not make the proposal effective: M03 remains Review pending until independent review and an explicit Control Tower decision.
+[ADR 0001](0001-version-baseline-and-update-policy.md) accepts Node.js 24.19.0 LTS, React and React DOM 19.2.8, and `react-router` 8.3.0 as an exact metadata-compatible baseline. It does not select a React Router mode, prove SSR or hydration, choose a bundler or server framework, or establish a deployment model. This ADR accepts the application-facing router, initial-document, request/data, runtime, and hosting-capability contracts needed before those implementation choices. Control Tower accepted M03 on 2026-08-21; M03-A1 records that decision and does not prove runtime compatibility.
 
 The product requires an SSR first page for Feed, SEO-capable post documents with canonical and Open Graph metadata, correct deep links and reloads, and hydrated client navigation. It also requires infinite Feed pagination, live search, comments, reactions, auth-sensitive account and admin surfaces, and strict separation of public data from preview or private data. The architecture keeps a Node.js backend direction and TanStack Query for interactive server-state caching while rejecting the legacy implementation.
 
@@ -30,15 +30,15 @@ The exact package metadata establishes an ESM package with a Node.js engine rang
 
 ## Considered options
 
-1. **Data Mode with a project-owned SSR integration.** Data Mode provides loaders, actions, pending states, fetchers, and error boundaries while retaining control over bundling, data, and server abstractions. The official [mode guidance](https://reactrouter.com/start/modes) and [custom integration guide](https://reactrouter.com/start/data/custom) explicitly support this separation. This is the proposed option.
-2. **Framework Mode with the official Vite integration.** Framework Mode wraps Data Mode with the React Router Vite plugin, according to the official [mode guidance](https://reactrouter.com/start/modes). In the exact [`@react-router/dev@8.3.0` metadata](https://registry.npmjs.org/%40react-router%2Fdev/8.3.0), Vite `^7.0.0 || ^8.0.0` is a non-optional peer dependency. Selecting Framework Mode here would therefore decide Vite before M04. It is not proposed.
-3. **Declarative Mode with project-built data and SSR abstractions.** Declarative Mode supplies basic matching and navigation, while Data Mode adds loaders, actions, pending states, and related route data APIs, as the [mode comparison](https://reactrouter.com/start/modes) documents. Rebuilding those capabilities beside Declarative Mode would duplicate the contract the project needs. It is not proposed.
-4. **SPA or static-only production deployment.** The official [SPA guide](https://reactrouter.com/how-to/spa) describes disabling runtime SSR, and the [rendering](https://reactrouter.com/start/framework/rendering) and [pre-rendering](https://reactrouter.com/how-to/pre-rendering) guides distinguish runtime SSR from build-time output. A static-only initial document cannot satisfy the required runtime Feed, auth-sensitive documents, and direct-request behavior. It is not proposed.
-5. **Experimental React Server Components path.** The current official [API navigation labels the RSC APIs as unstable](https://reactrouter.com/start/modes). RSC would introduce an unstable application and build contract before the standard SSR path is validated. It is not proposed for v1.
+1. **Data Mode with a project-owned SSR integration.** Data Mode provides loaders, actions, pending states, fetchers, and error boundaries while retaining control over bundling, data, and server abstractions. The official [mode guidance](https://reactrouter.com/start/modes) and [custom integration guide](https://reactrouter.com/start/data/custom) explicitly support this separation. This is the selected option.
+2. **Framework Mode with the official Vite integration.** Framework Mode wraps Data Mode with the React Router Vite plugin, according to the official [mode guidance](https://reactrouter.com/start/modes). In the exact [`@react-router/dev@8.3.0` metadata](https://registry.npmjs.org/%40react-router%2Fdev/8.3.0), Vite `^7.0.0 || ^8.0.0` is a non-optional peer dependency. Selecting Framework Mode here would therefore decide Vite before M04. It is not selected.
+3. **Declarative Mode with project-built data and SSR abstractions.** Declarative Mode supplies basic matching and navigation, while Data Mode adds loaders, actions, pending states, and related route data APIs, as the [mode comparison](https://reactrouter.com/start/modes) documents. Rebuilding those capabilities beside Declarative Mode would duplicate the contract the project needs. It is not selected.
+4. **SPA or static-only production deployment.** The official [SPA guide](https://reactrouter.com/how-to/spa) describes disabling runtime SSR, and the [rendering](https://reactrouter.com/start/framework/rendering) and [pre-rendering](https://reactrouter.com/how-to/pre-rendering) guides distinguish runtime SSR from build-time output. A static-only initial document cannot satisfy the required runtime Feed, auth-sensitive documents, and direct-request behavior. It is not selected.
+5. **Experimental React Server Components path.** The current official [API navigation labels the RSC APIs as unstable](https://reactrouter.com/start/modes). RSC would introduce an unstable application and build contract before the standard SSR path is validated. It is not selected for v1.
 
 ## Decision
 
-This ADR proposes the following v1 contract. It remains a proposal until Control Tower acceptance; no runtime capability is claimed by this documentation-only milestone.
+This ADR establishes the following accepted v1 contract. Control Tower accepted M03 on 2026-08-21; M03-A1 records that decision, and no runtime capability is claimed by this documentation-only acceptance record.
 
 ### Router mode
 
@@ -97,7 +97,7 @@ The official [custom Data Mode SSR guide](https://reactrouter.com/start/data/cus
 
 ### Package boundary
 
-- For this Data Mode proposal, the only direct React Router package remains the ADR 0001 baseline `react-router@8.3.0`. This statement is a package contract, not a manifest addition.
+- For this Data Mode decision, the only direct React Router package remains the ADR 0001 baseline `react-router@8.3.0`. This statement is a package contract, not a manifest addition.
 - `react-router/dom` remains a package subpath, not a package.
 - This ADR does not select `@react-router/dev`, `@react-router/node`, `@react-router/serve`, or `@react-router/express`. Their exact [dev](https://registry.npmjs.org/%40react-router%2Fdev/8.3.0), [Node](https://registry.npmjs.org/%40react-router%2Fnode/8.3.0), [serve](https://registry.npmjs.org/%40react-router%2Fserve/8.3.0), and [Express](https://registry.npmjs.org/%40react-router%2Fexpress/8.3.0) metadata is evidence about available integration packages, not a package selection.
 - M06 retains the server framework and adapter-package decision. M05 retains the package manager, actual manifest, lockfile, workspace layout, and repository/runtime topology decisions.
@@ -115,7 +115,7 @@ The official [custom Data Mode SSR guide](https://reactrouter.com/start/data/cus
 | M13 | Test framework, browser/runtime test tooling, CI jobs, and required status checks. |
 | M14 | Hosting provider, cloud or VPS, containers, proxy, domains, service/process split, environments, promotion, rollback, backup, restore, and rollout topology. |
 
-M07, M09, M10, and M11 also remain Planned and unchanged in [the roadmap](../roadmap.md). This proposal defines no database/ORM, editor schema, job system, or media/storage decision, and it defines no route tree or URL taxonomy.
+M07, M09, M10, and M11 also remain Planned and unchanged in [the roadmap](../roadmap.md). This decision defines no database/ORM, editor schema, job system, or media/storage decision, and it defines no route tree or URL taxonomy.
 
 ## Consequences
 
@@ -163,8 +163,8 @@ M13 retains ownership of the testing and CI strategy; listing required behaviors
 
 ## Follow-ups
 
-- Independent review must verify this proposal. Only Control Tower may decide whether to accept it; until then M03 remains Review pending and this ADR remains Proposed.
-- A separately authorized M03-A1 may record acceptance and update architecture only after that decision. This Builder does not edit architecture.
+- Control Tower accepted M03 on 2026-08-21 after an Independent Reviewer verdict of Accepted with P0/P1/P2 at 0/0/0. Runtime compatibility remains explicitly unverified.
+- M03-A1 only records that decision in this ADR, architecture, and roadmap. It does not revisit the technical decision or prove runtime compatibility.
 - M04 must decide the bundler/build/development model and prove safe server/browser route partitioning without changing this mode automatically.
 - M05 must decide repository/package/runtime topology, package manager, manifests, lockfile, workspace layout, and version carriers.
 - M06 must decide the backend/API/server framework, adapter package, error contracts, mutation transport, and status/header integration.

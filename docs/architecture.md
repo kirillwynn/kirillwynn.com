@@ -2,7 +2,7 @@
 
 ## Current state
 
-No application architecture is implemented. This repository currently defines governance, product requirements, logical boundaries, one Accepted version-baseline ADR, and a remaining ADR backlog only.
+No application architecture is implemented. This repository currently defines governance, product requirements, logical boundaries, two Accepted ADRs, and a remaining ADR backlog only.
 
 ## Hard constraints
 
@@ -45,19 +45,20 @@ No decision has yet established same-origin deployment, monorepo layout, process
 
 [ADR 0001](decisions/0001-version-baseline-and-update-policy.md) accepts only exact starting versions, the published metadata compatibility envelope, and the pin/update policy. It installs nothing and does not prove runtime compatibility. It does not choose a package manager, repository or runtime topology, React Router mode, a bundler, backend/API, or deployment.
 
+[ADR 0002](decisions/0002-react-router-ssr-runtime-deployment-model.md) accepts React Router 8.3.0 Data Mode with runtime initial-document SSR, buffered rendering as the baseline, hydrated client navigation, a portable Web `Request` to `Response` boundary, and a fullstack SSR-capable hosting class. Runtime compatibility remains unverified. The bundler, repository and runtime topology, backend adapter, and hosting provider remain open.
+
 ## Remaining ADR backlog
 
 Focused ADRs, based on current official primary sources at decision time, must decide:
 
-1. React Router SSR, runtime, and deployment model;
-2. Webpack 5, Vite, or another bundler;
-3. repository, package, and runtime topology;
-4. backend and API framework;
-5. ORM and migration system;
-6. session, authentication, OAuth, and CSRF architecture;
-7. Tiptap document schema, versioning, and sanitization;
-8. worker, scheduler, and durable outbox architecture;
-9. search architecture;
-10. storage, CDN, and media architecture;
-11. testing and CI strategy; and
-12. deployment, isolation, backup, restore, and rollout model.
+1. Webpack 5, Vite, or another bundler;
+2. repository, package, and runtime topology;
+3. backend and API framework;
+4. ORM and migration system;
+5. session, authentication, OAuth, and CSRF architecture;
+6. Tiptap document schema, versioning, and sanitization;
+7. worker, scheduler, and durable outbox architecture;
+8. search architecture;
+9. storage, CDN, and media architecture;
+10. testing and CI strategy; and
+11. deployment, isolation, backup, restore, and rollout model.
