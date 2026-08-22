@@ -1,6 +1,6 @@
 # 0004: Repository, Package, and Logical Runtime Topology
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-22
 - **Owners:** Control Tower
 
@@ -10,7 +10,7 @@
 
 Those Accepted ADRs deliberately do not choose a package manager, bootstrap broker, lockfile format, workspace layout, manifest ownership, dependency directions, logical runtime ownership, or production dependency closure. Without those decisions, a dependency-bearing implementation could create multiple lockfiles, hide undeclared imports through hoisting, ship an incomplete externalized SSR graph, or let server-only code become browser-reachable.
 
-This Proposed ADR establishes a future repository contract only. It creates no manifest, workspace configuration, lockfile, Node version file, source, build configuration, script, workflow, generated artifact, dependency installation, or runtime claim. It defines logical runtime and package ownership, not deployed processes or services.
+This Accepted ADR establishes a future repository contract only. It creates no manifest, workspace configuration, lockfile, Node version file, source, build configuration, script, workflow, generated artifact, dependency installation, or runtime claim. It defines logical runtime and package ownership, not deployed processes or services. Control Tower accepted M05 on 2026-08-22 after the Independent Reviewer returned Accepted with P0/P1/P2 = 0/0/0; M05-A1 records that decision and does not authorize implementation, dependency installation, or runtime compatibility.
 
 Official primary sources were reopened at the single cutoff **2026-08-22T17:38:05Z**. Exact registry records and tagged source describe immutable published artifacts; dist-tags and project documentation are rolling observations at the cutoff. Metadata compatibility is not install, build, SSR, hydration, or runtime compatibility.
 
@@ -66,7 +66,7 @@ Corepack is not a sixth package-manager option. It brokers the exact selected ma
 
 ## Decision
 
-This ADR proposes the following complete M05 contract. It remains non-authorizing until separately accepted, and even acceptance would not authorize dependency-bearing implementation.
+This ADR establishes the following complete M05 contract. Control Tower accepted M05 on 2026-08-22; M05-A1 records that decision and does not authorize dependency-bearing implementation or runtime compatibility.
 
 ### Exact manager, broker, and version carriers
 
@@ -256,7 +256,7 @@ M13 owns the eventual test/typecheck/lint frameworks, scripts, CI jobs, and enfo
 
 ## Follow-ups
 
-- M05-A1 may record Control Tower acceptance after an Independent Reviewer returns no findings; it must not rewrite this technical decision or authorize implementation.
+- Control Tower accepted M05 on 2026-08-22 after the Independent Reviewer returned Accepted with P0/P1/P2 = 0/0/0; M05-A1 records that decision, does not rewrite this technical decision, and does not authorize implementation or M06.
 - The first dependency-bearing milestone must create only the authorized future carriers/manifests/configuration/lockfile, recheck all exact metadata, review lifecycle scripts, and produce the validation evidence above.
 - M06 must select the server framework and adapter without changing the package graph, Data Mode contract, or build model implicitly.
 - M10 must decide worker technology and executable ownership; the reserved package does not prejudge process or service topology.
