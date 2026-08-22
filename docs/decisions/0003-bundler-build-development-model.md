@@ -1,16 +1,16 @@
 # 0003: Bundler, Build, and Development Model
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-21
 - **Owners:** Control Tower
 
 ## Context
 
-[ADR 0001](0001-version-baseline-and-update-policy.md) accepts the exact Node.js 24.19.0, TypeScript 6.0.3, React and React DOM 19.2.8, and React Router 8.3.0 baseline, ESM, and the exact-pin/update policy. [ADR 0002](0002-react-router-ssr-runtime-deployment-model.md) accepts React Router Data Mode with project-owned custom SSR, one shared logical route graph, buffered initial-document rendering, browser hydration, and a portable Web `Request` to `Response` boundary. Control Tower accepted M03-A1 on 2026-08-21; this milestone only records that lifecycle fact in [the roadmap](../roadmap.md).
+[ADR 0001](0001-version-baseline-and-update-policy.md) accepts the exact Node.js 24.19.0, TypeScript 6.0.3, React and React DOM 19.2.8, and React Router 8.3.0 baseline, ESM, and the exact-pin/update policy. [ADR 0002](0002-react-router-ssr-runtime-deployment-model.md) accepts React Router Data Mode with project-owned custom SSR, one shared logical route graph, buffered initial-document rendering, browser hydration, and a portable Web `Request` to `Response` boundary. Control Tower accepted M03-A1 on 2026-08-21; that lifecycle fact remains recorded in [the roadmap](../roadmap.md). Control Tower accepted M04 on 2026-08-22; M04-A1 records that decision and does not prove runtime compatibility or authorize implementation or M05.
 
-Those accepted decisions intentionally leave the bundler, production build graph, artifact contract, and development behavior open. Framework Mode and `@react-router/dev` remain unselected. Selecting Vite here does not change the accepted Router mode or grant authority to select a server framework, repository topology, deployment topology, or later-milestone tooling.
+Those earlier ADRs intentionally left the bundler, production build graph, artifact contract, and development behavior open. ADR 0003 now accepts the exact build contract below. Framework Mode and `@react-router/dev` remain unselected. Selecting Vite here does not change the accepted Router mode or grant authority to select a server framework, repository topology, deployment topology, or later-milestone tooling.
 
-This is a documentation-only proposal. It adds no dependency, package manifest, lockfile, build configuration, script, source file, generated artifact, workflow, or runtime claim. Published engine and peer ranges establish metadata compatibility only. No install, build, typecheck, test, development server, SSR, hydration, or runtime compatibility has been exercised.
+This is a documentation-only accepted decision record. It adds no dependency, package manifest, lockfile, build configuration, script, source file, generated artifact, workflow, or runtime claim. Published engine and peer ranges establish metadata compatibility only. No install, build, typecheck, test, development server, SSR, hydration, or runtime compatibility has been exercised.
 
 Official evidence was reopened at the single cutoff **2026-08-21T22:29:39Z**. The evidence classes are deliberately separate:
 
@@ -21,7 +21,7 @@ Official evidence was reopened at the single cutoff **2026-08-21T22:29:39Z**. Th
 
 ### Evidence matrix
 
-Every result below was verified at the same UTC cutoff. Official rolling documents are evidence for the proposed contract, not permission to adopt sample paths, scripts, packages, servers, containers, or providers.
+Every result below was verified at the same UTC cutoff. Official rolling documents are evidence for the accepted contract, not permission to adopt sample paths, scripts, packages, servers, containers, or providers.
 
 | Claim | Direct official source | Evidence class and exact identity | UTC cutoff | Exact verified result |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ Every result below was verified at the same UTC cutoff. Official rolling documen
 | Vite documents a low-level custom SSR flow and separate client and SSR production builds. | [SSR guide](https://vite.dev/guide/ssr) | Rolling official documentation | 2026-08-21T22:29:39Z | The guide documents middleware mode, `appType: "custom"`, `transformIndexHtml`, `ssrLoadModule`, SSR stack correction, separate client/SSR builds, production loading of the SSR artifact, module invalidation, and default SSR dependency externalization. |
 | Vite manifests expose emitted files and dependency relationships. | [backend integration](https://vite.dev/guide/backend-integration), [build options](https://vite.dev/config/build-options) | Rolling official documentation | 2026-08-21T22:29:39Z | The browser manifest maps logical source keys to emitted files, static imports, dynamic imports, CSS, and assets; `build.manifest`, `build.ssrManifest`, SSR output, and clean-output behavior are documented build capabilities. |
 | An SSR manifest does not independently identify request-used modules. | [SSR preload guidance](https://vite.dev/guide/ssr#generating-preload-directives) | Rolling official documentation | 2026-08-21T22:29:39Z | The manifest maps module IDs to browser files, but the rendering integration must separately collect the module IDs actually used by a request before it can emit route-aware preload directives. |
-| Vite 8 documents the proposed browser target, minification, source-map, and clean-build baselines. | [build options](https://vite.dev/config/build-options) | Rolling official documentation for Vite 8 | 2026-08-21T22:29:39Z | `baseline-widely-available` is fixed for Vite 8 at 2026-01-01 and resolves to Chrome 111, Edge 111, Firefox 114, Safari 16.4, and iOS 16.4; client minification defaults to Oxc, SSR minification to off, production source maps to off, and output clearing to on when safely scoped. |
+| Vite 8 documents the accepted browser target, minification, source-map, and clean-build baselines. | [build options](https://vite.dev/config/build-options) | Rolling official documentation for Vite 8 | 2026-08-21T22:29:39Z | `baseline-widely-available` is fixed for Vite 8 at 2026-01-01 and resolves to Chrome 111, Edge 111, Firefox 114, Safari 16.4, and iOS 16.4; client minification defaults to Oxc, SSR minification to off, production source maps to off, and output clearing to on when safely scoped. |
 | Vite exposes browser constants at build time and warns that `VITE_*` values are public. | [environment variables and modes](https://vite.dev/guide/env-and-mode) | Rolling official documentation | 2026-08-21T22:29:39Z | `import.meta.env` constants are statically replaced; `VITE_*` values are bundled into client code and must not contain sensitive information. |
 | Vite transforms TypeScript but does not typecheck, and provides first-party React Fast Refresh integration. | [features](https://vite.dev/guide/features) | Rolling official documentation | 2026-08-21T22:29:39Z | Vite documents transpile-only TypeScript behavior, separate static analysis, native ESM HMR, first-party React Fast Refresh, static dynamic-import splitting, and imported asset/CSS handling. |
 | The Environment API is not a stable mandatory baseline. | [Environment API status](https://vite.dev/guide/api-environment) | Rolling official documentation | 2026-08-21T22:29:39Z | The API is in release-candidate phase and includes APIs still marked experimental; stabilization with potential breaking changes is deferred to a future major. |
@@ -63,7 +63,7 @@ Every result below was verified at the same UTC cutoff. Official rolling documen
 
 The exact candidate is `vite@8.2.2` with `@vitejs/plugin-react@6.1.0`. Vite documents the required low-level custom SSR flow, separate browser and SSR production builds, a Node-targeted server graph, middleware-mode development, first-party React Fast Refresh, browser and SSR manifests, TypeScript/TSX transformation, and default SSR dependency externalization. These capabilities integrate directly with the accepted Data Mode; `@react-router/dev` is not required.
 
-This is the selected proposal because it supplies the most complete build and development layer while leaving the Router and server abstractions project-owned. Its costs are material: Vite 8's Rolldown architecture is recent, the custom SSR integration remains project-owned, and route-aware preload still needs project-owned request/module tracking. The Environment API is not used as the mandatory baseline while it remains release-candidate with experimental surfaces.
+This is the selected option because it supplies the most complete build and development layer while leaving the Router and server abstractions project-owned. Its costs are material: Vite 8's Rolldown architecture is recent, the custom SSR integration remains project-owned, and route-aware preload still needs project-owned request/module tracking. The Environment API is not used as the mandatory baseline while it remains release-candidate with experimental surfaces.
 
 ### Webpack 5
 
@@ -85,7 +85,7 @@ Selecting either directly would make the project owner of additional development
 
 ## Decision
 
-This ADR proposes the following M04 contract. It does not accept M04 and does not authorize M04-A1 or implementation.
+This ADR establishes the following accepted M04 contract. Control Tower accepted M04 on 2026-08-22; M04-A1 records that decision and does not authorize implementation.
 
 ### Exact build-tool baseline
 
@@ -183,7 +183,7 @@ Future implementation must run an independently defined typecheck over the appli
 
 ### Explicit exclusions
 
-This proposal does not select or add:
+This decision does not select or add:
 
 - `@react-router/dev`, React Router Framework Mode, a Framework Mode route-module convention, or a filesystem route convention;
 - `@vitejs/plugin-react-swc`, deprecated `@vitejs/plugin-react-oxc`, React Compiler packages, or experimental compiler plugin options;
@@ -196,7 +196,7 @@ This proposal does not select or add:
 
 ## Consequences
 
-- If accepted later, M05 receives an exact two-package build-tool baseline and a complete build contract without inheriting a package-manager or layout decision.
+- If separately authorized, M05 receives an exact two-package build-tool baseline and a complete build contract without inheriting a package-manager or layout decision.
 - The accepted Data Mode remains project-owned and independent of React Router Framework Mode.
 - Separate browser and server builds, manifests, clean outputs, and an enforceable browser boundary become required implementation work.
 - Development gains a documented SSR/HMR/Fast Refresh path, but the host integration and server invalidation behavior remain project responsibilities.
@@ -243,7 +243,8 @@ M13 decides the validation tools and required CI jobs. Listing behaviors here cr
 
 ## Follow-ups
 
-- An independent Reviewer must review this Proposed ADR and the M04 documentation diff. Control Tower acceptance is separately required; M04-A1 is not authorized by this proposal.
+- Control Tower accepted M04 on 2026-08-22 after the Independent Reviewer returned Accepted with P0/P1/P2 = 0/0/0; runtime compatibility remains unverified.
+- M04-A1 only records that decision in this ADR, architecture, and roadmap. It does not revisit technical content, authorize implementation or M05, or prove runtime compatibility.
 - M05 must recheck exact package metadata and decide dependency installation, the package manager, actual manifest and lockfile contract, repository/package/runtime layout, version carriers, and runtime packaging under its own task contract.
 - M06 must choose the backend/server framework and React Router adapter and decide the concrete Web `Request` to `Response`, HTTP, header, and error-boundary integration without changing the build contract implicitly.
 - M11 and M12 retain CDN/media and application cache decisions.
