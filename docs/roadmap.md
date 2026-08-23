@@ -22,9 +22,10 @@ Rows labeled `Mxx`, `M02+`, or `Gxx`, including combined labels, are directional
 | M05 | Accepted | Repository, Package, and Logical Runtime Topology. |
 | M05-A1 | Accepted | Repository, Package, and Logical Runtime Topology Acceptance Record. |
 | M06 | Accepted | Backend and API Framework and Contracts. |
-| M06-A1 | Review pending | Backend and API Framework and Contracts Acceptance Record. |
+| M06-A1 | Accepted | Backend and API Framework and Contracts Acceptance Record. |
+| M07 | Review pending | ORM, PostgreSQL Migrations, and Schema Compatibility. |
 
-M01, M01-R1, M01-R2, M02, M02-A1, M03, M03-A1, M04, M04-A1, M05, M05-A1, and M06 are Accepted. M06-A1 is Review pending. M07-M14 remain Planned and unauthorized, and all directional containers remain Planned and non-authorizable.
+M01, M01-R1, M01-R2, M02, M02-A1, M03, M03-A1, M04, M04-A1, M05, M05-A1, M06, and M06-A1 are Accepted. M07 is Review pending. M08-M14 remain Planned and unauthorized, and all directional containers remain Planned and non-authorizable.
 
 ## Planned ADR milestones
 
@@ -32,7 +33,6 @@ Each row below is a separate planned milestone. Listing it is not authorization.
 
 | Milestone | Status | Testable outcome |
 | --- | --- | --- |
-| M07 | Planned | Decide the ORM, PostgreSQL migrations, and schema compatibility. |
 | M08 | Planned | Decide the sessions, email/password, OAuth, and CSRF architecture. |
 | M09 | Planned | Decide Tiptap schema, versioning, sanitization, and renderer compatibility. |
 | M10 | Planned | Decide the worker, scheduler, durable outbox, and idempotency model. |
@@ -62,4 +62,4 @@ These remaining directions are non-authorizable containers until the Control Tow
 | Gxx/Mxx | Planned | Separately authorized isolated staging, staging acceptance, production readiness, and production promotion. Legacy staging remains unchanged. A separate Release Operator participates only at an agreed checkpoint after explicit Control Tower authorization for that checkpoint; this grants no authority for other external mutations. |
 | Mxx | Planned | Finance only after an accepted, working non-finance production release. |
 
-M01, M01-R1, M01-R2, M02, M02-A1, M03, M03-A1, M04, M04-A1, M05, M05-A1, and M06 are Accepted. M06-A1 is Review pending. M07-M14 remain Planned and unauthorized, and all directional containers remain Planned and non-authorizable.
+M01, M01-R1, M01-R2, M02, M02-A1, M03, M03-A1, M04, M04-A1, M05, M05-A1, M06, and M06-A1 are Accepted. M07 is Review pending. M08-M14 remain Planned and unauthorized, and all directional containers remain Planned and non-authorizable.
