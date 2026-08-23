@@ -1,6 +1,6 @@
 # 0005: Backend and API Framework and Contracts
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-22
 - **Owners:** Control Tower
 
@@ -8,13 +8,13 @@
 
 [ADR 0001](0001-version-baseline-and-update-policy.md) accepts exact versions, Node.js 24.19.0, TypeScript 6.0.3, ESM, and exact direct dependency pins. [ADR 0002](0002-react-router-ssr-runtime-deployment-model.md) accepts React Router 8.3.0 Data Mode, a project-owned custom SSR integration, buffered initial-document rendering, one logical route graph, and a portable Web `Request` to `Response` boundary. [ADR 0003](0003-bundler-build-development-model.md) accepts Vite 8.2.2 with `@vitejs/plugin-react` 6.1.0, separate browser and Node ESM builds, a project-owned development host, and a fail-closed browser boundary. [ADR 0004](0004-repository-package-runtime-topology.md) accepts pnpm 11.22.0 through Corepack 0.35.0 and assigns the future Node SSR/server graph to `packages/server` without choosing a server framework or adapter.
 
-M06 must choose that framework boundary without changing any Accepted ADR. It must also make the HTTP translation, Router handoff, API, mutation, error, authorization-enforcement, resource-limit, and graceful-lifecycle contracts precise enough for later implementation and executable validation. The result remains documentation only: it adds no dependency, manifest, lockfile, configuration, source, script, workflow, generated artifact, server, or runtime claim.
+M06 chooses that framework boundary without changing any earlier Accepted ADR. It also makes the HTTP translation, Router handoff, API, mutation, error, authorization-enforcement, resource-limit, and graceful-lifecycle contracts precise enough for later implementation and executable validation. The result remains documentation only: it adds no dependency, manifest, lockfile, configuration, source, script, workflow, generated artifact, server, or runtime claim.
 
 Official primary evidence was checked at the single cutoff **2026-08-22T20:19:31Z**. Exact registry documents and tagged source identify published artifacts; rolling project documentation describes behavior visible at the cutoff and can later change. Metadata compatibility is not install, typecheck, build, SSR, HTTP, security, or runtime compatibility.
 
 Remediation evidence was checked at the fixed cutoff **2026-08-22T23:04:48Z**. It is deliberately limited to the exact official sources needed to close the review findings: immutable tagged source is tied to the stated commit, while the dated Node security notice and other rolling documentation describe only what was visible at that cutoff. The formal Reviewer verdict was `Remediation required` with **P0/P1/P2 = 0/4/0**. For finding 2, the Control Tower corrected the Reviewer's pre-fix truncation premise: exact Node.js 24.19.0 already contains the CVE-2026-58044 rejection fix, so the contract below keeps `server.maxHeadersCount = 100` and relies on the exact parser behavior rather than disabling the limit.
 
-Second-remediation evidence was checked at the fixed cutoff **2026-08-23T10:42:34Z**. It is limited to immutable Node.js 24.19.0 and Vite 8.2.2 source needed to distinguish parser phases and establish one shared-server HMR ownership path; it does not refresh candidate versions or broader rolling evidence. The independent M06-R1 Reviewer verdict was `Remediation required` with **P0/P1/P2 = 0/2/1**. This M06-R2 amendment responds to those findings but remains `Proposed` and requires a fresh independent review and a separate Control Tower acceptance decision.
+Second-remediation evidence was checked at the fixed cutoff **2026-08-23T10:42:34Z**. It is limited to immutable Node.js 24.19.0 and Vite 8.2.2 source needed to distinguish parser phases and establish one shared-server HMR ownership path; it does not refresh candidate versions or broader rolling evidence. The independent M06-R1 Reviewer verdict was `Remediation required` with **P0/P1/P2 = 0/2/1**. M06-R2 responded to those findings; its independent Reviewer verdict was `Remediation required` with **P0/P1/P2 = 0/0/1**. M06-R3 changed only the deprecated Vite shared-server option reference; its independent Reviewer verdict was `Accepted` with **P0/P1/P2 = 0/0/0**. Control Tower accepted M06 on 2026-08-23; M06-A1 records that decision and makes no runtime claim.
 
 ### Official evidence matrix
 
@@ -287,7 +287,7 @@ M13 chooses the tools, commands, fixtures, CI jobs, and enforcement. Listing the
 
 ## Follow-ups
 
-- The independent M06-R1 review remains historical evidence with verdict `Remediation required` and **P0/P1/P2 = 0/2/1**. A fresh independent M06-R2 review must verify both P1 remediations, the P2 source-fragment correction to `#L7-L30`, the exact R2 source identities and cutoff, every retained HTTP/API/security clause, and the absence of implementation or runtime claims. Even a finding-free M06-R2 review does not itself accept M06; acceptance requires a separate Control Tower decision.
+- The independent M06-R1 review remains historical evidence with verdict `Remediation required` and **P0/P1/P2 = 0/2/1**. The independent M06-R2 review verified both P1 remediations, the P2 source-fragment correction to `#L7-L30`, the exact R2 source identities and cutoff, every retained HTTP/API/security clause, and the absence of implementation or runtime claims; its verdict was `Remediation required` with **P0/P1/P2 = 0/0/1**. M06-R3 corrected only the deprecated Vite shared-server option reference; its independent Reviewer returned `Accepted` with **P0/P1/P2 = 0/0/0**. As required, no review itself accepted M06; Control Tower accepted it separately on 2026-08-23, and M06-A1 records that decision without revisiting technical content, authorizing implementation or M07, or claiming runtime compatibility.
 - A separately authorized dependency-bearing milestone must recheck exact metadata, add `hono@4.13.3` as the only M06 runtime dependency in the server owner, update the frozen lockfile, and implement the bridge without adding an adapter implicitly.
 - M07-M12 must fill their explicitly deferred data, identity, editor, worker, media, resource, and cache contracts without weakening the M06 boundary.
 - M13 must choose executable validation and CI enforcement for every listed positive and negative proof, including raw-socket parser and FIFO-ledger phases, signal/body-disposition and trailer phases, bridge-owned HEAD cleanup, and exclusive shared-server ownership of the development-only Vite HMR exception.

@@ -2,7 +2,7 @@
 
 ## Current state
 
-No application architecture is implemented. This repository currently defines governance, product requirements, logical boundaries, four Accepted ADRs, and a remaining ADR backlog only.
+No application architecture is implemented. This repository currently defines governance, product requirements, logical boundaries, five Accepted ADRs, and a remaining ADR backlog only.
 
 ## Hard constraints
 
@@ -41,7 +41,7 @@ Application -> Google / GitHub identity providers
 
 The preferred technology direction is React 19, TypeScript, React Router 8, Gravity UI, TanStack Query, Tiptap, PostgreSQL, and TypeScript/Node.js backend and worker code. This list is not an accepted architecture decision and does not establish exact versions, compatibility, packaging, framework, or runtime topology.
 
-No decision has yet established same-origin deployment, process count, cloud or vendor, or backend framework.
+No decision has yet established same-origin deployment, process count, cloud or vendor.
 
 [ADR 0001](decisions/0001-version-baseline-and-update-policy.md) accepts only exact starting versions, the published metadata compatibility envelope, and the pin/update policy. It installs nothing and does not prove runtime compatibility. It does not choose a package manager, repository or runtime topology, React Router mode, a bundler, backend/API, or deployment.
 
@@ -51,16 +51,17 @@ No decision has yet established same-origin deployment, process count, cloud or 
 
 [ADR 0004](decisions/0004-repository-package-runtime-topology.md) accepts pnpm 11.22.0 through Corepack 0.35.0, one private workspace with explicit shared, web, server, and future-worker package ownership, one lockfile, strict dependency boundaries, and explicit production dependency closure. It implements nothing and does not prove package, build, SSR, hydration, worker, or runtime compatibility; process and deployment topology remain open.
 
+[ADR 0005](decisions/0005-backend-api-framework-and-contracts.md) accepts exactly `hono@4.13.3` with no Node adapter, a project-owned strict Node/Web bridge, a reserved `/api/v1` namespace with RFC 9457 problem contracts, bounded resource limits, and one Vite-owned development HMR `upgrade` listener on the shared project-owned server. It implements nothing, installs no dependency, and does not prove typecheck, build, SSR, HTTP, security, or runtime compatibility; ORM/migrations, identity, editor, worker, media, search, testing/CI, and deployment remain open.
+
 ## Remaining ADR backlog
 
 Focused ADRs, based on current official primary sources at decision time, must decide:
 
-1. backend and API framework;
-2. ORM and migration system;
-3. session, authentication, OAuth, and CSRF architecture;
-4. Tiptap document schema, versioning, and sanitization;
-5. worker, scheduler, and durable outbox architecture;
-6. search architecture;
-7. storage, CDN, and media architecture;
-8. testing and CI strategy; and
-9. deployment, isolation, backup, restore, and rollout model.
+1. ORM and migration system;
+2. session, authentication, OAuth, and CSRF architecture;
+3. Tiptap document schema, versioning, and sanitization;
+4. worker, scheduler, and durable outbox architecture;
+5. search architecture;
+6. storage, CDN, and media architecture;
+7. testing and CI strategy; and
+8. deployment, isolation, backup, restore, and rollout model.
