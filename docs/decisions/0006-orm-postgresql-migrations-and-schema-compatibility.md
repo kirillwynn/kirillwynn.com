@@ -1,6 +1,6 @@
 # 0006: ORM, PostgreSQL Migrations, and Schema Compatibility
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-23
 - **Owners:** Control Tower
 
@@ -8,7 +8,7 @@
 
 [ADR 0001](0001-version-baseline-and-update-policy.md) accepts Node.js 24.19.0, PostgreSQL 18.6, TypeScript 6.0.3, ESM, and exact direct dependency pins. [ADR 0002](0002-react-router-ssr-runtime-deployment-model.md) accepts a portable Web `Request` to `Response` boundary and keeps database access server-only. [ADR 0003](0003-bundler-build-development-model.md) requires the browser graph to fail closed against database packages and other server-only reachability. [ADR 0004](0004-repository-package-runtime-topology.md) assigns the Node persistence graph and its direct runtime dependencies to the future `packages/server` workspace; `packages/shared`, `packages/web`, and the future worker cannot own or import that graph. [ADR 0005](0005-backend-api-framework-and-contracts.md) carries the exact application `request.signal` to downstream work and leaves database driver behavior, transactions, cancellation, migrations, and database readiness to M07.
 
-M07 selects a typed PostgreSQL access layer and makes its ownership, pool, query, cancellation, transaction, migration, schema-compatibility, and readiness contracts precise enough for later implementation and executable validation. The result remains documentation only: it adds no dependency, manifest, lockfile, configuration, schema, migration, source, script, workflow, generated artifact, database, or runtime claim.
+M07 selects a typed PostgreSQL access layer and makes its ownership, pool, query, cancellation, transaction, migration, schema-compatibility, and readiness contracts precise enough for later implementation and executable validation. The initial independent M07 Reviewer returned `Remediation required` with **P0/P1/P2 = 0/3/0**. M07-R1 addressed those findings, and its independent Reviewer returned `Accepted` with **P0/P1/P2 = 0/0/0**. Control Tower accepted M07 on 2026-08-24; M07-A1 records that lifecycle decision without revisiting technical content, authorizing implementation or M08, or claiming runtime compatibility. The accepted result remains documentation only: it adds no dependency, manifest, lockfile, configuration, schema, migration, source, script, workflow, generated artifact, database, or runtime claim.
 
 Official primary evidence was checked at the single cutoff **2026-08-23T16:25:28Z**. Exact registry documents and immutable tagged source identify published artifacts; rolling official documentation describes behavior visible at the cutoff and can later change. Published engine, export, dependency, and type metadata establishes only a compatibility envelope. It does not prove installation, typechecking, pooling, queries, cancellation, transactions, migrations, PostgreSQL 18.6 behavior, security, or runtime compatibility.
 
@@ -259,7 +259,7 @@ M13 chooses tools, commands, fixtures, PostgreSQL service setup, CI jobs, and en
 
 ## Follow-ups
 
-- After independent review and explicit Control Tower acceptance, a separately authorized M07-A1 may accept this ADR, update the architecture summary and backlog, and record the lifecycle transition. M07 itself does not accept the decision.
+- The initial independent M07 Reviewer returned `Remediation required` with **P0/P1/P2 = 0/3/0**. M07-R1 addressed all three findings, and its independent Reviewer returned `Accepted` with **P0/P1/P2 = 0/0/0**. Control Tower accepted M07 separately on 2026-08-24; M07-A1 records that decision without revisiting technical content, authorizing implementation or M08, or claiming runtime compatibility.
 - A later dependency-bearing milestone must recheck the exact artifacts, public extension exports, and security state; add only the three accepted packages to the server owner; update the frozen lockfile; inspect lifecycle scripts and the transitive graph; and implement the persistence lifecycle without an implicit extra package or stock/private cancellation fallback.
 - Before any executable migration exists, a separate review must replace the empty `operation-catalog-v0` with a closed append-only operation catalog, exhaustive public Kysely compiler mapping, and accepted compiled-fingerprint golden vectors. This ADR authorizes none of those operations.
 - M08-M12 must define identity, editor, worker/backfill/outbox, media, resource, query, search, pagination, and cache contracts without bypassing the persistence facade or weakening transaction, migration, readiness, or public-error boundaries.
