@@ -2,7 +2,7 @@
 
 ## Current state
 
-No application architecture is implemented. This repository currently defines governance, product requirements, logical boundaries, five Accepted ADRs, and a remaining ADR backlog only.
+No application architecture is implemented. This repository currently defines governance, product requirements, logical boundaries, six Accepted ADRs, and a remaining ADR backlog only.
 
 ## Hard constraints
 
@@ -51,17 +51,18 @@ No decision has yet established same-origin deployment, process count, cloud or 
 
 [ADR 0004](decisions/0004-repository-package-runtime-topology.md) accepts pnpm 11.22.0 through Corepack 0.35.0, one private workspace with explicit shared, web, server, and future-worker package ownership, one lockfile, strict dependency boundaries, and explicit production dependency closure. It implements nothing and does not prove package, build, SSR, hydration, worker, or runtime compatibility; process and deployment topology remain open.
 
-[ADR 0005](decisions/0005-backend-api-framework-and-contracts.md) accepts exactly `hono@4.13.3` with no Node adapter, a project-owned strict Node/Web bridge, a reserved `/api/v1` namespace with RFC 9457 problem contracts, bounded resource limits, and one Vite-owned development HMR `upgrade` listener on the shared project-owned server. It implements nothing, installs no dependency, and does not prove typecheck, build, SSR, HTTP, security, or runtime compatibility; ORM/migrations, identity, editor, worker, media, search, testing/CI, and deployment remain open.
+[ADR 0005](decisions/0005-backend-api-framework-and-contracts.md) accepts exactly `hono@4.13.3` with no Node adapter, a project-owned strict Node/Web bridge, a reserved `/api/v1` namespace with RFC 9457 problem contracts, bounded resource limits, and one Vite-owned development HMR `upgrade` listener on the shared project-owned server. It implements nothing, installs no dependency, and does not prove typecheck, build, SSR, HTTP, security, or runtime compatibility; identity, editor, worker, media, search, testing/CI, and deployment remain open.
+
+[ADR 0006](decisions/0006-orm-postgresql-migrations-and-schema-compatibility.md) accepts exactly `kysely@0.29.5`, `pg@8.23.0`, and `@types/pg@8.23.1` for a server-only PostgreSQL persistence boundary with one owned bounded pool per server runtime instance, a narrow operation-specific facade, project-owned cancellation through public Kysely extension interfaces, callback-only transactions, and a fail-closed digest-backed migration protocol whose initial operation catalog is empty. It also accepts expand/backfill/switch/contract schema evolution and bounded mutation-free readiness. It implements nothing, installs no dependency, and does not prove typecheck, pooling, queries, cancellation, transactions, migrations, PostgreSQL, security, or runtime compatibility; identity, editor, worker, media, resource/search/cache, testing/CI, and deployment remain open.
 
 ## Remaining ADR backlog
 
 Focused ADRs, based on current official primary sources at decision time, must decide:
 
-1. ORM and migration system;
-2. session, authentication, OAuth, and CSRF architecture;
-3. Tiptap document schema, versioning, and sanitization;
-4. worker, scheduler, and durable outbox architecture;
-5. search architecture;
-6. storage, CDN, and media architecture;
-7. testing and CI strategy; and
-8. deployment, isolation, backup, restore, and rollout model.
+1. session, authentication, OAuth, and CSRF architecture;
+2. Tiptap document schema, versioning, and sanitization;
+3. worker, scheduler, and durable outbox architecture;
+4. search architecture;
+5. storage, CDN, and media architecture;
+6. testing and CI strategy; and
+7. deployment, isolation, backup, restore, and rollout model.
